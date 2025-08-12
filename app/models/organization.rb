@@ -5,7 +5,7 @@ class Organization < ApplicationRecord
   # has_many :parts, foreign_key: :customer_id
   # has_many :customer_orders, foreign_key: :customer_id
   # has_many :works_orders, through: :customer_orders
-  # has_many :invoices, foreign_key: :customer_id
+  has_many :invoices, foreign_key: :customer_id, dependent: :restrict_with_error
 
   validates :name, presence: true
   validates :is_customer, inclusion: { in: [true, false] }

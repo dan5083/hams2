@@ -1,0 +1,171 @@
+class WorksOrder < ApplicationRecord
+  belongs_to :customer_order
+  belongs_to :part
+  belongs_to :release_level
+  belongs_to :transport_method
+  belongs_to :ppi, class_name: 'PartProcessingInstruction'
+
+  has_many :release_notes, dependent: :restrict_with_error
+
+  validates :part_number, presence: true
+  validates :part_issue, presence: true
+  validates :part_description, presence: true
+  validates :due_date, presence: true
+  validates :quantity, presence: true, numericality: { greater_than: 0 }
+  validates :quantity_released, presence: true, numericality: { greater_than_or_equal_to: 0 }
+  validates :lot_price, presence: true, numericality: { greater_than_or_equal_to: 0 }
+  validates :price_type, inclusion: { in: %w[each lot] }
+
+  scope :active, -> { where(voided: false) }
+  scope :voided, -> { where(voided: true) }
+  scope :open, -> { where(is_open: true) }
+  scope :closed, -> { where(is_open: false) }
+  scope :for_customer, ->(customer) { joins(:customer_order).where(customer_orders: { customer: customer }) }
+  scope :due_between, ->(start_date, end_date) { where(due_date: start_date..end_date) }
+  scope :requires_completion, -> { where(is_open: true).where('quantity_released >= quantity') }
+
+  before_validation :set_part_details_from_ppi, if: :ppi_changed?
+  before_validation :calculate_pricing, if: :pricing_fields_changed?
+  before_save :rebuild_customised_process, if: :ppi_changed?
+  after_initialize :set_defaults, if: :new_record?
+  after_create :assign_next_number
+
+  def display_name
+    "WO#{number} - #{part_number}"
+  end
+
+  # Delegate customer info to customer_order
+  def customer
+    customer_order.customer
+  end
+
+  def invoice_customer_name
+    customer_order.invoice_customer_name
+  end
+
+  def invoice_address
+    customer_order.invoice_address
+  end
+
+  def delivery_customer_name
+    customer_order.delivery_customer_name
+  end
+
+  def delivery_address
+    customer_order.delivery_address
+  end
+
+  # Delegate PPI info
+  def special_instructions
+    ppi&.special_instructions
+  end
+
+  def specification
+    ppi&.specification
+  end
+
+  def quantity_remaining
+    quantity - quantity_released
+  end
+
+  def requires_completion?
+    is_open && quantity_remaining <= 0
+  end
+
+  def void!
+    transaction do
+      if release_notes.active.exists?
+        raise StandardError, "Cannot void works order with active release notes"
+      end
+      update!(voided: true)
+    end
+  end
+
+  def complete!(user = nil)
+    transaction do
+      update!(is_open: false)
+      # Log completion if you have logging system
+    end
+  end
+
+  def can_be_completed?
+    is_open && quantity_remaining <= 0
+  end
+
+  def calculate_quantity_released!
+    total = release_notes.active.sum(:quantity_accepted)
+    update!(quantity_released: total)
+    total
+  end
+
+  def unit_price
+    return 0 if quantity.zero?
+    case price_type
+    when 'each'
+      each_price || 0
+    when 'lot'
+      lot_price / quantity
+    else
+      0
+    end
+  end
+
+  def rebuild_customised_process!
+    return unless ppi
+    self.customised_process_data = ppi.build_customised_process
+    save! if persisted?
+  end
+
+  def self.next_number
+    Sequence.next_value('works_order_number')
+  end
+
+  def can_be_deleted?
+    release_notes.empty?
+  end
+
+  private
+
+  def set_defaults
+    self.voided = false if voided.nil?
+    self.is_open = true if is_open.nil?
+    self.quantity_released = 0 if quantity_released.nil?
+    self.part_issue = 'A' if part_issue.blank?
+    self.price_type = 'each' if price_type.blank?
+    self.customised_process_data = {} if customised_process_data.blank?
+  end
+
+  def assign_next_number
+    self.number = self.class.next_number
+    save!
+  end
+
+  def set_part_details_from_ppi
+    return unless ppi
+
+    self.part = ppi.part
+    self.part_number = ppi.part_number
+    self.part_issue = ppi.part_issue
+    self.part_description = ppi.part_description
+  end
+
+  def pricing_fields_changed?
+    quantity_changed? || lot_price_changed? || each_price_changed? || price_type_changed?
+  end
+
+  def calculate_pricing
+    case price_type
+    when 'each'
+      if each_price.present? && quantity.present?
+        self.lot_price = each_price * quantity
+      end
+    when 'lot'
+      self.each_price = nil
+    end
+  end
+
+  def rebuild_customised_process
+    return unless ppi
+    self.customised_process_data = ppi.build_customised_process
+  end
+end

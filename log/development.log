@@ -1415,3 +1415,454 @@ Redirected to https://login.xero.com/identity/connect/authorize?response_type=co
 Completed 302 Found in 21ms (ActiveRecord: 0.5ms (1 query, 0 cached) | GC: 0.0ms)
 
 
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (1.6ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (2.8ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (2.6ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+Migrating to CreateInvoices (20250812121024)
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (61.6ms)[0m  [1m[35mCREATE TABLE "invoices" ("id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, "customer_id" uuid NOT NULL, "date" date DEFAULT CURRENT_DATE NOT NULL, "total_ex_tax" decimal(10,2) DEFAULT 0.0 NOT NULL, "total_tax" decimal(10,2) DEFAULT 0.0 NOT NULL, "total_inc_tax" decimal(10,2) DEFAULT 0.0 NOT NULL, "xero_tax_type" character varying NOT NULL, "tax_rate_pct" decimal(5,2) NOT NULL, "xero_id" character varying, "number" character varying, "xero_data" jsonb DEFAULT '{}', "last_synced_at" timestamp(6), "status" character varying DEFAULT 'draft', "voided" boolean DEFAULT FALSE, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL, CONSTRAINT "fk_rails_0d349e632f"
+FOREIGN KEY ("customer_id")
+  REFERENCES "organizations" ("id")
+) /*application='Hams2'*/[0m
+  [1m[35m (12.3ms)[0m  [1m[35mCREATE INDEX "index_invoices_on_customer_id" ON "invoices" ("customer_id") /*application='Hams2'*/[0m
+  [1m[35m (16.8ms)[0m  [1m[35mCREATE INDEX "index_invoices_on_customer_id" ON "invoices" ("customer_id") /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.4ms)[0m  [1m[31mROLLBACK /*application='Hams2'*/[0m
+  [1m[35m (0.6ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.9ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (0.3ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.7ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (0.8ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+Migrating to CreateInvoices (20250812121024)
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (48.3ms)[0m  [1m[35mCREATE TABLE "invoices" ("id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, "customer_id" uuid NOT NULL, "date" date DEFAULT CURRENT_DATE NOT NULL, "total_ex_tax" decimal(10,2) DEFAULT 0.0 NOT NULL, "total_tax" decimal(10,2) DEFAULT 0.0 NOT NULL, "total_inc_tax" decimal(10,2) DEFAULT 0.0 NOT NULL, "xero_tax_type" character varying NOT NULL, "tax_rate_pct" decimal(5,2) NOT NULL, "xero_id" character varying, "number" character varying, "xero_data" jsonb DEFAULT '{}', "last_synced_at" timestamp(6), "status" character varying DEFAULT 'draft', "voided" boolean DEFAULT FALSE, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL, CONSTRAINT "fk_rails_0d349e632f"
+FOREIGN KEY ("customer_id")
+  REFERENCES "organizations" ("id")
+) /*application='Hams2'*/[0m
+  [1m[35m (11.7ms)[0m  [1m[35mCREATE INDEX "index_invoices_on_customer_id" ON "invoices" ("customer_id") /*application='Hams2'*/[0m
+  [1m[35m (3.4ms)[0m  [1m[35mCREATE INDEX "index_invoices_on_customer_id" ON "invoices" ("customer_id") /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[31mROLLBACK /*application='Hams2'*/[0m
+  [1m[35m (0.3ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (16.9ms)[0m  [1m[31mDELETE FROM schema_migrations WHERE version = '20250812121024' /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (0.3ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.9ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (1.0ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+Migrating to CreateInvoices (20250812121024)
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (46.5ms)[0m  [1m[35mCREATE TABLE "invoices" ("id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, "customer_id" uuid NOT NULL, "date" date DEFAULT CURRENT_DATE NOT NULL, "total_ex_tax" decimal(10,2) DEFAULT 0.0 NOT NULL, "total_tax" decimal(10,2) DEFAULT 0.0 NOT NULL, "total_inc_tax" decimal(10,2) DEFAULT 0.0 NOT NULL, "xero_tax_type" character varying NOT NULL, "tax_rate_pct" decimal(5,2) NOT NULL, "xero_id" character varying, "number" character varying, "xero_data" jsonb DEFAULT '{}', "last_synced_at" timestamp(6), "status" character varying DEFAULT 'draft', "voided" boolean DEFAULT FALSE, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL, CONSTRAINT "fk_rails_0d349e632f"
+FOREIGN KEY ("customer_id")
+  REFERENCES "organizations" ("id")
+) /*application='Hams2'*/[0m
+  [1m[35m (17.3ms)[0m  [1m[35mCREATE INDEX "index_invoices_on_customer_id" ON "invoices" ("customer_id") /*application='Hams2'*/[0m
+  [1m[35m (10.2ms)[0m  [1m[35mCREATE INDEX "index_invoices_on_customer_id" ON "invoices" ("customer_id") /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.7ms)[0m  [1m[31mROLLBACK /*application='Hams2'*/[0m
+  [1m[35m (0.8ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (24.9ms)[0m  [1m[31mDELETE FROM schema_migrations WHERE version = '20250812121024' /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (0.3ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.8ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (0.8ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+Migrating to CreateInvoices (20250812121024)
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (31.4ms)[0m  [1m[35mCREATE TABLE "invoices" ("id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, "customer_id" uuid NOT NULL, "date" date DEFAULT CURRENT_DATE NOT NULL, "total_ex_tax" decimal(10,2) DEFAULT 0.0 NOT NULL, "total_tax" decimal(10,2) DEFAULT 0.0 NOT NULL, "total_inc_tax" decimal(10,2) DEFAULT 0.0 NOT NULL, "xero_tax_type" character varying NOT NULL, "tax_rate_pct" decimal(5,2) NOT NULL, "xero_id" character varying, "number" character varying, "xero_data" jsonb DEFAULT '{}', "last_synced_at" timestamp(6), "status" character varying DEFAULT 'draft', "voided" boolean DEFAULT FALSE, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL, CONSTRAINT "fk_rails_0d349e632f"
+FOREIGN KEY ("customer_id")
+  REFERENCES "organizations" ("id")
+) /*application='Hams2'*/[0m
+  [1m[35m (10.5ms)[0m  [1m[35mCREATE INDEX "index_invoices_on_customer_id" ON "invoices" ("customer_id") /*application='Hams2'*/[0m
+  [1m[35m (12.5ms)[0m  [1m[35mCREATE UNIQUE INDEX "index_invoices_on_xero_id" ON "invoices" ("xero_id") WHERE xero_id IS NOT NULL /*application='Hams2'*/[0m
+  [1m[35m (9.6ms)[0m  [1m[35mCREATE UNIQUE INDEX "index_invoices_on_number" ON "invoices" ("number") WHERE number IS NOT NULL /*application='Hams2'*/[0m
+  [1m[35m (10.9ms)[0m  [1m[35mCREATE INDEX "index_invoices_on_date" ON "invoices" ("date") /*application='Hams2'*/[0m
+  [1m[35m (11.5ms)[0m  [1m[35mCREATE INDEX "index_invoices_on_status" ON "invoices" ("status") /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Create (0.5ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES ('20250812121024') RETURNING "version" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+Migrating to CreateInvoiceItems (20250812121026)
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (32.7ms)[0m  [1m[35mCREATE TABLE "invoice_items" ("id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, "invoice_id" uuid NOT NULL, "release_note_id" uuid, "additional_charge_id" uuid, "kind" character varying NOT NULL, "quantity" integer NOT NULL, "description" text NOT NULL, "line_amount_ex_tax" decimal(10,2) NOT NULL, "line_amount_tax" decimal(10,2) NOT NULL, "line_amount_inc_tax" decimal(10,2) NOT NULL, "position" integer DEFAULT 0 NOT NULL, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL, CONSTRAINT "fk_rails_25bf3d2c5e"
+FOREIGN KEY ("invoice_id")
+  REFERENCES "invoices" ("id")
+) /*application='Hams2'*/[0m
+  [1m[35m (9.1ms)[0m  [1m[35mCREATE INDEX "index_invoice_items_on_invoice_id" ON "invoice_items" ("invoice_id") /*application='Hams2'*/[0m
+  [1m[35m (9.5ms)[0m  [1m[35mCREATE INDEX "index_invoice_items_on_invoice_id_and_position" ON "invoice_items" ("invoice_id", "position") /*application='Hams2'*/[0m
+  [1m[35m (15.5ms)[0m  [1m[35mCREATE INDEX "index_invoice_items_on_release_note_id" ON "invoice_items" ("release_note_id") /*application='Hams2'*/[0m
+  [1m[35m (9.9ms)[0m  [1m[35mCREATE INDEX "index_invoice_items_on_kind" ON "invoice_items" ("kind") /*application='Hams2'*/[0m
+  [1m[35m (4.1ms)[0m  [1m[35m      ALTER TABLE invoice_items
+      ADD CONSTRAINT check_positive_amounts
+      CHECK (line_amount_ex_tax >= 0 AND line_amount_tax >= 0 AND line_amount_inc_tax >= 0);
+ /*application='Hams2'*/[0m
+  [1m[35m (0.9ms)[0m  [1m[35m      ALTER TABLE invoice_items
+      ADD CONSTRAINT check_positive_quantity
+      CHECK (quantity > 0);
+ /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Create (0.5ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES ('20250812121026') RETURNING "version" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.1ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+Migrating to CreateParts (20250812123824)
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (22.4ms)[0m  [1m[35mCREATE TABLE "parts" ("id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, "customer_id" uuid NOT NULL, "uniform_part_number" character varying NOT NULL, "uniform_part_issue" character varying DEFAULT 'A' NOT NULL, "description" character varying, "material" character varying, "specification" text, "notes" text, "enabled" boolean DEFAULT TRUE NOT NULL, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL, CONSTRAINT "fk_rails_09daf822d6"
+FOREIGN KEY ("customer_id")
+  REFERENCES "organizations" ("id")
+) /*application='Hams2'*/[0m
+  [1m[35m (10.3ms)[0m  [1m[35mCREATE INDEX "index_parts_on_customer_id" ON "parts" ("customer_id") /*application='Hams2'*/[0m
+  [1m[35m (9.6ms)[0m  [1m[35mCREATE UNIQUE INDEX "index_parts_on_customer_and_part_number_and_issue" ON "parts" ("customer_id", "uniform_part_number", "uniform_part_issue") /*application='Hams2'*/[0m
+  [1m[35m (9.4ms)[0m  [1m[35mCREATE INDEX "index_parts_on_uniform_part_number" ON "parts" ("uniform_part_number") /*application='Hams2'*/[0m
+  [1m[35m (9.8ms)[0m  [1m[35mCREATE INDEX "index_parts_on_enabled" ON "parts" ("enabled") /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Create (0.4ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES ('20250812123824') RETURNING "version" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (6.4ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+Migrating to CreateProcessGenerators (20250812123958)
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (22.7ms)[0m  [1m[35mCREATE TABLE "process_generators" ("id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, "name" character varying NOT NULL, "description" text, "enabled" boolean DEFAULT TRUE NOT NULL, "process_data" jsonb DEFAULT '{}', "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL) /*application='Hams2'*/[0m
+  [1m[35m (10.0ms)[0m  [1m[35mCREATE INDEX "index_process_generators_on_name" ON "process_generators" ("name") /*application='Hams2'*/[0m
+  [1m[35m (11.5ms)[0m  [1m[35mCREATE INDEX "index_process_generators_on_enabled" ON "process_generators" ("enabled") /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Create (0.4ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES ('20250812123958') RETURNING "version" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.8ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+Migrating to CreatePartProcessingInstructions (20250812124247)
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (25.5ms)[0m  [1m[35mCREATE TABLE "part_processing_instructions" ("id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, "part_id" uuid NOT NULL, "customer_id" uuid NOT NULL, "process_generator_id" uuid NOT NULL, "part_number" character varying NOT NULL, "part_issue" character varying NOT NULL, "part_description" character varying, "specification" text, "special_instructions" text, "customisation_data" jsonb DEFAULT '{}', "enabled" boolean DEFAULT TRUE NOT NULL, "replaces_id" uuid, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL, CONSTRAINT "fk_rails_e3df5c538a"
+FOREIGN KEY ("part_id")
+  REFERENCES "parts" ("id")
+, CONSTRAINT "fk_rails_d3711e18db"
+FOREIGN KEY ("customer_id")
+  REFERENCES "organizations" ("id")
+, CONSTRAINT "fk_rails_f510790d3e"
+FOREIGN KEY ("process_generator_id")
+  REFERENCES "process_generators" ("id")
+, CONSTRAINT "fk_rails_18af2a4392"
+FOREIGN KEY ("replaces_id")
+  REFERENCES "part_processing_instructions" ("id")
+) /*application='Hams2'*/[0m
+  [1m[35m (11.0ms)[0m  [1m[35mCREATE INDEX "index_part_processing_instructions_on_part_id" ON "part_processing_instructions" ("part_id") /*application='Hams2'*/[0m
+  [1m[35m (10.0ms)[0m  [1m[35mCREATE INDEX "index_part_processing_instructions_on_customer_id" ON "part_processing_instructions" ("customer_id") /*application='Hams2'*/[0m
+  [1m[35m (11.4ms)[0m  [1m[35mCREATE INDEX "index_part_processing_instructions_on_process_generator_id" ON "part_processing_instructions" ("process_generator_id") /*application='Hams2'*/[0m
+  [1m[35m (9.5ms)[0m  [1m[35mCREATE INDEX "index_part_processing_instructions_on_replaces_id" ON "part_processing_instructions" ("replaces_id") /*application='Hams2'*/[0m
+  [1m[35m (3.0ms)[0m  [1m[35mCREATE INDEX "index_part_processing_instructions_on_part_id" ON "part_processing_instructions" ("part_id") /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[31mROLLBACK /*application='Hams2'*/[0m
+  [1m[35m (0.3ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (48.6ms)[0m  [1m[31mDELETE FROM schema_migrations WHERE version = '20250812124247' /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (1.2ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.9ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (0.9ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+Migrating to CreatePartProcessingInstructions (20250812124247)
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (45.7ms)[0m  [1m[35mCREATE TABLE "part_processing_instructions" ("id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, "part_id" uuid NOT NULL, "customer_id" uuid NOT NULL, "process_generator_id" uuid NOT NULL, "part_number" character varying NOT NULL, "part_issue" character varying NOT NULL, "part_description" character varying, "specification" text, "special_instructions" text, "customisation_data" jsonb DEFAULT '{}', "enabled" boolean DEFAULT TRUE NOT NULL, "replaces_id" uuid, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL, CONSTRAINT "fk_rails_e3df5c538a"
+FOREIGN KEY ("part_id")
+  REFERENCES "parts" ("id")
+, CONSTRAINT "fk_rails_d3711e18db"
+FOREIGN KEY ("customer_id")
+  REFERENCES "organizations" ("id")
+, CONSTRAINT "fk_rails_f510790d3e"
+FOREIGN KEY ("process_generator_id")
+  REFERENCES "process_generators" ("id")
+, CONSTRAINT "fk_rails_18af2a4392"
+FOREIGN KEY ("replaces_id")
+  REFERENCES "part_processing_instructions" ("id")
+) /*application='Hams2'*/[0m
+  [1m[35m (9.4ms)[0m  [1m[35mCREATE INDEX "index_part_processing_instructions_on_part_id" ON "part_processing_instructions" ("part_id") /*application='Hams2'*/[0m
+  [1m[35m (9.3ms)[0m  [1m[35mCREATE INDEX "index_part_processing_instructions_on_customer_id" ON "part_processing_instructions" ("customer_id") /*application='Hams2'*/[0m
+  [1m[35m (11.8ms)[0m  [1m[35mCREATE INDEX "index_part_processing_instructions_on_process_generator_id" ON "part_processing_instructions" ("process_generator_id") /*application='Hams2'*/[0m
+  [1m[35m (12.7ms)[0m  [1m[35mCREATE INDEX "index_part_processing_instructions_on_replaces_id" ON "part_processing_instructions" ("replaces_id") /*application='Hams2'*/[0m
+  [1m[35m (11.6ms)[0m  [1m[35mCREATE INDEX "index_part_processing_instructions_on_enabled" ON "part_processing_instructions" ("enabled") /*application='Hams2'*/[0m
+  [1m[35m (12.0ms)[0m  [1m[35mCREATE INDEX "idx_on_part_number_part_issue_8bf19b3883" ON "part_processing_instructions" ("part_number", "part_issue") /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Create (0.5ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES ('20250812124247') RETURNING "version" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (6.2ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+Migrating to CreateCustomerOrders (20250812124249)
+  [1m[36mTRANSACTION (0.4ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (22.7ms)[0m  [1m[35mCREATE TABLE "customer_orders" ("id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, "customer_id" uuid NOT NULL, "number" character varying NOT NULL, "date_received" date NOT NULL, "requested_delivery_date" date, "voided" boolean DEFAULT FALSE NOT NULL, "notes" text, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL, CONSTRAINT "fk_rails_13f33fda6c"
+FOREIGN KEY ("customer_id")
+  REFERENCES "organizations" ("id")
+) /*application='Hams2'*/[0m
+  [1m[35m (10.1ms)[0m  [1m[35mCREATE INDEX "index_customer_orders_on_customer_id" ON "customer_orders" ("customer_id") /*application='Hams2'*/[0m
+  [1m[35m (5.6ms)[0m  [1m[35mCREATE INDEX "index_customer_orders_on_customer_id" ON "customer_orders" ("customer_id") /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[31mROLLBACK /*application='Hams2'*/[0m
+  [1m[35m (0.4ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (19.5ms)[0m  [1m[31mDELETE FROM schema_migrations WHERE version = '20250812124249' /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (0.3ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.8ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (0.7ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+Migrating to CreateCustomerOrders (20250812124249)
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (54.6ms)[0m  [1m[35mCREATE TABLE "customer_orders" ("id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, "customer_id" uuid NOT NULL, "number" character varying NOT NULL, "date_received" date NOT NULL, "requested_delivery_date" date, "voided" boolean DEFAULT FALSE NOT NULL, "notes" text, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL, CONSTRAINT "fk_rails_13f33fda6c"
+FOREIGN KEY ("customer_id")
+  REFERENCES "organizations" ("id")
+) /*application='Hams2'*/[0m
+  [1m[35m (9.3ms)[0m  [1m[35mCREATE INDEX "index_customer_orders_on_customer_id" ON "customer_orders" ("customer_id") /*application='Hams2'*/[0m
+  [1m[35m (9.0ms)[0m  [1m[35mCREATE INDEX "index_customer_orders_on_number" ON "customer_orders" ("number") /*application='Hams2'*/[0m
+  [1m[35m (9.6ms)[0m  [1m[35mCREATE INDEX "index_customer_orders_on_date_received" ON "customer_orders" ("date_received") /*application='Hams2'*/[0m
+  [1m[35m (10.1ms)[0m  [1m[35mCREATE INDEX "index_customer_orders_on_voided" ON "customer_orders" ("voided") /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Create (0.3ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES ('20250812124249') RETURNING "version" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.5ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+Migrating to CreateReleaseLevels (20250812124251)
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (21.1ms)[0m  [1m[35mCREATE TABLE "release_levels" ("id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, "name" character varying NOT NULL, "statement" text NOT NULL, "enabled" boolean DEFAULT TRUE NOT NULL, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL) /*application='Hams2'*/[0m
+  [1m[35m (11.9ms)[0m  [1m[35mCREATE UNIQUE INDEX "index_release_levels_on_name" ON "release_levels" ("name") /*application='Hams2'*/[0m
+  [1m[35m (36.5ms)[0m  [1m[35mCREATE INDEX "index_release_levels_on_enabled" ON "release_levels" ("enabled") /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Create (0.3ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES ('20250812124251') RETURNING "version" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (28.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+Migrating to CreateTransportMethods (20250812124252)
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (23.1ms)[0m  [1m[35mCREATE TABLE "transport_methods" ("id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, "name" character varying NOT NULL, "enabled" boolean DEFAULT TRUE NOT NULL, "description" text, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL) /*application='Hams2'*/[0m
+  [1m[35m (35.0ms)[0m  [1m[35mCREATE UNIQUE INDEX "index_transport_methods_on_name" ON "transport_methods" ("name") /*application='Hams2'*/[0m
+  [1m[35m (34.3ms)[0m  [1m[35mCREATE INDEX "index_transport_methods_on_enabled" ON "transport_methods" ("enabled") /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Create (0.4ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES ('20250812124252') RETURNING "version" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (24.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+Migrating to CreateWorksOrders (20250812124902)
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (30.5ms)[0m  [1m[35mCREATE TABLE "works_orders" ("id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, "number" integer NOT NULL, "customer_order_id" uuid NOT NULL, "part_id" uuid NOT NULL, "part_processing_instruction_id" uuid NOT NULL, "release_level_id" uuid NOT NULL, "transport_method_id" uuid NOT NULL, "customer_order_line" character varying, "part_number" character varying NOT NULL, "part_issue" character varying NOT NULL, "part_description" character varying NOT NULL, "quantity" integer NOT NULL, "quantity_released" integer DEFAULT 0 NOT NULL, "due_date" date NOT NULL, "is_open" boolean DEFAULT TRUE NOT NULL, "voided" boolean DEFAULT FALSE NOT NULL, "lot_price" decimal(10,2) NOT NULL, "price_type" character varying NOT NULL, "each_price" decimal(10,2), "material" character varying, "batch" character varying, "customised_process_data" jsonb DEFAULT '{}', "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL, CONSTRAINT "fk_rails_a071298a39"
+FOREIGN KEY ("customer_order_id")
+  REFERENCES "customer_orders" ("id")
+, CONSTRAINT "fk_rails_53a91737b3"
+FOREIGN KEY ("part_id")
+  REFERENCES "parts" ("id")
+, CONSTRAINT "fk_rails_347a85ef9c"
+FOREIGN KEY ("part_processing_instruction_id")
+  REFERENCES "part_processing_instructions" ("id")
+, CONSTRAINT "fk_rails_3a9bda734d"
+FOREIGN KEY ("release_level_id")
+  REFERENCES "release_levels" ("id")
+, CONSTRAINT "fk_rails_c31c0198d9"
+FOREIGN KEY ("transport_method_id")
+  REFERENCES "transport_methods" ("id")
+) /*application='Hams2'*/[0m
+  [1m[35m (9.2ms)[0m  [1m[35mCREATE INDEX "index_works_orders_on_customer_order_id" ON "works_orders" ("customer_order_id") /*application='Hams2'*/[0m
+  [1m[35m (9.9ms)[0m  [1m[35mCREATE INDEX "index_works_orders_on_part_id" ON "works_orders" ("part_id") /*application='Hams2'*/[0m
+  [1m[35m (9.9ms)[0m  [1m[35mCREATE INDEX "index_works_orders_on_ppi_id" ON "works_orders" ("part_processing_instruction_id") /*application='Hams2'*/[0m
+  [1m[35m (10.0ms)[0m  [1m[35mCREATE INDEX "index_works_orders_on_release_level_id" ON "works_orders" ("release_level_id") /*application='Hams2'*/[0m
+  [1m[35m (8.6ms)[0m  [1m[35mCREATE INDEX "index_works_orders_on_transport_method_id" ON "works_orders" ("transport_method_id") /*application='Hams2'*/[0m
+  [1m[35m (10.1ms)[0m  [1m[35mCREATE UNIQUE INDEX "index_works_orders_on_number" ON "works_orders" ("number") /*application='Hams2'*/[0m
+  [1m[35m (1.7ms)[0m  [1m[35mCREATE INDEX "index_works_orders_on_customer_order_id" ON "works_orders" ("customer_order_id") /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.4ms)[0m  [1m[31mROLLBACK /*application='Hams2'*/[0m
+  [1m[35m (0.4ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (13.2ms)[0m  [1m[31mDELETE FROM schema_migrations WHERE version = '20250812124902' /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (0.3ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.6ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (0.6ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+Migrating to CreateWorksOrders (20250812124902)
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (28.7ms)[0m  [1m[35mCREATE TABLE "works_orders" ("id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, "number" integer NOT NULL, "customer_order_id" uuid NOT NULL, "part_id" uuid NOT NULL, "part_processing_instruction_id" uuid NOT NULL, "release_level_id" uuid NOT NULL, "transport_method_id" uuid NOT NULL, "customer_order_line" character varying, "part_number" character varying NOT NULL, "part_issue" character varying NOT NULL, "part_description" character varying NOT NULL, "quantity" integer NOT NULL, "quantity_released" integer DEFAULT 0 NOT NULL, "due_date" date NOT NULL, "is_open" boolean DEFAULT TRUE NOT NULL, "voided" boolean DEFAULT FALSE NOT NULL, "lot_price" decimal(10,2) NOT NULL, "price_type" character varying NOT NULL, "each_price" decimal(10,2), "material" character varying, "batch" character varying, "customised_process_data" jsonb DEFAULT '{}', "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL, CONSTRAINT "fk_rails_a071298a39"
+FOREIGN KEY ("customer_order_id")
+  REFERENCES "customer_orders" ("id")
+, CONSTRAINT "fk_rails_53a91737b3"
+FOREIGN KEY ("part_id")
+  REFERENCES "parts" ("id")
+, CONSTRAINT "fk_rails_347a85ef9c"
+FOREIGN KEY ("part_processing_instruction_id")
+  REFERENCES "part_processing_instructions" ("id")
+, CONSTRAINT "fk_rails_3a9bda734d"
+FOREIGN KEY ("release_level_id")
+  REFERENCES "release_levels" ("id")
+, CONSTRAINT "fk_rails_c31c0198d9"
+FOREIGN KEY ("transport_method_id")
+  REFERENCES "transport_methods" ("id")
+) /*application='Hams2'*/[0m
+  [1m[35m (9.7ms)[0m  [1m[35mCREATE INDEX "index_works_orders_on_customer_order_id" ON "works_orders" ("customer_order_id") /*application='Hams2'*/[0m
+  [1m[35m (11.6ms)[0m  [1m[35mCREATE INDEX "index_works_orders_on_part_id" ON "works_orders" ("part_id") /*application='Hams2'*/[0m
+  [1m[35m (9.8ms)[0m  [1m[35mCREATE INDEX "index_works_orders_on_ppi_id" ON "works_orders" ("part_processing_instruction_id") /*application='Hams2'*/[0m
+  [1m[35m (11.9ms)[0m  [1m[35mCREATE INDEX "index_works_orders_on_release_level_id" ON "works_orders" ("release_level_id") /*application='Hams2'*/[0m
+  [1m[35m (9.1ms)[0m  [1m[35mCREATE INDEX "index_works_orders_on_transport_method_id" ON "works_orders" ("transport_method_id") /*application='Hams2'*/[0m
+  [1m[35m (10.2ms)[0m  [1m[35mCREATE UNIQUE INDEX "index_works_orders_on_number" ON "works_orders" ("number") /*application='Hams2'*/[0m
+  [1m[35m (12.4ms)[0m  [1m[35mCREATE INDEX "index_works_orders_on_due_date" ON "works_orders" ("due_date") /*application='Hams2'*/[0m
+  [1m[35m (11.9ms)[0m  [1m[35mCREATE INDEX "index_works_orders_on_is_open" ON "works_orders" ("is_open") /*application='Hams2'*/[0m
+  [1m[35m (12.0ms)[0m  [1m[35mCREATE INDEX "index_works_orders_on_voided" ON "works_orders" ("voided") /*application='Hams2'*/[0m
+  [1m[35m (12.7ms)[0m  [1m[35mCREATE INDEX "index_works_orders_on_part_number_and_part_issue" ON "works_orders" ("part_number", "part_issue") /*application='Hams2'*/[0m
+  [1m[35m (1.1ms)[0m  [1m[35m      ALTER TABLE works_orders
+      ADD CONSTRAINT check_positive_quantities
+      CHECK (quantity > 0 AND quantity_released >= 0 AND quantity_released <= quantity);
+ /*application='Hams2'*/[0m
+  [1m[35m (1.2ms)[0m  [1m[35m      ALTER TABLE works_orders
+      ADD CONSTRAINT check_positive_prices
+      CHECK (lot_price >= 0 AND (each_price IS NULL OR each_price >= 0));
+ /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Create (0.6ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES ('20250812124902') RETURNING "version" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (6.1ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+Migrating to CreateReleaseNotes (20250812124904)
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (23.7ms)[0m  [1m[35mCREATE TABLE "release_notes" ("id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, "number" integer NOT NULL, "works_order_id" uuid NOT NULL, "issued_by_id" uuid NOT NULL, "date" date NOT NULL, "quantity_accepted" integer DEFAULT 0 NOT NULL, "quantity_rejected" integer DEFAULT 0 NOT NULL, "remarks" text, "no_invoice" boolean DEFAULT FALSE NOT NULL, "voided" boolean DEFAULT FALSE NOT NULL, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL, CONSTRAINT "fk_rails_294f65a5ac"
+FOREIGN KEY ("works_order_id")
+  REFERENCES "works_orders" ("id")
+, CONSTRAINT "fk_rails_7781e1a309"
+FOREIGN KEY ("issued_by_id")
+  REFERENCES "users" ("id")
+) /*application='Hams2'*/[0m
+  [1m[35m (9.5ms)[0m  [1m[35mCREATE INDEX "index_release_notes_on_works_order_id" ON "release_notes" ("works_order_id") /*application='Hams2'*/[0m
+  [1m[35m (10.7ms)[0m  [1m[35mCREATE INDEX "index_release_notes_on_issued_by_id" ON "release_notes" ("issued_by_id") /*application='Hams2'*/[0m
+  [1m[35m (9.5ms)[0m  [1m[35mCREATE UNIQUE INDEX "index_release_notes_on_number" ON "release_notes" ("number") /*application='Hams2'*/[0m
+  [1m[35m (1.7ms)[0m  [1m[35mCREATE INDEX "index_release_notes_on_works_order_id" ON "release_notes" ("works_order_id") /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[31mROLLBACK /*application='Hams2'*/[0m
+  [1m[35m (0.4ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (18.0ms)[0m  [1m[31mDELETE FROM schema_migrations WHERE version = '20250812124904' /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (0.3ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.7ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (0.7ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+Migrating to CreateReleaseNotes (20250812124904)
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (26.2ms)[0m  [1m[35mCREATE TABLE "release_notes" ("id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, "number" integer NOT NULL, "works_order_id" uuid NOT NULL, "issued_by_id" uuid NOT NULL, "date" date NOT NULL, "quantity_accepted" integer DEFAULT 0 NOT NULL, "quantity_rejected" integer DEFAULT 0 NOT NULL, "remarks" text, "no_invoice" boolean DEFAULT FALSE NOT NULL, "voided" boolean DEFAULT FALSE NOT NULL, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL, CONSTRAINT "fk_rails_294f65a5ac"
+FOREIGN KEY ("works_order_id")
+  REFERENCES "works_orders" ("id")
+, CONSTRAINT "fk_rails_7781e1a309"
+FOREIGN KEY ("issued_by_id")
+  REFERENCES "users" ("id")
+) /*application='Hams2'*/[0m
+  [1m[35m (9.8ms)[0m  [1m[35mCREATE INDEX "index_release_notes_on_works_order_id" ON "release_notes" ("works_order_id") /*application='Hams2'*/[0m
+  [1m[35m (9.7ms)[0m  [1m[35mCREATE INDEX "index_release_notes_on_issued_by_id" ON "release_notes" ("issued_by_id") /*application='Hams2'*/[0m
+  [1m[35m (9.0ms)[0m  [1m[35mCREATE UNIQUE INDEX "index_release_notes_on_number" ON "release_notes" ("number") /*application='Hams2'*/[0m
+  [1m[35m (9.7ms)[0m  [1m[35mCREATE INDEX "index_release_notes_on_date" ON "release_notes" ("date") /*application='Hams2'*/[0m
+  [1m[35m (15.2ms)[0m  [1m[35mCREATE INDEX "index_release_notes_on_voided" ON "release_notes" ("voided") /*application='Hams2'*/[0m
+  [1m[35m (14.6ms)[0m  [1m[35mCREATE INDEX "index_release_notes_on_no_invoice" ON "release_notes" ("no_invoice") /*application='Hams2'*/[0m
+  [1m[35m (0.6ms)[0m  [1m[35m      ALTER TABLE release_notes
+      ADD CONSTRAINT check_positive_quantities
+      CHECK (quantity_accepted >= 0 AND quantity_rejected >= 0);
+ /*application='Hams2'*/[0m
+  [1m[35m (0.8ms)[0m  [1m[35m      ALTER TABLE release_notes
+      ADD CONSTRAINT check_has_quantity
+      CHECK (quantity_accepted > 0 OR quantity_rejected > 0);
+ /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Create (0.3ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES ('20250812124904') RETURNING "version" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.5ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+Migrating to CreateSequences (20250812124905)
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (20.4ms)[0m  [1m[35mCREATE TABLE "sequences" ("id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, "key" character varying NOT NULL, "value" integer DEFAULT 1 NOT NULL, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL) /*application='Hams2'*/[0m
+  [1m[35m (9.8ms)[0m  [1m[35mCREATE UNIQUE INDEX "index_sequences_on_key" ON "sequences" ("key") /*application='Hams2'*/[0m
+  [1m[35m (2.3ms)[0m  [1m[32m          INSERT INTO sequences (id, key, value, created_at, updated_at)
+          VALUES
+            (gen_random_uuid(), 'works_order_number', 1000, NOW(), NOW()),
+            (gen_random_uuid(), 'release_note_number', 1000, NOW(), NOW());
+ /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Create (0.4ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES ('20250812124905') RETURNING "version" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (4.8ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+Migrating to UpdateInvoiceItemsForReleaseNotes (20250812124907)
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (12.6ms)[0m  [1m[35mALTER TABLE "invoice_items" ADD CONSTRAINT "fk_rails_1f53a429b7"
+FOREIGN KEY ("release_note_id")
+  REFERENCES "release_notes" ("id")
+ /*application='Hams2'*/[0m
+  [1m[35m (4.3ms)[0m  [1m[35mCREATE INDEX "index_invoice_items_on_release_note_id" ON "invoice_items" ("release_note_id") /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[31mROLLBACK /*application='Hams2'*/[0m
+  [1m[35m (0.3ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (19.3ms)[0m  [1m[31mDELETE FROM schema_migrations WHERE version = '20250812124907' /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (0.3ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.7ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (0.7ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+Migrating to UpdateInvoiceItemsForReleaseNotes (20250812124907)
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (27.2ms)[0m  [1m[35mALTER TABLE "invoice_items" ADD CONSTRAINT "fk_rails_1f53a429b7"
+FOREIGN KEY ("release_note_id")
+  REFERENCES "release_notes" ("id")
+ /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Create (0.3ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES ('20250812124907') RETURNING "version" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (7.5ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[35m (0.4ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.3ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (1.5ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (2.5ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (2.2ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+Migrating to DropProcessGenerators (20250812140605)
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (33.8ms)[0m  [1m[35mDROP TABLE "process_templates" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.4ms)[0m  [1m[31mROLLBACK /*application='Hams2'*/[0m
+  [1m[35m (0.6ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (0.3ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.7ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (0.8ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+Migrating to DropProcessGenerators (20250812140605)
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (31.9ms)[0m  [1m[35mDROP TABLE "process_generators" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[31mROLLBACK /*application='Hams2'*/[0m
+  [1m[35m (0.4ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (1.2ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (1.9ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (0.8ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+Migrating to DropProcessGenerators (20250812140605)
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (30.1ms)[0m  [1m[35mALTER TABLE "part_processing_instructions" DROP CONSTRAINT "fk_rails_f510790d3e" /*application='Hams2'*/[0m
+  [1m[35m (3.9ms)[0m  [1m[35mALTER TABLE "part_processing_instructions" DROP COLUMN "process_template_id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[31mROLLBACK /*application='Hams2'*/[0m
+  [1m[35m (0.3ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (1.2ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (2.0ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (0.7ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+Migrating to DropProcessGenerators (20250812140605)
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (26.9ms)[0m  [1m[35mALTER TABLE "part_processing_instructions" DROP CONSTRAINT "fk_rails_f510790d3e" /*application='Hams2'*/[0m
+  [1m[35m (1.7ms)[0m  [1m[35mALTER TABLE "part_processing_instructions" DROP COLUMN "process_generator_id" /*application='Hams2'*/[0m
+  [1m[35m (1.5ms)[0m  [1m[35mALTER TABLE "part_processing_instructions" ADD "process_type" character varying /*application='Hams2'*/[0m
+  [1m[35m (2.5ms)[0m  [1m[35mDROP TABLE "process_generators" /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Create (0.8ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES ('20250812140605') RETURNING "version" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (14.2ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[35m (0.5ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.2ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m

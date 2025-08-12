@@ -10,10 +10,69 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_12_072440) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_12_140605) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
+
+  create_table "customer_orders", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "customer_id", null: false
+    t.string "number", null: false
+    t.date "date_received", null: false
+    t.date "requested_delivery_date"
+    t.boolean "voided", default: false, null: false
+    t.text "notes"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["customer_id"], name: "index_customer_orders_on_customer_id"
+    t.index ["date_received"], name: "index_customer_orders_on_date_received"
+    t.index ["number"], name: "index_customer_orders_on_number"
+    t.index ["voided"], name: "index_customer_orders_on_voided"
+  end
+
+  create_table "invoice_items", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "invoice_id", null: false
+    t.uuid "release_note_id"
+    t.uuid "additional_charge_id"
+    t.string "kind", null: false
+    t.integer "quantity", null: false
+    t.text "description", null: false
+    t.decimal "line_amount_ex_tax", precision: 10, scale: 2, null: false
+    t.decimal "line_amount_tax", precision: 10, scale: 2, null: false
+    t.decimal "line_amount_inc_tax", precision: 10, scale: 2, null: false
+    t.integer "position", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["invoice_id", "position"], name: "index_invoice_items_on_invoice_id_and_position"
+    t.index ["invoice_id"], name: "index_invoice_items_on_invoice_id"
+    t.index ["kind"], name: "index_invoice_items_on_kind"
+    t.index ["release_note_id"], name: "index_invoice_items_on_release_note_id"
+    t.check_constraint "line_amount_ex_tax >= 0::numeric AND line_amount_tax >= 0::numeric AND line_amount_inc_tax >= 0::numeric", name: "check_positive_amounts"
+    t.check_constraint "quantity > 0", name: "check_positive_quantity"
+  end
+
+  create_table "invoices", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "customer_id", null: false
+    t.date "date", default: -> { "CURRENT_DATE" }, null: false
+    t.decimal "total_ex_tax", precision: 10, scale: 2, default: "0.0", null: false
+    t.decimal "total_tax", precision: 10, scale: 2, default: "0.0", null: false
+    t.decimal "total_inc_tax", precision: 10, scale: 2, default: "0.0", null: false
+    t.string "xero_tax_type", null: false
+    t.decimal "tax_rate_pct", precision: 5, scale: 2, null: false
+    t.string "xero_id"
+    t.string "number"
+    t.jsonb "xero_data", default: {}
+    t.datetime "last_synced_at"
+    t.string "status", default: "draft"
+    t.boolean "voided", default: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["customer_id"], name: "index_invoices_on_customer_id"
+    t.index ["date"], name: "index_invoices_on_date"
+    t.index ["number"], name: "index_invoices_on_number", unique: true, where: "(number IS NOT NULL)"
+    t.index ["status"], name: "index_invoices_on_status"
+    t.index ["xero_id"], name: "index_invoices_on_xero_id", unique: true, where: "(xero_id IS NOT NULL)"
+  end
 
   create_table "organizations", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "name"
@@ -26,6 +85,84 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_12_072440) do
     t.index ["xero_contact_id"], name: "index_organizations_on_xero_contact_id"
   end
 
+  create_table "part_processing_instructions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "part_id", null: false
+    t.uuid "customer_id", null: false
+    t.string "part_number", null: false
+    t.string "part_issue", null: false
+    t.string "part_description"
+    t.text "specification"
+    t.text "special_instructions"
+    t.jsonb "customisation_data", default: {}
+    t.boolean "enabled", default: true, null: false
+    t.uuid "replaces_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "process_type"
+    t.index ["customer_id"], name: "index_part_processing_instructions_on_customer_id"
+    t.index ["enabled"], name: "index_part_processing_instructions_on_enabled"
+    t.index ["part_id"], name: "index_part_processing_instructions_on_part_id"
+    t.index ["part_number", "part_issue"], name: "idx_on_part_number_part_issue_8bf19b3883"
+    t.index ["replaces_id"], name: "index_part_processing_instructions_on_replaces_id"
+  end
+
+  create_table "parts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "customer_id", null: false
+    t.string "uniform_part_number", null: false
+    t.string "uniform_part_issue", default: "A", null: false
+    t.string "description"
+    t.string "material"
+    t.text "specification"
+    t.text "notes"
+    t.boolean "enabled", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["customer_id", "uniform_part_number", "uniform_part_issue"], name: "index_parts_on_customer_and_part_number_and_issue", unique: true
+    t.index ["customer_id"], name: "index_parts_on_customer_id"
+    t.index ["enabled"], name: "index_parts_on_enabled"
+    t.index ["uniform_part_number"], name: "index_parts_on_uniform_part_number"
+  end
+
+  create_table "release_levels", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "name", null: false
+    t.text "statement", null: false
+    t.boolean "enabled", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["enabled"], name: "index_release_levels_on_enabled"
+    t.index ["name"], name: "index_release_levels_on_name", unique: true
+  end
+
+  create_table "release_notes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.integer "number", null: false
+    t.uuid "works_order_id", null: false
+    t.uuid "issued_by_id", null: false
+    t.date "date", null: false
+    t.integer "quantity_accepted", default: 0, null: false
+    t.integer "quantity_rejected", default: 0, null: false
+    t.text "remarks"
+    t.boolean "no_invoice", default: false, null: false
+    t.boolean "voided", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["date"], name: "index_release_notes_on_date"
+    t.index ["issued_by_id"], name: "index_release_notes_on_issued_by_id"
+    t.index ["no_invoice"], name: "index_release_notes_on_no_invoice"
+    t.index ["number"], name: "index_release_notes_on_number", unique: true
+    t.index ["voided"], name: "index_release_notes_on_voided"
+    t.index ["works_order_id"], name: "index_release_notes_on_works_order_id"
+    t.check_constraint "quantity_accepted > 0 OR quantity_rejected > 0", name: "check_has_quantity"
+    t.check_constraint "quantity_accepted >= 0 AND quantity_rejected >= 0", name: "check_positive_quantities"
+  end
+
+  create_table "sequences", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "key", null: false
+    t.integer "value", default: 1, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["key"], name: "index_sequences_on_key", unique: true
+  end
+
   create_table "sessions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "user_id", null: false
     t.string "ip_address"
@@ -33,6 +170,16 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_12_072440) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["user_id"], name: "index_sessions_on_user_id"
+  end
+
+  create_table "transport_methods", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "name", null: false
+    t.boolean "enabled", default: true, null: false
+    t.text "description"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["enabled"], name: "index_transport_methods_on_enabled"
+    t.index ["name"], name: "index_transport_methods_on_name", unique: true
   end
 
   create_table "users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -44,6 +191,44 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_12_072440) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["email_address"], name: "index_users_on_email_address", unique: true
+  end
+
+  create_table "works_orders", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.integer "number", null: false
+    t.uuid "customer_order_id", null: false
+    t.uuid "part_id", null: false
+    t.uuid "part_processing_instruction_id", null: false
+    t.uuid "release_level_id", null: false
+    t.uuid "transport_method_id", null: false
+    t.string "customer_order_line"
+    t.string "part_number", null: false
+    t.string "part_issue", null: false
+    t.string "part_description", null: false
+    t.integer "quantity", null: false
+    t.integer "quantity_released", default: 0, null: false
+    t.date "due_date", null: false
+    t.boolean "is_open", default: true, null: false
+    t.boolean "voided", default: false, null: false
+    t.decimal "lot_price", precision: 10, scale: 2, null: false
+    t.string "price_type", null: false
+    t.decimal "each_price", precision: 10, scale: 2
+    t.string "material"
+    t.string "batch"
+    t.jsonb "customised_process_data", default: {}
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["customer_order_id"], name: "index_works_orders_on_customer_order_id"
+    t.index ["due_date"], name: "index_works_orders_on_due_date"
+    t.index ["is_open"], name: "index_works_orders_on_is_open"
+    t.index ["number"], name: "index_works_orders_on_number", unique: true
+    t.index ["part_id"], name: "index_works_orders_on_part_id"
+    t.index ["part_number", "part_issue"], name: "index_works_orders_on_part_number_and_part_issue"
+    t.index ["part_processing_instruction_id"], name: "index_works_orders_on_ppi_id"
+    t.index ["release_level_id"], name: "index_works_orders_on_release_level_id"
+    t.index ["transport_method_id"], name: "index_works_orders_on_transport_method_id"
+    t.index ["voided"], name: "index_works_orders_on_voided"
+    t.check_constraint "lot_price >= 0::numeric AND (each_price IS NULL OR each_price >= 0::numeric)", name: "check_positive_prices"
+    t.check_constraint "quantity > 0 AND quantity_released >= 0 AND quantity_released <= quantity", name: "check_positive_quantities"
   end
 
   create_table "xero_contacts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -61,6 +246,21 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_12_072440) do
     t.datetime "updated_at", null: false
   end
 
+  add_foreign_key "customer_orders", "organizations", column: "customer_id"
+  add_foreign_key "invoice_items", "invoices"
+  add_foreign_key "invoice_items", "release_notes"
+  add_foreign_key "invoices", "organizations", column: "customer_id"
   add_foreign_key "organizations", "xero_contacts"
+  add_foreign_key "part_processing_instructions", "organizations", column: "customer_id"
+  add_foreign_key "part_processing_instructions", "part_processing_instructions", column: "replaces_id"
+  add_foreign_key "part_processing_instructions", "parts"
+  add_foreign_key "parts", "organizations", column: "customer_id"
+  add_foreign_key "release_notes", "users", column: "issued_by_id"
+  add_foreign_key "release_notes", "works_orders"
   add_foreign_key "sessions", "users"
+  add_foreign_key "works_orders", "customer_orders"
+  add_foreign_key "works_orders", "part_processing_instructions"
+  add_foreign_key "works_orders", "parts"
+  add_foreign_key "works_orders", "release_levels"
+  add_foreign_key "works_orders", "transport_methods"
 end
