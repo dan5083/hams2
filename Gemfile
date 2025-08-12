@@ -64,7 +64,6 @@ group :test do
   gem "selenium-webdriver"
 end
 
-gem "xero-ruby", "~> 12.0"
+gem "xero-ruby", "~> 3.7.0"
 gem 'jwt'
 gem "dotenv-rails", "~> 3.1"
-gem "jwt"
