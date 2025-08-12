@@ -84,11 +84,10 @@ class XeroAuthController < ApplicationController
       Rails.cache.write('xero_tenant_id', connection['tenantId'], expires_in: 30.minutes)
       Rails.cache.write('xero_tenant_name', connection['tenantName'], expires_in: 30.minutes)
 
-      # Sync customers from Xero
-      tenant_id = connection['tenantId']
-      sync_customers_from_xero(xero_client, tenant_id, token_set)
+      # Instead of syncing, let's just test a simple API call
+      test_simple_api_call(xero_client, connection['tenantId'], token_set)
 
-      redirect_to root_path, notice: "Successfully connected to Xero (#{connection['tenantName']}) and synced #{Organization.count} customers!"
+      redirect_to root_path, notice: "Successfully connected to Xero (#{connection['tenantName']})!"
 
     rescue => e
       Rails.logger.error "Xero OAuth error: #{e.message}"
@@ -99,106 +98,83 @@ class XeroAuthController < ApplicationController
 
   private
 
-  def sync_customers_from_xero(xero_client, tenant_id, token_set)
+  def test_simple_api_call(xero_client, tenant_id, token_set)
     begin
-      Rails.logger.info "Starting sync with tenant: #{tenant_id}"
+      Rails.logger.info "=== DEBUGGING API CALL ==="
+      Rails.logger.info "Tenant ID: #{tenant_id}"
+      Rails.logger.info "Token keys: #{token_set.keys}"
+      Rails.logger.info "Gem version: #{XeroRuby::VERSION rescue 'Unknown'}"
 
-      # CRITICAL: Ensure token is set and refresh if needed
+      # Set token
       xero_client.set_token_set(token_set)
 
-      # Check if token needs refreshing (based on official sample)
-      if token_expired?(token_set)
-        Rails.logger.info "Token expired, refreshing..."
-        token_set = xero_client.refresh_token_set(token_set)
-        xero_client.set_token_set(token_set)
-        # Update cache with new token
-        Rails.cache.write('xero_token_set', token_set, expires_in: 30.minutes)
-      end
-
-      # Create accounting API instance
+      # Try to inspect what URL the gem is trying to hit
       accounting_api = XeroRuby::AccountingApi.new(xero_client)
 
-      Rails.logger.info "Making API call to get contacts..."
+      # Let's try the simplest possible call first - get organizations
+      Rails.logger.info "Trying get_organisations..."
+      begin
+        orgs_response = accounting_api.get_organisations(tenant_id)
+        Rails.logger.info "✅ get_organisations worked! Got #{orgs_response.organisations&.length || 0} orgs"
 
-      # Make the API call - using the pattern from the official sample
-      response = accounting_api.get_contacts(tenant_id)
+        # If that works, try contacts
+        Rails.logger.info "Trying get_contacts..."
+        contacts_response = accounting_api.get_contacts(tenant_id)
+        Rails.logger.info "✅ get_contacts worked! Got #{contacts_response.contacts&.length || 0} contacts"
 
-      contacts = response.contacts
-      Rails.logger.info "Successfully retrieved #{contacts.length} contacts"
+      rescue XeroRuby::ApiError => api_error
+        Rails.logger.error "❌ API Error Details:"
+        Rails.logger.error "  Code: #{api_error.code}"
+        Rails.logger.error "  Message: #{api_error.message}"
+        Rails.logger.error "  Headers: #{api_error.response_headers}" if api_error.respond_to?(:response_headers)
+        Rails.logger.error "  Body: #{api_error.response_body}" if api_error.respond_to?(:response_body)
 
-      # Clear existing data and sync
-      XeroContact.destroy_all
-      Organization.destroy_all
+        # Let's also try to see what URL was being called
+        if api_error.respond_to?(:response_headers) && api_error.response_headers
+          Rails.logger.error "  Response headers suggest URL issues"
+        end
 
-      customer_count = 0
-      contacts.each do |contact|
-        # Only sync customers
-        next unless contact.is_customer
+        # Try a manual HTTP call to see what's happening
+        test_manual_api_call(tenant_id, token_set)
 
-        Rails.logger.info "Creating contact: #{contact.name}"
-
-        # Create XeroContact record
-        xero_contact = XeroContact.create!(
-          name: contact.name || 'Unknown',
-          contact_status: contact.contact_status&.to_s || 'ACTIVE',
-          is_customer: contact.is_customer || false,
-          is_supplier: contact.is_supplier || false,
-          accounts_receivable_tax_type: contact.accounts_receivable_tax_type,
-          accounts_payable_tax_type: contact.accounts_payable_tax_type,
-          xero_id: contact.contact_id,
-          xero_data: contact.to_hash,
-          last_synced_at: Time.current
-        )
-
-        # Create corresponding organization
-        Organization.create!(
-          name: contact.name || 'Unknown',
-          enabled: true,
-          is_customer: contact.is_customer || false,
-          is_supplier: contact.is_supplier || false,
-          xero_contact: xero_contact
-        )
-
-        customer_count += 1
+        raise api_error
       end
 
-      Rails.logger.info "Successfully synced #{customer_count} customers"
-
-    rescue XeroRuby::ApiError => e
-      Rails.logger.error "=== XERO API ERROR ==="
-      Rails.logger.error "Message: #{e.message}"
-      Rails.logger.error "Code: #{e.code}" if e.respond_to?(:code)
-      Rails.logger.error "Headers: #{e.response_headers}" if e.respond_to?(:response_headers)
-      Rails.logger.error "Body: #{e.response_body}" if e.respond_to?(:response_body)
-
-      # Check if it's a token issue
-      if e.code == 401
-        Rails.logger.error "Authentication failed - token may be invalid"
-      elsif e.code == 404
-        Rails.logger.error "API endpoint not found - check tenant ID and API version"
-      end
-
-      raise e
     rescue => e
-      Rails.logger.error "Unexpected error: #{e.class.name}: #{e.message}"
+      Rails.logger.error "Unexpected error in test: #{e.class.name}: #{e.message}"
       Rails.logger.error e.backtrace.join("\n") if e.backtrace
       raise e
     end
   end
 
-  # Helper method to check if token is expired (from official sample)
-  def token_expired?(token_set)
-    return true unless token_set['access_token']
-
-    # Decode the JWT token to check expiration
+  def test_manual_api_call(tenant_id, token_set)
     begin
-      require 'jwt'
-      decoded_token = JWT.decode(token_set['access_token'], nil, false)
-      exp = decoded_token[0]['exp']
-      return Time.at(exp) <= Time.now
-    rescue
-      # If we can't decode, assume it's expired
-      return true
+      require 'net/http'
+      require 'uri'
+
+      # Try calling the Xero API directly to see what happens
+      uri = URI("https://api.xero.com/api.xro/2.0/Organisations")
+
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = true
+
+      request = Net::HTTP::Get.new(uri)
+      request['Authorization'] = "Bearer #{token_set['access_token']}"
+      request['xero-tenant-id'] = tenant_id
+      request['Accept'] = 'application/json'
+
+      Rails.logger.info "=== MANUAL API CALL ==="
+      Rails.logger.info "URL: #{uri}"
+      Rails.logger.info "Headers: Authorization: Bearer [REDACTED], xero-tenant-id: #{tenant_id}"
+
+      response = http.request(request)
+
+      Rails.logger.info "Response Code: #{response.code}"
+      Rails.logger.info "Response Headers: #{response.to_hash}"
+      Rails.logger.info "Response Body: #{response.body[0..500]}..." # First 500 chars
+
+    rescue => manual_error
+      Rails.logger.error "Manual API call failed: #{manual_error.message}"
     end
   end
 end
