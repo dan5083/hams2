@@ -65,8 +65,9 @@ class XeroAuthController < ApplicationController
       Rails.cache.write('xero_tenant_id', tenant['tenantId'], expires_in: 30.minutes)
       Rails.cache.write('xero_tenant_name', tenant['tenantName'], expires_in: 30.minutes)
 
-      # Sync customers from Xero
-      sync_customers_from_xero(xero_client, tenant['tenantId'], token_set)
+      # Sync customers from Xero - IMPORTANT: assign tenant_id to local variable first!
+      tenant_id = tenant['tenantId']
+      sync_customers_from_xero(xero_client, tenant_id, token_set)
 
       redirect_to root_path, notice: "Successfully connected to Xero (#{tenant['tenantName']}) and synced #{Organization.count} customers!"
 
@@ -90,36 +91,13 @@ class XeroAuthController < ApplicationController
       Rails.logger.info "Fetching contacts from tenant: #{tenant_id}"
       Rails.logger.info "Token set keys: #{token_set.keys}"
 
-      # In xero-ruby v12.x, the method signature requires proper options hash
-      # Try the most basic call first - no options parameter
-      begin
-        response = accounting_api.get_contacts(tenant_id)
-        Rails.logger.info "Basic call successful"
-      rescue => basic_error
-        Rails.logger.error "Basic call failed: #{basic_error.message}"
+      # CRITICAL: Assign tenant_id to a simple string variable to avoid the 404 bug
+      # This is a known issue with xero-ruby gem where direct hash access causes 404s
+      xero_tenant_id = tenant_id.to_s
+      Rails.logger.info "Using tenant ID: #{xero_tenant_id}"
 
-        # Try with empty options hash
-        begin
-          response = accounting_api.get_contacts(tenant_id, {})
-          Rails.logger.info "Call with empty options successful"
-        rescue => empty_opts_error
-          Rails.logger.error "Empty options call failed: #{empty_opts_error.message}"
-
-          # Try with explicit options that might be expected
-          opts = {
-            where: nil,
-            order: nil,
-            ids: nil,
-            page: nil,
-            include_archived: nil,
-            summary_only: nil,
-            search_term: nil,
-            if_modified_since: nil
-          }
-          response = accounting_api.get_contacts(tenant_id, **opts)
-          Rails.logger.info "Call with explicit options successful"
-        end
-      end
+      # Now make the API call with the local variable
+      response = accounting_api.get_contacts(xero_tenant_id)
 
       contacts = response.contacts
 
@@ -171,10 +149,10 @@ class XeroAuthController < ApplicationController
       Rails.logger.error "Response body: '#{e.response_body}'" if e.respond_to?(:response_body)
       Rails.logger.error "=== END ERROR DETAILS ==="
 
-      # Try a simple test to see if we can access anything
+      # Try a simple test to see if we can access anything with the tenant ID fix
       begin
         Rails.logger.info "Trying to get organizations instead..."
-        org_response = accounting_api.get_organisations(tenant_id)
+        org_response = accounting_api.get_organisations(xero_tenant_id)
         Rails.logger.info "Organizations call worked! Got #{org_response.organisations&.length || 0} orgs"
 
         # If orgs work but contacts don't, it might be a permissions issue
