@@ -7,6 +7,7 @@ Rails.application.routes.draw do
   # Xero OAuth routes
   get '/auth/xero', to: 'xero_auth#authorize'
   get '/auth/xero/callback', to: 'xero_auth#callback'
+  get '/test_xero_api', to: 'xero_auth#test_api'
 
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
@@ -22,4 +23,3 @@ Rails.application.routes.draw do
   # Dashboard for authenticated users, login for unauthenticated
   root "dashboard#index"
 end
-  get '/test_xero_api', to: 'xero_auth#test_api'
