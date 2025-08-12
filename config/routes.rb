@@ -22,3 +22,4 @@ Rails.application.routes.draw do
   # Dashboard for authenticated users, login for unauthenticated
   root "dashboard#index"
 end
+  get '/test_xero_api', to: 'xero_auth#test_api'
