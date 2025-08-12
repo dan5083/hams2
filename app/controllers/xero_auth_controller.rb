@@ -5,7 +5,7 @@ class XeroAuthController < ApplicationController
       client_id: ENV['XERO_CLIENT_ID'] || Rails.application.credentials.dig(:xero, :client_id),
       client_secret: ENV['XERO_CLIENT_SECRET'] || Rails.application.credentials.dig(:xero, :client_secret),
       redirect_uri: ENV['XERO_REDIRECT_URI'] || Rails.application.credentials.dig(:xero, :redirect_uri),
-      scopes: 'accounting.contacts accounting.transactions offline_access'
+      scopes: 'accounting.contacts accounting.transactions'
     }
 
     xero_client = XeroRuby::ApiClient.new(credentials: creds)
@@ -33,7 +33,9 @@ class XeroAuthController < ApplicationController
       }
 
       xero_client = XeroRuby::ApiClient.new(credentials: creds)
-      token_set = xero_client.get_token_set_from_callback(auth_code)
+
+      # Set the authorization code first, then get the token set
+      token_set = xero_client.get_token_set_from_callback(params)
 
       # Get available tenants (companies)
       tenants = xero_client.connections
