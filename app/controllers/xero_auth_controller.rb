@@ -43,17 +43,30 @@ class XeroAuthController < ApplicationController
         return
       end
 
-      # For now, use the first tenant (demo company)
-      tenant = tenants.first
+      # Log all available tenants
+      Rails.logger.info "Available Xero tenants:"
+      tenants.each do |t|
+        Rails.logger.info "- Name: '#{t.tenant_name}', ID: #{t.tenant_id}"
+      end
+
+      # Look for Demo Company first, fallback to first tenant
+      demo_tenant = tenants.find do |t|
+        t.tenant_name&.downcase&.include?("demo")
+      end
+
+      tenant = demo_tenant || tenants.first
+
+      Rails.logger.info "Selected tenant: #{tenant.tenant_name} (#{tenant.tenant_id})"
 
       # Store the credentials (in production, you'd store these securely per user)
       Rails.cache.write('xero_token_set', token_set, expires_in: 30.minutes)
       Rails.cache.write('xero_tenant_id', tenant.tenant_id, expires_in: 30.minutes)
+      Rails.cache.write('xero_tenant_name', tenant.tenant_name, expires_in: 30.minutes)
 
       # Sync customers from Xero
       sync_customers_from_xero(xero_client, tenant.tenant_id)
 
-      redirect_to root_path, notice: "Successfully connected to Xero and synced #{Organization.count} customers!"
+      redirect_to root_path, notice: "Successfully connected to Xero (#{tenant.tenant_name}) and synced #{Organization.count} customers!"
 
     rescue => e
       Rails.logger.error "Xero OAuth error: #{e.message}"
