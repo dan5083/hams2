@@ -66,7 +66,7 @@ class XeroAuthController < ApplicationController
       Rails.cache.write('xero_tenant_name', tenant['tenantName'], expires_in: 30.minutes)
 
       # Sync customers from Xero
-      sync_customers_from_xero(xero_client, tenant['tenantId'])
+      sync_customers_from_xero(xero_client, tenant['tenantId'], token_set)
 
       redirect_to root_path, notice: "Successfully connected to Xero (#{tenant['tenantName']}) and synced #{Organization.count} customers!"
 
@@ -78,9 +78,9 @@ class XeroAuthController < ApplicationController
 
   private
 
-  def sync_customers_from_xero(xero_client, tenant_id)
+  def sync_customers_from_xero(xero_client, tenant_id, token_set)
     # Set the token set on the client first
-    xero_client.set_token_set(Rails.cache.read('xero_token_set'))
+    xero_client.set_token_set(token_set)
 
     # Use the authenticated client to get real contacts
     accounting_api = XeroRuby::AccountingApi.new(xero_client)
