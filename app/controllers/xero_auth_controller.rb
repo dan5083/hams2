@@ -72,6 +72,7 @@ class XeroAuthController < ApplicationController
 
     rescue => e
       Rails.logger.error "Xero OAuth error: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n") if e.backtrace
       redirect_to root_path, alert: "Failed to connect to Xero: #{e.message}"
     end
   end
@@ -87,7 +88,39 @@ class XeroAuthController < ApplicationController
 
     begin
       Rails.logger.info "Fetching contacts from tenant: #{tenant_id}"
-      response = accounting_api.get_contacts(tenant_id)
+      Rails.logger.info "Token set keys: #{token_set.keys}"
+
+      # In xero-ruby v12.x, the method signature requires proper options hash
+      # Try the most basic call first - no options parameter
+      begin
+        response = accounting_api.get_contacts(tenant_id)
+        Rails.logger.info "Basic call successful"
+      rescue => basic_error
+        Rails.logger.error "Basic call failed: #{basic_error.message}"
+
+        # Try with empty options hash
+        begin
+          response = accounting_api.get_contacts(tenant_id, {})
+          Rails.logger.info "Call with empty options successful"
+        rescue => empty_opts_error
+          Rails.logger.error "Empty options call failed: #{empty_opts_error.message}"
+
+          # Try with explicit options that might be expected
+          opts = {
+            where: nil,
+            order: nil,
+            ids: nil,
+            page: nil,
+            include_archived: nil,
+            summary_only: nil,
+            search_term: nil,
+            if_modified_since: nil
+          }
+          response = accounting_api.get_contacts(tenant_id, **opts)
+          Rails.logger.info "Call with explicit options successful"
+        end
+      end
+
       contacts = response.contacts
 
       Rails.logger.info "Found #{contacts.length} contacts"
@@ -96,14 +129,16 @@ class XeroAuthController < ApplicationController
       XeroContact.destroy_all
       Organization.destroy_all
 
+      customer_count = 0
       contacts.each do |contact|
         # Only sync customers (not suppliers or employees)
         next unless contact.is_customer
 
         Rails.logger.info "Creating contact: #{contact.name}"
 
+        # Handle potential nil values more defensively
         xero_contact = XeroContact.create!(
-          name: contact.name,
+          name: contact.name || 'Unknown',
           contact_status: contact.contact_status&.to_s || 'ACTIVE',
           is_customer: contact.is_customer || false,
           is_supplier: contact.is_supplier || false,
@@ -116,21 +151,45 @@ class XeroAuthController < ApplicationController
 
         # Create corresponding organization
         Organization.create!(
-          name: contact.name,
+          name: contact.name || 'Unknown',
           enabled: true,
           is_customer: contact.is_customer || false,
           is_supplier: contact.is_supplier || false,
           xero_contact: xero_contact
         )
+
+        customer_count += 1
       end
 
-      Rails.logger.info "Synced #{Organization.count} customers successfully"
+      Rails.logger.info "Synced #{customer_count} customers successfully"
 
     rescue XeroRuby::ApiError => e
-      Rails.logger.error "Xero API Error: #{e.message}"
-      Rails.logger.error "Response code: #{e.code}" if e.respond_to?(:code)
+      Rails.logger.error "=== XERO API ERROR DETAILS ==="
+      Rails.logger.error "Error message: #{e.message}"
+      Rails.logger.error "HTTP status code: #{e.code}" if e.respond_to?(:code)
       Rails.logger.error "Response headers: #{e.response_headers}" if e.respond_to?(:response_headers)
-      Rails.logger.error "Response body: #{e.response_body}" if e.respond_to?(:response_body)
+      Rails.logger.error "Response body: '#{e.response_body}'" if e.respond_to?(:response_body)
+      Rails.logger.error "=== END ERROR DETAILS ==="
+
+      # Try a simple test to see if we can access anything
+      begin
+        Rails.logger.info "Trying to get organizations instead..."
+        org_response = accounting_api.get_organisations(tenant_id)
+        Rails.logger.info "Organizations call worked! Got #{org_response.organisations&.length || 0} orgs"
+
+        # If orgs work but contacts don't, it might be a permissions issue
+        if org_response.organisations&.any?
+          org = org_response.organisations.first
+          Rails.logger.info "First org: #{org.name}"
+        end
+      rescue => org_error
+        Rails.logger.error "Organizations call also failed: #{org_error.message}"
+      end
+
+      raise e
+    rescue => e
+      Rails.logger.error "Unexpected error during Xero sync: #{e.class.name}: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n") if e.backtrace
       raise e
     end
   end
