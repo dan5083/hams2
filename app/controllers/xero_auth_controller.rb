@@ -79,12 +79,18 @@ class XeroAuthController < ApplicationController
   private
 
   def sync_customers_from_xero(xero_client, tenant_id)
+    # Set the token set on the client first
+    xero_client.set_token_set(Rails.cache.read('xero_token_set'))
+
     # Use the authenticated client to get real contacts
     accounting_api = XeroRuby::AccountingApi.new(xero_client)
 
     begin
+      Rails.logger.info "Fetching contacts from tenant: #{tenant_id}"
       response = accounting_api.get_contacts(tenant_id)
       contacts = response.contacts
+
+      Rails.logger.info "Found #{contacts.length} contacts"
 
       # Clear existing demo data and sync real data
       XeroContact.destroy_all
@@ -93,6 +99,8 @@ class XeroAuthController < ApplicationController
       contacts.each do |contact|
         # Only sync customers (not suppliers or employees)
         next unless contact.is_customer
+
+        Rails.logger.info "Creating contact: #{contact.name}"
 
         xero_contact = XeroContact.create!(
           name: contact.name,
@@ -116,8 +124,13 @@ class XeroAuthController < ApplicationController
         )
       end
 
+      Rails.logger.info "Synced #{Organization.count} customers successfully"
+
     rescue XeroRuby::ApiError => e
       Rails.logger.error "Xero API Error: #{e.message}"
+      Rails.logger.error "Response code: #{e.code}" if e.respond_to?(:code)
+      Rails.logger.error "Response headers: #{e.response_headers}" if e.respond_to?(:response_headers)
+      Rails.logger.error "Response body: #{e.response_body}" if e.respond_to?(:response_body)
       raise e
     end
   end
