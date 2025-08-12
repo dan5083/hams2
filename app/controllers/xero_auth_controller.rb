@@ -23,8 +23,7 @@ class XeroAuthController < ApplicationController
   def callback
     Rails.logger.info "=== XERO CALLBACK RECEIVED ==="
     Rails.logger.info "Raw params: #{params.inspect}"
-    Rails.logger.info "Request method: #{request.method}"
-    Rails.logger.info "Request headers: #{request.headers.to_h.select { |k,v| k.start_with?('HTTP_') }}"
+    Rails.logger.info "Session ID: #{session.id}" if session.respond_to?(:id)
 
     auth_code = params[:code]
     Rails.logger.info "Auth code: #{auth_code&.first(20)}..." if auth_code
@@ -42,27 +41,16 @@ class XeroAuthController < ApplicationController
         redirect_uri: ENV['XERO_REDIRECT_URI']
       }
 
-      Rails.logger.info "Creating Xero client with:"
-      Rails.logger.info "  client_id: #{creds[:client_id]&.first(8)}..."
-      Rails.logger.info "  redirect_uri: #{creds[:redirect_uri]}"
-
+      Rails.logger.info "Creating Xero client..."
       xero_client = XeroRuby::ApiClient.new(credentials: creds)
 
       Rails.logger.info "Getting token set from callback..."
       token_set = xero_client.get_token_set_from_callback(params)
 
       Rails.logger.info "=== TOKEN SET ANALYSIS ==="
-      Rails.logger.info "Token set class: #{token_set.class}"
-      Rails.logger.info "Token set nil?: #{token_set.nil?}"
-
       if token_set
         Rails.logger.info "Token keys: #{token_set.keys}"
         Rails.logger.info "Has access_token?: #{token_set.key?('access_token')}"
-        Rails.logger.info "Has error?: #{token_set.key?('error')}"
-
-        if token_set.key?('access_token')
-          Rails.logger.info "Access token starts: #{token_set['access_token']&.first(20)}..."
-        end
 
         if token_set.key?('error')
           Rails.logger.error "❌ Token error: #{token_set['error']}"
@@ -82,22 +70,7 @@ class XeroAuthController < ApplicationController
       connections = xero_client.connections
 
       Rails.logger.info "=== CONNECTIONS ANALYSIS ==="
-      Rails.logger.info "Connections class: #{connections.class}"
       Rails.logger.info "Connections length: #{connections.length}" if connections.respond_to?(:length)
-
-      if connections.is_a?(Array)
-        connections.each_with_index do |conn, i|
-          Rails.logger.info "Connection #{i}: #{conn.inspect}"
-        end
-      else
-        Rails.logger.info "Connections content: #{connections.inspect}"
-      end
-
-      if connections.is_a?(Hash) && connections.key?('error')
-        Rails.logger.error "❌ Connections error: #{connections}"
-        redirect_to root_path, alert: "Failed to get organizations: #{connections['error']}"
-        return
-      end
 
       if connections.empty?
         Rails.logger.error "❌ No connections found"
@@ -106,46 +79,71 @@ class XeroAuthController < ApplicationController
       end
 
       connection = connections.first
-      Rails.logger.info "=== SELECTED CONNECTION ==="
-      Rails.logger.info "Connection keys: #{connection.keys}" if connection.respond_to?(:keys)
-      Rails.logger.info "Tenant ID: #{connection['tenantId']}" if connection.is_a?(Hash)
-      Rails.logger.info "Tenant Name: #{connection['tenantName']}" if connection.is_a?(Hash)
+      tenant_id = connection['tenantId']
+      tenant_name = connection['tenantName']
 
-      # Cache the important data
-      Rails.cache.write('xero_token_set', token_set, expires_in: 30.minutes)
-      Rails.cache.write('xero_tenant_id', connection['tenantId'], expires_in: 30.minutes)
-      Rails.cache.write('xero_tenant_name', connection['tenantName'], expires_in: 30.minutes)
+      Rails.logger.info "=== STORING DATA ==="
+      Rails.logger.info "Tenant ID: #{tenant_id}"
+      Rails.logger.info "Tenant Name: #{tenant_name}"
 
-      Rails.logger.info "✅ Data cached successfully"
+      # Store in BOTH cache AND session for reliability
+      Rails.cache.write('xero_token_set', token_set, expires_in: 1.hour)
+      Rails.cache.write('xero_tenant_id', tenant_id, expires_in: 1.hour)
+      Rails.cache.write('xero_tenant_name', tenant_name, expires_in: 1.hour)
 
-      # DON'T try API calls yet - just succeed
-      redirect_to root_path, notice: "✅ Connected to #{connection['tenantName']}! Now try /test_xero_api to test API calls."
+      # Also store in session as backup
+      session[:xero_token_set] = token_set
+      session[:xero_tenant_id] = tenant_id
+      session[:xero_tenant_name] = tenant_name
+
+      Rails.logger.info "✅ Data stored in both cache and session"
+
+      # Test immediately if we can read it back
+      test_token = Rails.cache.read('xero_token_set')
+      test_tenant = Rails.cache.read('xero_tenant_id')
+      Rails.logger.info "Immediate read test - Token: #{test_token ? 'Found' : 'NOT FOUND'}, Tenant: #{test_tenant}"
+
+      redirect_to root_path, notice: "✅ Connected to #{tenant_name}! Try /test_xero_api"
 
     rescue => e
       Rails.logger.error "=== CALLBACK ERROR ==="
-      Rails.logger.error "Error class: #{e.class}"
-      Rails.logger.error "Error message: #{e.message}"
-      Rails.logger.error "Backtrace:"
-      e.backtrace&.first(10)&.each { |line| Rails.logger.error "  #{line}" }
+      Rails.logger.error "Error: #{e.class}: #{e.message}"
+      e.backtrace&.first(5)&.each { |line| Rails.logger.error "  #{line}" }
 
       redirect_to root_path, alert: "Failed to connect to Xero: #{e.message}"
     end
   end
 
   def test_api
-    Rails.logger.info "=== MANUAL API TEST ==="
+    Rails.logger.info "=== MANUAL API TEST START ==="
+    Rails.logger.info "Session ID: #{session.id}" if session.respond_to?(:id)
 
+    # Try cache first, then session
     token_set = Rails.cache.read('xero_token_set')
     tenant_id = Rails.cache.read('xero_tenant_id')
 
-    Rails.logger.info "Token from cache: #{token_set ? 'Found' : 'Not found'}"
-    Rails.logger.info "Tenant from cache: #{tenant_id}"
+    Rails.logger.info "From cache - Token: #{token_set ? 'Found' : 'Not found'}, Tenant: #{tenant_id}"
 
+    # If cache is empty, try session
     if token_set.nil? || tenant_id.nil?
-      render plain: "❌ No cached token/tenant. Connect to Xero first via /auth/xero"
+      Rails.logger.info "Cache empty, trying session..."
+      token_set = session[:xero_token_set]
+      tenant_id = session[:xero_tenant_id]
+      Rails.logger.info "From session - Token: #{token_set ? 'Found' : 'Not found'}, Tenant: #{tenant_id}"
+    end
+
+    # If still nothing, show what we have
+    if token_set.nil? || tenant_id.nil?
+      Rails.logger.error "=== DEBUGGING STORAGE ==="
+      Rails.logger.error "Cache keys: #{Rails.cache.instance_variable_get(:@data)&.keys rescue 'Cannot read cache'}"
+      Rails.logger.error "Session keys: #{session.keys}"
+      Rails.logger.error "Session data: #{session.to_hash}"
+
+      render plain: "❌ No cached token/tenant found.\nCache: Token=#{token_set ? 'Found' : 'Missing'}, Tenant=#{tenant_id ? 'Found' : 'Missing'}\nSession: Token=#{session[:xero_token_set] ? 'Found' : 'Missing'}, Tenant=#{session[:xero_tenant_id] ? 'Found' : 'Missing'}\nConnect via /auth/xero first."
       return
     end
 
+    Rails.logger.info "Found data! Testing API..."
     Rails.logger.info "Token keys: #{token_set.keys}"
     Rails.logger.info "Access token: #{token_set['access_token']&.first(30)}..."
 
@@ -153,7 +151,7 @@ class XeroAuthController < ApplicationController
       require 'net/http'
       require 'uri'
 
-      uri = URI("https://api.xero.com/api.xro/2.0/Organisations")
+      uri = URI("https://api.xero.com/api.xro/2.0/Contacts")
 
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = true
@@ -168,16 +166,26 @@ class XeroAuthController < ApplicationController
 
       response = http.request(request)
 
-      Rails.logger.info "=== MANUAL HTTP RESPONSE ==="
+      Rails.logger.info "=== API RESPONSE ==="
       Rails.logger.info "Status: #{response.code} #{response.message}"
-      Rails.logger.info "Headers: #{response.to_hash}"
       Rails.logger.info "Body length: #{response.body&.length}"
-      Rails.logger.info "Body: #{response.body}"
+      Rails.logger.info "Body preview: #{response.body&.first(200)}..."
 
       if response.code == '200'
-        render plain: "✅ SUCCESS! API call worked. Response: #{response.body[0..500]}"
+        # Parse JSON to count contacts
+        begin
+          data = JSON.parse(response.body)
+          contacts = data['Contacts'] || []
+          customers = contacts.select { |c| c['IsCustomer'] == true }
+
+          Rails.logger.info "Total contacts: #{contacts.length}, Customers: #{customers.length}"
+
+          render plain: "✅ SUCCESS! API call worked.\nTotal contacts: #{contacts.length}\nCustomers: #{customers.length}\n\nFirst few customers:\n#{customers.first(3).map { |c| "- #{c['Name']}" }.join("\n")}"
+        rescue JSON::ParserError => e
+          render plain: "✅ API call succeeded but JSON parse failed: #{e.message}\n\nRaw response: #{response.body[0..500]}"
+        end
       else
-        render plain: "❌ API call failed with #{response.code}. Check logs for details."
+        render plain: "❌ API call failed with #{response.code}.\nResponse: #{response.body}\nCheck logs for details."
       end
 
     rescue => e
