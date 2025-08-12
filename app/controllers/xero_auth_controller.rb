@@ -37,39 +37,58 @@ class XeroAuthController < ApplicationController
       # Set the authorization code first, then get the token set
       token_set = xero_client.get_token_set_from_callback(params)
 
-      # Get available tenants (companies)
-      tenants = xero_client.connections
+      # CHECK: Ensure token_set is valid
+      Rails.logger.info "Token set received: #{token_set.keys}"
 
-      if tenants.empty?
+      if token_set.key?('error')
+        Rails.logger.error "Token error: #{token_set}"
+        redirect_to root_path, alert: "Token error: #{token_set['error']}"
+        return
+      end
+
+      # CRITICAL: Set the token set on the client BEFORE calling connections
+      xero_client.set_token_set(token_set)
+
+      # Get available tenants (companies) - NOW with authenticated client
+      connections = xero_client.connections
+
+      # Check if connections returned an error
+      if connections.is_a?(Hash) && connections.key?('error')
+        Rails.logger.error "Connections error: #{connections}"
+        redirect_to root_path, alert: "Failed to get organizations: #{connections['error']}"
+        return
+      end
+
+      if connections.empty?
         redirect_to root_path, alert: "No Xero organizations found"
         return
       end
 
       # Log all available tenants
       Rails.logger.info "Available Xero tenants:"
-      tenants.each do |t|
-        Rails.logger.info "- Name: '#{t['tenantName']}', ID: #{t['tenantId']}"
+      connections.each do |connection|
+        Rails.logger.info "- Name: '#{connection['tenantName']}', ID: #{connection['tenantId']}"
       end
 
       # Look for Demo Company first, fallback to first tenant
-      demo_tenant = tenants.find do |t|
-        t['tenantName']&.downcase&.include?("demo")
+      demo_connection = connections.find do |c|
+        c['tenantName']&.downcase&.include?("demo")
       end
 
-      tenant = demo_tenant || tenants.first
+      connection = demo_connection || connections.first
 
-      Rails.logger.info "Selected tenant: #{tenant['tenantName']} (#{tenant['tenantId']})"
+      Rails.logger.info "Selected tenant: #{connection['tenantName']} (#{connection['tenantId']})"
 
       # Store the credentials (in production, you'd store these securely per user)
       Rails.cache.write('xero_token_set', token_set, expires_in: 30.minutes)
-      Rails.cache.write('xero_tenant_id', tenant['tenantId'], expires_in: 30.minutes)
-      Rails.cache.write('xero_tenant_name', tenant['tenantName'], expires_in: 30.minutes)
+      Rails.cache.write('xero_tenant_id', connection['tenantId'], expires_in: 30.minutes)
+      Rails.cache.write('xero_tenant_name', connection['tenantName'], expires_in: 30.minutes)
 
-      # Sync customers from Xero - IMPORTANT: assign tenant_id to local variable first!
-      tenant_id = tenant['tenantId']
+      # Sync customers from Xero
+      tenant_id = connection['tenantId']
       sync_customers_from_xero(xero_client, tenant_id, token_set)
 
-      redirect_to root_path, notice: "Successfully connected to Xero (#{tenant['tenantName']}) and synced #{Organization.count} customers!"
+      redirect_to root_path, notice: "Successfully connected to Xero (#{connection['tenantName']}) and synced #{Organization.count} customers!"
 
     rescue => e
       Rails.logger.error "Xero OAuth error: #{e.message}"
@@ -81,40 +100,44 @@ class XeroAuthController < ApplicationController
   private
 
   def sync_customers_from_xero(xero_client, tenant_id, token_set)
-    # Set the token set on the client first
-    xero_client.set_token_set(token_set)
-
-    # Use the authenticated client to get real contacts
-    accounting_api = XeroRuby::AccountingApi.new(xero_client)
-
     begin
-      Rails.logger.info "Fetching contacts from tenant: #{tenant_id}"
-      Rails.logger.info "Token set keys: #{token_set.keys}"
+      Rails.logger.info "Starting sync with tenant: #{tenant_id}"
 
-      # CRITICAL: Assign tenant_id to a simple string variable to avoid the 404 bug
-      # This is a known issue with xero-ruby gem where direct hash access causes 404s
-      xero_tenant_id = tenant_id.to_s
-      Rails.logger.info "Using tenant ID: #{xero_tenant_id}"
+      # CRITICAL: Ensure token is set and refresh if needed
+      xero_client.set_token_set(token_set)
 
-      # Now make the API call with the local variable
-      response = accounting_api.get_contacts(xero_tenant_id)
+      # Check if token needs refreshing (based on official sample)
+      if token_expired?(token_set)
+        Rails.logger.info "Token expired, refreshing..."
+        token_set = xero_client.refresh_token_set(token_set)
+        xero_client.set_token_set(token_set)
+        # Update cache with new token
+        Rails.cache.write('xero_token_set', token_set, expires_in: 30.minutes)
+      end
+
+      # Create accounting API instance
+      accounting_api = XeroRuby::AccountingApi.new(xero_client)
+
+      Rails.logger.info "Making API call to get contacts..."
+
+      # Make the API call - using the pattern from the official sample
+      response = accounting_api.get_contacts(tenant_id)
 
       contacts = response.contacts
+      Rails.logger.info "Successfully retrieved #{contacts.length} contacts"
 
-      Rails.logger.info "Found #{contacts.length} contacts"
-
-      # Clear existing demo data and sync real data
+      # Clear existing data and sync
       XeroContact.destroy_all
       Organization.destroy_all
 
       customer_count = 0
       contacts.each do |contact|
-        # Only sync customers (not suppliers or employees)
+        # Only sync customers
         next unless contact.is_customer
 
         Rails.logger.info "Creating contact: #{contact.name}"
 
-        # Handle potential nil values more defensively
+        # Create XeroContact record
         xero_contact = XeroContact.create!(
           name: contact.name || 'Unknown',
           contact_status: contact.contact_status&.to_s || 'ACTIVE',
@@ -139,36 +162,43 @@ class XeroAuthController < ApplicationController
         customer_count += 1
       end
 
-      Rails.logger.info "Synced #{customer_count} customers successfully"
+      Rails.logger.info "Successfully synced #{customer_count} customers"
 
     rescue XeroRuby::ApiError => e
-      Rails.logger.error "=== XERO API ERROR DETAILS ==="
-      Rails.logger.error "Error message: #{e.message}"
-      Rails.logger.error "HTTP status code: #{e.code}" if e.respond_to?(:code)
-      Rails.logger.error "Response headers: #{e.response_headers}" if e.respond_to?(:response_headers)
-      Rails.logger.error "Response body: '#{e.response_body}'" if e.respond_to?(:response_body)
-      Rails.logger.error "=== END ERROR DETAILS ==="
+      Rails.logger.error "=== XERO API ERROR ==="
+      Rails.logger.error "Message: #{e.message}"
+      Rails.logger.error "Code: #{e.code}" if e.respond_to?(:code)
+      Rails.logger.error "Headers: #{e.response_headers}" if e.respond_to?(:response_headers)
+      Rails.logger.error "Body: #{e.response_body}" if e.respond_to?(:response_body)
 
-      # Try a simple test to see if we can access anything with the tenant ID fix
-      begin
-        Rails.logger.info "Trying to get organizations instead..."
-        org_response = accounting_api.get_organisations(xero_tenant_id)
-        Rails.logger.info "Organizations call worked! Got #{org_response.organisations&.length || 0} orgs"
-
-        # If orgs work but contacts don't, it might be a permissions issue
-        if org_response.organisations&.any?
-          org = org_response.organisations.first
-          Rails.logger.info "First org: #{org.name}"
-        end
-      rescue => org_error
-        Rails.logger.error "Organizations call also failed: #{org_error.message}"
+      # Check if it's a token issue
+      if e.code == 401
+        Rails.logger.error "Authentication failed - token may be invalid"
+      elsif e.code == 404
+        Rails.logger.error "API endpoint not found - check tenant ID and API version"
       end
 
       raise e
     rescue => e
-      Rails.logger.error "Unexpected error during Xero sync: #{e.class.name}: #{e.message}"
+      Rails.logger.error "Unexpected error: #{e.class.name}: #{e.message}"
       Rails.logger.error e.backtrace.join("\n") if e.backtrace
       raise e
+    end
+  end
+
+  # Helper method to check if token is expired (from official sample)
+  def token_expired?(token_set)
+    return true unless token_set['access_token']
+
+    # Decode the JWT token to check expiration
+    begin
+      require 'jwt'
+      decoded_token = JWT.decode(token_set['access_token'], nil, false)
+      exp = decoded_token[0]['exp']
+      return Time.at(exp) <= Time.now
+    rescue
+      # If we can't decode, assume it's expired
+      return true
     end
   end
 end

@@ -65,5 +65,6 @@ group :test do
 end
 
 gem "xero-ruby", "~> 12.0"
-
+gem 'jwt'
 gem "dotenv-rails", "~> 3.1"
+gem "jwt"
