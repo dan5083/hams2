@@ -1,0 +1,1417 @@
+  [1m[35mSQL (2.0ms)[0m  [1m[35mSET search_path TO public /*application='Hams2'*/[0m
+  [1m[35m (1655.8ms)[0m  [1m[35mCREATE DATABASE "hams2_development" ENCODING = 'unicode' /*application='Hams2'*/[0m
+  [1m[35mSQL (0.2ms)[0m  [1m[35mSET search_path TO public /*application='Hams2'*/[0m
+  [1m[35m (1058.3ms)[0m  [1m[35mCREATE DATABASE "hams2_test" ENCODING = 'unicode' /*application='Hams2'*/[0m
+Started GET "/" for 127.0.0.1 at 2025-08-11 20:53:50 +0100
+  [1m[35m (40.9ms)[0m  [1m[35mCREATE TABLE "schema_migrations" ("version" character varying NOT NULL PRIMARY KEY) /*application='Hams2'*/[0m
+  [1m[35m (34.9ms)[0m  [1m[35mCREATE TABLE "ar_internal_metadata" ("key" character varying NOT NULL PRIMARY KEY, "value" character varying, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.7ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+Processing by Rails::WelcomeController#index as HTML
+  Rendering /home/daniel/.rbenv/versions/3.3.5/lib/ruby/gems/3.3.0/gems/railties-8.0.2/lib/rails/templates/rails/welcome/index.html.erb
+  Rendered /home/daniel/.rbenv/versions/3.3.5/lib/ruby/gems/3.3.0/gems/railties-8.0.2/lib/rails/templates/rails/welcome/index.html.erb (Duration: 1.0ms | GC: 0.0ms)
+Completed 200 OK in 78ms (Views: 9.5ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 16.6ms)
+
+
+  [1m[35m (1.6ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.8ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (1.0ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Create (6.1ms)[0m  [1m[32mINSERT INTO "ar_internal_metadata" ("key", "value", "created_at", "updated_at") VALUES ('environment', 'development', '2025-08-11 19:55:56.523589', '2025-08-11 19:55:56.523593') RETURNING "key" /*application='Hams2'*/[0m
+Migrating to CreateUsers (20250811195519)
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (32.2ms)[0m  [1m[35mCREATE TABLE "users" ("id" bigserial primary key, "email_address" character varying NOT NULL, "password_digest" character varying NOT NULL, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL) /*application='Hams2'*/[0m
+  [1m[35m (12.6ms)[0m  [1m[35mCREATE UNIQUE INDEX "index_users_on_email_address" ON "users" ("email_address") /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Create (0.7ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES ('20250811195519') RETURNING "version" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (15.4ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+Migrating to CreateSessions (20250811195521)
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (41.4ms)[0m  [1m[35mCREATE TABLE "sessions" ("id" bigserial primary key, "user_id" bigint NOT NULL, "ip_address" character varying, "user_agent" character varying, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL, CONSTRAINT "fk_rails_758836b4f0"
+FOREIGN KEY ("user_id")
+  REFERENCES "users" ("id")
+) /*application='Hams2'*/[0m
+  [1m[35m (13.7ms)[0m  [1m[35mCREATE INDEX "index_sessions_on_user_id" ON "sessions" ("user_id") /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Create (0.3ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES ('20250811195521') RETURNING "version" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[35m (0.4ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.4ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[35m (0.3ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.6ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (0.6ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+  [1m[35m (0.3ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.2ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+Started GET "/" for ::1 at 2025-08-11 21:07:15 +0100
+  [1m[36mActiveRecord::SchemaMigration Load (1.9ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  
+ActiveRecord::PendingMigrationError (
+
+Migrations are pending. To resolve this issue, run:
+
+        bin/rails db:migrate
+
+You have 1 pending migration:
+
+db/migrate/20250811195719_add_fields_to_users.rb
+
+
+):
+  
+activerecord (8.0.2) lib/active_record/migration.rb:743:in `check_pending_migrations'
+activerecord (8.0.2) lib/active_record/migration.rb:660:in `block (2 levels) in call'
+activesupport (8.0.2) lib/active_support/file_update_checker.rb:85:in `execute'
+activerecord (8.0.2) lib/active_record/migration.rb:665:in `block in call'
+activerecord (8.0.2) lib/active_record/migration.rb:657:in `synchronize'
+activerecord (8.0.2) lib/active_record/migration.rb:657:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/callbacks.rb:31:in `block in call'
+activesupport (8.0.2) lib/active_support/callbacks.rb:100:in `run_callbacks'
+actionpack (8.0.2) lib/action_dispatch/middleware/callbacks.rb:30:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/executor.rb:16:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/actionable_exceptions.rb:18:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/debug_exceptions.rb:31:in `call'
+web-console (4.2.1) lib/web_console/middleware.rb:132:in `call_app'
+web-console (4.2.1) lib/web_console/middleware.rb:28:in `block in call'
+web-console (4.2.1) lib/web_console/middleware.rb:17:in `catch'
+web-console (4.2.1) lib/web_console/middleware.rb:17:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/show_exceptions.rb:32:in `call'
+railties (8.0.2) lib/rails/rack/logger.rb:41:in `call_app'
+railties (8.0.2) lib/rails/rack/logger.rb:29:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/remote_ip.rb:96:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/request_id.rb:34:in `call'
+rack (3.2.0) lib/rack/method_override.rb:28:in `call'
+rack (3.2.0) lib/rack/runtime.rb:24:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/server_timing.rb:61:in `block in call'
+actionpack (8.0.2) lib/action_dispatch/middleware/server_timing.rb:26:in `collect_events'
+actionpack (8.0.2) lib/action_dispatch/middleware/server_timing.rb:60:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/executor.rb:16:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/static.rb:27:in `call'
+rack (3.2.0) lib/rack/sendfile.rb:114:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/host_authorization.rb:143:in `call'
+railties (8.0.2) lib/rails/engine.rb:535:in `call'
+puma (6.6.1) lib/puma/configuration.rb:279:in `call'
+puma (6.6.1) lib/puma/request.rb:99:in `block in handle_request'
+puma (6.6.1) lib/puma/thread_pool.rb:390:in `with_force_shutdown'
+puma (6.6.1) lib/puma/request.rb:98:in `handle_request'
+puma (6.6.1) lib/puma/server.rb:472:in `process_client'
+puma (6.6.1) lib/puma/server.rb:254:in `block in run'
+puma (6.6.1) lib/puma/thread_pool.rb:167:in `block in spawn_thread'
+Started GET "/favicon.ico" for ::1 at 2025-08-11 21:07:16 +0100
+  [1m[36mActiveRecord::SchemaMigration Load (0.9ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  
+ActiveRecord::PendingMigrationError (
+
+Migrations are pending. To resolve this issue, run:
+
+        bin/rails db:migrate
+
+You have 1 pending migration:
+
+db/migrate/20250811195719_add_fields_to_users.rb
+
+
+):
+  
+activerecord (8.0.2) lib/active_record/migration.rb:743:in `check_pending_migrations'
+activerecord (8.0.2) lib/active_record/migration.rb:660:in `block (2 levels) in call'
+activesupport (8.0.2) lib/active_support/file_update_checker.rb:85:in `execute'
+activerecord (8.0.2) lib/active_record/migration.rb:665:in `block in call'
+activerecord (8.0.2) lib/active_record/migration.rb:657:in `synchronize'
+activerecord (8.0.2) lib/active_record/migration.rb:657:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/callbacks.rb:31:in `block in call'
+activesupport (8.0.2) lib/active_support/callbacks.rb:100:in `run_callbacks'
+actionpack (8.0.2) lib/action_dispatch/middleware/callbacks.rb:30:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/executor.rb:16:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/actionable_exceptions.rb:18:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/debug_exceptions.rb:31:in `call'
+web-console (4.2.1) lib/web_console/middleware.rb:132:in `call_app'
+web-console (4.2.1) lib/web_console/middleware.rb:28:in `block in call'
+web-console (4.2.1) lib/web_console/middleware.rb:17:in `catch'
+web-console (4.2.1) lib/web_console/middleware.rb:17:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/show_exceptions.rb:32:in `call'
+railties (8.0.2) lib/rails/rack/logger.rb:41:in `call_app'
+railties (8.0.2) lib/rails/rack/logger.rb:29:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/remote_ip.rb:96:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/request_id.rb:34:in `call'
+rack (3.2.0) lib/rack/method_override.rb:28:in `call'
+rack (3.2.0) lib/rack/runtime.rb:24:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/server_timing.rb:61:in `block in call'
+actionpack (8.0.2) lib/action_dispatch/middleware/server_timing.rb:26:in `collect_events'
+actionpack (8.0.2) lib/action_dispatch/middleware/server_timing.rb:60:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/executor.rb:16:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/static.rb:27:in `call'
+rack (3.2.0) lib/rack/sendfile.rb:114:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/host_authorization.rb:143:in `call'
+railties (8.0.2) lib/rails/engine.rb:535:in `call'
+puma (6.6.1) lib/puma/configuration.rb:279:in `call'
+puma (6.6.1) lib/puma/request.rb:99:in `block in handle_request'
+puma (6.6.1) lib/puma/thread_pool.rb:390:in `with_force_shutdown'
+puma (6.6.1) lib/puma/request.rb:98:in `handle_request'
+puma (6.6.1) lib/puma/server.rb:472:in `process_client'
+puma (6.6.1) lib/puma/server.rb:254:in `block in run'
+puma (6.6.1) lib/puma/thread_pool.rb:167:in `block in spawn_thread'
+Started GET "/service-worker.js" for ::1 at 2025-08-11 21:07:18 +0100
+  [1m[36mActiveRecord::SchemaMigration Load (0.8ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  
+ActiveRecord::PendingMigrationError (
+
+Migrations are pending. To resolve this issue, run:
+
+        bin/rails db:migrate
+
+You have 1 pending migration:
+
+db/migrate/20250811195719_add_fields_to_users.rb
+
+
+):
+  
+activerecord (8.0.2) lib/active_record/migration.rb:743:in `check_pending_migrations'
+activerecord (8.0.2) lib/active_record/migration.rb:660:in `block (2 levels) in call'
+activesupport (8.0.2) lib/active_support/file_update_checker.rb:85:in `execute'
+activerecord (8.0.2) lib/active_record/migration.rb:665:in `block in call'
+activerecord (8.0.2) lib/active_record/migration.rb:657:in `synchronize'
+activerecord (8.0.2) lib/active_record/migration.rb:657:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/callbacks.rb:31:in `block in call'
+activesupport (8.0.2) lib/active_support/callbacks.rb:100:in `run_callbacks'
+actionpack (8.0.2) lib/action_dispatch/middleware/callbacks.rb:30:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/executor.rb:16:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/actionable_exceptions.rb:18:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/debug_exceptions.rb:31:in `call'
+web-console (4.2.1) lib/web_console/middleware.rb:132:in `call_app'
+web-console (4.2.1) lib/web_console/middleware.rb:28:in `block in call'
+web-console (4.2.1) lib/web_console/middleware.rb:17:in `catch'
+web-console (4.2.1) lib/web_console/middleware.rb:17:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/show_exceptions.rb:32:in `call'
+railties (8.0.2) lib/rails/rack/logger.rb:41:in `call_app'
+railties (8.0.2) lib/rails/rack/logger.rb:29:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/remote_ip.rb:96:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/request_id.rb:34:in `call'
+rack (3.2.0) lib/rack/method_override.rb:28:in `call'
+rack (3.2.0) lib/rack/runtime.rb:24:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/server_timing.rb:61:in `block in call'
+actionpack (8.0.2) lib/action_dispatch/middleware/server_timing.rb:26:in `collect_events'
+actionpack (8.0.2) lib/action_dispatch/middleware/server_timing.rb:60:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/executor.rb:16:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/static.rb:27:in `call'
+rack (3.2.0) lib/rack/sendfile.rb:114:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/host_authorization.rb:143:in `call'
+railties (8.0.2) lib/rails/engine.rb:535:in `call'
+puma (6.6.1) lib/puma/configuration.rb:279:in `call'
+puma (6.6.1) lib/puma/request.rb:99:in `block in handle_request'
+puma (6.6.1) lib/puma/thread_pool.rb:390:in `with_force_shutdown'
+puma (6.6.1) lib/puma/request.rb:98:in `handle_request'
+puma (6.6.1) lib/puma/server.rb:472:in `process_client'
+puma (6.6.1) lib/puma/server.rb:254:in `block in run'
+puma (6.6.1) lib/puma/thread_pool.rb:167:in `block in spawn_thread'
+Started GET "/service-worker.js" for ::1 at 2025-08-11 21:07:47 +0100
+  [1m[36mActiveRecord::SchemaMigration Load (1.7ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  
+ActiveRecord::PendingMigrationError (
+
+Migrations are pending. To resolve this issue, run:
+
+        bin/rails db:migrate
+
+You have 1 pending migration:
+
+db/migrate/20250811195719_add_fields_to_users.rb
+
+
+):
+  
+activerecord (8.0.2) lib/active_record/migration.rb:743:in `check_pending_migrations'
+activerecord (8.0.2) lib/active_record/migration.rb:660:in `block (2 levels) in call'
+activesupport (8.0.2) lib/active_support/file_update_checker.rb:85:in `execute'
+activerecord (8.0.2) lib/active_record/migration.rb:665:in `block in call'
+activerecord (8.0.2) lib/active_record/migration.rb:657:in `synchronize'
+activerecord (8.0.2) lib/active_record/migration.rb:657:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/callbacks.rb:31:in `block in call'
+activesupport (8.0.2) lib/active_support/callbacks.rb:100:in `run_callbacks'
+actionpack (8.0.2) lib/action_dispatch/middleware/callbacks.rb:30:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/executor.rb:16:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/actionable_exceptions.rb:18:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/debug_exceptions.rb:31:in `call'
+web-console (4.2.1) lib/web_console/middleware.rb:132:in `call_app'
+web-console (4.2.1) lib/web_console/middleware.rb:28:in `block in call'
+web-console (4.2.1) lib/web_console/middleware.rb:17:in `catch'
+web-console (4.2.1) lib/web_console/middleware.rb:17:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/show_exceptions.rb:32:in `call'
+railties (8.0.2) lib/rails/rack/logger.rb:41:in `call_app'
+railties (8.0.2) lib/rails/rack/logger.rb:29:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/remote_ip.rb:96:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/request_id.rb:34:in `call'
+rack (3.2.0) lib/rack/method_override.rb:28:in `call'
+rack (3.2.0) lib/rack/runtime.rb:24:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/server_timing.rb:61:in `block in call'
+actionpack (8.0.2) lib/action_dispatch/middleware/server_timing.rb:26:in `collect_events'
+actionpack (8.0.2) lib/action_dispatch/middleware/server_timing.rb:60:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/executor.rb:16:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/static.rb:27:in `call'
+rack (3.2.0) lib/rack/sendfile.rb:114:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/host_authorization.rb:143:in `call'
+railties (8.0.2) lib/rails/engine.rb:535:in `call'
+puma (6.6.1) lib/puma/configuration.rb:279:in `call'
+puma (6.6.1) lib/puma/request.rb:99:in `block in handle_request'
+puma (6.6.1) lib/puma/thread_pool.rb:390:in `with_force_shutdown'
+puma (6.6.1) lib/puma/request.rb:98:in `handle_request'
+puma (6.6.1) lib/puma/server.rb:472:in `process_client'
+puma (6.6.1) lib/puma/server.rb:254:in `block in run'
+puma (6.6.1) lib/puma/thread_pool.rb:167:in `block in spawn_thread'
+  [1m[35m (1.2ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.8ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (0.9ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+Migrating to AddFieldsToUsers (20250811195719)
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (3.5ms)[0m  [1m[35mALTER TABLE "users" ADD "username" character varying /*application='Hams2'*/[0m
+  [1m[35m (0.3ms)[0m  [1m[35mALTER TABLE "users" ADD "full_name" character varying /*application='Hams2'*/[0m
+  [1m[35m (0.6ms)[0m  [1m[35mALTER TABLE "users" ADD "enabled" boolean /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Create (0.4ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES ('20250811195719') RETURNING "version" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (9.0ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[35m (0.4ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.3ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+Started GET "/" for ::1 at 2025-08-11 21:08:23 +0100
+  [1m[36mActiveRecord::SchemaMigration Load (1.2ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+Processing by SessionsController#new as HTML
+  Rendering layout layouts/application.html.erb
+  Rendering sessions/new.html.erb within layouts/application
+  Rendered sessions/new.html.erb within layouts/application (Duration: 14.5ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 36.5ms | GC: 0.0ms)
+Completed 200 OK in 134ms (Views: 41.9ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/assets/application-8b441ae0.css" for ::1 at 2025-08-11 21:08:24 +0100
+Started GET "/assets/tailwind-4dce4948.css" for ::1 at 2025-08-11 21:08:24 +0100
+Started GET "/service-worker.js" for ::1 at 2025-08-11 21:08:26 +0100
+  
+ActionController::RoutingError (No route matches [GET] "/service-worker.js"):
+  
+Started GET "/service-worker.js" for ::1 at 2025-08-11 21:08:55 +0100
+  
+ActionController::RoutingError (No route matches [GET] "/service-worker.js"):
+  
+Started GET "/passwords/new" for ::1 at 2025-08-11 21:09:03 +0100
+Processing by PasswordsController#new as HTML
+  Rendering layout layouts/application.html.erb
+  Rendering passwords/new.html.erb within layouts/application
+  Rendered passwords/new.html.erb within layouts/application (Duration: 2.5ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 4.0ms | GC: 0.0ms)
+Completed 200 OK in 17ms (Views: 4.8ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/registrations/new" for ::1 at 2025-08-11 21:09:15 +0100
+Processing by RegistrationsController#new as HTML
+Redirected to http://[::1]:3000/session/new
+Filter chain halted as :require_authentication rendered or redirected
+Completed 302 Found in 22ms (ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/session/new" for ::1 at 2025-08-11 21:09:15 +0100
+Processing by SessionsController#new as HTML
+  Rendering layout layouts/application.html.erb
+  Rendering sessions/new.html.erb within layouts/application
+  Rendered sessions/new.html.erb within layouts/application (Duration: 2.2ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 3.3ms | GC: 0.0ms)
+Completed 200 OK in 17ms (Views: 3.8ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 1.2ms)
+
+
+Started GET "/service-worker.js" for ::1 at 2025-08-11 21:09:49 +0100
+  
+ActionController::RoutingError (No route matches [GET] "/service-worker.js"):
+  
+Started GET "/" for ::1 at 2025-08-11 21:10:34 +0100
+Processing by SessionsController#new as HTML
+  Rendering layout layouts/application.html.erb
+  Rendering sessions/new.html.erb within layouts/application
+  Rendered sessions/new.html.erb within layouts/application (Duration: 4.1ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 6.7ms | GC: 0.0ms)
+Completed 200 OK in 55ms (Views: 8.0ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/service-worker.js" for ::1 at 2025-08-11 21:10:36 +0100
+  
+ActionController::RoutingError (No route matches [GET] "/service-worker.js"):
+  
+Started GET "/service-worker.js" for ::1 at 2025-08-11 21:11:31 +0100
+  
+ActionController::RoutingError (No route matches [GET] "/service-worker.js"):
+  
+Started GET "/registrations/new" for ::1 at 2025-08-11 21:14:41 +0100
+Processing by RegistrationsController#new as HTML
+Redirected to http://localhost:3000/session/new
+Filter chain halted as :require_authentication rendered or redirected
+Completed 302 Found in 17ms (ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/session/new" for ::1 at 2025-08-11 21:14:41 +0100
+Processing by SessionsController#new as HTML
+  Rendering layout layouts/application.html.erb
+  Rendering sessions/new.html.erb within layouts/application
+  Rendered sessions/new.html.erb within layouts/application (Duration: 2.1ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 4.2ms | GC: 0.0ms)
+Completed 200 OK in 18ms (Views: 4.9ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 1.3ms)
+
+
+Started GET "/assets/application-8b441ae0.css" for ::1 at 2025-08-11 21:12:57 +0100
+Started GET "/assets/tailwind-4dce4948.css" for ::1 at 2025-08-11 21:12:57 +0100
+Started GET "/service-worker.js" for ::1 at 2025-08-11 21:12:58 +0100
+  
+ActionController::RoutingError (No route matches [GET] "/service-worker.js"):
+  
+Started GET "/registrations/new" for ::1 at 2025-08-11 21:13:26 +0100
+Processing by RegistrationsController#new as HTML
+Redirected to http://localhost:3000/session/new
+Filter chain halted as :require_authentication rendered or redirected
+Completed 302 Found in 17ms (ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/session/new" for ::1 at 2025-08-11 21:13:26 +0100
+Processing by SessionsController#new as HTML
+  Rendering layout layouts/application.html.erb
+  Rendering sessions/new.html.erb within layouts/application
+  Rendered sessions/new.html.erb within layouts/application (Duration: 4.0ms | GC: 2.4ms)
+  Rendered layout layouts/application.html.erb (Duration: 4.9ms | GC: 2.4ms)
+Completed 200 OK in 18ms (Views: 5.3ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 2.4ms)
+
+
+Started GET "/service-worker.js" for ::1 at 2025-08-11 21:13:57 +0100
+  
+ActionController::RoutingError (No route matches [GET] "/service-worker.js"):
+  
+Started GET "/" for ::1 at 2025-08-11 21:17:32 +0100
+  [1m[36mActiveRecord::SchemaMigration Load (2.0ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+Processing by SessionsController#new as HTML
+  Rendering layout layouts/application.html.erb
+  Rendering sessions/new.html.erb within layouts/application
+  Rendered sessions/new.html.erb within layouts/application (Duration: 14.9ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 31.1ms | GC: 0.0ms)
+Completed 200 OK in 98ms (Views: 37.2ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/service-worker.js" for ::1 at 2025-08-11 21:17:34 +0100
+  
+ActionController::RoutingError (No route matches [GET] "/service-worker.js"):
+  
+Started GET "/registrations/new" for ::1 at 2025-08-11 21:18:01 +0100
+Processing by RegistrationsController#new as HTML
+  Rendering layout layouts/application.html.erb
+  Rendering registrations/new.html.erb within layouts/application
+  Rendered registrations/new.html.erb within layouts/application (Duration: 8.9ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 10.1ms | GC: 0.0ms)
+Completed 200 OK in 133ms (Views: 10.8ms | ActiveRecord: 32.0ms (0 queries, 0 cached) | GC: 1.1ms)
+
+
+Started GET "/service-worker.js" for ::1 at 2025-08-11 21:18:04 +0100
+  
+ActionController::RoutingError (No route matches [GET] "/service-worker.js"):
+  
+Started GET "/service-worker.js" for ::1 at 2025-08-11 21:18:11 +0100
+  
+ActionController::RoutingError (No route matches [GET] "/service-worker.js"):
+  
+Started GET "/service-worker.js" for ::1 at 2025-08-11 21:18:33 +0100
+  
+ActionController::RoutingError (No route matches [GET] "/service-worker.js"):
+  
+Started GET "/service-worker.js" for ::1 at 2025-08-11 21:19:34 +0100
+  
+ActionController::RoutingError (No route matches [GET] "/service-worker.js"):
+  
+Started GET "/registrations/new" for ::1 at 2025-08-11 21:20:42 +0100
+Processing by RegistrationsController#new as HTML
+  Rendering layout layouts/application.html.erb
+  Rendering registrations/new.html.erb within layouts/application
+  Rendered registrations/new.html.erb within layouts/application (Duration: 4.1ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 5.8ms | GC: 0.0ms)
+Completed 200 OK in 24ms (Views: 6.4ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/service-worker.js" for ::1 at 2025-08-11 21:20:44 +0100
+  
+ActionController::RoutingError (No route matches [GET] "/service-worker.js"):
+  
+Started GET "/service-worker.js" for ::1 at 2025-08-11 21:21:13 +0100
+  
+ActionController::RoutingError (No route matches [GET] "/service-worker.js"):
+  
+Started GET "/session/new" for ::1 at 2025-08-11 21:22:29 +0100
+Processing by SessionsController#new as HTML
+  Rendering layout layouts/application.html.erb
+  Rendering sessions/new.html.erb within layouts/application
+  Rendered sessions/new.html.erb within layouts/application (Duration: 3.4ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 5.4ms | GC: 0.0ms)
+Completed 200 OK in 31ms (Views: 6.3ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started POST "/registrations" for ::1 at 2025-08-11 21:22:30 +0100
+Processing by RegistrationsController#create as TURBO_STREAM
+  Parameters: {"authenticity_token"=>"[FILTERED]", "user"=>{"full_name"=>"Daniel Bayliss", "username"=>"Dan", "email_address"=>"[FILTERED]", "password"=>"[FILTERED]", "password_confirmation"=>"[FILTERED]"}, "commit"=>"Register"}
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*action='create',application='Hams2',controller='registrations'*/[0m
+  ↳ app/controllers/registrations_controller.rb:13:in `create'
+  [1m[36mUser Exists? (8.4ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."email_address" = 'daniel@hardanodisingstl.com' LIMIT 1 /*action='create',application='Hams2',controller='registrations'*/[0m
+  ↳ app/controllers/registrations_controller.rb:13:in `create'
+  [1m[36mUser Exists? (0.7ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."username" = 'Dan' LIMIT 1 /*action='create',application='Hams2',controller='registrations'*/[0m
+  ↳ app/controllers/registrations_controller.rb:13:in `create'
+  [1m[36mUser Create (2.3ms)[0m  [1m[32mINSERT INTO "users" ("email_address", "password_digest", "created_at", "updated_at", "username", "full_name", "enabled") VALUES ('daniel@hardanodisingstl.com', '$2a$12$xb8ItZPgDyFHF3m2bBs7beW3jeCATpiQYl9LTBOocADer81p0oQ32', '2025-08-11 20:22:31.468939', '2025-08-11 20:22:31.468939', 'Dan', 'Daniel Bayliss', TRUE) RETURNING "id" /*action='create',application='Hams2',controller='registrations'*/[0m
+  ↳ app/controllers/registrations_controller.rb:13:in `create'
+  [1m[36mTRANSACTION (7.6ms)[0m  [1m[35mCOMMIT /*action='create',application='Hams2',controller='registrations'*/[0m
+  ↳ app/controllers/registrations_controller.rb:13:in `create'
+Redirected to http://localhost:3000/session/new
+Completed 302 Found in 702ms (ActiveRecord: 19.5ms (3 queries, 0 cached) | GC: 7.6ms)
+
+
+Started GET "/session/new" for ::1 at 2025-08-11 21:22:31 +0100
+Processing by SessionsController#new as TURBO_STREAM
+  Rendering layout layouts/application.html.erb
+  Rendering sessions/new.html.erb within layouts/application
+  Rendered sessions/new.html.erb within layouts/application (Duration: 8.2ms | GC: 4.9ms)
+  Rendered layout layouts/application.html.erb (Duration: 10.0ms | GC: 4.9ms)
+Completed 200 OK in 28ms (Views: 10.7ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 4.9ms)
+
+
+Started GET "/passwords/new" for ::1 at 2025-08-11 21:22:43 +0100
+Processing by PasswordsController#new as HTML
+  Rendering layout layouts/application.html.erb
+  Rendering passwords/new.html.erb within layouts/application
+  Rendered passwords/new.html.erb within layouts/application (Duration: 1.9ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 3.0ms | GC: 0.0ms)
+Completed 200 OK in 33ms (Views: 3.9ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started POST "/session" for ::1 at 2025-08-11 21:22:44 +0100
+Processing by SessionsController#create as TURBO_STREAM
+  Parameters: {"authenticity_token"=>"[FILTERED]", "email_address"=>"[FILTERED]", "password"=>"[FILTERED]", "commit"=>"Sign in"}
+[31mUnpermitted parameters: :authenticity_token, :commit. Context: { controller: SessionsController, action: create, request: #<ActionDispatch::Request:0x00007c624fee5650>, params: {"authenticity_token"=>"[FILTERED]", "email_address"=>"[FILTERED]", "password"=>"[FILTERED]", "commit"=>"Sign in", "controller"=>"sessions", "action"=>"create"} }[0m
+  [1m[36mUser Load (0.8ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'daniel@hardanodisingstl.com' LIMIT 1 /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/sessions_controller.rb:9:in `create'
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:42:in `start_new_session_for'
+  [1m[36mSession Create (5.0ms)[0m  [1m[32mINSERT INTO "sessions" ("user_id", "ip_address", "user_agent", "created_at", "updated_at") VALUES (1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36', '2025-08-11 20:22:44.835271', '2025-08-11 20:22:44.835271') RETURNING "id" /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:42:in `start_new_session_for'
+  [1m[36mTRANSACTION (6.1ms)[0m  [1m[35mCOMMIT /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:42:in `start_new_session_for'
+Redirected to http://localhost:3000/registrations/new
+Completed 302 Found in 637ms (ActiveRecord: 16.8ms (2 queries, 0 cached) | GC: 1.8ms)
+
+
+Started GET "/registrations/new" for ::1 at 2025-08-11 21:22:44 +0100
+Processing by RegistrationsController#new as TURBO_STREAM
+  Rendering layout layouts/application.html.erb
+  Rendering registrations/new.html.erb within layouts/application
+  Rendered registrations/new.html.erb within layouts/application (Duration: 2.3ms | GC: 0.2ms)
+  Rendered layout layouts/application.html.erb (Duration: 3.2ms | GC: 0.2ms)
+Completed 200 OK in 16ms (Views: 3.6ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.2ms)
+
+
+Started POST "/session" for ::1 at 2025-08-11 21:23:10 +0100
+Processing by SessionsController#create as TURBO_STREAM
+  Parameters: {"authenticity_token"=>"[FILTERED]", "email_address"=>"[FILTERED]", "password"=>"[FILTERED]", "commit"=>"Sign in"}
+[31mUnpermitted parameters: :authenticity_token, :commit. Context: { controller: SessionsController, action: create, request: #<ActionDispatch::Request:0x00007c624fe9fab0>, params: {"authenticity_token"=>"[FILTERED]", "email_address"=>"[FILTERED]", "password"=>"[FILTERED]", "commit"=>"Sign in", "controller"=>"sessions", "action"=>"create"} }[0m
+  [1m[36mUser Load (0.7ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'daniel@hardanodisingstl.com' LIMIT 1 /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/sessions_controller.rb:9:in `create'
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:42:in `start_new_session_for'
+  [1m[36mSession Create (2.1ms)[0m  [1m[32mINSERT INTO "sessions" ("user_id", "ip_address", "user_agent", "created_at", "updated_at") VALUES (1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36', '2025-08-11 20:23:11.259026', '2025-08-11 20:23:11.259026') RETURNING "id" /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:42:in `start_new_session_for'
+  [1m[36mTRANSACTION (5.3ms)[0m  [1m[35mCOMMIT /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:42:in `start_new_session_for'
+Redirected to http://localhost:3000/
+Completed 302 Found in 318ms (ActiveRecord: 8.4ms (2 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/" for ::1 at 2025-08-11 21:23:11 +0100
+Processing by SessionsController#new as TURBO_STREAM
+  Rendering layout layouts/application.html.erb
+  Rendering sessions/new.html.erb within layouts/application
+  Rendered sessions/new.html.erb within layouts/application (Duration: 1.4ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 2.3ms | GC: 0.0ms)
+Completed 200 OK in 14ms (Views: 2.7ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/service-worker.js" for ::1 at 2025-08-11 21:23:42 +0100
+  
+ActionController::RoutingError (No route matches [GET] "/service-worker.js"):
+  
+Started GET "/" for ::1 at 2025-08-11 21:23:56 +0100
+Processing by SessionsController#new as */*
+  Rendering layout layouts/application.html.erb
+  Rendering sessions/new.html.erb within layouts/application
+  Rendered sessions/new.html.erb within layouts/application (Duration: 1.9ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 3.1ms | GC: 0.0ms)
+Completed 200 OK in 16ms (Views: 3.6ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/.well-known/appspecific/com.chrome.devtools.json" for ::1 at 2025-08-11 21:23:56 +0100
+  
+ActionController::RoutingError (No route matches [GET] "/.well-known/appspecific/com.chrome.devtools.json"):
+  
+Started GET "/assets/stimulus.min-2395e199.js.map" for ::1 at 2025-08-11 21:23:56 +0100
+Started GET "/assets/turbo.min-5f3b7fda.js.map" for ::1 at 2025-08-11 21:23:56 +0100
+Started POST "/session" for ::1 at 2025-08-11 21:24:01 +0100
+Processing by SessionsController#create as TURBO_STREAM
+  Parameters: {"authenticity_token"=>"[FILTERED]", "email_address"=>"[FILTERED]", "password"=>"[FILTERED]", "commit"=>"Sign in"}
+[31mUnpermitted parameters: :authenticity_token, :commit. Context: { controller: SessionsController, action: create, request: #<ActionDispatch::Request:0x00007c626d77f500>, params: {"authenticity_token"=>"[FILTERED]", "email_address"=>"[FILTERED]", "password"=>"[FILTERED]", "commit"=>"Sign in", "controller"=>"sessions", "action"=>"create"} }[0m
+  [1m[36mUser Load (0.7ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'daniel@hardanodisingstl.com' LIMIT 1 /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/sessions_controller.rb:9:in `create'
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:42:in `start_new_session_for'
+  [1m[36mSession Create (1.9ms)[0m  [1m[32mINSERT INTO "sessions" ("user_id", "ip_address", "user_agent", "created_at", "updated_at") VALUES (1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36', '2025-08-11 20:24:01.379033', '2025-08-11 20:24:01.379033') RETURNING "id" /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:42:in `start_new_session_for'
+  [1m[36mTRANSACTION (5.0ms)[0m  [1m[35mCOMMIT /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:42:in `start_new_session_for'
+Redirected to http://localhost:3000/
+Completed 302 Found in 319ms (ActiveRecord: 7.8ms (2 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/" for ::1 at 2025-08-11 21:24:01 +0100
+Processing by SessionsController#new as TURBO_STREAM
+  Rendering layout layouts/application.html.erb
+  Rendering sessions/new.html.erb within layouts/application
+  Rendered sessions/new.html.erb within layouts/application (Duration: 1.4ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 2.3ms | GC: 0.0ms)
+Completed 200 OK in 14ms (Views: 2.6ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started POST "/session" for ::1 at 2025-08-11 21:24:38 +0100
+Processing by SessionsController#create as TURBO_STREAM
+  Parameters: {"authenticity_token"=>"[FILTERED]", "email_address"=>"[FILTERED]", "password"=>"[FILTERED]", "commit"=>"Sign in"}
+[31mUnpermitted parameters: :authenticity_token, :commit. Context: { controller: SessionsController, action: create, request: #<ActionDispatch::Request:0x00007c626c113a28>, params: {"authenticity_token"=>"[FILTERED]", "email_address"=>"[FILTERED]", "password"=>"[FILTERED]", "commit"=>"Sign in", "controller"=>"sessions", "action"=>"create"} }[0m
+  [1m[36mUser Load (1.1ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'daniel@hardanodisingstl.com' LIMIT 1 /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/sessions_controller.rb:9:in `create'
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:42:in `start_new_session_for'
+  [1m[36mSession Create (2.1ms)[0m  [1m[32mINSERT INTO "sessions" ("user_id", "ip_address", "user_agent", "created_at", "updated_at") VALUES (1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36', '2025-08-11 20:24:39.145196', '2025-08-11 20:24:39.145196') RETURNING "id" /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:42:in `start_new_session_for'
+  [1m[36mTRANSACTION (18.3ms)[0m  [1m[35mCOMMIT /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:42:in `start_new_session_for'
+Redirected to http://localhost:3000/
+Completed 302 Found in 339ms (ActiveRecord: 21.6ms (2 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/" for ::1 at 2025-08-11 21:24:39 +0100
+Processing by SessionsController#new as TURBO_STREAM
+  Rendering layout layouts/application.html.erb
+  Rendering sessions/new.html.erb within layouts/application
+  Rendered sessions/new.html.erb within layouts/application (Duration: 1.4ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 2.3ms | GC: 0.0ms)
+Completed 200 OK in 14ms (Views: 2.7ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/" for ::1 at 2025-08-11 21:29:26 +0100
+  [1m[36mActiveRecord::SchemaMigration Load (1.9ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+Processing by DashboardController#index as HTML
+Redirected to http://[::1]:3000/session/new
+Filter chain halted as :require_authentication rendered or redirected
+Completed 302 Found in 57ms (ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/session/new" for ::1 at 2025-08-11 21:29:27 +0100
+Processing by SessionsController#new as HTML
+  Rendering layout layouts/application.html.erb
+  Rendering sessions/new.html.erb within layouts/application
+  Rendered sessions/new.html.erb within layouts/application (Duration: 6.6ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 25.4ms | GC: 0.0ms)
+Completed 200 OK in 70ms (Views: 32.1ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/service-worker.js" for ::1 at 2025-08-11 21:29:28 +0100
+  
+ActionController::RoutingError (No route matches [GET] "/service-worker.js"):
+  
+Started POST "/session" for ::1 at 2025-08-11 21:29:42 +0100
+Processing by SessionsController#create as TURBO_STREAM
+  Parameters: {"authenticity_token"=>"[FILTERED]", "email_address"=>"[FILTERED]", "password"=>"[FILTERED]", "commit"=>"Sign in"}
+[31mUnpermitted parameters: :authenticity_token, :commit. Context: { controller: SessionsController, action: create, request: #<ActionDispatch::Request:0x00007bd3b4dc0bf0>, params: {"authenticity_token"=>"[FILTERED]", "email_address"=>"[FILTERED]", "password"=>"[FILTERED]", "commit"=>"Sign in", "controller"=>"sessions", "action"=>"create"} }[0m
+  [1m[36mUser Load (0.9ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'daniel@hardanodisingstl.com' LIMIT 1 /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/sessions_controller.rb:9:in `create'
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:42:in `start_new_session_for'
+  [1m[36mSession Create (6.5ms)[0m  [1m[32mINSERT INTO "sessions" ("user_id", "ip_address", "user_agent", "created_at", "updated_at") VALUES (1, '::1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36', '2025-08-11 20:29:42.747739', '2025-08-11 20:29:42.747739') RETURNING "id" /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:42:in `start_new_session_for'
+  [1m[36mTRANSACTION (7.5ms)[0m  [1m[35mCOMMIT /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:42:in `start_new_session_for'
+Redirected to http://[::1]:3000/
+Completed 302 Found in 403ms (ActiveRecord: 34.1ms (2 queries, 0 cached) | GC: 0.8ms)
+
+
+Started GET "/" for ::1 at 2025-08-11 21:29:42 +0100
+Processing by DashboardController#index as TURBO_STREAM
+  [1m[36mSession Load (0.6ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = 5 LIMIT 1 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+  Rendering layout layouts/application.html.erb
+  Rendering dashboard/index.html.erb within layouts/application
+  Rendered dashboard/index.html.erb within layouts/application (Duration: 0.4ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 1.9ms | GC: 0.0ms)
+Completed 200 OK in 21ms (Views: 2.6ms | ActiveRecord: 0.6ms (1 query, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/service-worker.js" for ::1 at 2025-08-11 21:30:13 +0100
+  
+ActionController::RoutingError (No route matches [GET] "/service-worker.js"):
+  
+  [1m[35m (1.7ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (2.7ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (2.7ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+Migrating to CreateXeroContacts (20250812054513)
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (55.6ms)[0m  [1m[35mCREATE TABLE "xero_contacts" ("id" bigserial primary key, "name" character varying, "contact_status" character varying, "is_customer" boolean, "is_supplier" boolean, "merged_to_contact_id" character varying, "accounts_receivable_tax_type" character varying, "accounts_payable_tax_type" character varying, "xero_id" character varying, "xero_data" jsonb, "last_synced_at" timestamp, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Create (1.1ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES ('20250812054513') RETURNING "version" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (111.0ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[35m (1.6ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (1.4ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[35m (1.3ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (2.0ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (1.4ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+Migrating to CreateOrganizations (20250812064124)
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (47.8ms)[0m  [1m[35mCREATE TABLE "organizations" ("id" bigserial primary key, "name" character varying, "enabled" boolean, "is_customer" boolean, "is_supplier" boolean, "xero_contact_id" bigint NOT NULL, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL, CONSTRAINT "fk_rails_92de51f0a9"
+FOREIGN KEY ("xero_contact_id")
+  REFERENCES "xero_contacts" ("id")
+) /*application='Hams2'*/[0m
+  [1m[35m (11.4ms)[0m  [1m[35mCREATE INDEX "index_organizations_on_xero_contact_id" ON "organizations" ("xero_contact_id") /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Create (0.4ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES ('20250812064124') RETURNING "version" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (6.8ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[35m (0.4ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.3ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mXeroContact Count (52.6ms)[0m  [1m[34mSELECT COUNT(*) FROM "xero_contacts" /*application='Hams2'*/[0m
+  [1m[36mOrganization Count (4.5ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" /*application='Hams2'*/[0m
+  [1m[36mXeroContact Load (0.8ms)[0m  [1m[34mSELECT "xero_contacts".* FROM "xero_contacts" WHERE "xero_contacts"."xero_id" = 'demo-1' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mXeroContact Exists? (1.0ms)[0m  [1m[34mSELECT 1 AS one FROM "xero_contacts" WHERE "xero_contacts"."xero_id" = 'demo-1' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mXeroContact Create (15.4ms)[0m  [1m[32mINSERT INTO "xero_contacts" ("name", "contact_status", "is_customer", "is_supplier", "merged_to_contact_id", "accounts_receivable_tax_type", "accounts_payable_tax_type", "xero_id", "xero_data", "last_synced_at", "created_at", "updated_at") VALUES ('Acme Manufacturing Ltd', 'ACTIVE', TRUE, FALSE, NULL, 'OUTPUT', NULL, 'demo-1', '{"contact_id":"demo-1","name":"Acme Manufacturing Ltd","email_address":"accounts@acme.com","phones":[{"phone_number":"01234 567890"}]}', '2025-08-12 06:51:15.109059', '2025-08-12 06:51:15.111455', '2025-08-12 06:51:15.111455') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (12.4ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mXeroContact Load (0.4ms)[0m  [1m[34mSELECT "xero_contacts".* FROM "xero_contacts" WHERE "xero_contacts"."xero_id" = 'demo-2' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mXeroContact Exists? (1.1ms)[0m  [1m[34mSELECT 1 AS one FROM "xero_contacts" WHERE "xero_contacts"."xero_id" = 'demo-2' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mXeroContact Create (0.7ms)[0m  [1m[32mINSERT INTO "xero_contacts" ("name", "contact_status", "is_customer", "is_supplier", "merged_to_contact_id", "accounts_receivable_tax_type", "accounts_payable_tax_type", "xero_id", "xero_data", "last_synced_at", "created_at", "updated_at") VALUES ('Precision Engineering Co', 'ACTIVE', TRUE, FALSE, NULL, 'OUTPUT', NULL, 'demo-2', '{"contact_id":"demo-2","name":"Precision Engineering Co","email_address":"orders@precision-eng.co.uk","phones":[{"phone_number":"0161 123 4567"}]}', '2025-08-12 06:51:15.145167', '2025-08-12 06:51:15.147717', '2025-08-12 06:51:15.147717') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.3ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mXeroContact Count (0.6ms)[0m  [1m[34mSELECT COUNT(*) FROM "xero_contacts" /*application='Hams2'*/[0m
+  [1m[36mXeroContact Load (1.1ms)[0m  [1m[34mSELECT "xero_contacts".* FROM "xero_contacts" WHERE "xero_contacts"."xero_id" = 'demo-1' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mXeroContact Exists? (0.3ms)[0m  [1m[34mSELECT 1 AS one FROM "xero_contacts" WHERE "xero_contacts"."xero_id" = 'demo-1' AND "xero_contacts"."id" != 1 LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mXeroContact Update (1.3ms)[0m  [1m[33mUPDATE "xero_contacts" SET "last_synced_at" = '2025-08-12 06:52:39.554246', "updated_at" = '2025-08-12 06:52:39.560237' WHERE "xero_contacts"."id" = 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (6.7ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mXeroContact Load (0.5ms)[0m  [1m[34mSELECT "xero_contacts".* FROM "xero_contacts" WHERE "xero_contacts"."xero_id" = 'demo-2' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mXeroContact Exists? (0.8ms)[0m  [1m[34mSELECT 1 AS one FROM "xero_contacts" WHERE "xero_contacts"."xero_id" = 'demo-2' AND "xero_contacts"."id" != 2 LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mXeroContact Update (0.4ms)[0m  [1m[33mUPDATE "xero_contacts" SET "last_synced_at" = '2025-08-12 06:52:39.572433', "updated_at" = '2025-08-12 06:52:39.574597' WHERE "xero_contacts"."id" = 2 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.4ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mXeroContact Load (0.5ms)[0m  [1m[34mSELECT "xero_contacts".* FROM "xero_contacts" WHERE "xero_contacts"."contact_status" = 'ACTIVE' /*application='Hams2'*/[0m
+  [1m[36mOrganization Load (0.7ms)[0m  [1m[34mSELECT "organizations".* FROM "organizations" WHERE "organizations"."xero_contact_id" = 1 LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mOrganization Create (3.6ms)[0m  [1m[32mINSERT INTO "organizations" ("name", "enabled", "is_customer", "is_supplier", "xero_contact_id", "created_at", "updated_at") VALUES ('Acme Manufacturing Ltd', TRUE, TRUE, FALSE, 1, '2025-08-12 06:52:39.650200', '2025-08-12 06:52:39.650200') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (7.4ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mOrganization Load (0.4ms)[0m  [1m[34mSELECT "organizations".* FROM "organizations" WHERE "organizations"."xero_contact_id" = 2 LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mOrganization Create (0.8ms)[0m  [1m[32mINSERT INTO "organizations" ("name", "enabled", "is_customer", "is_supplier", "xero_contact_id", "created_at", "updated_at") VALUES ('Precision Engineering Co', TRUE, TRUE, FALSE, 2, '2025-08-12 06:52:39.665563', '2025-08-12 06:52:39.665563') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (4.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mOrganization Count (0.4ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" /*application='Hams2'*/[0m
+  [1m[36mOrganization Load (0.5ms)[0m  [1m[34mSELECT "organizations".* FROM "organizations" ORDER BY "organizations"."id" ASC LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mXeroContact Load (0.5ms)[0m  [1m[34mSELECT "xero_contacts".* FROM "xero_contacts" WHERE "xero_contacts"."id" = 1 LIMIT 1 /*application='Hams2'*/[0m
+Started GET "/" for 127.0.0.1 at 2025-08-12 08:02:05 +0100
+  [1m[36mActiveRecord::SchemaMigration Load (2.2ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+Processing by DashboardController#index as HTML
+Redirected to http://127.0.0.1:3000/session/new
+Filter chain halted as :require_authentication rendered or redirected
+Completed 302 Found in 63ms (ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 15.5ms)
+
+
+Started GET "/session/new" for 127.0.0.1 at 2025-08-12 08:02:05 +0100
+Processing by SessionsController#new as HTML
+  Rendering layout layouts/application.html.erb
+  Rendering sessions/new.html.erb within layouts/application
+  Rendered sessions/new.html.erb within layouts/application (Duration: 23.6ms | GC: 0.7ms)
+  Rendered layout layouts/application.html.erb (Duration: 56.8ms | GC: 6.7ms)
+Completed 200 OK in 118ms (Views: 65.4ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 7.0ms)
+
+
+Started GET "/assets/application-8b441ae0.css" for 127.0.0.1 at 2025-08-12 08:02:05 +0100
+Started GET "/assets/tailwind-4dce4948.css" for 127.0.0.1 at 2025-08-12 08:02:05 +0100
+Started GET "/assets/application-bfcdf840.js" for 127.0.0.1 at 2025-08-12 08:02:05 +0100
+Started GET "/assets/turbo.min-3a2e143f.js" for 127.0.0.1 at 2025-08-12 08:02:05 +0100
+Started GET "/assets/stimulus.min-4b1e420e.js" for 127.0.0.1 at 2025-08-12 08:02:06 +0100
+Started GET "/assets/stimulus-loading-1fc53fe7.js" for 127.0.0.1 at 2025-08-12 08:02:06 +0100
+Started GET "/assets/controllers/application-3affb389.js" for 127.0.0.1 at 2025-08-12 08:02:06 +0100
+Started GET "/assets/controllers/hello_controller-708796bd.js" for 127.0.0.1 at 2025-08-12 08:02:06 +0100
+Started GET "/assets/controllers/index-ee64e1f1.js" for 127.0.0.1 at 2025-08-12 08:02:06 +0100
+Started GET "/passwords/new" for 127.0.0.1 at 2025-08-12 08:02:36 +0100
+Processing by PasswordsController#new as HTML
+  Rendering layout layouts/application.html.erb
+  Rendering passwords/new.html.erb within layouts/application
+  Rendered passwords/new.html.erb within layouts/application (Duration: 3.9ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 5.8ms | GC: 0.0ms)
+Completed 200 OK in 147ms (Views: 7.4ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started POST "/session" for 127.0.0.1 at 2025-08-12 08:02:37 +0100
+Processing by SessionsController#create as TURBO_STREAM
+  Parameters: {"authenticity_token"=>"[FILTERED]", "email_address"=>"[FILTERED]", "password"=>"[FILTERED]", "commit"=>"Sign in"}
+[31mUnpermitted parameters: :authenticity_token, :commit. Context: { controller: SessionsController, action: create, request: #<ActionDispatch::Request:0x00007f05591a6d68>, params: {"authenticity_token"=>"[FILTERED]", "email_address"=>"[FILTERED]", "password"=>"[FILTERED]", "commit"=>"Sign in", "controller"=>"sessions", "action"=>"create"} }[0m
+  [1m[36mUser Load (1.2ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'daniel@hardanodisingstl.com' LIMIT 1 /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/sessions_controller.rb:9:in `create'
+  [1m[36mTRANSACTION (0.9ms)[0m  [1m[35mBEGIN /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:42:in `start_new_session_for'
+  [1m[36mSession Create (13.6ms)[0m  [1m[32mINSERT INTO "sessions" ("user_id", "ip_address", "user_agent", "created_at", "updated_at") VALUES (1, '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36', '2025-08-12 07:02:38.852360', '2025-08-12 07:02:38.852360') RETURNING "id" /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:42:in `start_new_session_for'
+  [1m[36mTRANSACTION (9.1ms)[0m  [1m[35mCOMMIT /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:42:in `start_new_session_for'
+Redirected to http://127.0.0.1:3000/
+Completed 302 Found in 1146ms (ActiveRecord: 95.4ms (2 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/" for 127.0.0.1 at 2025-08-12 08:02:38 +0100
+Processing by DashboardController#index as TURBO_STREAM
+  [1m[36mSession Load (0.9ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = 6 LIMIT 1 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+  Rendering layout layouts/application.html.erb
+  Rendering dashboard/index.html.erb within layouts/application
+  [1m[36mOrganization Count (1.0ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_customer" = TRUE /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:17
+  [1m[36mOrganization Count (0.4ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:28
+  [1m[36mCACHE Organization Count (0.0ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_customer" = TRUE[0m
+  ↳ app/views/dashboard/index.html.erb:29
+  [1m[36mOrganization Count (0.4ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_supplier" = TRUE /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:30
+  [1m[36mXeroContact Count (0.7ms)[0m  [1m[34mSELECT COUNT(*) FROM "xero_contacts" /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:38
+  [1m[36mOrganization Count (0.4ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_customer" = TRUE AND "organizations"."enabled" = TRUE /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:39
+  [1m[36mXeroContact Exists? (0.4ms)[0m  [1m[34mSELECT 1 AS one FROM "xero_contacts" LIMIT 1 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:41
+  [1m[36mXeroContact Maximum (9.4ms)[0m  [1m[34mSELECT MAX("xero_contacts"."last_synced_at") FROM "xero_contacts" /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:42
+  [1m[36mOrganization Exists? (0.5ms)[0m  [1m[34mSELECT 1 AS one FROM "organizations" LIMIT 1 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:52
+  [1m[36mOrganization Load (0.4ms)[0m  [1m[34mSELECT "organizations".* FROM "organizations" LIMIT 10 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:66
+  [1m[36mXeroContact Load (2.0ms)[0m  [1m[34mSELECT "xero_contacts".* FROM "xero_contacts" WHERE "xero_contacts"."id" IN (1, 2) /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:66
+  Rendered dashboard/index.html.erb within layouts/application (Duration: 96.7ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 98.5ms | GC: 0.0ms)
+Completed 200 OK in 218ms (Views: 78.2ms | ActiveRecord: 22.2ms (12 queries, 1 cached) | GC: 0.0ms)
+
+
+Started GET "/auth/xero" for 127.0.0.1 at 2025-08-12 08:02:45 +0100
+Processing by XeroAuthController#authorize as HTML
+  [1m[36mSession Load (1.1ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = 6 LIMIT 1 /*action='authorize',application='Hams2',controller='xero_auth'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+Completed 500 Internal Server Error in 25ms (ActiveRecord: 1.1ms (1 query, 0 cached) | GC: 0.0ms)
+
+
+  
+NoMethodError (undefined method `[]' for nil):
+  
+app/controllers/xero_auth_controller.rb:5:in `authorize'
+Started GET "/auth/xero" for 127.0.0.1 at 2025-08-12 08:02:46 +0100
+Processing by XeroAuthController#authorize as HTML
+  [1m[36mSession Load (0.5ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = 6 LIMIT 1 /*action='authorize',application='Hams2',controller='xero_auth'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+Completed 500 Internal Server Error in 18ms (ActiveRecord: 0.5ms (1 query, 0 cached) | GC: 3.9ms)
+
+
+  
+NoMethodError (undefined method `[]' for nil):
+  
+app/controllers/xero_auth_controller.rb:5:in `authorize'
+Started GET "/auth/xero" for 127.0.0.1 at 2025-08-12 08:02:46 +0100
+Processing by XeroAuthController#authorize as HTML
+  [1m[36mSession Load (0.7ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = 6 LIMIT 1 /*action='authorize',application='Hams2',controller='xero_auth'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+Completed 500 Internal Server Error in 34ms (ActiveRecord: 0.7ms (1 query, 0 cached) | GC: 0.0ms)
+
+
+  
+NoMethodError (undefined method `[]' for nil):
+  
+app/controllers/xero_auth_controller.rb:5:in `authorize'
+Started GET "/auth/xero" for 127.0.0.1 at 2025-08-12 08:02:52 +0100
+Processing by XeroAuthController#authorize as HTML
+  [1m[36mSession Load (0.8ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = 6 LIMIT 1 /*action='authorize',application='Hams2',controller='xero_auth'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+Completed 500 Internal Server Error in 14ms (ActiveRecord: 0.7ms (1 query, 0 cached) | GC: 0.0ms)
+
+
+  
+NoMethodError (undefined method `[]' for nil):
+  
+app/controllers/xero_auth_controller.rb:5:in `authorize'
+Started GET "/auth/xero" for 127.0.0.1 at 2025-08-12 08:02:54 +0100
+Processing by XeroAuthController#authorize as HTML
+  [1m[36mSession Load (1.3ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = 6 LIMIT 1 /*action='authorize',application='Hams2',controller='xero_auth'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+Completed 500 Internal Server Error in 22ms (ActiveRecord: 1.2ms (1 query, 0 cached) | GC: 0.0ms)
+
+
+  
+NoMethodError (undefined method `[]' for nil):
+  
+app/controllers/xero_auth_controller.rb:5:in `authorize'
+Started GET "/favicon.ico" for 127.0.0.1 at 2025-08-12 08:03:27 +0100
+  
+ActionController::RoutingError (No route matches [GET] "/favicon.ico"):
+  
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+Started GET "/" for 127.0.0.1 at 2025-08-12 08:11:20 +0100
+  [1m[36mActiveRecord::SchemaMigration Load (1.9ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+Processing by DashboardController#index as HTML
+  [1m[36mSession Load (0.8ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = 6 LIMIT 1 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+  Rendering layout layouts/application.html.erb
+  Rendering dashboard/index.html.erb within layouts/application
+  [1m[36mOrganization Count (0.5ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_customer" = TRUE /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:17
+  [1m[36mOrganization Count (0.2ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:28
+  [1m[36mCACHE Organization Count (0.0ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_customer" = TRUE[0m
+  ↳ app/views/dashboard/index.html.erb:29
+  [1m[36mOrganization Count (0.4ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_supplier" = TRUE /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:30
+  [1m[36mXeroContact Count (0.6ms)[0m  [1m[34mSELECT COUNT(*) FROM "xero_contacts" /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:38
+  [1m[36mOrganization Count (0.3ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_customer" = TRUE AND "organizations"."enabled" = TRUE /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:39
+  [1m[36mXeroContact Exists? (0.6ms)[0m  [1m[34mSELECT 1 AS one FROM "xero_contacts" LIMIT 1 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:41
+  [1m[36mXeroContact Maximum (1.0ms)[0m  [1m[34mSELECT MAX("xero_contacts"."last_synced_at") FROM "xero_contacts" /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:42
+  [1m[36mOrganization Exists? (0.5ms)[0m  [1m[34mSELECT 1 AS one FROM "organizations" LIMIT 1 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:52
+  [1m[36mOrganization Load (0.5ms)[0m  [1m[34mSELECT "organizations".* FROM "organizations" LIMIT 10 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:66
+  [1m[36mXeroContact Load (2.0ms)[0m  [1m[34mSELECT "xero_contacts".* FROM "xero_contacts" WHERE "xero_contacts"."id" IN (1, 2) /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:66
+  Rendered dashboard/index.html.erb within layouts/application (Duration: 76.6ms | GC: 0.3ms)
+  Rendered layout layouts/application.html.erb (Duration: 97.1ms | GC: 0.3ms)
+Completed 200 OK in 271ms (Views: 90.8ms | ActiveRecord: 31.1ms (12 queries, 1 cached) | GC: 24.2ms)
+
+
+Started GET "/auth/xero" for 127.0.0.1 at 2025-08-12 08:11:22 +0100
+Processing by XeroAuthController#authorize as HTML
+  [1m[36mSession Load (1.0ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = 6 LIMIT 1 /*action='authorize',application='Hams2',controller='xero_auth'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+Completed 500 Internal Server Error in 33ms (ActiveRecord: 0.9ms (1 query, 0 cached) | GC: 0.0ms)
+
+
+  
+NoMethodError (undefined method `[]' for nil):
+  
+app/controllers/xero_auth_controller.rb:5:in `authorize'
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+Started GET "/" for 127.0.0.1 at 2025-08-12 08:14:01 +0100
+  [1m[36mActiveRecord::SchemaMigration Load (0.8ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+Processing by DashboardController#index as HTML
+  [1m[36mSession Load (1.0ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = 6 LIMIT 1 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+  Rendering layout layouts/application.html.erb
+  Rendering dashboard/index.html.erb within layouts/application
+  [1m[36mOrganization Count (1.2ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_customer" = TRUE /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:17
+  [1m[36mOrganization Count (0.5ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:28
+  [1m[36mCACHE Organization Count (0.0ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_customer" = TRUE[0m
+  ↳ app/views/dashboard/index.html.erb:29
+  [1m[36mOrganization Count (0.5ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_supplier" = TRUE /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:30
+  [1m[36mXeroContact Count (0.8ms)[0m  [1m[34mSELECT COUNT(*) FROM "xero_contacts" /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:38
+  [1m[36mOrganization Count (0.3ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_customer" = TRUE AND "organizations"."enabled" = TRUE /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:39
+  [1m[36mXeroContact Exists? (0.3ms)[0m  [1m[34mSELECT 1 AS one FROM "xero_contacts" LIMIT 1 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:41
+  [1m[36mXeroContact Maximum (1.0ms)[0m  [1m[34mSELECT MAX("xero_contacts"."last_synced_at") FROM "xero_contacts" /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:42
+  [1m[36mOrganization Exists? (0.4ms)[0m  [1m[34mSELECT 1 AS one FROM "organizations" LIMIT 1 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:52
+  [1m[36mOrganization Load (0.4ms)[0m  [1m[34mSELECT "organizations".* FROM "organizations" LIMIT 10 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:66
+  [1m[36mXeroContact Load (0.6ms)[0m  [1m[34mSELECT "xero_contacts".* FROM "xero_contacts" WHERE "xero_contacts"."id" IN (1, 2) /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:66
+  Rendered dashboard/index.html.erb within layouts/application (Duration: 61.2ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 77.6ms | GC: 0.0ms)
+Completed 200 OK in 173ms (Views: 67.0ms | ActiveRecord: 26.1ms (12 queries, 1 cached) | GC: 11.8ms)
+
+
+Started GET "/auth/xero" for 127.0.0.1 at 2025-08-12 08:14:02 +0100
+Processing by XeroAuthController#authorize as HTML
+  [1m[36mSession Load (0.8ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = 6 LIMIT 1 /*action='authorize',application='Hams2',controller='xero_auth'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+Completed 500 Internal Server Error in 14ms (ActiveRecord: 0.7ms (1 query, 0 cached) | GC: 0.0ms)
+
+
+  
+ArgumentError (unknown keywords: :client_id, :client_secret, :redirect_uri, :scopes):
+  
+app/controllers/xero_auth_controller.rb:4:in `new'
+app/controllers/xero_auth_controller.rb:4:in `authorize'
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (0.4ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (1.1ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (1.1ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+Migrating to EnableUuidExtension (20250812072438)
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35mSQL (49.3ms)[0m  [1m[35mCREATE EXTENSION IF NOT EXISTS "pgcrypto" /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Create (0.4ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES ('20250812072438') RETURNING "version" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (8.8ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+Migrating to ConvertToUuids (20250812072440)
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSession Delete All (1.4ms)[0m  [1m[31mDELETE FROM "sessions" /*application='Hams2'*/[0m
+  [1m[36mOrganization Delete All (0.8ms)[0m  [1m[31mDELETE FROM "organizations" /*application='Hams2'*/[0m
+  [1m[36mXeroContact Delete All (1.5ms)[0m  [1m[31mDELETE FROM "xero_contacts" /*application='Hams2'*/[0m
+  [1m[36mUser Delete All (0.9ms)[0m  [1m[31mDELETE FROM "users" /*application='Hams2'*/[0m
+  [1m[35m (5.5ms)[0m  [1m[35mALTER TABLE "organizations" DROP CONSTRAINT "fk_rails_92de51f0a9" /*application='Hams2'*/[0m
+  [1m[35m (0.6ms)[0m  [1m[35mALTER TABLE "sessions" DROP CONSTRAINT "fk_rails_758836b4f0" /*application='Hams2'*/[0m
+  [1m[35m (10.0ms)[0m  [1m[35mALTER TABLE "users" ALTER COLUMN "id" TYPE uuid, ALTER COLUMN "id" SET DEFAULT gen_random_uuid() /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[31mROLLBACK /*application='Hams2'*/[0m
+  [1m[35m (0.4ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (1.2ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (1.9ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (0.8ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+Migrating to ConvertToUuids (20250812072440)
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSession Delete All (1.0ms)[0m  [1m[31mDELETE FROM "sessions" /*application='Hams2'*/[0m
+  [1m[36mOrganization Delete All (0.4ms)[0m  [1m[31mDELETE FROM "organizations" /*application='Hams2'*/[0m
+  [1m[36mXeroContact Delete All (0.8ms)[0m  [1m[31mDELETE FROM "xero_contacts" /*application='Hams2'*/[0m
+  [1m[36mUser Delete All (0.7ms)[0m  [1m[31mDELETE FROM "users" /*application='Hams2'*/[0m
+  [1m[35m (4.8ms)[0m  [1m[35mDROP TABLE "sessions" /*application='Hams2'*/[0m
+  [1m[35m (1.2ms)[0m  [1m[35mDROP TABLE "organizations" /*application='Hams2'*/[0m
+  [1m[35m (1.0ms)[0m  [1m[35mDROP TABLE "xero_contacts" /*application='Hams2'*/[0m
+  [1m[35m (1.8ms)[0m  [1m[35mDROP TABLE "users" /*application='Hams2'*/[0m
+  [1m[35m (39.3ms)[0m  [1m[35mCREATE TABLE "users" ("id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, "email_address" character varying NOT NULL, "password_digest" character varying NOT NULL, "username" character varying, "full_name" character varying, "enabled" boolean, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL) /*application='Hams2'*/[0m
+  [1m[35m (11.1ms)[0m  [1m[35mCREATE UNIQUE INDEX "index_users_on_email_address" ON "users" ("email_address") /*application='Hams2'*/[0m
+  [1m[35m (24.7ms)[0m  [1m[35mCREATE TABLE "xero_contacts" ("id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, "name" character varying, "contact_status" character varying, "is_customer" boolean, "is_supplier" boolean, "merged_to_contact_id" character varying, "accounts_receivable_tax_type" character varying, "accounts_payable_tax_type" character varying, "xero_id" character varying, "xero_data" jsonb, "last_synced_at" timestamp, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL) /*application='Hams2'*/[0m
+  [1m[35m (37.9ms)[0m  [1m[35mCREATE TABLE "organizations" ("id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, "name" character varying, "enabled" boolean, "is_customer" boolean, "is_supplier" boolean, "xero_contact_id" uuid NOT NULL, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL) /*application='Hams2'*/[0m
+  [1m[35m (11.6ms)[0m  [1m[35mCREATE INDEX "index_organizations_on_xero_contact_id" ON "organizations" ("xero_contact_id") /*application='Hams2'*/[0m
+  [1m[35m (30.3ms)[0m  [1m[35mCREATE TABLE "sessions" ("id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, "user_id" uuid NOT NULL, "ip_address" character varying, "user_agent" character varying, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL) /*application='Hams2'*/[0m
+  [1m[35m (11.8ms)[0m  [1m[35mCREATE INDEX "index_sessions_on_user_id" ON "sessions" ("user_id") /*application='Hams2'*/[0m
+  [1m[35m (4.2ms)[0m  [1m[35mALTER TABLE "organizations" ADD CONSTRAINT "fk_rails_92de51f0a9"
+FOREIGN KEY ("xero_contact_id")
+  REFERENCES "xero_contacts" ("id")
+ /*application='Hams2'*/[0m
+  [1m[35m (1.6ms)[0m  [1m[35mALTER TABLE "sessions" ADD CONSTRAINT "fk_rails_758836b4f0"
+FOREIGN KEY ("user_id")
+  REFERENCES "users" ("id")
+ /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Create (0.3ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES ('20250812072440') RETURNING "version" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (17.2ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[35m (0.5ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.3ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+Started GET "/" for 127.0.0.1 at 2025-08-12 08:29:05 +0100
+  [1m[36mActiveRecord::SchemaMigration Load (1.9ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+Processing by DashboardController#index as HTML
+  [1m[36mSession Load (0.6ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = NULL LIMIT 1 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+Redirected to http://127.0.0.1:3000/session/new
+Filter chain halted as :require_authentication rendered or redirected
+Completed 302 Found in 117ms (ActiveRecord: 13.4ms (1 query, 0 cached) | GC: 28.4ms)
+
+
+Started GET "/session/new" for 127.0.0.1 at 2025-08-12 08:29:05 +0100
+Processing by SessionsController#new as HTML
+  Rendering layout layouts/application.html.erb
+  Rendering sessions/new.html.erb within layouts/application
+  Rendered sessions/new.html.erb within layouts/application (Duration: 8.3ms | GC: 0.2ms)
+  Rendered layout layouts/application.html.erb (Duration: 34.9ms | GC: 0.2ms)
+Completed 200 OK in 81ms (Views: 43.6ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.9ms)
+
+
+Started POST "/session" for 127.0.0.1 at 2025-08-12 08:29:21 +0100
+Processing by SessionsController#create as TURBO_STREAM
+  Parameters: {"authenticity_token"=>"[FILTERED]", "email_address"=>"[FILTERED]", "password"=>"[FILTERED]", "commit"=>"Sign in"}
+[31mUnpermitted parameters: :authenticity_token, :commit. Context: { controller: SessionsController, action: create, request: #<ActionDispatch::Request:0x0000788c3d099f60>, params: {"authenticity_token"=>"[FILTERED]", "email_address"=>"[FILTERED]", "password"=>"[FILTERED]", "commit"=>"Sign in", "controller"=>"sessions", "action"=>"create"} }[0m
+  [1m[36mUser Load (0.9ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'daniel@hardanodisingstl.com' LIMIT 1 /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/sessions_controller.rb:9:in `create'
+Redirected to http://127.0.0.1:3000/session/new
+Completed 302 Found in 333ms (ActiveRecord: 8.5ms (1 query, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/session/new" for 127.0.0.1 at 2025-08-12 08:29:21 +0100
+Processing by SessionsController#new as TURBO_STREAM
+  Rendering layout layouts/application.html.erb
+  Rendering sessions/new.html.erb within layouts/application
+  Rendered sessions/new.html.erb within layouts/application (Duration: 1.7ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 2.7ms | GC: 0.0ms)
+Completed 200 OK in 15ms (Views: 3.2ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started POST "/session" for 127.0.0.1 at 2025-08-12 08:31:39 +0100
+Processing by SessionsController#create as TURBO_STREAM
+  Parameters: {"authenticity_token"=>"[FILTERED]", "email_address"=>"[FILTERED]", "password"=>"[FILTERED]", "commit"=>"Sign in"}
+[31mUnpermitted parameters: :authenticity_token, :commit. Context: { controller: SessionsController, action: create, request: #<ActionDispatch::Request:0x0000788c39965008>, params: {"authenticity_token"=>"[FILTERED]", "email_address"=>"[FILTERED]", "password"=>"[FILTERED]", "commit"=>"Sign in", "controller"=>"sessions", "action"=>"create"} }[0m
+  [1m[36mUser Load (0.8ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'daniel@hardanodisingstl.com' LIMIT 1 /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/sessions_controller.rb:9:in `create'
+Redirected to http://127.0.0.1:3000/session/new
+Completed 302 Found in 315ms (ActiveRecord: 0.8ms (1 query, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/session/new" for 127.0.0.1 at 2025-08-12 08:29:55 +0100
+Processing by SessionsController#new as TURBO_STREAM
+  Rendering layout layouts/application.html.erb
+  Rendering sessions/new.html.erb within layouts/application
+  Rendered sessions/new.html.erb within layouts/application (Duration: 1.9ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 3.0ms | GC: 0.0ms)
+Completed 200 OK in 19ms (Views: 3.6ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/registrations/new" for 127.0.0.1 at 2025-08-12 08:30:12 +0100
+Processing by RegistrationsController#new as HTML
+  Rendering layout layouts/application.html.erb
+  Rendering registrations/new.html.erb within layouts/application
+  Rendered registrations/new.html.erb within layouts/application (Duration: 5.2ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 6.1ms | GC: 0.0ms)
+Completed 200 OK in 20ms (Views: 6.8ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/registrations/new" for 127.0.0.1 at 2025-08-12 08:30:16 +0100
+Processing by RegistrationsController#new as HTML
+  Rendering layout layouts/application.html.erb
+  Rendering registrations/new.html.erb within layouts/application
+  Rendered registrations/new.html.erb within layouts/application (Duration: 2.8ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 4.1ms | GC: 0.0ms)
+Completed 200 OK in 34ms (Views: 4.7ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/registrations/new" for 127.0.0.1 at 2025-08-12 08:30:59 +0100
+Processing by RegistrationsController#new as HTML
+  Rendering layout layouts/application.html.erb
+  Rendering registrations/new.html.erb within layouts/application
+  Rendered registrations/new.html.erb within layouts/application (Duration: 1.9ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 3.1ms | GC: 0.0ms)
+Completed 200 OK in 27ms (Views: 3.9ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/registrations/new" for 127.0.0.1 at 2025-08-12 08:31:04 +0100
+Processing by RegistrationsController#new as HTML
+  Rendering layout layouts/application.html.erb
+  Rendering registrations/new.html.erb within layouts/application
+  Rendered registrations/new.html.erb within layouts/application (Duration: 2.6ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 3.7ms | GC: 0.0ms)
+Completed 200 OK in 42ms (Views: 4.6ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started POST "/registrations" for 127.0.0.1 at 2025-08-12 08:32:55 +0100
+Processing by RegistrationsController#create as TURBO_STREAM
+  Parameters: {"authenticity_token"=>"[FILTERED]", "user"=>{"full_name"=>"Brian Benton ", "username"=>"Brian", "email_address"=>"[FILTERED]", "password"=>"[FILTERED]", "password_confirmation"=>"[FILTERED]"}, "commit"=>"Register"}
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*action='create',application='Hams2',controller='registrations'*/[0m
+  ↳ app/controllers/registrations_controller.rb:13:in `create'
+  [1m[36mUser Exists? (2.1ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."email_address" = 'brian@hardanodisingstl.com' LIMIT 1 /*action='create',application='Hams2',controller='registrations'*/[0m
+  ↳ app/controllers/registrations_controller.rb:13:in `create'
+  [1m[36mUser Exists? (0.2ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."username" = 'Brian' LIMIT 1 /*action='create',application='Hams2',controller='registrations'*/[0m
+  ↳ app/controllers/registrations_controller.rb:13:in `create'
+  [1m[36mUser Create (2.9ms)[0m  [1m[32mINSERT INTO "users" ("email_address", "password_digest", "username", "full_name", "enabled", "created_at", "updated_at") VALUES ('brian@hardanodisingstl.com', '$2a$12$EtButkoKGoYLzUPt.GM0fuUOkQvwNITcMS1r1WbFXSWCrF8cPfpSO', 'Brian', 'Brian Benton ', TRUE, '2025-08-12 07:32:56.002632', '2025-08-12 07:32:56.002632') RETURNING "id" /*action='create',application='Hams2',controller='registrations'*/[0m
+  ↳ app/controllers/registrations_controller.rb:13:in `create'
+  [1m[36mTRANSACTION (10.1ms)[0m  [1m[35mCOMMIT /*action='create',application='Hams2',controller='registrations'*/[0m
+  ↳ app/controllers/registrations_controller.rb:13:in `create'
+Redirected to http://127.0.0.1:3000/session/new
+Completed 302 Found in 335ms (ActiveRecord: 15.5ms (3 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/session/new" for 127.0.0.1 at 2025-08-12 08:32:56 +0100
+Processing by SessionsController#new as TURBO_STREAM
+  Rendering layout layouts/application.html.erb
+  Rendering sessions/new.html.erb within layouts/application
+  Rendered sessions/new.html.erb within layouts/application (Duration: 1.6ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 2.5ms | GC: 0.0ms)
+Completed 200 OK in 14ms (Views: 3.0ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started POST "/session" for 127.0.0.1 at 2025-08-12 08:33:19 +0100
+Processing by SessionsController#create as TURBO_STREAM
+  Parameters: {"authenticity_token"=>"[FILTERED]", "email_address"=>"[FILTERED]", "password"=>"[FILTERED]", "commit"=>"Sign in"}
+[31mUnpermitted parameters: :authenticity_token, :commit. Context: { controller: SessionsController, action: create, request: #<ActionDispatch::Request:0x0000788c39681f58>, params: {"authenticity_token"=>"[FILTERED]", "email_address"=>"[FILTERED]", "password"=>"[FILTERED]", "commit"=>"Sign in", "controller"=>"sessions", "action"=>"create"} }[0m
+  [1m[36mUser Load (0.6ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'brian@hardanodisingstl.com' LIMIT 1 /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/sessions_controller.rb:9:in `create'
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:42:in `start_new_session_for'
+  [1m[36mSession Create (3.3ms)[0m  [1m[32mINSERT INTO "sessions" ("user_id", "ip_address", "user_agent", "created_at", "updated_at") VALUES ('52d38d4d-3b20-4e3c-a6e7-b579d9dc53e5', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36', '2025-08-12 07:33:19.598324', '2025-08-12 07:33:19.598324') RETURNING "id" /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:42:in `start_new_session_for'
+  [1m[36mTRANSACTION (5.1ms)[0m  [1m[35mCOMMIT /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:42:in `start_new_session_for'
+Redirected to http://127.0.0.1:3000/
+Completed 302 Found in 356ms (ActiveRecord: 11.4ms (2 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/" for 127.0.0.1 at 2025-08-12 08:33:19 +0100
+Processing by DashboardController#index as TURBO_STREAM
+  [1m[36mSession Load (0.5ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '19956b1b-b66a-400a-ac70-cec11b11f2ea' LIMIT 1 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+  Rendering layout layouts/application.html.erb
+  Rendering dashboard/index.html.erb within layouts/application
+  [1m[36mOrganization Count (1.6ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_customer" = TRUE /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:17
+  [1m[36mOrganization Count (0.3ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:28
+  [1m[36mCACHE Organization Count (0.0ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_customer" = TRUE[0m
+  ↳ app/views/dashboard/index.html.erb:29
+  [1m[36mOrganization Count (0.2ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_supplier" = TRUE /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:30
+  [1m[36mXeroContact Count (0.7ms)[0m  [1m[34mSELECT COUNT(*) FROM "xero_contacts" /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:38
+  [1m[36mOrganization Count (0.4ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_customer" = TRUE AND "organizations"."enabled" = TRUE /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:39
+  [1m[36mXeroContact Exists? (0.2ms)[0m  [1m[34mSELECT 1 AS one FROM "xero_contacts" LIMIT 1 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:41
+  [1m[36mOrganization Exists? (0.3ms)[0m  [1m[34mSELECT 1 AS one FROM "organizations" LIMIT 1 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:52
+  Rendered dashboard/index.html.erb within layouts/application (Duration: 60.2ms | GC: 31.1ms)
+  Rendered layout layouts/application.html.erb (Duration: 61.6ms | GC: 31.1ms)
+Completed 200 OK in 82ms (Views: 55.4ms | ActiveRecord: 7.5ms (9 queries, 1 cached) | GC: 31.1ms)
+
+
+Started GET "/auth/xero" for 127.0.0.1 at 2025-08-12 08:33:25 +0100
+Processing by XeroAuthController#authorize as HTML
+  [1m[36mSession Load (0.7ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '19956b1b-b66a-400a-ac70-cec11b11f2ea' LIMIT 1 /*action='authorize',application='Hams2',controller='xero_auth'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+Redirected to https://login.xero.com/identity/connect/authorize?response_type=code&client_id=38BB5233008B4DBCA49F5E3C328B1542&redirect_uri=https%3A%2F%2F96b083e967cb.ngrok-free.app%2Fauth%2Fxero%2Fcallback&scope=accounting.contacts+accounting.transactions
+Completed 302 Found in 25ms (ActiveRecord: 0.7ms (1 query, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/auth/xero" for 127.0.0.1 at 2025-08-12 08:33:25 +0100
+Processing by XeroAuthController#authorize as HTML
+  [1m[36mSession Load (0.4ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '19956b1b-b66a-400a-ac70-cec11b11f2ea' LIMIT 1 /*action='authorize',application='Hams2',controller='xero_auth'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+Redirected to https://login.xero.com/identity/connect/authorize?response_type=code&client_id=38BB5233008B4DBCA49F5E3C328B1542&redirect_uri=https%3A%2F%2F96b083e967cb.ngrok-free.app%2Fauth%2Fxero%2Fcallback&scope=accounting.contacts+accounting.transactions
+Completed 302 Found in 17ms (ActiveRecord: 0.4ms (1 query, 0 cached) | GC: 0.0ms)
+
+
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+Started GET "/" for 127.0.0.1 at 2025-08-12 08:38:17 +0100
+  [1m[36mActiveRecord::SchemaMigration Load (0.9ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+Processing by DashboardController#index as HTML
+  [1m[36mSession Load (0.7ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '19956b1b-b66a-400a-ac70-cec11b11f2ea' LIMIT 1 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+  Rendering layout layouts/application.html.erb
+  Rendering dashboard/index.html.erb within layouts/application
+  [1m[36mOrganization Count (0.8ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_customer" = TRUE /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:17
+  [1m[36mOrganization Count (0.3ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:28
+  [1m[36mCACHE Organization Count (0.0ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_customer" = TRUE[0m
+  ↳ app/views/dashboard/index.html.erb:29
+  [1m[36mOrganization Count (0.2ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_supplier" = TRUE /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:30
+  [1m[36mXeroContact Count (0.4ms)[0m  [1m[34mSELECT COUNT(*) FROM "xero_contacts" /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:38
+  [1m[36mOrganization Count (0.3ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_customer" = TRUE AND "organizations"."enabled" = TRUE /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:39
+  [1m[36mXeroContact Exists? (0.3ms)[0m  [1m[34mSELECT 1 AS one FROM "xero_contacts" LIMIT 1 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:41
+  [1m[36mOrganization Exists? (0.3ms)[0m  [1m[34mSELECT 1 AS one FROM "organizations" LIMIT 1 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:52
+  Rendered dashboard/index.html.erb within layouts/application (Duration: 22.7ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 42.7ms | GC: 0.0ms)
+Completed 200 OK in 176ms (Views: 42.7ms | ActiveRecord: 20.8ms (9 queries, 1 cached) | GC: 23.9ms)
+
+
+Started GET "/assets/application-bfcdf840.js" for 127.0.0.1 at 2025-08-12 08:38:18 +0100
+Started GET "/assets/turbo.min-3a2e143f.js" for 127.0.0.1 at 2025-08-12 08:38:18 +0100
+Started GET "/assets/stimulus.min-4b1e420e.js" for 127.0.0.1 at 2025-08-12 08:38:18 +0100
+Started GET "/assets/controllers/index-ee64e1f1.js" for 127.0.0.1 at 2025-08-12 08:38:18 +0100
+Started GET "/assets/stimulus-loading-1fc53fe7.js" for 127.0.0.1 at 2025-08-12 08:38:18 +0100
+Started GET "/assets/controllers/application-3affb389.js" for 127.0.0.1 at 2025-08-12 08:38:18 +0100
+Started GET "/assets/controllers/hello_controller-708796bd.js" for 127.0.0.1 at 2025-08-12 08:38:18 +0100
+Started GET "/auth/xero" for 127.0.0.1 at 2025-08-12 08:38:20 +0100
+Processing by XeroAuthController#authorize as HTML
+  [1m[36mSession Load (1.0ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '19956b1b-b66a-400a-ac70-cec11b11f2ea' LIMIT 1 /*action='authorize',application='Hams2',controller='xero_auth'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+Redirected to https://login.xero.com/identity/connect/authorize?response_type=code&client_id=38BB5233008B4DBCA49F5E3C328B1542&redirect_uri=https%3A%2F%2F96b083e967cb.ngrok-free.app%2Fauth%2Fxero%2Fcallback&scope=accounting.contacts+accounting.transactions
+Completed 302 Found in 25ms (ActiveRecord: 1.0ms (1 query, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/auth/xero" for 127.0.0.1 at 2025-08-12 08:38:21 +0100
+Processing by XeroAuthController#authorize as HTML
+  [1m[36mSession Load (0.6ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '19956b1b-b66a-400a-ac70-cec11b11f2ea' LIMIT 1 /*action='authorize',application='Hams2',controller='xero_auth'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+Redirected to https://login.xero.com/identity/connect/authorize?response_type=code&client_id=38BB5233008B4DBCA49F5E3C328B1542&redirect_uri=https%3A%2F%2F96b083e967cb.ngrok-free.app%2Fauth%2Fxero%2Fcallback&scope=accounting.contacts+accounting.transactions
+Completed 302 Found in 19ms (ActiveRecord: 0.6ms (1 query, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/session/new" for 127.0.0.1 at 2025-08-12 08:38:25 +0100
+Processing by SessionsController#new as HTML
+  Rendering layout layouts/application.html.erb
+  Rendering sessions/new.html.erb within layouts/application
+  Rendered sessions/new.html.erb within layouts/application (Duration: 7.8ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 10.3ms | GC: 0.0ms)
+Completed 200 OK in 29ms (Views: 11.5ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started POST "/session" for 127.0.0.1 at 2025-08-12 08:38:42 +0100
+Processing by SessionsController#create as TURBO_STREAM
+  Parameters: {"authenticity_token"=>"[FILTERED]", "email_address"=>"[FILTERED]", "password"=>"[FILTERED]", "commit"=>"Sign in"}
+[31mUnpermitted parameters: :authenticity_token, :commit. Context: { controller: SessionsController, action: create, request: #<ActionDispatch::Request:0x000070d58be5a200>, params: {"authenticity_token"=>"[FILTERED]", "email_address"=>"[FILTERED]", "password"=>"[FILTERED]", "commit"=>"Sign in", "controller"=>"sessions", "action"=>"create"} }[0m
+  [1m[36mUser Load (0.8ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'daniel@hardanodisingstl.com' LIMIT 1 /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/sessions_controller.rb:9:in `create'
+Redirected to http://127.0.0.1:3000/session/new
+Completed 302 Found in 324ms (ActiveRecord: 4.4ms (1 query, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/session/new" for 127.0.0.1 at 2025-08-12 08:38:43 +0100
+Processing by SessionsController#new as TURBO_STREAM
+  Rendering layout layouts/application.html.erb
+  Rendering sessions/new.html.erb within layouts/application
+  Rendered sessions/new.html.erb within layouts/application (Duration: 1.5ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 2.9ms | GC: 0.0ms)
+Completed 200 OK in 15ms (Views: 3.4ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started POST "/session" for 127.0.0.1 at 2025-08-12 08:39:07 +0100
+Processing by SessionsController#create as TURBO_STREAM
+  Parameters: {"authenticity_token"=>"[FILTERED]", "email_address"=>"[FILTERED]", "password"=>"[FILTERED]", "commit"=>"Sign in"}
+[31mUnpermitted parameters: :authenticity_token, :commit. Context: { controller: SessionsController, action: create, request: #<ActionDispatch::Request:0x000070d58bd71b90>, params: {"authenticity_token"=>"[FILTERED]", "email_address"=>"[FILTERED]", "password"=>"[FILTERED]", "commit"=>"Sign in", "controller"=>"sessions", "action"=>"create"} }[0m
+  [1m[36mUser Load (0.6ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'brian@hardanodisingstl.com' LIMIT 1 /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/sessions_controller.rb:9:in `create'
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:42:in `start_new_session_for'
+  [1m[36mSession Create (2.4ms)[0m  [1m[32mINSERT INTO "sessions" ("user_id", "ip_address", "user_agent", "created_at", "updated_at") VALUES ('52d38d4d-3b20-4e3c-a6e7-b579d9dc53e5', '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36', '2025-08-12 07:39:07.532650', '2025-08-12 07:39:07.532650') RETURNING "id" /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:42:in `start_new_session_for'
+  [1m[36mTRANSACTION (8.9ms)[0m  [1m[35mCOMMIT /*action='create',application='Hams2',controller='sessions'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:42:in `start_new_session_for'
+Redirected to http://127.0.0.1:3000/
+Completed 302 Found in 357ms (ActiveRecord: 12.5ms (2 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/" for 127.0.0.1 at 2025-08-12 08:39:07 +0100
+Processing by DashboardController#index as TURBO_STREAM
+  [1m[36mSession Load (0.4ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '6ec4d8a1-a4b9-4a6a-acc5-3b330f8088c4' LIMIT 1 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+  Rendering layout layouts/application.html.erb
+  Rendering dashboard/index.html.erb within layouts/application
+  [1m[36mOrganization Count (0.3ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_customer" = TRUE /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:17
+  [1m[36mOrganization Count (0.2ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:28
+  [1m[36mCACHE Organization Count (0.0ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_customer" = TRUE[0m
+  ↳ app/views/dashboard/index.html.erb:29
+  [1m[36mOrganization Count (0.5ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_supplier" = TRUE /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:30
+  [1m[36mXeroContact Count (0.4ms)[0m  [1m[34mSELECT COUNT(*) FROM "xero_contacts" /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:38
+  [1m[36mOrganization Count (0.4ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_customer" = TRUE AND "organizations"."enabled" = TRUE /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:39
+  [1m[36mXeroContact Exists? (0.3ms)[0m  [1m[34mSELECT 1 AS one FROM "xero_contacts" LIMIT 1 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:41
+  [1m[36mOrganization Exists? (0.2ms)[0m  [1m[34mSELECT 1 AS one FROM "organizations" LIMIT 1 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:52
+  Rendered dashboard/index.html.erb within layouts/application (Duration: 12.2ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 13.8ms | GC: 0.0ms)
+Completed 200 OK in 28ms (Views: 11.9ms | ActiveRecord: 2.8ms (9 queries, 1 cached) | GC: 0.0ms)
+
+
+Started GET "/auth/xero" for 127.0.0.1 at 2025-08-12 08:39:09 +0100
+Processing by XeroAuthController#authorize as HTML
+  [1m[36mSession Load (0.8ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '6ec4d8a1-a4b9-4a6a-acc5-3b330f8088c4' LIMIT 1 /*action='authorize',application='Hams2',controller='xero_auth'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+Redirected to https://login.xero.com/identity/connect/authorize?response_type=code&client_id=38BB5233008B4DBCA49F5E3C328B1542&redirect_uri=https%3A%2F%2F96b083e967cb.ngrok-free.app%2Fauth%2Fxero%2Fcallback&scope=accounting.contacts+accounting.transactions
+Completed 302 Found in 25ms (ActiveRecord: 0.7ms (1 query, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/auth/xero" for 127.0.0.1 at 2025-08-12 08:39:09 +0100
+Processing by XeroAuthController#authorize as HTML
+  [1m[36mSession Load (0.5ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '6ec4d8a1-a4b9-4a6a-acc5-3b330f8088c4' LIMIT 1 /*action='authorize',application='Hams2',controller='xero_auth'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+Redirected to https://login.xero.com/identity/connect/authorize?response_type=code&client_id=38BB5233008B4DBCA49F5E3C328B1542&redirect_uri=https%3A%2F%2F96b083e967cb.ngrok-free.app%2Fauth%2Fxero%2Fcallback&scope=accounting.contacts+accounting.transactions
+Completed 302 Found in 14ms (ActiveRecord: 0.5ms (1 query, 0 cached) | GC: 0.0ms)
+
+
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+Started GET "/auth/xero" for 127.0.0.1 at 2025-08-12 08:48:40 +0100
+  [1m[36mActiveRecord::SchemaMigration Load (0.9ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+Processing by XeroAuthController#authorize as HTML
+  [1m[36mSession Load (0.6ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '6ec4d8a1-a4b9-4a6a-acc5-3b330f8088c4' LIMIT 1 /*action='authorize',application='Hams2',controller='xero_auth'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+Redirected to https://login.xero.com/identity/connect/authorize?response_type=code&client_id=38BB5233008B4DBCA49F5E3C328B1542&redirect_uri=https%3A%2F%2Fde56c9051949.ngrok-free.app%2Fauth%2Fxero%2Fcallback&scope=accounting.contacts+accounting.transactions
+Completed 302 Found in 131ms (ActiveRecord: 13.5ms (1 query, 0 cached) | GC: 27.2ms)
+
+
+Started GET "/auth/xero" for 127.0.0.1 at 2025-08-12 08:47:05 +0100
+Processing by XeroAuthController#authorize as HTML
+  [1m[36mSession Load (0.7ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '6ec4d8a1-a4b9-4a6a-acc5-3b330f8088c4' LIMIT 1 /*action='authorize',application='Hams2',controller='xero_auth'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+Redirected to https://login.xero.com/identity/connect/authorize?response_type=code&client_id=38BB5233008B4DBCA49F5E3C328B1542&redirect_uri=https%3A%2F%2Fde56c9051949.ngrok-free.app%2Fauth%2Fxero%2Fcallback&scope=accounting.contacts+accounting.transactions
+Completed 302 Found in 15ms (ActiveRecord: 0.7ms (1 query, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/auth/xero" for 127.0.0.1 at 2025-08-12 08:47:06 +0100
+Processing by XeroAuthController#authorize as HTML
+  [1m[36mSession Load (0.6ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '6ec4d8a1-a4b9-4a6a-acc5-3b330f8088c4' LIMIT 1 /*action='authorize',application='Hams2',controller='xero_auth'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+Redirected to https://login.xero.com/identity/connect/authorize?response_type=code&client_id=38BB5233008B4DBCA49F5E3C328B1542&redirect_uri=https%3A%2F%2Fde56c9051949.ngrok-free.app%2Fauth%2Fxero%2Fcallback&scope=accounting.contacts+accounting.transactions
+Completed 302 Found in 17ms (ActiveRecord: 0.6ms (1 query, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/auth/xero" for 127.0.0.1 at 2025-08-12 08:48:14 +0100
+Processing by XeroAuthController#authorize as HTML
+  [1m[36mSession Load (1.0ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '6ec4d8a1-a4b9-4a6a-acc5-3b330f8088c4' LIMIT 1 /*action='authorize',application='Hams2',controller='xero_auth'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+Redirected to https://login.xero.com/identity/connect/authorize?response_type=code&client_id=38BB5233008B4DBCA49F5E3C328B1542&redirect_uri=https%3A%2F%2Fde56c9051949.ngrok-free.app%2Fauth%2Fxero%2Fcallback&scope=accounting.contacts+accounting.transactions
+Completed 302 Found in 25ms (ActiveRecord: 1.0ms (1 query, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/auth/xero" for 127.0.0.1 at 2025-08-12 08:48:15 +0100
+Processing by XeroAuthController#authorize as HTML
+  [1m[36mSession Load (0.8ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '6ec4d8a1-a4b9-4a6a-acc5-3b330f8088c4' LIMIT 1 /*action='authorize',application='Hams2',controller='xero_auth'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+Redirected to https://login.xero.com/identity/connect/authorize?response_type=code&client_id=38BB5233008B4DBCA49F5E3C328B1542&redirect_uri=https%3A%2F%2Fde56c9051949.ngrok-free.app%2Fauth%2Fxero%2Fcallback&scope=accounting.contacts+accounting.transactions
+Completed 302 Found in 18ms (ActiveRecord: 0.8ms (1 query, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/auth/xero" for 127.0.0.1 at 2025-08-12 08:51:00 +0100
+Processing by XeroAuthController#authorize as HTML
+  [1m[36mSession Load (0.8ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '6ec4d8a1-a4b9-4a6a-acc5-3b330f8088c4' LIMIT 1 /*action='authorize',application='Hams2',controller='xero_auth'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+Redirected to https://login.xero.com/identity/connect/authorize?response_type=code&client_id=38BB5233008B4DBCA49F5E3C328B1542&redirect_uri=https%3A%2F%2Fde56c9051949.ngrok-free.app%2Fauth%2Fxero%2Fcallback&scope=accounting.contacts+accounting.transactions
+Completed 302 Found in 16ms (ActiveRecord: 0.8ms (1 query, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/auth/xero" for 127.0.0.1 at 2025-08-12 08:51:08 +0100
+Processing by XeroAuthController#authorize as HTML
+  [1m[36mSession Load (0.7ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '6ec4d8a1-a4b9-4a6a-acc5-3b330f8088c4' LIMIT 1 /*action='authorize',application='Hams2',controller='xero_auth'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+Redirected to https://login.xero.com/identity/connect/authorize?response_type=code&client_id=38BB5233008B4DBCA49F5E3C328B1542&redirect_uri=https%3A%2F%2Fde56c9051949.ngrok-free.app%2Fauth%2Fxero%2Fcallback&scope=accounting.contacts+accounting.transactions
+Completed 302 Found in 15ms (ActiveRecord: 0.6ms (1 query, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/auth/xero" for 127.0.0.1 at 2025-08-12 08:51:08 +0100
+Processing by XeroAuthController#authorize as HTML
+  [1m[36mSession Load (0.7ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '6ec4d8a1-a4b9-4a6a-acc5-3b330f8088c4' LIMIT 1 /*action='authorize',application='Hams2',controller='xero_auth'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+Redirected to https://login.xero.com/identity/connect/authorize?response_type=code&client_id=38BB5233008B4DBCA49F5E3C328B1542&redirect_uri=https%3A%2F%2Fde56c9051949.ngrok-free.app%2Fauth%2Fxero%2Fcallback&scope=accounting.contacts+accounting.transactions
+Completed 302 Found in 26ms (ActiveRecord: 0.7ms (1 query, 0 cached) | GC: 0.0ms)
+
+
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+Started GET "/auth/xero" for 127.0.0.1 at 2025-08-12 08:54:04 +0100
+  [1m[36mActiveRecord::SchemaMigration Load (0.9ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+Processing by XeroAuthController#authorize as HTML
+  [1m[36mSession Load (0.7ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '6ec4d8a1-a4b9-4a6a-acc5-3b330f8088c4' LIMIT 1 /*action='authorize',application='Hams2',controller='xero_auth'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+Redirected to https://login.xero.com/identity/connect/authorize?response_type=code&client_id=38BB5233008B4DBCA49F5E3C328B1542&redirect_uri=https%3A%2F%2Fde56c9051949.ngrok-free.app%2Fauth%2Fxero%2Fcallback&scope=accounting.contacts+accounting.transactions
+Completed 302 Found in 105ms (ActiveRecord: 12.8ms (1 query, 0 cached) | GC: 6.9ms)
+
+
+Started GET "/auth/xero" for 127.0.0.1 at 2025-08-12 08:54:05 +0100
+Processing by XeroAuthController#authorize as HTML
+  [1m[36mSession Load (0.5ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '6ec4d8a1-a4b9-4a6a-acc5-3b330f8088c4' LIMIT 1 /*action='authorize',application='Hams2',controller='xero_auth'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+Redirected to https://login.xero.com/identity/connect/authorize?response_type=code&client_id=38BB5233008B4DBCA49F5E3C328B1542&redirect_uri=https%3A%2F%2Fde56c9051949.ngrok-free.app%2Fauth%2Fxero%2Fcallback&scope=accounting.contacts+accounting.transactions
+Completed 302 Found in 21ms (ActiveRecord: 0.5ms (1 query, 0 cached) | GC: 0.0ms)
+
+

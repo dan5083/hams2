@@ -1,0 +1,96 @@
+<div class="max-w-6xl mx-auto p-6">
+  <h1 class="text-3xl font-bold text-gray-900 mb-8">HAMS 2.0 Dashboard</h1>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <!-- Xero Integration Card -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+      <h2 class="text-xl font-semibold text-gray-800 mb-4">Xero Integration</h2>
+      <p class="text-gray-600 mb-4">Connect to your Xero account to sync customer data.</p>
+
+      <div class="space-y-3">
+        <%= link_to auth_xero_path,
+            class: "inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" do %>
+          🔗 Connect to Xero
+        <% end %>
+
+        <div class="text-sm text-gray-600">
+          <strong>Customers:</strong> <%= Organization.customers.count %>
+        </div>
+      </div>
+    </div>
+
+    <!-- Organizations Card -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+      <h2 class="text-xl font-semibold text-gray-800 mb-4">Organizations</h2>
+      <p class="text-gray-600 mb-4">Manage your customers and suppliers.</p>
+
+      <div class="space-y-2 text-sm">
+        <div><strong>Total:</strong> <%= Organization.count %></div>
+        <div><strong>Customers:</strong> <%= Organization.customers.count %></div>
+        <div><strong>Suppliers:</strong> <%= Organization.suppliers.count %></div>
+      </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+      <h2 class="text-xl font-semibold text-gray-800 mb-4">Quick Stats</h2>
+      <div class="space-y-2 text-sm">
+        <div><strong>Xero Contacts:</strong> <%= XeroContact.count %></div>
+        <div><strong>Active Customers:</strong> <%= Organization.customers.enabled.count %></div>
+        <div><strong>Last Sync:</strong>
+          <% if XeroContact.any? %>
+            <%= time_ago_in_words(XeroContact.maximum(:last_synced_at)) %> ago
+          <% else %>
+            Never
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Organizations -->
+  <% if Organization.any? %>
+    <div class="mt-8">
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Recent Customers</h2>
+      <div class="bg-white rounded-lg shadow overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Xero</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200">
+            <% Organization.includes(:xero_contact).limit(10).each do |org| %>
+              <tr>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <%= org.display_name %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <% if org.is_customer %>
+                    <span class="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">Customer</span>
+                  <% end %>
+                  <% if org.is_supplier %>
+                    <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">Supplier</span>
+                  <% end %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <%= org.contact_email %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <% if org.synced_with_xero? %>
+                    <span class="text-green-600">✓ Synced</span>
+                  <% else %>
+                    <span class="text-gray-400">Manual</span>
+                  <% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% end %>
+</div>
