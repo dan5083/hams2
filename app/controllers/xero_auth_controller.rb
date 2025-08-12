@@ -5,7 +5,7 @@ class XeroAuthController < ApplicationController
       client_id: ENV['XERO_CLIENT_ID'] || Rails.application.credentials.dig(:xero, :client_id),
       client_secret: ENV['XERO_CLIENT_SECRET'] || Rails.application.credentials.dig(:xero, :client_secret),
       redirect_uri: ENV['XERO_REDIRECT_URI'] || Rails.application.credentials.dig(:xero, :redirect_uri),
-      scopes: 'accounting.contacts accounting.transactions'
+      scopes: 'accounting.contacts accounting.transactions offline_access'
     }
 
     xero_client = XeroRuby::ApiClient.new(credentials: creds)
