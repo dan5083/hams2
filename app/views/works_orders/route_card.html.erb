@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <style>
+      body {
+        counter-reset: page 1;
+      }
+
+      @page {
+        size: A4 portrait;
+        margin: 1cm 0.5cm 0.5cm;
+        counter-increment: page;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        font-size: 10pt;
+        font-family: sans-serif;
+        padding: 0;
+        margin: 0;
+
+        --standard-border-width: 0.25pt;
+        --standard-border-color: black;
+        --standard-border-style: solid;
+        --standard-padding: 0.25rem;
+      }
+
+      .page-number::after {
+        display: inline;
+        content: counter(page);
+      }
+
+      .total-pages::after {
+        display: inline;
+        content: counter(pages);
+      }
+
+      .page-identification {
+        font-size: 0.5rem;
+      }
+
+      header {
+        display: block;
+        width: 100%;
+      }
+
+      .header-details {
+        flex-grow: 1;
+        flex-shrink: 1;
+        width: 100%;
+      }
+
+      .header-row {
+        display: table;
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .header-row-inner {
+        display: table-row-group;
+      }
+
+      .header-row-inner2 {
+        display: table-row;
+      }
+
+      .header-field-label, .header-field-value {
+        display: table-cell;
+        border-color: var(--standard-border-color);
+        border-style: var(--standard-border-style);
+        border-width: var(--standard-border-width);
+        padding: var(--standard-padding);
+      }
+
+      .header-field-label {
+        font-weight: bold;
+      }
+
+      .operations {
+        margin-top: var(--standard-padding);
+      }
+
+      .operations table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .operations th, .operations td {
+        border-color: var(--standard-border-color);
+        border-style: var(--standard-border-style);
+        border-width: var(--standard-border-width);
+        padding: var(--standard-padding);
+        line-height: 0.6cm;
+      }
+
+      p {
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <% if @works_order %>
+      <%= render 'route_card_header', works_order: @works_order %>
+    <% end %>
+
+    <section class="operations">
+      <%= render 'route_card_ops', operations: @operations %>
+    </section>
+  </body>
+</html>

@@ -67,3 +67,5 @@ end
 gem "xero-ruby", "~> 3.7.0"
 gem 'jwt'
 gem "dotenv-rails", "~> 3.1"
+gem 'wicked_pdf'
+gem 'wkhtmltopdf-binary'

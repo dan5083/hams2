@@ -1,9 +1,111 @@
-# This file should ensure the existence of records required to run the application in every environment (production,
-# development, test). The code here should be idempotent so that it can be executed at any point in every environment.
-# The data can then be loaded with the bin/rails db:seed command (or created alongside the database with db:setup).
-#
-# Example:
-#
-#   ["Action", "Comedy", "Drama", "Horror"].each do |genre_name|
-#     MovieGenre.find_or_create_by!(name: genre_name)
-#   end
+# db/seeds.rb
+# Simple seed file for local testing the operational workflow
+
+puts "🌱 Seeding database for local testing..."
+
+# Create a test user first
+user = User.find_or_create_by(email_address: "test@hardanodisingstl.com") do |u|
+  u.username = "testuser"
+  u.full_name = "Test User"
+  u.password = "password123"
+  u.enabled = true
+end
+
+puts "✅ Created user: #{user.display_name}"
+
+# Create required sequences if they don't exist
+sequences_to_create = [
+  { key: 'release_note_number', starting_value: 1000 },
+  { key: 'works_order_number', starting_value: 2000 },
+  { key: 'invoice_number', starting_value: 3000 }
+]
+
+sequences_to_create.each do |seq_data|
+  Sequence.find_or_create_by(key: seq_data[:key]) do |seq|
+    seq.value = seq_data[:starting_value]
+  end
+  puts "✅ Created sequence: #{seq_data[:key]}"
+end
+
+# Create a test Xero contact first (required for organizations)
+xero_contact = XeroContact.find_or_create_by(xero_id: "test-xero-contact-123") do |xc|
+  xc.name = "Test Customer Ltd"
+  xc.contact_status = "ACTIVE"
+  xc.is_customer = true
+  xc.is_supplier = false
+  xc.accounts_receivable_tax_type = "OUTPUT2"
+  xc.xero_data = {
+    "email_address" => "test@testcustomer.com",
+    "addresses" => [
+      {
+        "address_type" => "STREET",
+        "address_line_1" => "123 Test Street",
+        "city" => "Test City",
+        "postal_code" => "TE5T 1NG"
+      }
+    ]
+  }
+  xc.last_synced_at = Time.current
+end
+
+puts "✅ Created Xero contact: #{xero_contact.name}"
+
+# Create a test customer organization
+customer = Organization.find_or_create_by(name: "Test Customer Ltd") do |org|
+  org.xero_contact = xero_contact
+  org.is_customer = true
+  org.is_supplier = false
+  org.enabled = true
+end
+
+puts "✅ Created customer: #{customer.name}"
+
+# Create a simple part for the customer
+part = Part.ensure(
+  customer_id: customer.id,
+  part_number: "WIDGET001",
+  part_issue: "A"
+)
+
+puts "✅ Created part: #{part.display_name} for #{customer.name}"
+
+# Create release level and transport method
+release_level = ReleaseLevel.find_or_create_by(name: "Standard Release") do |rl|
+  rl.statement = "The above parts have been processed in accordance with [SPECIFICATION] and are released for dispatch."
+  rl.enabled = true
+end
+
+transport_method = TransportMethod.find_or_create_by(name: "Customer Collection") do |tm|
+  tm.enabled = true
+end
+
+puts "✅ Created release level: #{release_level.name}"
+puts "✅ Created transport method: #{transport_method.name}"
+
+# Create a basic Part Processing Instruction (PPI)
+ppi = PartProcessingInstruction.find_or_create_by(
+  part: part,
+  customer: customer,
+  part_number: "WIDGET001",
+  part_issue: "A"
+) do |p|
+  p.part_description = "Test Widget Component"
+  p.specification = "Hard anodise to 25 microns, natural finish"
+  p.process_type = "hard_anodising" # Use a valid process type from ProcessBuilder
+  p.customisation_data = {}
+  p.enabled = true
+end
+
+puts "✅ Created PPI: #{ppi.display_name}"
+
+puts "\n🎉 Seeding complete! You now have:"
+puts "   - Customer: #{customer.name}"
+puts "   - Part: #{part.display_name}"
+puts "   - PPI: #{ppi.specification}"
+puts "   - User: #{user.display_name}"
+puts "\n📋 You can now test the workflow:"
+puts "   1. Create a Customer Order"
+puts "   2. Create a Works Order from the Customer Order"
+puts "   3. Create Release Notes from the Works Order"
+puts "   4. Generate invoices from Release Notes"
+puts "\n🔗 Start at: /customer_orders"

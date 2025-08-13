@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <style>
+      body {
+        font-family: sans-serif;
+        font-size: 10pt;
+        margin: 0;
+        padding: 0;
+        --standard-border-width: 1pt;
+        --standard-border-color: black;
+        --standard-border-style: solid;
+      }
+
+      @page {
+        size: A4 portrait;
+        margin: 2cm 1.5cm;
+      }
+
+      .page {
+        page-break-after: always;
+      }
+
+      .page:last-child {
+        page-break-after: avoid;
+      }
+
+      h1 {
+        text-align: center;
+        margin-bottom: 1rem;
+        font-size: 1.5em;
+      }
+
+      h2 {
+        font-size: 1em;
+        margin: 1rem 0 0.5rem 0;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 1rem;
+      }
+
+      th, td {
+        border-color: var(--standard-border-color);
+        border-style: var(--standard-border-style);
+        border-width: var(--standard-border-width);
+        padding: 0.5rem;
+        vertical-align: top;
+      }
+
+      th {
+        background-color: #f8f9fa;
+        font-weight: bold;
+        text-align: left;
+        width: 30%;
+      }
+
+      .addresses {
+        table-layout: fixed;
+        margin-bottom: 2rem;
+      }
+
+      .address {
+        width: 33.33%;
+        vertical-align: top;
+        padding: 0.5rem;
+      }
+
+      .address h2 {
+        font-size: 1em;
+        margin: 0 0 0.5rem 0;
+        text-decoration: underline;
+      }
+
+      .address p {
+        margin: 0;
+        line-height: 1.4;
+      }
+
+      .header-table {
+        margin-bottom: 2rem;
+      }
+
+      .detail-table {
+        margin-top: 1rem;
+        margin-bottom: 2rem;
+      }
+
+      .signature-table {
+        table-layout: fixed;
+        margin-top: 2rem;
+      }
+
+      .signature-table th {
+        width: 30%;
+      }
+
+      .signature-table td {
+        height: 3rem;
+      }
+
+      .handwriting {
+        font-family: cursive;
+        font-size: 2em;
+      }
+
+      .statement {
+        margin: 2rem 0;
+        padding: 1rem;
+        border: 1pt solid #ccc;
+        background-color: #f8f9fa;
+      }
+
+      .signature-block {
+        margin-top: 3rem;
+        text-align: center;
+      }
+
+      p {
+        margin: 0.5rem 0;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Page 1: Collection/Delivery Note -->
+    <div class="page">
+      <h1>Release Note</h1>
+
+      <!-- Header Information -->
+      <table class="header-table">
+        <tbody>
+          <tr>
+            <th>Release Note Number</th>
+            <td>RN<%= @release_note.number %></td>
+          </tr>
+          <tr>
+            <th>Date</th>
+            <td><%= @release_note.date.strftime("%d/%m/%Y") %></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Addresses -->
+      <table class="addresses">
+        <tbody>
+          <tr>
+            <td class="address">
+              <h2>From</h2>
+              <p>
+                <%= @company_name || "Hard Anodising Surface Treatments Ltd" %><br/>
+                <%= simple_format(@trading_address || "Your trading address here") %>
+              </p>
+            </td>
+            <td class="address">
+              <h2>Invoice To</h2>
+              <p>
+                <%= @release_note.invoice_customer_name %><br/>
+                <%= simple_format(@release_note.invoice_address) if @release_note.invoice_address %>
+              </p>
+            </td>
+            <td class="address">
+              <h2>Deliver To</h2>
+              <p>
+                <%= @release_note.delivery_customer_name %><br/>
+                <%= simple_format(@release_note.delivery_address) if @release_note.delivery_address %>
+              </p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Release Note Details -->
+      <table class="detail-table">
+        <tbody>
+          <tr>
+            <th>Customer Order</th>
+            <td>
+              <%= @release_note.works_order.customer_order.number %>
+              <% if @release_note.works_order.respond_to?(:customer_order_line) && @release_note.works_order.customer_order_line.present? %>
+                (line <%= @release_note.works_order.customer_order_line %>)
+              <% end %>
+            </td>
+          </tr>
+          <tr>
+            <th>Part Number</th>
+            <td><%= @release_note.works_order.part_number %></td>
+          </tr>
+          <tr>
+            <th>Issue</th>
+            <td><%= @release_note.works_order.part_issue %></td>
+          </tr>
+          <tr>
+            <th>Description</th>
+            <td><%= @release_note.works_order.part_description %></td>
+          </tr>
+          <tr>
+            <th>Treatment Specification</th>
+            <td><%= @release_note.specification %></td>
+          </tr>
+          <tr>
+            <th>Quantity Accepted</th>
+            <td><%= @release_note.quantity_accepted %></td>
+          </tr>
+          <tr>
+            <th>Quantity Rejected</th>
+            <td><%= @release_note.quantity_rejected %></td>
+          </tr>
+          <tr>
+            <th>Our Works Order Number</th>
+            <td>WO<%= @release_note.works_order.number %></td>
+          </tr>
+          <% if @release_note.respond_to?(:remarks) && @release_note.remarks.present? %>
+            <tr>
+              <th>Remarks</th>
+              <td><%= simple_format(@release_note.remarks) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+
+      <!-- Proof of Collection/Delivery -->
+      <h2>Proof of Collection/Delivery</h2>
+      <table class="signature-table">
+        <tbody>
+          <tr>
+            <th>Signature</th>
+            <td></td>
+          </tr>
+          <tr>
+            <th>Name</th>
+            <td></td>
+          </tr>
+          <tr>
+            <th>Date/Time</th>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Page 2: Certificate/Statement -->
+    <div class="page">
+      <h1>Release Note</h1>
+
+      <!-- Header Information (repeated) -->
+      <table class="header-table">
+        <tbody>
+          <tr>
+            <th>Release Note Number</th>
+            <td>RN<%= @release_note.number %></td>
+          </tr>
+          <tr>
+            <th>Date</th>
+            <td><%= @release_note.date.strftime("%d/%m/%Y") %></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Addresses (repeated) -->
+      <table class="addresses">
+        <tbody>
+          <tr>
+            <td class="address">
+              <h2>From</h2>
+              <p>
+                <%= @company_name || "Hard Anodising Surface Treatments Ltd" %><br/>
+                <%= simple_format(@trading_address || "Your trading address here") %>
+              </p>
+            </td>
+            <td class="address">
+              <h2>Invoice To</h2>
+              <p>
+                <%= @release_note.invoice_customer_name %><br/>
+                <%= simple_format(@release_note.invoice_address) if @release_note.invoice_address %>
+              </p>
+            </td>
+            <td class="address">
+              <h2>Deliver To</h2>
+              <p>
+                <%= @release_note.delivery_customer_name %><br/>
+                <%= simple_format(@release_note.delivery_address) if @release_note.delivery_address %>
+              </p>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Release Note Details (repeated) -->
+      <table class="detail-table">
+        <tbody>
+          <tr>
+            <th>Customer Order</th>
+            <td>
+              <%= @release_note.works_order.customer_order.number %>
+              <% if @release_note.works_order.respond_to?(:customer_order_line) && @release_note.works_order.customer_order_line.present? %>
+                (line <%= @release_note.works_order.customer_order_line %>)
+              <% end %>
+            </td>
+          </tr>
+          <tr>
+            <th>Part Number</th>
+            <td><%= @release_note.works_order.part_number %></td>
+          </tr>
+          <tr>
+            <th>Issue</th>
+            <td><%= @release_note.works_order.part_issue %></td>
+          </tr>
+          <tr>
+            <th>Description</th>
+            <td><%= @release_note.works_order.part_description %></td>
+          </tr>
+          <tr>
+            <th>Treatment Specification</th>
+            <td><%= @release_note.specification %></td>
+          </tr>
+          <tr>
+            <th>Quantity Accepted</th>
+            <td><%= @release_note.quantity_accepted %></td>
+          </tr>
+          <tr>
+            <th>Quantity Rejected</th>
+            <td><%= @release_note.quantity_rejected %></td>
+          </tr>
+          <tr>
+            <th>Our Works Order Number</th>
+            <td>WO<%= @release_note.works_order.number %></td>
+          </tr>
+          <% if @release_note.respond_to?(:remarks) && @release_note.remarks.present? %>
+            <tr>
+              <th>Remarks</th>
+              <td><%= simple_format(@release_note.remarks) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+
+      <!-- Release Statement -->
+      <div class="statement">
+        <p><%= simple_format(@release_note.release_statement) if @release_note.release_statement.present? %></p>
+      </div>
+
+      <!-- Signature Block -->
+      <div class="signature-block">
+        <p>
+          <span class="handwriting"><%= @release_note.issued_by.display_name %></span><br/>
+          For and on behalf of <%= @company_name || "Hard Anodising Surface Treatments Ltd" %>
+        </p>
+      </div>
+    </div>
+  </body>
+</html>

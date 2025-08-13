@@ -1,0 +1,44 @@
+<!-- Navigation Bar with inline styles for debugging -->
+<nav style="background-color: #2563eb; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+  <div style="max-width: 80rem; margin: 0 auto; padding: 0 1rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; height: 4rem;">
+
+      <!-- Logo/Brand -->
+      <div style="display: flex; align-items: center;">
+        <%= link_to root_path, style: "display: flex; align-items: center; color: white; text-decoration: none;" do %>
+          <span style="font-size: 1.25rem; font-weight: bold;">HAMS 2.0</span>
+        <% end %>
+      </div>
+
+      <!-- Main Navigation Links -->
+      <div style="display: flex; gap: 2rem;
+        <%= link_to "Home", root_path,
+            style: "color: white; padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; text-decoration: none; #{current_page?(root_path) ? 'background-color: rgba(29, 78, 216, 1);' : ''}" %>
+
+        <%= link_to "Customer Orders", customer_orders_path,
+            style: "color: white; padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; text-decoration: none; #{current_page?(customer_orders_path) ? 'background-color: rgba(29, 78, 216, 1);' : ''}" %>
+
+        <%= link_to "Works Orders", works_orders_path,
+            style: "color: white; padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; text-decoration: none; #{current_page?(works_orders_path) ? 'background-color: rgba(29, 78, 216, 1);' : ''}" %>
+
+        <%= link_to "Release Notes", release_notes_path,
+            style: "color: white; padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; text-decoration: none; #{current_page?(release_notes_path) ? 'background-color: rgba(29, 78, 216, 1);' : ''}" %>
+
+        <%= link_to "Parts", parts_path,
+            style: "color: white; padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; text-decoration: none; #{current_page?(parts_path) ? 'background-color: rgba(29, 78, 216, 1);' : ''}" %>
+      </div>
+
+      <!-- User Menu -->
+      <div style="display: flex; align-items: center; gap: 1rem;">
+        <% if Current.user %>
+          <span style="color: white; font-size: 0.875rem;">Welcome, <%= Current.user.display_name %></span>
+          <%= link_to "Logout", session_path, method: :delete,
+              style: "color: white; padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; text-decoration: none;" %>
+        <% else %>
+          <%= link_to "Login", new_session_path,
+              style: "color: white; padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; text-decoration: none;" %>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</nav>

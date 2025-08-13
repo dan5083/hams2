@@ -1,0 +1,112 @@
+<%# Helper method for header fields %>
+<% content_for :header_field do |label, value| %>
+  <div class="header-field-label">
+    <%= label %>
+  </div>
+  <div class="header-field-value">
+    <%= value %>
+  </div>
+<% end %>
+
+<%# Helper method for header rows %>
+<% content_for :header_row do |&block| %>
+  <div class="header-row">
+    <div class="header-row-inner">
+      <div class="header-row-inner2">
+        <%= capture(&block) %>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<header>
+  <div class="header-details">
+    <!-- Customer -->
+    <div class="header-row">
+      <div class="header-row-inner">
+        <div class="header-row-inner2">
+          <div class="header-field-label">Customer</div>
+          <div class="header-field-value"><%= works_order.customer.name %></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Customer Order & WO -->
+    <div class="header-row">
+      <div class="header-row-inner">
+        <div class="header-row-inner2">
+          <div class="header-field-label">Customer Order</div>
+          <div class="header-field-value"><%= works_order.customer_order.number %></div>
+          <div class="header-field-label">WO</div>
+          <div class="header-field-value"><%= works_order.number %></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Spec & Qty -->
+    <div class="header-row">
+      <div class="header-row-inner">
+        <div class="header-row-inner2">
+          <div class="header-field-label">Spec</div>
+          <div class="header-field-value"><%= works_order.specification %></div>
+          <div class="header-field-label">Qty</div>
+          <div class="header-field-value"><%= works_order.quantity %></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Part Number, Issue & Description -->
+    <div class="header-row">
+      <div class="header-row-inner">
+        <div class="header-row-inner2">
+          <div class="header-field-label">Part Number</div>
+          <div class="header-field-value"><%= works_order.part_number %></div>
+          <div class="header-field-label">Issue</div>
+          <div class="header-field-value"><%= works_order.part_issue %></div>
+          <div class="header-field-label">Description</div>
+          <div class="header-field-value"><%= works_order.part_description %></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Material & Pricing -->
+    <div class="header-row">
+      <div class="header-row-inner">
+        <div class="header-row-inner2">
+          <div class="header-field-label">Material</div>
+          <div class="header-field-value"><%= works_order.material if works_order.respond_to?(:material) %></div>
+          <% if works_order.each_price.present? %>
+            <div class="header-field-label">Each Price</div>
+            <div class="header-field-value"><%= number_to_currency(works_order.each_price) %></div>
+          <% end %>
+          <div class="header-field-label">Lot Price</div>
+          <div class="header-field-value"><%= number_to_currency(works_order.lot_price) %></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dates -->
+    <div class="header-row">
+      <div class="header-row-inner">
+        <div class="header-row-inner2">
+          <div class="header-field-label">Date Created</div>
+          <div class="header-field-value"><%= works_order.created_at.strftime("%d/%m/%Y") %></div>
+          <div class="header-field-label">Due Date</div>
+          <div class="header-field-value"><%= works_order.due_date.strftime("%d/%m/%Y") %></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Special Instructions (if present) -->
+    <% if works_order.special_instructions.present? %>
+      <div class="header-row">
+        <div class="header-row-inner">
+          <div class="header-row-inner2">
+            <div class="header-field-label">Special Instructions</div>
+            <div class="header-field-value"><%= works_order.special_instructions %></div>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</header>

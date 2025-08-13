@@ -2,9 +2,10 @@
 class InvoiceItem < ApplicationRecord
   belongs_to :invoice
   belongs_to :release_note, optional: true
-  # belongs_to :additional_charge, optional: true # For future use
+  # belongs_to :additional_charge, optional: true # For future use - Mike had wo_additional_charges
 
-  validates :kind, inclusion: { in: %w[main additional manual] }
+  # Match Mike's kind values exactly
+  validates :kind, inclusion: { in: %w[main additional] }
   validates :quantity, presence: true, numericality: { greater_than: 0 }
   validates :description, presence: true
   validates :line_amount_ex_tax, :line_amount_tax, :line_amount_inc_tax,
@@ -18,7 +19,6 @@ class InvoiceItem < ApplicationRecord
 
   scope :main_items, -> { where(kind: 'main') }
   scope :additional_items, -> { where(kind: 'additional') }
-  scope :manual_items, -> { where(kind: 'manual') }
 
   def unit_price_ex_tax
     return 0 if quantity.zero?
@@ -44,16 +44,17 @@ class InvoiceItem < ApplicationRecord
     }
   end
 
-  # Create invoice item from release note
+  # Create invoice item from release note - simplified version of Mike's logic
   def self.create_from_release_note(release_note, invoice)
     return unless release_note.can_be_invoiced?
 
+    # Create the main item
     item = new(
       invoice: invoice,
       release_note: release_note,
       kind: 'main',
       quantity: release_note.quantity_accepted,
-      description: release_note.invoice_description,
+      description: description_for_release_note(release_note),
       line_amount_ex_tax: release_note.invoice_value
     )
 
@@ -71,5 +72,18 @@ class InvoiceItem < ApplicationRecord
   def update_invoice_totals
     invoice.calculate_totals
     invoice.save! if invoice.persisted?
+  end
+
+  # Match Mike's description generation
+  def self.description_for_release_note(release_note)
+    works_order = release_note.works_order
+    customer_order = works_order.customer_order
+
+    content_lines = [
+      "Treatment of part #{works_order.part_number} (quantity: #{release_note.quantity_summary})",
+      "Your order: #{customer_order.number}",
+      "Our release note #{release_note.number} and works order #{works_order.number}."
+    ]
+    content_lines.join("\n\n")
   end
 end

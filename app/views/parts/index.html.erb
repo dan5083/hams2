@@ -1,0 +1,147 @@
+<div class="container mx-auto px-4 py-6">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold text-gray-900">Parts Management</h1>
+    <%= link_to "New Part", new_part_path,
+        class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" %>
+  </div>
+
+  <!-- Filters -->
+  <div class="bg-white p-4 rounded-lg shadow mb-6">
+    <%= form_with url: parts_path, method: :get, local: true, class: "flex flex-wrap gap-4 items-end" do |form| %>
+      <div>
+        <%= form.label :search, "Part Number/Issue", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.text_field :search,
+            value: params[:search],
+            placeholder: "Search part number or issue...",
+            class: "border border-gray-300 rounded-md px-3 py-2 w-48" %>
+      </div>
+
+      <div>
+        <%= form.label :customer_id, class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.select :customer_id,
+            options_for_select([['All Customers', '']] + @customers.map { |c| [c.name, c.id] }, params[:customer_id]),
+            {},
+            { class: "border border-gray-300 rounded-md px-3 py-2 w-48" } %>
+      </div>
+
+      <div>
+        <%= form.label :status, class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.select :status,
+            options_for_select([
+              ['All Parts', ''],
+              ['Enabled', 'enabled'],
+              ['Disabled', 'disabled']
+            ], params[:status]),
+            {},
+            { class: "border border-gray-300 rounded-md px-3 py-2" } %>
+      </div>
+
+      <div>
+        <%= form.submit "Filter", class: "bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" %>
+        <%= link_to "Clear", parts_path, class: "bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded ml-2" %>
+      </div>
+    <% end %>
+  </div>
+
+  <!-- Parts Table -->
+  <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Part Number
+          </th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Customer
+          </th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            PPIs
+          </th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Works Orders
+          </th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Status
+          </th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Actions
+          </th>
+        </tr>
+      </thead>
+      <tbody class="bg-white divide-y divide-gray-200">
+        <% @parts.each do |part| %>
+          <tr class="hover:bg-gray-50">
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+              <%= link_to part.display_name, part, class: "text-blue-600 hover:text-blue-900" %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              <%= part.customer.name %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              <%= part.part_processing_instructions.enabled.count %>
+              <% if part.part_processing_instructions.count != part.part_processing_instructions.enabled.count %>
+                (<%= part.part_processing_instructions.count %> total)
+              <% end %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              <%= part.works_orders.active.count %>
+              <% if part.works_orders.count != part.works_orders.active.count %>
+                (<%= part.works_orders.count %> total)
+              <% end %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <% if part.enabled %>
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                  Enabled
+                </span>
+              <% else %>
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                  Disabled
+                </span>
+              <% end %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+              <div class="flex space-x-2">
+                <%= link_to "View", part, class: "text-blue-600 hover:text-blue-900" %>
+                <%= link_to "Edit", edit_part_path(part), class: "text-yellow-600 hover:text-yellow-900" %>
+                <%= link_to part.enabled? ? "Disable" : "Enable",
+                    toggle_enabled_part_path(part),
+                    method: :patch,
+                    class: part.enabled? ? "text-red-600 hover:text-red-900" : "text-green-600 hover:text-green-900",
+                    data: { confirm: "Are you sure you want to #{part.enabled? ? 'disable' : 'enable'} this part?" } %>
+                <% if part.can_be_deleted? %>
+                  <%= link_to "Delete", part_path(part),
+                      method: :delete,
+                      class: "text-red-600 hover:text-red-900",
+                      data: { confirm: "Are you sure you want to delete this part? This cannot be undone." } %>
+                <% end %>
+              </div>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+
+    <% if @parts.empty? %>
+      <div class="text-center py-8">
+        <p class="text-gray-500">No parts found.</p>
+        <%= link_to "Create your first part", new_part_path,
+            class: "text-blue-600 hover:text-blue-900 font-medium" %>
+      </div>
+    <% end %>
+  </div>
+
+  <!-- Info Box -->
+  <div class="mt-6 bg-blue-50 border border-blue-200 rounded-md p-4">
+    <div class="flex">
+      <div class="ml-3">
+        <h3 class="text-sm font-medium text-blue-800">About Parts Management</h3>
+        <div class="mt-2 text-sm text-blue-700">
+          <p>Parts are automatically created and managed through the Part Processing Instructions (PPIs) system.
+          Each unique combination of customer, part number, and issue creates a distinct part record.
+          Part numbers and issues are automatically normalized to uppercase alphanumeric format for consistency.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

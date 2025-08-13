@@ -2,7 +2,9 @@
 tree -I "node_modules|.git|.DS_Store|*.log|coverage|build|dist|tmp"
 # Show all models with filenames as headers:
 for file in app/models/[a-e]*.rb; do echo "=== $file ==="; cat "$file"; echo; done
-for file in app/models/[f-z]*.rb; do echo "=== $file ==="; cat "$file"; echo; done
+for file in app/models/[f-j]*.rb; do echo "=== $file ==="; cat "$file"; echo; done
+for file in app/models/[k-z]*.rb; do echo "=== $file ==="; cat "$file"; echo; done
+
 
 # Show controllers.rb files starting with a-i
 for file in app/controllers/[a-i]*.rb; do
@@ -19,15 +21,11 @@ for file in app/controllers/[j-z]*.rb; do
 done
 
 
-# For all views in folders A–R
-for file in app/views/[a-r]*/*.html.erb; do echo "=== $file ==="; cat "$file"; echo; done
-
-# For all views in folders S–t
-# s–t
-for f in app/views/[s-t]*/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-
-# u–z
-for f in app/views/[u-z]*/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
+# For all views in folders A–F
+for file in app/views/[a-f]*/*.html.erb; do echo "=== $file ==="; cat "$file"; echo; done
+for f in app/views/[g-p]*/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
+for f in app/views/[q-v]*/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
+for f in app/views/[w-z]*/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
 
 # See the helpers
 for file in app/helpers/*.rb; do echo "=== $file ==="; cat "$file"; echo; done

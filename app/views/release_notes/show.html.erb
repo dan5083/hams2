@@ -1,0 +1,233 @@
+<div class="container mx-auto px-4 py-6">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold text-gray-900">Release Note RN<%= @release_note.number %></h1>
+    <div class="flex space-x-2">
+      <%= link_to "PDF", pdf_release_note_path(@release_note),
+          class: "bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded",
+          target: "_blank" %>
+      <% unless @release_note.voided || @release_note.invoice_item.present? %>
+        <%= link_to "Edit", edit_release_note_path(@release_note),
+            class: "bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded" %>
+        <% if @release_note.can_be_voided? %>
+          <%= link_to "Void", void_release_note_path(@release_note),
+              method: :patch,
+              class: "bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded",
+              data: { confirm: "Are you sure you want to void this release note? This cannot be undone." } %>
+        <% end %>
+      <% end %>
+      <%= link_to "Back to Release Notes", release_notes_path,
+          class: "bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" %>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <!-- Release Note Details -->
+    <div class="bg-white shadow rounded-lg p-6">
+      <h2 class="text-xl font-semibold text-gray-900 mb-4">Release Note Details</h2>
+
+      <dl class="space-y-3">
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Release Note Number</dt>
+          <dd class="text-sm text-gray-900 font-semibold">RN<%= @release_note.number %></dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Date</dt>
+          <dd class="text-sm text-gray-900"><%= @release_note.date.strftime("%d/%m/%Y") %></dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Issued By</dt>
+          <dd class="text-sm text-gray-900"><%= @release_note.issued_by.display_name %></dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Status</dt>
+          <dd class="text-sm">
+            <% if @release_note.voided %>
+              <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                Voided
+              </span>
+            <% elsif @release_note.invoice_item.present? %>
+              <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                Invoiced
+              </span>
+            <% elsif @release_note.can_be_invoiced? %>
+              <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+                Pending Invoice
+              </span>
+            <% else %>
+              <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                Active
+              </span>
+            <% end %>
+          </dd>
+        </div>
+
+        <% if @release_note.respond_to?(:remarks) && @release_note.remarks.present? %>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Remarks</dt>
+            <dd class="text-sm text-gray-900"><%= simple_format(@release_note.remarks) %></dd>
+          </div>
+        <% end %>
+      </dl>
+    </div>
+
+    <!-- Quantities -->
+    <div class="bg-white shadow rounded-lg p-6">
+      <h2 class="text-xl font-semibold text-gray-900 mb-4">Quantities</h2>
+
+      <dl class="space-y-3">
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Quantity Accepted</dt>
+          <dd class="text-sm text-gray-900 font-semibold text-lg text-green-600">
+            <%= @release_note.quantity_accepted %>
+          </dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Quantity Rejected</dt>
+          <dd class="text-sm text-gray-900 font-semibold text-lg <%= @release_note.quantity_rejected > 0 ? 'text-red-600' : 'text-gray-400' %>">
+            <%= @release_note.quantity_rejected %>
+          </dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Total Quantity</dt>
+          <dd class="text-sm text-gray-900 font-semibold text-lg">
+            <%= @release_note.total_quantity %>
+          </dd>
+        </div>
+
+        <% if @release_note.can_be_invoiced? %>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Invoice Value</dt>
+            <dd class="text-sm text-gray-900 font-semibold text-lg text-blue-600">
+              <%= number_to_currency(@release_note.invoice_value) %>
+            </dd>
+          </div>
+        <% end %>
+      </dl>
+    </div>
+  </div>
+
+  <!-- Works Order Details -->
+  <div class="bg-white shadow rounded-lg p-6 mb-6">
+    <h2 class="text-xl font-semibold text-gray-900 mb-4">Works Order Details</h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <dl class="space-y-3">
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Works Order</dt>
+          <dd class="text-sm text-gray-900">
+            <%= link_to "WO#{@release_note.works_order.number}", @release_note.works_order,
+                class: "text-blue-600 hover:text-blue-900" %>
+          </dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Customer Order</dt>
+          <dd class="text-sm text-gray-900">
+            <%= link_to @release_note.works_order.customer_order.number, @release_note.works_order.customer_order,
+                class: "text-blue-600 hover:text-blue-900" %>
+          </dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Customer</dt>
+          <dd class="text-sm text-gray-900"><%= @release_note.customer.name %></dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Part Number</dt>
+          <dd class="text-sm text-gray-900 font-mono">
+            <%= @release_note.works_order.part_number %>-<%= @release_note.works_order.part_issue %>
+          </dd>
+        </div>
+      </dl>
+
+      <dl class="space-y-3">
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Description</dt>
+          <dd class="text-sm text-gray-900"><%= @release_note.works_order.part_description %></dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Specification</dt>
+          <dd class="text-sm text-gray-900"><%= @release_note.specification %></dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">WO Quantity</dt>
+          <dd class="text-sm text-gray-900">
+            <%= @release_note.works_order.quantity_released %>/<%= @release_note.works_order.quantity %>
+          </dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Due Date</dt>
+          <dd class="text-sm text-gray-900"><%= @release_note.works_order.due_date.strftime("%d/%m/%Y") %></dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+
+  <!-- Customer Addresses -->
+  <div class="bg-white shadow rounded-lg p-6 mb-6">
+    <h2 class="text-xl font-semibold text-gray-900 mb-4">Customer Information</h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div>
+        <h3 class="text-sm font-medium text-gray-500 mb-2">Invoice To</h3>
+        <div class="text-sm text-gray-900">
+          <strong><%= @release_note.invoice_customer_name %></strong><br/>
+          <%= simple_format(@release_note.invoice_address) if @release_note.invoice_address %>
+        </div>
+      </div>
+
+      <div>
+        <h3 class="text-sm font-medium text-gray-500 mb-2">Deliver To</h3>
+        <div class="text-sm text-gray-900">
+          <strong><%= @release_note.delivery_customer_name %></strong><br/>
+          <%= simple_format(@release_note.delivery_address) if @release_note.delivery_address %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Release Statement -->
+  <% if @release_note.release_statement.present? %>
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+      <h2 class="text-xl font-semibold text-gray-900 mb-4">Release Statement</h2>
+      <div class="text-sm text-gray-700">
+        <%= simple_format(@release_note.release_statement) %>
+      </div>
+    </div>
+  <% end %>
+
+  <!-- Invoice Information -->
+  <% if @release_note.invoice_item.present? %>
+    <div class="bg-white shadow rounded-lg p-6">
+      <h2 class="text-xl font-semibold text-gray-900 mb-4">Invoice Information</h2>
+
+      <p class="text-sm text-gray-600 mb-2">This release note has been invoiced:</p>
+
+      <dl class="space-y-2">
+        <div>
+          <dt class="text-sm font-medium text-gray-500 inline">Invoice:</dt>
+          <dd class="text-sm text-gray-900 inline ml-2">
+            <%= link_to @release_note.invoice_item.invoice.display_name, @release_note.invoice_item.invoice,
+                class: "text-blue-600 hover:text-blue-900" %>
+          </dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500 inline">Amount:</dt>
+          <dd class="text-sm text-gray-900 inline ml-2">
+            <%= number_to_currency(@release_note.invoice_item.line_amount_inc_tax) %>
+          </dd>
+        </div>
+      </dl>
+    </div>
+  <% end %>
+</div>

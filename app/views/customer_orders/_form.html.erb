@@ -1,0 +1,98 @@
+<%# Customer Order Form Partial %>
+<%= form_with model: customer_order, local: true, class: "space-y-6" do |form| %>
+  <% if customer_order.errors.any? %>
+    <div class="bg-red-50 border border-red-200 rounded-md p-4">
+      <div class="flex">
+        <div class="ml-3">
+          <h3 class="text-sm font-medium text-red-800">
+            <%= pluralize(customer_order.errors.count, "error") %> prohibited this customer order from being saved:
+          </h3>
+          <div class="mt-2 text-sm text-red-700">
+            <ul class="list-disc list-inside space-y-1">
+              <% customer_order.errors.full_messages.each do |message| %>
+                <li><%= message %></li>
+              <% end %>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="bg-white shadow rounded-lg p-6">
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Customer Order Details</h3>
+
+    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+      <!-- Customer Selection -->
+      <div>
+        <%= form.label :customer_id, class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.select :customer_id,
+            options_for_select([['Select Customer', '']] + @customers.map { |c| [c.name, c.id] }, customer_order.customer_id),
+            {},
+            {
+              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+              required: true
+            } %>
+      </div>
+
+      <!-- Order Number -->
+      <div>
+        <%= form.label :number, "Order Number", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.text_field :number,
+            placeholder: "Customer PO number or job reference",
+            class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+            required: true %>
+      </div>
+
+      <!-- Date Received -->
+      <div>
+        <%= form.label :date_received, class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.date_field :date_received,
+            value: customer_order.date_received&.strftime("%Y-%m-%d") || Date.current.strftime("%Y-%m-%d"),
+            class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+            required: true %>
+      </div>
+
+      <!-- Customer Reference -->
+      <div>
+        <%= form.label :customer_reference, class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.text_field :customer_reference,
+            placeholder: "Customer's internal reference",
+            class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
+      </div>
+
+      <!-- Delivery Required Date -->
+      <div>
+        <%= form.label :delivery_required_date, class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.date_field :delivery_required_date,
+            class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
+      </div>
+    </div>
+
+    <!-- Notes Section -->
+    <div class="mt-6">
+      <%= form.label :notes, class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= form.text_area :notes,
+          rows: 3,
+          placeholder: "Internal notes about this order...",
+          class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
+    </div>
+
+    <!-- Special Requirements -->
+    <div class="mt-6">
+      <%= form.label :special_requirements, class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= form.text_area :special_requirements,
+          rows: 3,
+          placeholder: "Any special delivery or processing requirements...",
+          class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
+    </div>
+  </div>
+
+  <!-- Form Actions -->
+  <div class="flex justify-end space-x-3">
+    <%= link_to "Cancel", customer_order.persisted? ? customer_order : customer_orders_path,
+        class: "bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded" %>
+    <%= form.submit customer_order.persisted? ? "Update Customer Order" : "Create Customer Order",
+        class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" %>
+  </div>
+<% end %>

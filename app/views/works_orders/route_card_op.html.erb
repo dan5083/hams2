@@ -1,0 +1,42 @@
+<%# Render individual operation %>
+<%
+  has_variables = op[:all_variables]&.length&.> 0 || false
+  top_style = has_variables ? 'border-bottom-style: dashed;' : ''
+  bottom_style = has_variables ? 'border-top-style: dashed;' : ''
+  rowspan = has_variables ? 2 : 1
+%>
+
+<tr class="op op-<%= op[:number] %>">
+  <td rowspan="<%= rowspan %>">
+    <%= op[:number] %>
+  </td>
+  <td style="<%= top_style %>">
+    <% if op[:content] %>
+      <% op[:content].each do |item| %>
+        <% if item[:type] == "paragraph" %>
+          <%= item[:as_html]&.html_safe %>
+        <% end %>
+      <% end %>
+    <% end %>
+  </td>
+
+  <% batch_cols.times do %>
+    <td style="<%= top_style %>"></td>
+  <% end %>
+</tr>
+
+<% if has_variables %>
+  <tr>
+    <td style="<%= bottom_style %>">
+      <% op[:all_variables].each do |variable| %>
+        <div class="variable-row" style="font-weight:bold; text-align: right;">
+          <span class="variable-name"><%= variable[:as_html]&.html_safe %></span>:
+        </div>
+      <% end %>
+    </td>
+
+    <% batch_cols.times do %>
+      <td style="<%= bottom_style %>"></td>
+    <% end %>
+  </tr>
+<% end %>

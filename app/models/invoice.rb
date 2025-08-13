@@ -1,75 +1,116 @@
-# app/models/invoice_item.rb
-class InvoiceItem < ApplicationRecord
-  belongs_to :invoice
-  belongs_to :release_note, optional: true
-  # belongs_to :additional_charge, optional: true # For future use
+# app/models/invoice.rb
+class Invoice < ApplicationRecord
+  belongs_to :customer, class_name: 'Organization'
+  has_many :invoice_items, dependent: :destroy
 
-  validates :kind, inclusion: { in: %w[main additional manual] }
-  validates :quantity, presence: true, numericality: { greater_than: 0 }
-  validates :description, presence: true
-  validates :line_amount_ex_tax, :line_amount_tax, :line_amount_inc_tax,
+  validates :number, presence: true
+  validates :date, presence: true
+  validates :tax_rate_pct, presence: true, numericality: { greater_than_or_equal_to: 0 }
+  validates :xero_tax_type, presence: true
+
+  # Financial validations - exactly matching Mike's fields
+  validates :total_ex_tax, :total_tax, :total_inc_tax,
             presence: true, numericality: { greater_than_or_equal_to: 0 }
-  validates :position, presence: true, numericality: { greater_than_or_equal_to: 0 }
 
-  before_validation :calculate_tax_amounts, if: :line_amount_ex_tax_changed?
-  before_validation :set_position, if: :new_record?
-  after_save :update_invoice_totals
-  after_destroy :update_invoice_totals
+  # Scopes exactly like Mike's - no status, just Xero sync tracking
+  scope :synced, -> { where.not(xero_id: nil) }
+  scope :requiring_xero_sync, -> { where(xero_id: nil) }
+  scope :recent, -> { order(date: :desc) }
 
-  scope :main_items, -> { where(kind: 'main') }
-  scope :additional_items, -> { where(kind: 'additional') }
-  scope :manual_items, -> { where(kind: 'manual') }
+  # For dashboard compatibility - treat all as "draft" until synced like Mike did
+  scope :draft, -> { all }
 
-  def unit_price_ex_tax
-    return 0 if quantity.zero?
-    line_amount_ex_tax / quantity
+  before_validation :set_defaults, if: :new_record?
+  after_initialize :set_defaults, if: :new_record?
+  after_create :assign_next_number
+
+  def display_name
+    "INV#{number}"
   end
 
-  def calculate_tax_amounts
-    return unless invoice&.tax_rate_pct && line_amount_ex_tax
-
-    tax_rate = invoice.tax_rate_pct / 100.0
-    self.line_amount_tax = (line_amount_ex_tax * tax_rate).round(2)
-    self.line_amount_inc_tax = line_amount_ex_tax + line_amount_tax
+  def self.next_number
+    Sequence.next_value('invoice_number')
   end
 
-  # Convert to Xero line item format
-  def to_xero_line_item
+  # Exactly like Mike's calculate_totals
+  def calculate_totals
+    self.total_ex_tax = invoice_items.sum(:line_amount_ex_tax)
+    self.total_tax = invoice_items.sum(:line_amount_tax)
+    self.total_inc_tax = total_ex_tax + total_tax
+  end
+
+  def calculate_totals!
+    calculate_totals
+    save! if persisted?
+  end
+
+  # Simple like Mike's - just track Xero sync
+  def synced_with_xero?
+    xero_id.present?
+  end
+
+  def requires_xero_sync?
+    xero_id.blank?
+  end
+
+  def xero_url
+    return unless xero_id
+    "https://go.xero.com/AccountsReceivable/View.aspx?InvoiceID=#{xero_id}"
+  end
+
+  # Mike's Xero format - simple AUTHORISED status
+  def to_xero_invoice
     {
-      "Description" => description,
-      "Quantity" => quantity,
-      "UnitAmount" => unit_price_ex_tax.to_f,
-      "TaxType" => invoice.xero_tax_type,
-      "LineAmount" => line_amount_ex_tax.to_f
-    }
+      "Type" => "ACCREC",
+      "Contact" => {
+        "ContactID" => customer.xero_contact&.xero_id
+      },
+      "InvoiceNumber" => display_name,
+      "Date" => date.strftime("%Y-%m-%d"),
+      "LineItems" => invoice_items.map(&:to_xero_line_item),
+      "Status" => "AUTHORISED"
+    }.compact
   end
 
-  # Create invoice item from release note
-  def self.create_from_release_note(release_note, invoice)
-    return unless release_note.can_be_invoiced?
+  # Mike's creation method from release notes
+  def self.create_from_release_notes(release_notes, customer, user = nil)
+    return nil if release_notes.empty?
 
-    item = new(
-      invoice: invoice,
-      release_note: release_note,
-      kind: 'main',
-      quantity: release_note.quantity_accepted,
-      description: release_note.invoice_description,
-      line_amount_ex_tax: release_note.invoice_value
-    )
+    customer_ids = release_notes.map { |rn| rn.customer.id }.uniq
+    if customer_ids.length > 1
+      raise StandardError, "All release notes must be for the same customer"
+    end
 
-    # Tax will be calculated automatically
-    item.save!
-    item
+    unless release_notes.all?(&:can_be_invoiced?)
+      raise StandardError, "Some release notes cannot be invoiced"
+    end
+
+    invoice = new(customer: customer, date: Date.current)
+
+    if invoice.save
+      release_notes.each do |release_note|
+        InvoiceItem.create_from_release_note(release_note, invoice)
+      end
+      invoice.calculate_totals!
+      invoice
+    else
+      nil
+    end
   end
 
   private
 
-  def set_position
-    self.position = (invoice.invoice_items.maximum(:position) || -1) + 1
+  def set_defaults
+    self.date = Date.current if date.blank?
+    self.tax_rate_pct = 20.0 if tax_rate_pct.blank? # UK VAT rate
+    self.xero_tax_type = 'OUTPUT2' if xero_tax_type.blank? # UK standard rate
+    self.total_ex_tax = 0.0 if total_ex_tax.blank?
+    self.total_tax = 0.0 if total_tax.blank?
+    self.total_inc_tax = 0.0 if total_inc_tax.blank?
   end
 
-  def update_invoice_totals
-    invoice.calculate_totals
-    invoice.save! if invoice.persisted?
+  def assign_next_number
+    self.number = self.class.next_number
+    save!
   end
 end

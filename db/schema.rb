@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_12_140605) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_13_091303) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -33,7 +33,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_12_140605) do
   create_table "invoice_items", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "invoice_id", null: false
     t.uuid "release_note_id"
-    t.uuid "additional_charge_id"
     t.string "kind", null: false
     t.integer "quantity", null: false
     t.text "description", null: false
@@ -61,16 +60,11 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_12_140605) do
     t.decimal "tax_rate_pct", precision: 5, scale: 2, null: false
     t.string "xero_id"
     t.string "number"
-    t.jsonb "xero_data", default: {}
-    t.datetime "last_synced_at"
-    t.string "status", default: "draft"
-    t.boolean "voided", default: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["customer_id"], name: "index_invoices_on_customer_id"
     t.index ["date"], name: "index_invoices_on_date"
     t.index ["number"], name: "index_invoices_on_number", unique: true, where: "(number IS NOT NULL)"
-    t.index ["status"], name: "index_invoices_on_status"
     t.index ["xero_id"], name: "index_invoices_on_xero_id", unique: true, where: "(xero_id IS NOT NULL)"
   end
 

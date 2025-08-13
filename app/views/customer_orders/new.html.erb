@@ -1,0 +1,10 @@
+<%# new.html.erb %>
+<div class="container mx-auto px-4 py-6">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold text-gray-900">New Customer Order</h1>
+    <%= link_to "Back to Orders", customer_orders_path,
+        class: "bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" %>
+  </div>
+
+  <%= render 'form', customer_order: @customer_order %>
+</div>

@@ -1,0 +1,221 @@
+<div class="container mx-auto px-4 py-6">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold text-gray-900">Works Order WO<%= @works_order.number %></h1>
+    <div class="flex space-x-2">
+      <%= link_to "Edit", edit_works_order_path(@works_order),
+          class: "bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded" %>
+      <%= link_to "Route Card", route_card_works_order_path(@works_order),
+          class: "bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded",
+          target: "_blank" %>
+      <% if @works_order.can_be_completed? %>
+        <%= link_to "Complete", complete_works_order_path(@works_order),
+            method: :patch,
+            class: "bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded",
+            data: { confirm: "Are you sure you want to complete this works order?" } %>
+      <% end %>
+      <%= link_to "Back to Works Orders", works_orders_path,
+          class: "bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" %>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Basic Details -->
+    <div class="bg-white shadow rounded-lg p-6">
+      <h2 class="text-xl font-semibold text-gray-900 mb-4">Basic Details</h2>
+
+      <dl class="space-y-3">
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Customer</dt>
+          <dd class="text-sm text-gray-900"><%= @works_order.customer.name %></dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Customer Order</dt>
+          <dd class="text-sm text-gray-900"><%= @works_order.customer_order.number %></dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Part Number</dt>
+          <dd class="text-sm text-gray-900"><%= @works_order.part_number %>-<%= @works_order.part_issue %></dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Description</dt>
+          <dd class="text-sm text-gray-900"><%= @works_order.part_description %></dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Specification</dt>
+          <dd class="text-sm text-gray-900"><%= @works_order.specification %></dd>
+        </div>
+      </dl>
+    </div>
+
+    <!-- Quantity & Pricing -->
+    <div class="bg-white shadow rounded-lg p-6">
+      <h2 class="text-xl font-semibold text-gray-900 mb-4">Quantity & Pricing</h2>
+
+      <dl class="space-y-3">
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Quantity Ordered</dt>
+          <dd class="text-sm text-gray-900"><%= @works_order.quantity %></dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Quantity Released</dt>
+          <dd class="text-sm text-gray-900"><%= @works_order.quantity_released %></dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Quantity Remaining</dt>
+          <dd class="text-sm text-gray-900 font-semibold <%= @works_order.quantity_remaining > 0 ? 'text-green-600' : 'text-red-600' %>">
+            <%= @works_order.quantity_remaining %>
+          </dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Price Type</dt>
+          <dd class="text-sm text-gray-900"><%= @works_order.price_type.capitalize %></dd>
+        </div>
+
+        <% if @works_order.each_price.present? %>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Each Price</dt>
+            <dd class="text-sm text-gray-900"><%= number_to_currency(@works_order.each_price) %></dd>
+          </div>
+        <% end %>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Lot Price</dt>
+          <dd class="text-sm text-gray-900"><%= number_to_currency(@works_order.lot_price) %></dd>
+        </div>
+      </dl>
+    </div>
+
+    <!-- Dates & Status -->
+    <div class="bg-white shadow rounded-lg p-6">
+      <h2 class="text-xl font-semibold text-gray-900 mb-4">Dates & Status</h2>
+
+      <dl class="space-y-3">
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Created</dt>
+          <dd class="text-sm text-gray-900"><%= @works_order.created_at.strftime("%d/%m/%Y %H:%M") %></dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Due Date</dt>
+          <dd class="text-sm text-gray-900"><%= @works_order.due_date.strftime("%d/%m/%Y") %></dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Status</dt>
+          <dd class="text-sm">
+            <% if @works_order.is_open %>
+              <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                Open
+              </span>
+            <% else %>
+              <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                Closed
+              </span>
+            <% end %>
+          </dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Release Level</dt>
+          <dd class="text-sm text-gray-900"><%= @works_order.release_level.name %></dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Transport Method</dt>
+          <dd class="text-sm text-gray-900"><%= @works_order.transport_method.name %></dd>
+        </div>
+      </dl>
+    </div>
+
+    <!-- Special Instructions -->
+    <% if @works_order.special_instructions.present? %>
+      <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">Special Instructions</h2>
+        <p class="text-sm text-gray-900"><%= simple_format(@works_order.special_instructions) %></p>
+      </div>
+    <% end %>
+  </div>
+
+  <!-- Release Notes -->
+  <div class="bg-white shadow rounded-lg p-6 mt-6">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-semibold text-gray-900">Release Notes</h2>
+      <%= link_to "New Release Note", new_works_order_release_note_path(@works_order),
+          class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm" %>
+    </div>
+
+    <% if @works_order.release_notes.any? %>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Number
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Date
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Accepted
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Rejected
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Status
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <% @works_order.release_notes.recent.each do |release_note| %>
+              <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  RN<%= release_note.number %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <%= release_note.date.strftime("%d/%m/%Y") %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <%= release_note.quantity_accepted %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <%= release_note.quantity_rejected %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <% if release_note.voided %>
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                      Voided
+                    </span>
+                  <% elsif release_note.invoice_item.present? %>
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                      Invoiced
+                    </span>
+                  <% else %>
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                      Active
+                    </span>
+                  <% end %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <%= link_to "View", release_note, class: "text-blue-600 hover:text-blue-900" %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <p class="text-gray-500">No release notes yet.</p>
+    <% end %>
+  </div>
+</div>

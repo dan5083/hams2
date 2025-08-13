@@ -48,13 +48,6 @@
         <div><strong>Synced with Xero:</strong> <%= Invoice.synced.count %></div>
         <div><strong>Pending Sync:</strong> <%= Invoice.requiring_xero_sync.count %></div>
       </div>
-
-      <div class="mt-4 space-y-2">
-        <%= link_to invoices_path,
-            class: "inline-block bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded text-sm" do %>
-          📄 View All Invoices
-        <% end %>
-      </div>
     </div>
 
     <!-- Quick Actions Card -->
@@ -63,14 +56,14 @@
       <p class="text-gray-600 mb-4">Common tasks and operations.</p>
 
       <div class="space-y-2">
-        <% if Invoice.requiring_xero_sync.any? && session[:xero_token_set] %>
-          <%= link_to push_batch_xero_invoices_path,
-              method: :post,
-              params: { invoice_ids: Invoice.requiring_xero_sync.pluck(:id) },
-              class: "block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm text-center",
-              confirm: "Push #{Invoice.requiring_xero_sync.count} invoices to Xero?" do %>
-            🚀 Push to Xero (<%= Invoice.requiring_xero_sync.count %>)
-          <% end %>
+        <%= link_to customer_orders_path,
+            class: "block w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded text-sm text-center" do %>
+          📋 Customer Orders
+        <% end %>
+
+        <%= link_to works_orders_path,
+            class: "block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm text-center" do %>
+          🏭 Works Orders
         <% end %>
 
         <div class="text-sm text-gray-600">
@@ -116,75 +109,6 @@
                     <span class="text-green-600">✓ Synced</span>
                   <% else %>
                     <span class="text-gray-400">Manual</span>
-                  <% end %>
-                </td>
-              </tr>
-            <% end %>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  <% end %>
-
-  <!-- Recent Invoices Section -->
-  <% if Invoice.any? %>
-    <div class="mt-8">
-      <h2 class="text-2xl font-bold text-gray-900 mb-4">Recent Invoices</h2>
-      <div class="bg-white rounded-lg shadow overflow-hidden">
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50">
-            <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Number</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200">
-            <% Invoice.includes(:customer).recent.limit(10).each do |invoice| %>
-              <tr>
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  <%= link_to invoice_path(invoice), class: "text-blue-600 hover:text-blue-800" do %>
-                    <%= invoice.display_number %>
-                  <% end %>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  <%= invoice.customer.display_name %>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  <%= invoice.date.strftime("%d %b %Y") %>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  £<%= number_with_precision(invoice.total_inc_tax, precision: 2) %>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  <% case invoice.status %>
-                  <% when 'draft' %>
-                    <span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs">Draft</span>
-                  <% when 'pushed_to_xero' %>
-                    <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">Pushed</span>
-                  <% when 'synced' %>
-                    <span class="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">Synced</span>
-                  <% when 'voided' %>
-                    <span class="bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs">Voided</span>
-                  <% end %>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  <% if invoice.can_be_pushed_to_xero? && session[:xero_token_set] %>
-                    <%= link_to push_single_xero_invoice_path(invoice),
-                        method: :post,
-                        class: "text-blue-600 hover:text-blue-800 text-xs",
-                        confirm: "Push this invoice to Xero?" do %>
-                      🚀 Push
-                    <% end %>
-                  <% elsif invoice.xero_url %>
-                    <%= link_to invoice.xero_url,
-                        target: "_blank",
-                        class: "text-green-600 hover:text-green-800 text-xs" do %>
-                      👁️ View in Xero
-                    <% end %>
                   <% end %>
                 </td>
               </tr>

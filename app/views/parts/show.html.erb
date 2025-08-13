@@ -1,0 +1,245 @@
+<div class="container mx-auto px-4 py-6">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold text-gray-900">Part: <%= @part.display_name %></h1>
+    <div class="flex space-x-2">
+      <%= link_to "Edit", edit_part_path(@part),
+          class: "bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded" %>
+      <%= link_to @part.enabled? ? "Disable" : "Enable",
+          toggle_enabled_part_path(@part),
+          method: :patch,
+          class: @part.enabled? ? "bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded" : "bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded",
+          data: { confirm: "Are you sure you want to #{@part.enabled? ? 'disable' : 'enable'} this part?" } %>
+      <%= link_to "Back to Parts", parts_path,
+          class: "bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" %>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <!-- Part Details -->
+    <div class="bg-white shadow rounded-lg p-6">
+      <h2 class="text-xl font-semibold text-gray-900 mb-4">Part Details</h2>
+
+      <dl class="space-y-3">
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Customer</dt>
+          <dd class="text-sm text-gray-900"><%= @part.customer.name %></dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Part Number</dt>
+          <dd class="text-sm text-gray-900 font-mono"><%= @part.uniform_part_number %></dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Part Issue</dt>
+          <dd class="text-sm text-gray-900 font-mono"><%= @part.uniform_part_issue %></dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Display Name</dt>
+          <dd class="text-sm text-gray-900 font-semibold"><%= @part.display_name %></dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Status</dt>
+          <dd class="text-sm">
+            <% if @part.enabled %>
+              <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                Enabled
+              </span>
+            <% else %>
+              <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                Disabled
+              </span>
+            <% end %>
+          </dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Created</dt>
+          <dd class="text-sm text-gray-900"><%= @part.created_at.strftime("%d/%m/%Y %H:%M") %></dd>
+        </div>
+      </dl>
+    </div>
+
+    <!-- Summary Statistics -->
+    <div class="bg-white shadow rounded-lg p-6">
+      <h2 class="text-xl font-semibold text-gray-900 mb-4">Usage Summary</h2>
+
+      <dl class="space-y-3">
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Total PPIs</dt>
+          <dd class="text-sm text-gray-900 font-semibold"><%= @part.part_processing_instructions.count %></dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Active PPIs</dt>
+          <dd class="text-sm text-gray-900 font-semibold"><%= @part.part_processing_instructions.enabled.count %></dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Total Works Orders</dt>
+          <dd class="text-sm text-gray-900 font-semibold"><%= @part.works_orders.count %></dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Active Works Orders</dt>
+          <dd class="text-sm text-gray-900 font-semibold"><%= @part.works_orders.active.count %></dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Open Works Orders</dt>
+          <dd class="text-sm text-gray-900 font-semibold"><%= @part.works_orders.open.count %></dd>
+        </div>
+      </dl>
+    </div>
+  </div>
+
+  <!-- Part Processing Instructions -->
+  <div class="bg-white shadow rounded-lg p-6 mb-6">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-semibold text-gray-900">Part Processing Instructions</h2>
+      <%= link_to "New PPI", new_part_processing_instruction_path(part_id: @part.id),
+          class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm" %>
+    </div>
+
+    <% if @part_processing_instructions.any? %>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Customer
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Specification
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Process Type
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Status
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <% @part_processing_instructions.each do |ppi| %>
+              <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <%= ppi.customer.name %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <%= truncate(ppi.specification, length: 50) %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <%= ppi.process_type.humanize if ppi.process_type %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <% if ppi.enabled %>
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                      Enabled
+                    </span>
+                  <% else %>
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                      Disabled
+                    </span>
+                  <% end %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <%= link_to "View", ppi, class: "text-blue-600 hover:text-blue-900" %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <div class="text-center py-8">
+        <p class="text-gray-500">No part processing instructions yet.</p>
+        <%= link_to "Create the first PPI", new_part_processing_instruction_path(part_id: @part.id),
+            class: "text-blue-600 hover:text-blue-900 font-medium" %>
+      </div>
+    <% end %>
+  </div>
+
+  <!-- Recent Works Orders -->
+  <div class="bg-white shadow rounded-lg p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-semibold text-gray-900">Recent Works Orders</h2>
+      <%= link_to "View All", works_orders_path(part_id: @part.id),
+          class: "text-blue-600 hover:text-blue-900 text-sm" %>
+    </div>
+
+    <% if @works_orders.any? %>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                WO Number
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Customer Order
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Quantity
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Due Date
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Status
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <% @works_orders.each do |works_order| %>
+              <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <%= link_to "WO#{works_order.number}", works_order, class: "text-blue-600 hover:text-blue-900" %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <%= works_order.customer_order.number %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <%= works_order.quantity_released %>/<%= works_order.quantity %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <%= works_order.due_date.strftime("%d/%m/%Y") %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <% if works_order.voided %>
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                      Voided
+                    </span>
+                  <% elsif works_order.is_open %>
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                      Open
+                    </span>
+                  <% else %>
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                      Closed
+                    </span>
+                  <% end %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <%= link_to "View", works_order, class: "text-blue-600 hover:text-blue-900" %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <div class="text-center py-8">
+        <p class="text-gray-500">No works orders for this part yet.</p>
+      </div>
+    <% end %>
+  </div>
+</div>

@@ -1,0 +1,33 @@
+<%# Render operations table %>
+<% batch_cols = 3 %>
+
+<table style="table-layout: fixed;">
+  <thead>
+    <tr>
+      <th style="width: 1cm;">
+        Op
+      </th>
+      <th>
+        <div style="display:flex; align-items: center;">
+          <div style="flex: 1 0 auto;">
+            Description
+          </div>
+          <div style="flex: 0 0 auto; text-align: right;">
+            <div>Batch:</div>
+            <div>Date:</div>
+            <div>Qty:</div>
+          </div>
+        </div>
+      </th>
+      <% batch_cols.times do %>
+        <th style="width: 1.5cm"></th>
+      <% end %>
+    </tr>
+  </thead>
+
+  <% operations.each do |op| %>
+    <tbody style="page-break-inside: avoid;">
+      <%= render 'route_card_op', op: op, batch_cols: batch_cols %>
+    </tbody>
+  <% end %>
+</table>

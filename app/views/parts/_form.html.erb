@@ -1,0 +1,101 @@
+<%# _form.html.erb %>
+<%= form_with model: part, local: true, class: "space-y-6" do |form| %>
+  <% if part.errors.any? %>
+    <div class="bg-red-50 border border-red-200 rounded-md p-4">
+      <div class="flex">
+        <div class="ml-3">
+          <h3 class="text-sm font-medium text-red-800">
+            <%= pluralize(part.errors.count, "error") %> prohibited this part from being saved:
+          </h3>
+          <div class="mt-2 text-sm text-red-700">
+            <ul class="list-disc list-inside space-y-1">
+              <% part.errors.full_messages.each do |message| %>
+                <li><%= message %></li>
+              <% end %>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="bg-white shadow rounded-lg p-6">
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Part Details</h3>
+
+    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+      <!-- Customer Selection -->
+      <div>
+        <%= form.label :customer_id, class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.select :customer_id,
+            options_for_select([['Select Customer', '']] + @customers.map { |c| [c.name, c.id] }, part.customer_id),
+            {},
+            {
+              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+              required: true,
+              disabled: part.persisted? # Can't change customer on existing part
+            } %>
+        <% if part.persisted? %>
+          <p class="mt-1 text-xs text-gray-500">Customer cannot be changed on existing parts</p>
+        <% end %>
+      </div>
+
+      <!-- Part Number -->
+      <div>
+        <%= form.label :uniform_part_number, "Part Number", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.text_field :uniform_part_number,
+            placeholder: "Enter part number",
+            class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm font-mono",
+            required: true %>
+        <p class="mt-1 text-xs text-gray-500">Will be automatically normalized to uppercase alphanumeric</p>
+      </div>
+
+      <!-- Part Issue -->
+      <div>
+        <%= form.label :uniform_part_issue, "Part Issue", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.text_field :uniform_part_issue,
+            placeholder: "A",
+            class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm font-mono",
+            required: true %>
+        <p class="mt-1 text-xs text-gray-500">Defaults to 'A' if not specified</p>
+      </div>
+
+      <!-- Enabled Status -->
+      <% if part.persisted? %>
+        <div>
+          <%= form.label :enabled, class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <div class="mt-1">
+            <%= form.check_box :enabled, class: "rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-offset-0 focus:ring-blue-200 focus:ring-opacity-50" %>
+            <%= form.label :enabled, "Part is enabled", class: "ml-2 text-sm text-gray-900" %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <!-- Information Box -->
+  <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
+    <div class="flex">
+      <div class="ml-3">
+        <h3 class="text-sm font-medium text-blue-800">Part Management Notes</h3>
+        <div class="mt-2 text-sm text-blue-700">
+          <% if part.persisted? %>
+            <p>Changing the part number, issue, or customer will redirect you to the correct part record
+            (creating a new one if necessary). Use Part Processing Instructions to manage different
+            specifications for the same part.</p>
+          <% else %>
+            <p>Parts are automatically created when needed through Part Processing Instructions.
+            Each unique combination of customer, part number, and issue creates a distinct part record.</p>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Form Actions -->
+  <div class="flex justify-end space-x-3">
+    <%= link_to "Cancel", part.persisted? ? part : parts_path,
+        class: "bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded" %>
+    <%= form.submit part.persisted? ? "Update Part" : "Create Part",
+        class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" %>
+  </div>
+<% end %>
