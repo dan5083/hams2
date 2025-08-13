@@ -1,5 +1,5 @@
 source "https://rubygems.org"
-ruby "3.3.9"
+ruby "3.3.5"
 
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
 gem "rails", "~> 8.0.2"
@@ -76,5 +76,3 @@ end
 gem "xero-ruby", "~> 3.7.0"
 gem 'jwt'
 gem "dotenv-rails", "~> 3.1"
-gem 'wicked_pdf'
-gem 'wkhtmltopdf-binary'

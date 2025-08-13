@@ -383,10 +383,6 @@ GEM
       base64
       websocket-extensions (>= 0.1.0)
     websocket-extensions (0.1.5)
-    wicked_pdf (2.8.2)
-      activesupport
-      ostruct
-    wkhtmltopdf-binary (0.12.6.9)
     xero-ruby (3.7.1)
       faraday (~> 1.0, >= 1.0.1)
       json (~> 2.1, >= 2.1.0)
@@ -433,9 +429,10 @@ DEPENDENCIES
   turbo-rails
   tzinfo-data
   web-console
-  wicked_pdf
-  wkhtmltopdf-binary
   xero-ruby (~> 3.7.0)
+
+RUBY VERSION
+   ruby 3.3.5p100
 
 BUNDLED WITH
    2.6.8
