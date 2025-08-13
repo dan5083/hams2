@@ -1,0 +1,13 @@
+tmp/
+log/*.log
+test/
+spec/
+.git/
+*.tgz
+*.tar.gz
+.env
+config/master.key
+vendor/bundle/ruby/*/cache/
+node_modules/
+coverage/
+.DS_Store
