@@ -1,0 +1,150 @@
+<%# app/views/part_processing_instructions/_form.html.erb %>
+<%= form_with model: ppi, local: true, class: "space-y-6" do |form| %>
+  <% if ppi.errors.any? %>
+    <div class="bg-red-50 border border-red-200 rounded-md p-4">
+      <div class="flex">
+        <div class="ml-3">
+          <h3 class="text-sm font-medium text-red-800">
+            <%= pluralize(ppi.errors.count, "error") %> prohibited this PPI from being saved:
+          </h3>
+          <div class="mt-2 text-sm text-red-700">
+            <ul class="list-disc list-inside space-y-1">
+              <% ppi.errors.full_messages.each do |message| %>
+                <li><%= message %></li>
+              <% end %>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="bg-white shadow rounded-lg p-6">
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Part Processing Instruction Details</h3>
+
+    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+      <!-- Customer Selection -->
+      <div>
+        <%= form.label :customer_id, class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.select :customer_id,
+            options_for_select([['Select Customer', '']] + @customers.map { |c| [c.name, c.id] }, ppi.customer_id),
+            {},
+            {
+              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+              required: true,
+              disabled: ppi.persisted? || @part.present? # Can't change if editing or from specific part
+            } %>
+        <% if ppi.persisted? || @part.present? %>
+          <p class="mt-1 text-xs text-gray-500">Customer cannot be changed</p>
+        <% end %>
+      </div>
+
+      <!-- Part Number -->
+      <div>
+        <%= form.label :part_number, class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.text_field :part_number,
+            placeholder: "Enter part number",
+            class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm font-mono",
+            required: true,
+            disabled: @part.present? %>
+        <% if @part.present? %>
+          <p class="mt-1 text-xs text-gray-500">Pre-filled from selected part</p>
+        <% else %>
+          <p class="mt-1 text-xs text-gray-500">Will be automatically normalized</p>
+        <% end %>
+      </div>
+
+      <!-- Part Issue -->
+      <div>
+        <%= form.label :part_issue, class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.text_field :part_issue,
+            placeholder: "A",
+            class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm font-mono",
+            required: true,
+            disabled: @part.present? %>
+        <% if @part.present? %>
+          <p class="mt-1 text-xs text-gray-500">Pre-filled from selected part</p>
+        <% end %>
+      </div>
+
+      <!-- Part Description -->
+      <div>
+        <%= form.label :part_description, class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.text_field :part_description,
+            placeholder: "Brief description of the part",
+            class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
+      </div>
+
+      <!-- Process Type -->
+      <div>
+        <%= form.label :process_type, class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.select :process_type,
+            options_for_select([
+              ['Anodising', 'anodising'],
+              ['Hard Anodising', 'hard_anodising'],
+              ['Chromate Conversion', 'chromate_conversion'],
+              ['Passivation', 'passivation'],
+              ['Cleaning', 'cleaning'],
+              ['Custom', 'custom']
+            ], ppi.process_type || 'anodising'),
+            {},
+            {
+              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            } %>
+      </div>
+
+      <!-- Enabled Status (for editing) -->
+      <% if ppi.persisted? %>
+        <div>
+          <%= form.label :enabled, class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <div class="mt-1">
+            <%= form.check_box :enabled, class: "rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-offset-0 focus:ring-blue-200 focus:ring-opacity-50" %>
+            <%= form.label :enabled, "PPI is enabled", class: "ml-2 text-sm text-gray-900" %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+
+    <!-- Specification (full width) -->
+    <div class="mt-6">
+      <%= form.label :specification, class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= form.text_area :specification,
+          placeholder: "Enter processing specification and requirements...",
+          rows: 4,
+          class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
+      <p class="mt-1 text-xs text-gray-500">Detailed specification for processing this part</p>
+    </div>
+
+    <!-- Special Instructions (full width) -->
+    <div class="mt-6">
+      <%= form.label :special_instructions, class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= form.text_area :special_instructions,
+          placeholder: "Any special handling or processing instructions...",
+          rows: 3,
+          class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
+      <p class="mt-1 text-xs text-gray-500">Optional special instructions or notes</p>
+    </div>
+  </div>
+
+  <!-- Information Box -->
+  <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
+    <div class="flex">
+      <div class="ml-3">
+        <h3 class="text-sm font-medium text-blue-800">Testing Mode - Simple PPI Creation</h3>
+        <div class="mt-2 text-sm text-blue-700">
+          <p>This is a simplified PPI creation form for testing the invoice workflow.
+          Fill in the basic details and you'll be able to create works orders for this part/customer combination.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Form Actions -->
+  <div class="flex justify-end space-x-3">
+    <%= link_to "Cancel",
+        ppi.persisted? ? ppi : (@part.present? ? @part : part_processing_instructions_path),
+        class: "bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded" %>
+    <%= form.submit ppi.persisted? ? "Update PPI" : "Create PPI",
+        class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" %>
+  </div>
+<% end %>
