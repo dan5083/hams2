@@ -1,4 +1,11 @@
 Rails.application.routes.draw do
+  get "transport_methods/index"
+  get "transport_methods/new"
+  get "transport_methods/create"
+  get "transport_methods/edit"
+  get "transport_methods/update"
+  get "transport_methods/destroy"
+  get "transport_methods/toggle_enabled"
   # Authentication routes
   resource :session
   resources :passwords, param: :token
@@ -152,4 +159,7 @@ Rails.application.routes.draw do
 
   # Root route - Dashboard for authenticated users, login for unauthenticated
   root "dashboard#index"
+
+  # Artifacts management
+  get 'artifacts', to: 'artifacts#index'
 end

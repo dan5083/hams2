@@ -1,5 +1,6 @@
+# app/controllers/works_orders_controller.rb - Simplified version
 class WorksOrdersController < ApplicationController
-  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card]
+  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :complete]
 
   def index
     @works_orders = WorksOrder.includes(:customer_order, :part, :release_level, :transport_method)
@@ -23,33 +24,56 @@ class WorksOrdersController < ApplicationController
 
   def new
     @works_order = WorksOrder.new
-    @customer_orders = CustomerOrder.active.includes(:customer).order(created_at: :desc)
-    @parts = Part.enabled.includes(:customer).order(:uniform_part_number)
-    @release_levels = ReleaseLevel.enabled.ordered
-    @transport_methods = TransportMethod.enabled.ordered
-    @ppis = PartProcessingInstruction.enabled.includes(:customer, :part)
+
+    # If coming from nested route, pre-select the customer order
+    if params[:customer_order_id].present?
+      @customer_order = CustomerOrder.find(params[:customer_order_id])
+      @works_order.customer_order = @customer_order
+      @customer_orders = [@customer_order] # Only show the selected customer order
+    else
+      @customer_orders = CustomerOrder.active.includes(:customer).order(created_at: :desc)
+      @customer_order = nil
+    end
+
+    load_reference_data
   end
 
   def create
     @works_order = WorksOrder.new(works_order_params)
 
-    if @works_order.save
-      redirect_to @works_order, notice: 'Works order was successfully created.'
+    # If customer_order_id is missing, try to get it from the route
+    if @works_order.customer_order_id.blank? && params[:customer_order_id].present?
+      @works_order.customer_order_id = params[:customer_order_id]
+    end
+
+    # Set up the part and PPI automatically
+    if setup_part_and_ppi(@works_order)
+      if @works_order.save
+        redirect_to @works_order, notice: 'Works order was successfully created.'
+      else
+        load_form_data_for_errors
+        render :new, status: :unprocessable_entity
+      end
     else
-      load_form_data
+      load_form_data_for_errors
       render :new, status: :unprocessable_entity
     end
   end
 
   def edit
-    load_form_data
+    load_reference_data
   end
 
   def update
+    # For updates, we might need to recreate the part/PPI if part details changed
+    if part_details_changed?
+      setup_part_and_ppi(@works_order)
+    end
+
     if @works_order.update(works_order_params)
       redirect_to @works_order, notice: 'Works order was successfully updated.'
     else
-      load_form_data
+      load_reference_data
       render :edit, status: :unprocessable_entity
     end
   end
@@ -78,8 +102,6 @@ class WorksOrdersController < ApplicationController
   end
 
   def complete
-    @works_order = WorksOrder.find(params[:id])
-
     if @works_order.can_be_completed?
       @works_order.complete!(Current.user)
       redirect_to @works_order, notice: 'Works order completed successfully.'
@@ -96,61 +118,101 @@ class WorksOrdersController < ApplicationController
 
   def works_order_params
     params.require(:works_order).permit(
-      :customer_order_id, :part_id, :release_level_id, :transport_method_id,
-      :ppi_id, :quantity, :lot_price, :each_price, :price_type,
-      :part_number, :part_issue, :part_description
+      :customer_order_id, :part_id, :quantity, :lot_price, :each_price, :price_type,
+      :part_number, :part_issue, :part_description, :release_level_id, :transport_method_id
     )
   end
 
-  def load_form_data
-    @customer_orders = CustomerOrder.active.includes(:customer).order(created_at: :desc)
-    @parts = Part.enabled.includes(:customer).order(:uniform_part_number)
+  def load_reference_data
     @release_levels = ReleaseLevel.enabled.ordered
     @transport_methods = TransportMethod.enabled.ordered
-    @ppis = PartProcessingInstruction.enabled.includes(:customer, :part)
+
+    # Load all parts for the customer (temporarily remove PPI requirement to debug)
+    if @customer_order.present?
+      @parts = Part.enabled
+                   .for_customer(@customer_order.customer)
+                   .includes(:customer, :part_processing_instructions)
+                   .order(:uniform_part_number)
+
+      Rails.logger.info "🔍 Loading parts for customer: #{@customer_order.customer.name}"
+      Rails.logger.info "🔍 Found #{@parts.count} parts"
+      @parts.each do |part|
+        ppis = part.part_processing_instructions.where(customer: @customer_order.customer, enabled: true)
+        Rails.logger.info "🔍 Part #{part.display_name}: #{ppis.count} PPIs"
+      end
+    else
+      @parts = Part.enabled
+                   .includes(:customer, :part_processing_instructions)
+                   .order(:uniform_part_number)
+    end
   end
 
-  def generate_qr_code(data)
-    # QR code functionality removed - feature never took off
-    nil
+  def load_form_data_for_errors
+    if params[:customer_order_id].present?
+      @customer_order = CustomerOrder.find(params[:customer_order_id])
+      @customer_orders = [@customer_order]
+    elsif @works_order.customer_order.present?
+      @customer_order = @works_order.customer_order
+      @customer_orders = [@customer_order]
+    else
+      @customer_order = nil
+      @customer_orders = CustomerOrder.active.includes(:customer).order(created_at: :desc)
+    end
+    load_reference_data
+  end
+
+  def setup_part_and_ppi(works_order)
+    return false unless works_order.customer_order && works_order.part_id.present?
+
+    customer = works_order.customer_order.customer
+
+    begin
+      # Get the selected part
+      part = Part.find(works_order.part_id)
+      works_order.part = part
+      works_order.part_number = part.uniform_part_number
+      works_order.part_issue = part.uniform_part_issue
+      works_order.part_description = part.description || "#{part.uniform_part_number} component"
+
+      # Find THE PPI for this part and customer (should only be one)
+      ppi = PartProcessingInstruction.find_by(
+        part: part,
+        customer: customer,
+        enabled: true
+      )
+
+      if ppi.blank?
+        works_order.errors.add(:part_id, "No processing instruction found for #{part.display_name}. Please set up this part properly first.")
+        return false
+      end
+
+      # Use the PPI
+      works_order.ppi = ppi
+
+      return true
+    rescue => e
+      works_order.errors.add(:base, "Error setting up part: #{e.message}")
+      return false
+    end
+  end
+
+  def part_details_changed?
+    @works_order.part_number_changed? || @works_order.part_issue_changed?
   end
 
   def build_operations_from_process(works_order)
-    # This method should build the operations array from the works order's
-    # customised_process_data. The structure should match what your templates expect.
-    # This is a placeholder - you'll need to implement based on your ProcessBuilder logic
-
-    process_data = works_order.customised_process_data || {}
-    operations = []
-
-    # Example structure - adapt based on your actual process data format
-    if process_data['operations']
-      process_data['operations'].each_with_index do |op_data, index|
-        operations << {
-          number: index + 1,
-          content: [
-            {
-              type: 'paragraph',
-              as_html: op_data['description'] || 'Operation description'
-            }
-          ],
-          all_variables: op_data['variables'] || []
-        }
-      end
-    else
-      # Default single operation if no process data
-      operations << {
+    # Simple default operation for route cards
+    [
+      {
         number: 1,
         content: [
           {
             type: 'paragraph',
-            as_html: works_order.specification || 'Process as per specification'
+            as_html: works_order.ppi&.specification || "Process as per customer requirements"
           }
         ],
         all_variables: []
       }
-    end
-
-    operations
+    ]
   end
 end

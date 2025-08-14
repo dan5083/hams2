@@ -1,4 +1,4 @@
-<%# app/views/works_orders/_form.html.erb %>
+<%# app/views/works_orders/_form.html.erb - Simplified version %>
 <%= form_with model: works_order, local: true, class: "space-y-6" do |form| %>
   <% if works_order.errors.any? %>
     <div class="bg-red-50 border border-red-200 rounded-md p-4">
@@ -24,39 +24,53 @@
 
     <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
       <!-- Customer Order Selection -->
-      <div>
+      <div class="sm:col-span-2">
         <%= form.label :customer_order_id, class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.select :customer_order_id,
-            options_for_select([['Select Customer Order', '']] + @customer_orders.map { |co| ["#{co.customer.name} - #{co.number}", co.id] }, works_order.customer_order_id),
-            {},
-            {
-              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
-              required: true
-            } %>
+        <% if @customer_order.present? && @customer_orders.length == 1 %>
+          <!-- Show as read-only text when pre-selected -->
+          <div class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-gray-50 text-gray-900">
+            <%= @customer_order.customer.name %> - <%= @customer_order.number %>
+          </div>
+          <%= form.hidden_field :customer_order_id, value: @customer_order.id %>
+          <p class="mt-1 text-xs text-gray-500">Pre-selected from the customer order you came from</p>
+        <% else %>
+          <%= form.select :customer_order_id,
+              options_for_select([['Select Customer Order', '']] + @customer_orders.map { |co| ["#{co.customer.name} - #{co.number}", co.id] }, works_order.customer_order_id),
+              {},
+              {
+                class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+                required: true
+              } %>
+        <% end %>
       </div>
 
-      <!-- Part Selection -->
-      <div>
-        <%= form.label :part_id, class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <!-- Part Number Selection -->
+      <div class="sm:col-span-2">
+        <%= form.label :part_id, "Part Number", class: "block text-sm font-medium text-gray-700 mb-1" %>
         <%= form.select :part_id,
-            options_for_select([['Select Part', '']] + @parts.map { |p| ["#{p.display_name} (#{p.customer.name})", p.id] }, works_order.part_id),
+            options_for_select([['Select Part Number', '']] + @parts.map { |p| ["#{p.display_name}", p.id] }, works_order.part_id),
             {},
             {
               class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
-              required: true
+              required: true,
+              onchange: "updatePartDetails(this)"
             } %>
+        <p class="mt-1 text-xs text-gray-500">Select the part number to be processed</p>
       </div>
 
-      <!-- PPI Selection -->
+      <!-- Hidden fields to store part details -->
+      <%= form.hidden_field :part_number %>
+      <%= form.hidden_field :part_issue %>
+      <%= form.hidden_field :part_description %>
+
+      <!-- Quantity -->
       <div>
-        <%= form.label :ppi_id, "Part Processing Instruction", class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.select :ppi_id,
-            options_for_select([['Select PPI', '']] + @ppis.map { |ppi| ["#{ppi.display_name} - #{ppi.customer.name}", ppi.id] }, works_order.ppi_id),
-            {},
-            {
-              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
-              required: true
-            } %>
+        <%= form.label :quantity, class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.number_field :quantity,
+            placeholder: "Enter quantity",
+            min: 1,
+            class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+            required: true %>
       </div>
 
       <!-- Release Level -->
@@ -82,49 +96,6 @@
               required: true
             } %>
       </div>
-
-      <!-- Quantity -->
-      <div>
-        <%= form.label :quantity, class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.number_field :quantity,
-            min: 1,
-            placeholder: "Enter quantity",
-            class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
-            required: true %>
-      </div>
-    </div>
-  </div>
-
-  <!-- Part Details Section -->
-  <div class="bg-white shadow rounded-lg p-6">
-    <h3 class="text-lg font-medium text-gray-900 mb-4">Part Details</h3>
-    <p class="text-sm text-gray-600 mb-4">These fields will be auto-populated when you select a PPI, but can be overridden if needed.</p>
-
-    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-      <!-- Part Number -->
-      <div>
-        <%= form.label :part_number, class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.text_field :part_number,
-            placeholder: "Part number",
-            class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm font-mono" %>
-      </div>
-
-      <!-- Part Issue -->
-      <div>
-        <%= form.label :part_issue, class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.text_field :part_issue,
-            placeholder: "A",
-            class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm font-mono" %>
-      </div>
-
-      <!-- Part Description -->
-      <div class="sm:col-span-2">
-        <%= form.label :part_description, class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.text_area :part_description,
-            rows: 3,
-            placeholder: "Part description",
-            class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
-      </div>
     </div>
   </div>
 
@@ -132,43 +103,49 @@
   <div class="bg-white shadow rounded-lg p-6">
     <h3 class="text-lg font-medium text-gray-900 mb-4">Pricing</h3>
 
-    <div class="grid grid-cols-1 gap-6 sm:grid-cols-3">
+    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
       <!-- Price Type -->
-      <div>
+      <div class="sm:col-span-2">
         <%= form.label :price_type, class: "block text-sm font-medium text-gray-700 mb-1" %>
         <%= form.select :price_type,
             options_for_select([
-              ['Each', 'each'],
-              ['Lot', 'lot']
+              ['Each (price per part)', 'each'],
+              ['Lot (total job price)', 'lot']
             ], works_order.price_type || 'each'),
             {},
             {
               class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
-              required: true
+              required: true,
+              onchange: "togglePriceFields(this.value)"
             } %>
       </div>
 
-      <!-- Each Price -->
-      <div>
-        <%= form.label :each_price, class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <!-- Each Price (shown when price_type is 'each') -->
+      <div id="each_price_field" class="sm:col-span-2" style="<%= works_order.price_type == 'lot' ? 'display: none;' : '' %>">
+        <%= form.label :each_price, "Price per part", class: "block text-sm font-medium text-gray-700 mb-1" %>
         <%= form.number_field :each_price,
             step: 0.01,
             min: 0,
             placeholder: "0.00",
-            class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
-        <p class="mt-1 text-xs text-gray-500">Price per individual part (for 'each' pricing)</p>
+            class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+            id: "each_price_input" %>
+        <p class="mt-1 text-xs text-gray-500">
+          The total job price will be calculated as: quantity × price per part
+        </p>
       </div>
 
-      <!-- Lot Price -->
-      <div>
-        <%= form.label :lot_price, class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <!-- Lot Price (shown when price_type is 'lot') -->
+      <div id="lot_price_field" class="sm:col-span-2" style="<%= works_order.price_type == 'each' ? 'display: none;' : '' %>">
+        <%= form.label :lot_price, "Total job price", class: "block text-sm font-medium text-gray-700 mb-1" %>
         <%= form.number_field :lot_price,
             step: 0.01,
             min: 0,
             placeholder: "0.00",
             class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
-            required: true %>
-        <p class="mt-1 text-xs text-gray-500">Total price for the entire lot</p>
+            id: "lot_price_input" %>
+        <p class="mt-1 text-xs text-gray-500">
+          This is the total price for the entire job regardless of quantity
+        </p>
       </div>
     </div>
   </div>
@@ -177,15 +154,26 @@
   <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
     <div class="flex">
       <div class="ml-3">
-        <h3 class="text-sm font-medium text-blue-800">Works Order Creation Notes</h3>
+        <h3 class="text-sm font-medium text-blue-800">Simplified Works Order Creation</h3>
         <div class="mt-2 text-sm text-blue-700">
-          <p>Select a Part Processing Instruction (PPI) to automatically populate part details and specifications.
-          The PPI defines the process requirements for this part. You can override the part details if needed,
-          but ensure they match the customer's requirements.</p>
+          <p>This form has been simplified to focus on core functionality. Part and PPI relationships will be handled automatically based on the part number and customer.</p>
         </div>
       </div>
     </div>
   </div>
+
+  <!-- Parts data for JavaScript -->
+  <script>
+    window.partsData = {
+      <% @parts.each do |part| %>
+        "<%= part.id %>": {
+          "uniform_part_number": "<%= j part.uniform_part_number %>",
+          "uniform_part_issue": "<%= j part.uniform_part_issue %>",
+          "description": "<%= j (part.description || "#{part.uniform_part_number} component") %>"
+        },
+      <% end %>
+    };
+  </script>
 
   <!-- Form Actions -->
   <div class="flex justify-end space-x-3">
@@ -195,3 +183,68 @@
         class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" %>
   </div>
 <% end %>
+
+<script>
+// Part selection handler
+function updatePartDetails(selectElement) {
+  const partId = selectElement.value;
+  const partNumberField = document.getElementById('works_order_part_number');
+  const partIssueField = document.getElementById('works_order_part_issue');
+  const partDescriptionField = document.getElementById('works_order_part_description');
+
+  if (partId && window.partsData) {
+    const part = window.partsData[partId];
+    if (part) {
+      partNumberField.value = part.uniform_part_number;
+      partIssueField.value = part.uniform_part_issue;
+      partDescriptionField.value = part.description || `${part.uniform_part_number} component`;
+    }
+  } else {
+    // Clear fields if no part selected
+    partNumberField.value = '';
+    partIssueField.value = '';
+    partDescriptionField.value = '';
+  }
+}
+
+// Pricing field toggle
+function togglePriceFields(priceType) {
+  const eachPriceField = document.getElementById('each_price_field');
+  const lotPriceField = document.getElementById('lot_price_field');
+  const eachPriceInput = document.getElementById('each_price_input');
+  const lotPriceInput = document.getElementById('lot_price_input');
+
+  if (priceType === 'each') {
+    // Show each price field, hide lot price field
+    eachPriceField.style.display = 'block';
+    lotPriceField.style.display = 'none';
+
+    // Make each price required, lot price not required
+    eachPriceInput.required = true;
+    lotPriceInput.required = false;
+
+    // Clear lot price when switching to each pricing
+    lotPriceInput.value = '';
+
+  } else {
+    // Show lot price field, hide each price field
+    eachPriceField.style.display = 'none';
+    lotPriceField.style.display = 'block';
+
+    // Make lot price required, each price not required
+    lotPriceInput.required = true;
+    eachPriceInput.required = false;
+
+    // Clear each price when switching to lot pricing
+    eachPriceInput.value = '';
+  }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+  const priceTypeSelect = document.querySelector('#works_order_price_type');
+  if (priceTypeSelect) {
+    togglePriceFields(priceTypeSelect.value);
+  }
+});
+</script>

@@ -1,10 +1,10 @@
-# app/models/works_order.rb
+# app/models/works_order.rb - Simplified PPI/part version for testing workflow
 class WorksOrder < ApplicationRecord
   belongs_to :customer_order
-  belongs_to :part
+  belongs_to :part, optional: true # Make optional for now
   belongs_to :release_level
   belongs_to :transport_method
-  belongs_to :ppi, class_name: 'PartProcessingInstruction'
+  belongs_to :ppi, class_name: 'PartProcessingInstruction', optional: true # Make optional for now
 
   has_many :release_notes, dependent: :restrict_with_error
 
@@ -23,11 +23,11 @@ class WorksOrder < ApplicationRecord
   scope :for_customer, ->(customer) { joins(:customer_order).where(customer_orders: { customer: customer }) }
   scope :requires_completion, -> { where(is_open: true).where('quantity_released >= quantity') }
 
-  before_validation :set_part_details_from_ppi, if: :ppi_changed?
   before_validation :calculate_pricing, if: :pricing_fields_changed?
-  before_save :rebuild_customised_process, if: :ppi_changed?
+  before_validation :set_part_details_from_ppi, if: :ppi_id_changed?
+  before_validation :normalize_part_details
+  before_validation :assign_next_number, if: :new_record?
   after_initialize :set_defaults, if: :new_record?
-  after_create :assign_next_number
 
   def display_name
     "WO#{number} - #{part_number}"
@@ -54,13 +54,13 @@ class WorksOrder < ApplicationRecord
     customer_order.delivery_address
   end
 
-  # Delegate PPI info
-  def special_instructions
-    ppi&.special_instructions
+  # Get specification from PPI or use a default
+  def specification
+    ppi&.specification || "Process as per customer requirements for #{part_number}-#{part_issue}"
   end
 
-  def specification
-    ppi&.specification
+  def special_instructions
+    ppi&.special_instructions
   end
 
   def quantity_remaining
@@ -109,12 +109,6 @@ class WorksOrder < ApplicationRecord
     end
   end
 
-  def rebuild_customised_process!
-    return unless ppi
-    self.customised_process_data = ppi.build_customised_process
-    save! if persisted?
-  end
-
   def self.next_number
     Sequence.next_value('works_order_number')
   end
@@ -135,8 +129,7 @@ class WorksOrder < ApplicationRecord
   end
 
   def assign_next_number
-    self.number = self.class.next_number
-    save!
+    self.number = self.class.next_number if number.blank?
   end
 
   def set_part_details_from_ppi
@@ -145,7 +138,14 @@ class WorksOrder < ApplicationRecord
     self.part = ppi.part
     self.part_number = ppi.part_number
     self.part_issue = ppi.part_issue
-    self.part_description = ppi.part_description
+    self.part_description = ppi.part_description if part_description.blank?
+  end
+
+  def normalize_part_details
+    # Normalize part number and issue to match Part model expectations
+    self.part_number = Part.make_uniform(part_number) if part_number.present?
+    self.part_issue = Part.make_uniform(part_issue) if part_issue.present?
+    self.part_issue = 'A' if part_issue.blank?
   end
 
   def pricing_fields_changed?
@@ -161,10 +161,5 @@ class WorksOrder < ApplicationRecord
     when 'lot'
       self.each_price = nil
     end
-  end
-
-  def rebuild_customised_process
-    return unless ppi
-    self.customised_process_data = ppi.build_customised_process
   end
 end

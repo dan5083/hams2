@@ -26,7 +26,13 @@ for file in app/views/[a-f]*/*.html.erb; do echo "=== $file ==="; cat "$file"; e
 for f in app/views/[g-p]*/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
 for f in app/views/[registrations]*/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
 for f in app/views/[release_notes]*/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/[s-z]*/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
+for f in app/views/[release_levels]*/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
+for f in app/views/[s]*/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
+for f in app/views/[transport_methods]*/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
+for f in app/views/works_orders/[a-q]*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
+for f in app/views/works_orders/[r-z]*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
+for f in app/views/[xero_auth]*/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
+
 
 # See the helpers
 for file in app/helpers/*.rb; do echo "=== $file ==="; cat "$file"; echo; done

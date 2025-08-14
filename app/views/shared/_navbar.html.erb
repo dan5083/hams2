@@ -11,7 +11,7 @@
       </div>
 
       <!-- Main Navigation Links -->
-      <div style="display: flex; gap: 2rem;
+      <div style="display: flex; gap: 2rem;">
         <%= link_to "Home", root_path,
             style: "color: white; padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; text-decoration: none; #{current_page?(root_path) ? 'background-color: rgba(29, 78, 216, 1);' : ''}" %>
 
@@ -26,6 +26,9 @@
 
         <%= link_to "Parts", parts_path,
             style: "color: white; padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; text-decoration: none; #{current_page?(parts_path) ? 'background-color: rgba(29, 78, 216, 1);' : ''}" %>
+
+        <%= link_to "Artifacts", artifacts_path,
+            style: "color: white; padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; text-decoration: none; #{current_page?(artifacts_path) ? 'background-color: rgba(29, 78, 216, 1);' : ''}" %>
       </div>
 
       <!-- User Menu -->

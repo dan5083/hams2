@@ -1,0 +1,93 @@
+<%# app/views/artifacts/index.html.erb %>
+<div class="container mx-auto px-4 py-6">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold text-gray-900">Artifacts Management</h1>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <!-- Release Levels Card -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+      <h2 class="text-xl font-semibold text-gray-800 mb-4">Release Levels</h2>
+      <p class="text-gray-600 mb-4">Manage release level types and statements.</p>
+
+      <div class="space-y-2 text-sm mb-4">
+        <div><strong>Total:</strong> <%= @release_levels_count %></div>
+        <div><strong>Enabled:</strong> <%= @enabled_release_levels_count %></div>
+        <div><strong>Disabled:</strong> <%= @release_levels_count - @enabled_release_levels_count %></div>
+      </div>
+
+      <div class="space-y-2">
+        <%= link_to release_levels_path,
+            class: "block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm text-center" do %>
+          📋 Manage Release Levels
+        <% end %>
+
+        <%= link_to new_release_level_path,
+            class: "block w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded text-sm text-center" do %>
+          ➕ Add New Release Level
+        <% end %>
+      </div>
+    </div>
+
+    <!-- Transport Methods Card -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+      <h2 class="text-xl font-semibold text-gray-800 mb-4">Transport Methods</h2>
+      <p class="text-gray-600 mb-4">Manage delivery and transport options.</p>
+
+      <div class="space-y-2 text-sm mb-4">
+        <div><strong>Total:</strong> <%= @transport_methods_count %></div>
+        <div><strong>Enabled:</strong> <%= @enabled_transport_methods_count %></div>
+        <div><strong>Disabled:</strong> <%= @transport_methods_count - @enabled_transport_methods_count %></div>
+      </div>
+
+      <div class="space-y-2">
+        <%= link_to transport_methods_path,
+            class: "block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm text-center" do %>
+          🚚 Manage Transport Methods
+        <% end %>
+
+        <%= link_to new_transport_method_path,
+            class: "block w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded text-sm text-center" do %>
+          ➕ Add New Transport Method
+        <% end %>
+      </div>
+    </div>
+
+    <!-- Quick Actions Card -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+      <h2 class="text-xl font-semibold text-gray-800 mb-4">Quick Actions</h2>
+      <p class="text-gray-600 mb-4">Common administrative tasks.</p>
+
+      <div class="space-y-2">
+        <%= link_to new_customer_order_path,
+            class: "block w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded text-sm text-center" do %>
+          📋 New Customer Order
+        <% end %>
+
+        <%= link_to new_works_order_path,
+            class: "block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm text-center" do %>
+          🏭 New Works Order
+        <% end %>
+
+        <%= link_to root_path,
+            class: "block w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded text-sm text-center" do %>
+          🏠 Back to Dashboard
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <!-- Information Box -->
+  <div class="mt-6 bg-blue-50 border border-blue-200 rounded-md p-4">
+    <div class="flex">
+      <div class="ml-3">
+        <h3 class="text-sm font-medium text-blue-800">About Artifacts Management</h3>
+        <div class="mt-2 text-sm text-blue-700">
+          <p>This page provides centralized access to manage release levels and transport methods
+          that are needed when creating works orders. Use these tools to set up the reference data
+          before creating works orders.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -77,35 +77,103 @@ end
 
 transport_method = TransportMethod.find_or_create_by(name: "Customer Collection") do |tm|
   tm.enabled = true
+  tm.description = "Customer will collect parts from our facility"
 end
 
 puts "✅ Created release level: #{release_level.name}"
 puts "✅ Created transport method: #{transport_method.name}"
 
 # Create a basic Part Processing Instruction (PPI)
-ppi = PartProcessingInstruction.find_or_create_by(
+# First check if it already exists to avoid duplicates
+existing_ppi = PartProcessingInstruction.find_by(
   part: part,
   customer: customer,
   part_number: "WIDGET001",
   part_issue: "A"
-) do |p|
-  p.part_description = "Test Widget Component"
-  p.specification = "Hard anodise to 25 microns, natural finish"
-  p.process_type = "hard_anodising" # Use a valid process type from ProcessBuilder
-  p.customisation_data = {}
-  p.enabled = true
+)
+
+if existing_ppi
+  puts "✅ PPI already exists: #{existing_ppi.specification}"
+  ppi = existing_ppi
+else
+  # Create new PPI
+  ppi = PartProcessingInstruction.create!(
+    part: part,
+    customer: customer,
+    part_number: "WIDGET001",
+    part_issue: "A",
+    part_description: "Test Widget Component",
+    specification: "Hard anodise to 25 microns, natural finish",
+    process_type: "hard_anodising", # Use a valid process type from ProcessBuilder
+    customisation_data: { "thickness" => "25 microns", "finish" => "Natural", "sealing" => "Sealed" },
+    enabled: true
+  )
+  puts "✅ Created PPI: #{ppi.specification}"
 end
 
-puts "✅ Created PPI: #{ppi.display_name}"
+# Create a second example part and PPI for testing
+part2 = Part.ensure(
+  customer_id: customer.id,
+  part_number: "BRACKET200",
+  part_issue: "B"
+)
+
+puts "✅ Created part: #{part2.display_name} for #{customer.name}"
+
+existing_ppi2 = PartProcessingInstruction.find_by(
+  part: part2,
+  customer: customer,
+  part_number: "BRACKET200",
+  part_issue: "B"
+)
+
+if existing_ppi2
+  puts "✅ PPI already exists: #{existing_ppi2.specification}"
+  ppi2 = existing_ppi2
+else
+  ppi2 = PartProcessingInstruction.create!(
+    part: part2,
+    customer: customer,
+    part_number: "BRACKET200",
+    part_issue: "B",
+    part_description: "Test Bracket Component",
+    specification: "Anodise to 15 microns, black finish",
+    process_type: "anodising",
+    customisation_data: { "thickness" => "15 microns", "finish" => "Black", "sealing" => "Sealed" },
+    enabled: true
+  )
+  puts "✅ Created PPI: #{ppi2.specification}"
+end
 
 puts "\n🎉 Seeding complete! You now have:"
 puts "   - Customer: #{customer.name}"
-puts "   - Part: #{part.display_name}"
-puts "   - PPI: #{ppi.specification}"
+puts "   - Parts: #{part.display_name}, #{part2.display_name}"
+puts "   - PPIs: 2 processing instructions"
 puts "   - User: #{user.display_name}"
+puts "   - Release Level: #{release_level.name}"
+puts "   - Transport Method: #{transport_method.name}"
+
 puts "\n📋 You can now test the workflow:"
 puts "   1. Create a Customer Order"
 puts "   2. Create a Works Order from the Customer Order"
 puts "   3. Create Release Notes from the Works Order"
 puts "   4. Generate invoices from Release Notes"
+
 puts "\n🔗 Start at: /customer_orders"
+
+# Verify the setup worked
+puts "\n🔍 Verification:"
+parts_with_ppis = Part.enabled
+                      .for_customer(customer)
+                      .joins(:part_processing_instructions)
+                      .where(part_processing_instructions: { customer: customer, enabled: true })
+                      .distinct
+                      .count
+
+puts "   - Parts with PPIs for #{customer.name}: #{parts_with_ppis}"
+
+if parts_with_ppis > 0
+  puts "   ✅ Setup successful - works orders can be created!"
+else
+  puts "   ❌ Setup failed - no parts with PPIs found"
+end
