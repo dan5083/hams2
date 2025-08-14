@@ -55,6 +55,7 @@ class PartProcessingInstructionsController < ApplicationController
     # Set defaults for testing
     @ppi.process_type = 'anodising' if @ppi.process_type.blank?
     @ppi.specification = "Process as per customer requirements for #{@ppi.part_number}-#{@ppi.part_issue}" if @ppi.specification.blank?
+    @ppi.customisation_data = {} if @ppi.customisation_data.blank?
 
     if @ppi.save
       redirect_to @ppi, notice: 'Part processing instruction was successfully created.'
