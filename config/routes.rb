@@ -20,6 +20,7 @@ Rails.application.routes.draw do
   resources :parts do
     member do
       get :toggle_enabled
+      get :destroy
     end
     collection do
       get :search
@@ -29,7 +30,8 @@ Rails.application.routes.draw do
   # Part Processing Instructions
   resources :part_processing_instructions, path: 'ppis' do
     member do
-      patch :toggle_enabled
+      get :toggle_enabled
+      get :destroy
     end
     collection do
       get :search

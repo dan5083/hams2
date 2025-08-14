@@ -14243,3 +14243,5 @@ Processing by WorksOrdersController#show as TURBO_STREAM
 Completed 200 OK in 73ms (Views: 44.3ms | ActiveRecord: 10.1ms (9 queries, 0 cached) | GC: 5.9ms)
 
 
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
