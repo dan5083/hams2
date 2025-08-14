@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_14_062859) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_14_072006) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -189,7 +189,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_14_062859) do
     t.integer "number", null: false
     t.uuid "customer_order_id", null: false
     t.uuid "part_id", null: false
-    t.uuid "part_processing_instruction_id", null: false
+    t.uuid "ppi_id", null: false
     t.uuid "release_level_id", null: false
     t.uuid "transport_method_id", null: false
     t.string "customer_order_line"
@@ -213,7 +213,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_14_062859) do
     t.index ["number"], name: "index_works_orders_on_number", unique: true
     t.index ["part_id"], name: "index_works_orders_on_part_id"
     t.index ["part_number", "part_issue"], name: "index_works_orders_on_part_number_and_part_issue"
-    t.index ["part_processing_instruction_id"], name: "index_works_orders_on_ppi_id"
+    t.index ["ppi_id"], name: "index_works_orders_on_ppi_id"
     t.index ["release_level_id"], name: "index_works_orders_on_release_level_id"
     t.index ["transport_method_id"], name: "index_works_orders_on_transport_method_id"
     t.index ["voided"], name: "index_works_orders_on_voided"
@@ -249,7 +249,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_14_062859) do
   add_foreign_key "release_notes", "works_orders"
   add_foreign_key "sessions", "users"
   add_foreign_key "works_orders", "customer_orders"
-  add_foreign_key "works_orders", "part_processing_instructions"
+  add_foreign_key "works_orders", "part_processing_instructions", column: "ppi_id"
   add_foreign_key "works_orders", "parts"
   add_foreign_key "works_orders", "release_levels"
   add_foreign_key "works_orders", "transport_methods"
