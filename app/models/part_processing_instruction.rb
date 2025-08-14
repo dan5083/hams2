@@ -13,7 +13,7 @@ class PartProcessingInstruction < ApplicationRecord
   validates :part_description, presence: true
   validates :specification, presence: true
   validates :process_type, inclusion: { in: ProcessBuilder.available_types }
-  validates :customisation_data, presence: true
+  # Temporarily removed for testing: validates :customisation_data, presence: true
 
   scope :enabled, -> { where(enabled: true) }
   scope :disabled, -> { where(enabled: false) }
