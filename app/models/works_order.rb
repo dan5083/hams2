@@ -1,3 +1,4 @@
+# app/models/works_order.rb
 class WorksOrder < ApplicationRecord
   belongs_to :customer_order
   belongs_to :part
@@ -10,7 +11,6 @@ class WorksOrder < ApplicationRecord
   validates :part_number, presence: true
   validates :part_issue, presence: true
   validates :part_description, presence: true
-  validates :due_date, presence: true
   validates :quantity, presence: true, numericality: { greater_than: 0 }
   validates :quantity_released, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validates :lot_price, presence: true, numericality: { greater_than_or_equal_to: 0 }
@@ -21,7 +21,6 @@ class WorksOrder < ApplicationRecord
   scope :open, -> { where(is_open: true) }
   scope :closed, -> { where(is_open: false) }
   scope :for_customer, ->(customer) { joins(:customer_order).where(customer_orders: { customer: customer }) }
-  scope :due_between, ->(start_date, end_date) { where(due_date: start_date..end_date) }
   scope :requires_completion, -> { where(is_open: true).where('quantity_released >= quantity') }
 
   before_validation :set_part_details_from_ppi, if: :ppi_changed?

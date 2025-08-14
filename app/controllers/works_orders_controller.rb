@@ -97,7 +97,7 @@ class WorksOrdersController < ApplicationController
   def works_order_params
     params.require(:works_order).permit(
       :customer_order_id, :part_id, :release_level_id, :transport_method_id,
-      :ppi_id, :due_date, :quantity, :lot_price, :each_price, :price_type,
+      :ppi_id, :quantity, :lot_price, :each_price, :price_type,
       :part_number, :part_issue, :part_description
     )
   end

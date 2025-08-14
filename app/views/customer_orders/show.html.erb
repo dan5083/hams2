@@ -40,20 +40,6 @@
           <dd class="text-sm text-gray-900"><%= @customer_order.date_received.strftime("%d/%m/%Y") %></dd>
         </div>
 
-        <% if @customer_order.respond_to?(:customer_reference) && @customer_order.customer_reference.present? %>
-          <div>
-            <dt class="text-sm font-medium text-gray-500">Customer Reference</dt>
-            <dd class="text-sm text-gray-900"><%= @customer_order.customer_reference %></dd>
-          </div>
-        <% end %>
-
-        <% if @customer_order.respond_to?(:delivery_required_date) && @customer_order.delivery_required_date.present? %>
-          <div>
-            <dt class="text-sm font-medium text-gray-500">Delivery Required</dt>
-            <dd class="text-sm text-gray-900"><%= @customer_order.delivery_required_date.strftime("%d/%m/%Y") %></dd>
-          </div>
-        <% end %>
-
         <div>
           <dt class="text-sm font-medium text-gray-500">Status</dt>
           <dd class="text-sm">
@@ -103,21 +89,7 @@
     </div>
   </div>
 
-  <!-- Notes Section -->
-  <% if @customer_order.respond_to?(:notes) && @customer_order.notes.present? %>
-    <div class="bg-white shadow rounded-lg p-6 mb-6">
-      <h2 class="text-xl font-semibold text-gray-900 mb-4">Notes</h2>
-      <p class="text-sm text-gray-900 whitespace-pre-wrap"><%= @customer_order.notes %></p>
-    </div>
-  <% end %>
 
-  <!-- Special Requirements -->
-  <% if @customer_order.respond_to?(:special_requirements) && @customer_order.special_requirements.present? %>
-    <div class="bg-white shadow rounded-lg p-6 mb-6">
-      <h2 class="text-xl font-semibold text-gray-900 mb-4">Special Requirements</h2>
-      <p class="text-sm text-gray-900 whitespace-pre-wrap"><%= @customer_order.special_requirements %></p>
-    </div>
-  <% end %>
 
   <!-- Works Orders -->
   <div class="bg-white shadow rounded-lg p-6">
@@ -144,9 +116,6 @@
                 Quantity
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Due Date
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -165,9 +134,6 @@
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   <%= works_order.quantity_released %>/<%= works_order.quantity %>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <%= works_order.due_date.strftime("%d/%m/%Y") %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                   <% if works_order.voided %>

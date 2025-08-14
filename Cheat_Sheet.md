@@ -24,8 +24,8 @@ done
 # For all views in folders A–F
 for file in app/views/[a-f]*/*.html.erb; do echo "=== $file ==="; cat "$file"; echo; done
 for f in app/views/[g-p]*/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/[q-v]*/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/[w-z]*/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
+<!-- for f in app/views/[q-r]*/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done --> Realease notes and registrations too long for terminal
+for f in app/views/[s-z]*/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
 
 # See the helpers
 for file in app/helpers/*.rb; do echo "=== $file ==="; cat "$file"; echo; done

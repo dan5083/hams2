@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_13_091303) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_14_062859) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -19,9 +19,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_13_091303) do
     t.uuid "customer_id", null: false
     t.string "number", null: false
     t.date "date_received", null: false
-    t.date "requested_delivery_date"
     t.boolean "voided", default: false, null: false
-    t.text "notes"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["customer_id"], name: "index_customer_orders_on_customer_id"
@@ -200,7 +198,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_13_091303) do
     t.string "part_description", null: false
     t.integer "quantity", null: false
     t.integer "quantity_released", default: 0, null: false
-    t.date "due_date", null: false
     t.boolean "is_open", default: true, null: false
     t.boolean "voided", default: false, null: false
     t.decimal "lot_price", precision: 10, scale: 2, null: false
@@ -212,7 +209,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_13_091303) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["customer_order_id"], name: "index_works_orders_on_customer_order_id"
-    t.index ["due_date"], name: "index_works_orders_on_due_date"
     t.index ["is_open"], name: "index_works_orders_on_is_open"
     t.index ["number"], name: "index_works_orders_on_number", unique: true
     t.index ["part_id"], name: "index_works_orders_on_part_id"

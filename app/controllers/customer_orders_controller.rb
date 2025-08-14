@@ -94,11 +94,7 @@ class CustomerOrdersController < ApplicationController
     params.require(:customer_order).permit(
       :customer_id,
       :number,
-      :date_received,
-      :notes,
-      :customer_reference,
-      :delivery_required_date,
-      :special_requirements
+      :date_received
     )
   end
 end
