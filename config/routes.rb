@@ -19,7 +19,7 @@ Rails.application.routes.draw do
   # 1. Parts management - Basic CRUD for parts
   resources :parts do
     member do
-      patch :toggle_enabled
+      get :toggle_enabled
     end
     collection do
       get :search
