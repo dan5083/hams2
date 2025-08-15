@@ -50,7 +50,23 @@ class PartProcessingInstructionsController < ApplicationController
   end
 
   def create
+    Rails.logger.info "🔍 Raw Params: #{params.inspect}"
+    Rails.logger.info "🔍 PPI Params: #{ppi_params.inspect}"
+    Rails.logger.info "🔍 Part ID from params: #{params[:part_id]}"
+
     @ppi = PartProcessingInstruction.new(ppi_params)
+
+    # If coming from an existing part, set the part association directly
+    if params[:part_id].present?
+      @part = Part.find(params[:part_id])
+      @ppi.part = @part
+      @ppi.customer = @part.customer
+      @ppi.part_number = @part.uniform_part_number
+      @ppi.part_issue = @part.uniform_part_issue
+      @ppi.part_description = @ppi.part_description.presence || "#{@part.uniform_part_number} component"
+    end
+
+    Rails.logger.info "🔍 PPI before save: customer_id=#{@ppi.customer_id}, part_number=#{@ppi.part_number}, part_issue=#{@ppi.part_issue}, part=#{@ppi.part&.id}"
 
     # Set defaults for testing
     @ppi.process_type = 'anodising' if @ppi.process_type.blank?
@@ -60,6 +76,7 @@ class PartProcessingInstructionsController < ApplicationController
     if @ppi.save
       redirect_to @ppi, notice: 'Part processing instruction was successfully created.'
     else
+      Rails.logger.error "🚨 PPI Save Errors: #{@ppi.errors.full_messages}"
       load_form_data_for_errors
       render :new, status: :unprocessable_entity
     end
@@ -142,7 +159,8 @@ class PartProcessingInstructionsController < ApplicationController
   def ppi_params
     params.require(:part_processing_instruction).permit(
       :customer_id, :part_number, :part_issue, :part_description,
-      :specification, :special_instructions, :process_type, :enabled
+      :specification, :special_instructions, :process_type, :enabled,
+      :part_id
     )
   end
 
