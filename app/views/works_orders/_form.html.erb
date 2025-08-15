@@ -1,4 +1,4 @@
-<%# app/views/works_orders/_form.html.erb - Simplified version %>
+<%# app/views/works_orders/_form.html.erb - With currency formatting %>
 <%= form_with model: works_order, local: true, class: "space-y-6" do |form| %>
   <% if works_order.errors.any? %>
     <div class="bg-red-50 border border-red-200 rounded-md p-4">
@@ -122,13 +122,19 @@
 
       <!-- Each Price (shown when price_type is 'each') -->
       <div id="each_price_field" class="sm:col-span-2" style="<%= works_order.price_type == 'lot' ? 'display: none;' : '' %>">
-        <%= form.label :each_price, "Price per part", class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.number_field :each_price,
-            step: 0.01,
-            min: 0,
-            placeholder: "0.00",
-            class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
-            id: "each_price_input" %>
+        <%= form.label :each_price, "Price per part (£)", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <div class="mt-1 relative rounded-md shadow-sm">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <span class="text-gray-500 sm:text-sm">£</span>
+          </div>
+          <%= form.number_field :each_price,
+              step: 0.01,
+              min: 0,
+              placeholder: "0.00",
+              class: "block w-full pl-7 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+              id: "each_price_input",
+              onblur: "formatCurrency(this)" %>
+        </div>
         <p class="mt-1 text-xs text-gray-500">
           The total job price will be calculated as: quantity × price per part
         </p>
@@ -136,13 +142,19 @@
 
       <!-- Lot Price (shown when price_type is 'lot') -->
       <div id="lot_price_field" class="sm:col-span-2" style="<%= works_order.price_type == 'each' ? 'display: none;' : '' %>">
-        <%= form.label :lot_price, "Total job price", class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.number_field :lot_price,
-            step: 0.01,
-            min: 0,
-            placeholder: "0.00",
-            class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
-            id: "lot_price_input" %>
+        <%= form.label :lot_price, "Total job price (£)", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <div class="mt-1 relative rounded-md shadow-sm">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <span class="text-gray-500 sm:text-sm">£</span>
+          </div>
+          <%= form.number_field :lot_price,
+              step: 0.01,
+              min: 0,
+              placeholder: "0.00",
+              class: "block w-full pl-7 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+              id: "lot_price_input",
+              onblur: "formatCurrency(this)" %>
+        </div>
         <p class="mt-1 text-xs text-gray-500">
           This is the total price for the entire job regardless of quantity
         </p>
@@ -185,6 +197,34 @@
 <% end %>
 
 <script>
+// Currency formatting function
+function formatCurrency(input) {
+  let value = input.value;
+
+  // Remove any non-numeric characters except decimal point
+  value = value.replace(/[^\d.]/g, '');
+
+  // Handle multiple decimal points
+  const parts = value.split('.');
+  if (parts.length > 2) {
+    value = parts[0] + '.' + parts.slice(1).join('');
+  }
+
+  // Convert to number and back to ensure proper formatting
+  const numValue = parseFloat(value);
+
+  if (!isNaN(numValue) && numValue >= 0) {
+    // Format to 2 decimal places
+    input.value = numValue.toFixed(2);
+  } else if (value === '' || value === '.') {
+    // Allow empty or just decimal point while typing
+    input.value = '';
+  } else {
+    // Invalid input, reset to 0.00
+    input.value = '0.00';
+  }
+}
+
 // Part selection handler
 function updatePartDetails(selectElement) {
   const partId = selectElement.value;
@@ -245,6 +285,18 @@ document.addEventListener('DOMContentLoaded', function() {
   const priceTypeSelect = document.querySelector('#works_order_price_type');
   if (priceTypeSelect) {
     togglePriceFields(priceTypeSelect.value);
+  }
+
+  // Format existing values on page load
+  const eachPriceInput = document.getElementById('each_price_input');
+  const lotPriceInput = document.getElementById('lot_price_input');
+
+  if (eachPriceInput && eachPriceInput.value) {
+    formatCurrency(eachPriceInput);
+  }
+
+  if (lotPriceInput && lotPriceInput.value) {
+    formatCurrency(lotPriceInput);
   }
 });
 </script>
