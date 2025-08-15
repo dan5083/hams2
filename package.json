@@ -1,0 +1,14 @@
+{
+  "name": "hams2",
+  "version": "1.0.0",
+  "description": "Hard Anodising Management System",
+  "engines": {
+    "node": "18.x"
+  },
+  "dependencies": {
+    "puppeteer": "^21.0.0"
+  },
+  "scripts": {
+    "postinstall": "echo 'Node.js dependencies installed for PDF generation'"
+  }
+}
