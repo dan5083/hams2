@@ -9,6 +9,12 @@
           method: :patch,
           class: @part.enabled? ? "bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded" : "bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded",
           data: { confirm: "Are you sure you want to #{@part.enabled? ? 'disable' : 'enable'} this part?" } %>
+      <% if @part.can_be_deleted? %>
+        <%= link_to "Delete", part_path(@part),
+            method: :delete,
+            class: "bg-red-600 hover:bg-red-800 text-white font-bold py-2 px-4 rounded",
+            data: { confirm: "Are you sure you want to delete this part? This cannot be undone." } %>
+      <% end %>
       <%= link_to "Back to Parts", parts_path,
           class: "bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" %>
     </div>
@@ -188,9 +194,6 @@
                 Quantity
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Due Date
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -210,20 +213,17 @@
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   <%= works_order.quantity_released %>/<%= works_order.quantity %>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <%= works_order.due_date.strftime("%d/%m/%Y") %>
-                </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                   <% if works_order.voided %>
                     <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
                       Voided
                     </span>
                   <% elsif works_order.is_open %>
-                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                    <span class="inline-flex px-2 py-1 text-xs font-medium text-green-600">
                       Open
                     </span>
                   <% else %>
-                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                    <span class="inline-flex px-2 py-1 text-xs font-medium text-gray-600">
                       Closed
                     </span>
                   <% end %>
