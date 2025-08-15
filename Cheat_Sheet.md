@@ -14,7 +14,14 @@ for file in app/controllers/[a-i]*.rb; do
 done
 
 # Show controllers.rb files starting with j-z
-for file in app/controllers/[j-z]*.rb; do
+for file in app/controllers/[j-p]*.rb; do
+  echo "=== $file ==="
+  cat "$file"
+  echo
+done
+
+# Show controllers.rb files starting with j-z
+for file in app/controllers/[q-z]*.rb; do
   echo "=== $file ==="
   cat "$file"
   echo
@@ -47,7 +54,7 @@ for file in app/javascript/controllers/**/[a-b]*_controller.js; do echo "=== $fi
 # JS Controllers [c-i]:
 for file in app/javascript/controllers/**/[c-i]*_controller.js; do echo "=== $file ==="; cat "$file"; echo; done
 # JS Controllers [j-q]:
-justload log_builder_controller.js
+
 # JS Controllers [r–z]:
 for f in app/javascript/controllers/**/[r-z]*_controller.js; do echo "=== $f ==="; cat "$f"; echo; done
 

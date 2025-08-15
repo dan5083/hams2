@@ -1,0 +1,158 @@
+/* PDF-specific styles for better print layout */
+@media print {
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    /* Removed color-adjust: exact; - non-standard property */
+  }
+}
+
+/* Common PDF styles */
+.pdf-container {
+  font-family: 'Helvetica', 'Arial', sans-serif;
+  font-size: 10pt;
+  line-height: 1.4;
+  color: #000;
+  background: white;
+}
+
+/* Page breaks */
+.page-break {
+  page-break-before: always;
+}
+
+.no-page-break {
+  page-break-inside: avoid;
+}
+
+/* PDF Headers */
+.pdf-header {
+  text-align: center;
+  margin-bottom: 2rem;
+  border-bottom: 2pt solid #000;
+  padding-bottom: 1rem;
+}
+
+.pdf-header h1 {
+  font-size: 1.5em;
+  font-weight: bold;
+  margin: 0;
+}
+
+/* PDF Tables */
+.pdf-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+}
+
+.pdf-table th,
+.pdf-table td {
+  border: 1pt solid #000;
+  padding: 0.5rem;
+  vertical-align: top;
+  text-align: left;
+}
+
+.pdf-table th {
+  background-color: #f8f9fa;
+  font-weight: bold;
+}
+
+/* Address blocks */
+.address-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.address-block {
+  border: 1pt solid #000;
+  padding: 0.5rem;
+  min-height: 4rem;
+}
+
+.address-block h3 {
+  font-weight: bold;
+  margin: 0 0 0.5rem 0;
+  text-decoration: underline;
+  font-size: 0.9em;
+}
+
+/* Signature areas */
+.signature-area {
+  margin-top: 3rem;
+  border: 1pt solid #000;
+  padding: 1rem;
+  min-height: 3rem;
+}
+
+.signature-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.signature-field {
+  border-bottom: 1pt solid #000;
+  min-height: 2rem;
+  padding-top: 1.5rem;
+  text-align: center;
+  font-size: 0.8em;
+}
+
+/* Route card specific styles */
+.route-card-header {
+  margin-bottom: 1rem;
+}
+
+.route-card-operations {
+  width: 100%;
+}
+
+.route-card-operations th {
+  background-color: #e9ecef;
+  font-weight: bold;
+  text-align: center;
+}
+
+.operation-row {
+  page-break-inside: avoid;
+}
+
+.operation-description {
+  min-height: 3rem;
+  padding: 0.5rem;
+}
+
+/* Batch columns */
+.batch-column {
+  width: 2cm;
+  text-align: center;
+}
+
+/* Utility classes */
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.font-bold { font-weight: bold; }
+.text-sm { font-size: 0.9em; }
+.text-xs { font-size: 0.8em; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-4 { margin-bottom: 1rem; }
+.mt-4 { margin-top: 1rem; }
+
+/* Status badges for PDFs */
+.status-badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border: 1pt solid #000;
+  border-radius: 0.25rem;
+  font-size: 0.8em;
+  font-weight: bold;
+}
+
+.status-active { background-color: #d4edda; }
+.status-voided { background-color: #f8d7da; }
+.status-invoiced { background-color: #d1ecf1; }

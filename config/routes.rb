@@ -1,11 +1,4 @@
 Rails.application.routes.draw do
-  get "transport_methods/index"
-  get "transport_methods/new"
-  get "transport_methods/create"
-  get "transport_methods/edit"
-  get "transport_methods/update"
-  get "transport_methods/destroy"
-  get "transport_methods/toggle_enabled"
   # Authentication routes
   resource :session
   resources :passwords, param: :token
@@ -19,8 +12,7 @@ Rails.application.routes.draw do
   # 1. Parts management - Basic CRUD for parts
   resources :parts do
     member do
-      get :toggle_enabled
-      get :destroy
+      patch :toggle_enabled
     end
     collection do
       get :search
@@ -30,8 +22,7 @@ Rails.application.routes.draw do
   # Part Processing Instructions
   resources :part_processing_instructions, path: 'ppis' do
     member do
-      get :toggle_enabled
-      get :destroy
+      patch :toggle_enabled
     end
     collection do
       get :search
@@ -48,10 +39,10 @@ Rails.application.routes.draw do
     resources :works_orders, only: [:new, :create], shallow: true
   end
 
-  # 3. Works Orders routes (main CRUD)
+  # 3. Works Orders routes (main CRUD) - PDFs for shop floor route cards
   resources :works_orders do
     member do
-      get :route_card
+      get :route_card       # Shop floor manufacturing instructions (HTML + PDF)
       patch :complete
       patch :void
     end
@@ -60,32 +51,32 @@ Rails.application.routes.draw do
     resources :release_notes, except: [:index] do
       member do
         patch :void
-        get :pdf # For release note PDF generation
+        get :pdf            # Customer delivery/collection documentation
       end
     end
   end
 
-  # 5. Release Notes (standalone routes for management)
+  # 5. Release Notes (standalone routes for management) - PDFs for delivery docs
   resources :release_notes, only: [:index, :show] do
     member do
       patch :void
-      get :pdf
+      get :pdf              # Customer delivery/collection documentation
     end
 
     collection do
-      get :pending_invoice # Release notes ready for invoicing
+      get :pending_invoice  # Release notes ready for invoicing
     end
   end
 
-  # 6. Invoice routes
+  # 6. Invoice routes (PDFs handled by Xero)
   resources :invoices do
     member do
-      post :void
-      get :pdf
+      patch :void
+      # No PDF route - Xero handles invoice PDFs professionally
     end
 
     collection do
-      get :new_manual # For creating manual invoices
+      get :new_manual       # For creating manual invoices
       post :create_manual
       post :create_from_release_notes # Bulk invoice creation
     end

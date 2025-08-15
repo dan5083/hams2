@@ -124,6 +124,8 @@ GEM
       raabro (~> 1.4)
     globalid (1.2.1)
       activesupport (>= 6.1)
+    grover (1.2.3)
+      nokogiri (~> 1)
     httpclient (2.9.0)
       mutex_m
     i18n (1.14.7)
@@ -410,6 +412,7 @@ DEPENDENCIES
   capybara
   debug
   dotenv-rails (~> 3.1)
+  grover
   importmap-rails
   jbuilder
   jwt

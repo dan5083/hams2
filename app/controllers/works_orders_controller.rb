@@ -93,10 +93,23 @@ class WorksOrdersController < ApplicationController
     respond_to do |format|
       format.html { render layout: false }
       format.pdf do
-        # If using wicked_pdf or similar
-        render pdf: "route_card_wo#{@works_order.number}",
-               layout: false,
-               template: 'works_orders/route_card'
+        pdf = Grover.new(
+          render_to_string(
+            template: 'works_orders/route_card',
+            layout: false,
+            locals: { works_order: @works_order, operations: @operations }
+          ),
+          format: 'A4',
+          margin: { top: '1cm', bottom: '0.5cm', left: '0.5cm', right: '0.5cm' },
+          print_background: true,
+          prefer_css_page_size: true,
+          emulate_media: 'print'
+        ).to_pdf
+
+        send_data pdf,
+                  filename: "route_card_wo#{@works_order.number}.pdf",
+                  type: 'application/pdf',
+                  disposition: 'inline'
       end
     end
   end

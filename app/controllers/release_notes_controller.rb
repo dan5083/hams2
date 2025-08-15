@@ -1,3 +1,4 @@
+# app/controllers/release_notes_controller.rb
 class ReleaseNotesController < ApplicationController
   before_action :set_release_note, only: [:show, :edit, :update, :destroy, :void, :pdf]
   before_action :set_works_order, only: [:new, :create]
@@ -83,24 +84,29 @@ class ReleaseNotesController < ApplicationController
   end
 
   def pdf
-    # Set up data for the PDF template
+    # Set up data for the PDF template - customer delivery documentation
     @company_name = "Hard Anodising Surface Treatments Ltd"
     @trading_address = "Your Company Address\nCity, County\nPostcode"
 
     respond_to do |format|
       format.html { render layout: false }
       format.pdf do
-        # If using wicked_pdf
-        render pdf: "release_note_#{@release_note.number}",
-               layout: false,
-               template: 'release_notes/pdf',
-               page_size: 'A4',
-               margin: {
-                 top: 20,
-                 bottom: 15,
-                 left: 15,
-                 right: 15
-               }
+        pdf = Grover.new(
+          render_to_string(
+            template: 'release_notes/pdf',
+            layout: false,
+            locals: { release_note: @release_note, company_name: @company_name, trading_address: @trading_address }
+          ),
+          format: 'A4',
+          margin: { top: '1cm', bottom: '1cm', left: '1cm', right: '1cm' },
+          print_background: true,
+          prefer_css_page_size: true
+        ).to_pdf
+
+        send_data pdf,
+                  filename: "delivery_note_#{@release_note.number}.pdf",
+                  type: 'application/pdf',
+                  disposition: 'inline'
       end
     end
   end

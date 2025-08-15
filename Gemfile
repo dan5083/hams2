@@ -76,3 +76,5 @@ end
 gem "xero-ruby", "~> 3.7.0"
 gem 'jwt'
 gem "dotenv-rails", "~> 3.1"
+# PDF generation with Puppeteer (much smaller than wicked_pdf for Heroku)
+gem 'grover'
