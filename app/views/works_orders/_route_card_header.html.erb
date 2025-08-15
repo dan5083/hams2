@@ -1,23 +1,4 @@
-<%# Helper method for header fields %>
-<% content_for :header_field do |label, value| %>
-  <div class="header-field-label">
-    <%= label %>
-  </div>
-  <div class="header-field-value">
-    <%= value %>
-  </div>
-<% end %>
-
-<%# Helper method for header rows %>
-<% content_for :header_row do |&block| %>
-  <div class="header-row">
-    <div class="header-row-inner">
-      <div class="header-row-inner2">
-        <%= capture(&block) %>
-      </div>
-    </div>
-  </div>
-<% end %>
+<%# Route Card Header for Works Order %>
 
 <header>
   <div class="header-details">
