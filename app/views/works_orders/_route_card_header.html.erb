@@ -58,10 +58,10 @@
           <div class="header-field-value"><%= works_order.material if works_order.respond_to?(:material) %></div>
           <% if works_order.each_price.present? %>
             <div class="header-field-label">Each Price</div>
-            <div class="header-field-value"><%= number_to_currency(works_order.each_price) %></div>
+            <div class="header-field-value"><%= number_to_currency(works_order.each_price, unit: "£") %></div>
           <% end %>
           <div class="header-field-label">Lot Price</div>
-          <div class="header-field-value"><%= number_to_currency(works_order.lot_price) %></div>
+          <div class="header-field-value"><%= number_to_currency(works_order.lot_price, unit: "£") %></div>
         </div>
       </div>
     </div>
