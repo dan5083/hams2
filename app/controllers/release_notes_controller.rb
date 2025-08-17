@@ -86,7 +86,7 @@ class ReleaseNotesController < ApplicationController
   def pdf
     # Set up data for the PDF template - customer delivery documentation
     @company_name = "Hard Anodising Surface Treatments Ltd"
-    @trading_address = "Your Company Address\nCity, County\nPostcode"
+    @trading_address = "Firs Industrial Estate, Rickets Close\nKidderminster, DY11 7QN"
 
     respond_to do |format|
       format.html { render layout: false }
