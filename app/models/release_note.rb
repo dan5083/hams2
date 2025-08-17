@@ -22,8 +22,8 @@ class ReleaseNote < ApplicationRecord
   scope :recent, -> { order(number: :desc) }
 
   before_validation :set_date, if: :new_record?
+  before_validation :assign_next_number, if: :new_record?
   after_initialize :set_defaults, if: :new_record?
-  after_create :assign_next_number
   after_save :update_works_order_quantity_released
   after_destroy :update_works_order_quantity_released
 
@@ -129,8 +129,7 @@ class ReleaseNote < ApplicationRecord
   end
 
   def assign_next_number
-    self.number = self.class.next_number
-    save!
+    self.number = self.class.next_number if number.blank?
   end
 
   def total_quantity_must_be_positive
