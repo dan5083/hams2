@@ -103,7 +103,7 @@
           <div>
             <dt class="text-sm font-medium text-gray-500">Invoice Value</dt>
             <dd class="text-sm text-gray-900 font-semibold text-lg text-blue-600">
-              <%= number_to_currency(@release_note.invoice_value) %>
+              £<%= sprintf("%.2f", @release_note.invoice_value) %>
             </dd>
           </div>
         <% end %>
@@ -163,11 +163,6 @@
             <%= @release_note.works_order.quantity_released %>/<%= @release_note.works_order.quantity %>
           </dd>
         </div>
-
-        <div>
-          <dt class="text-sm font-medium text-gray-500">Due Date</dt>
-          <dd class="text-sm text-gray-900"><%= @release_note.works_order.due_date.strftime("%d/%m/%Y") %></dd>
-        </div>
       </dl>
     </div>
   </div>
@@ -224,7 +219,7 @@
         <div>
           <dt class="text-sm font-medium text-gray-500 inline">Amount:</dt>
           <dd class="text-sm text-gray-900 inline ml-2">
-            <%= number_to_currency(@release_note.invoice_item.line_amount_inc_tax) %>
+            £<%= sprintf("%.2f", @release_note.invoice_item.line_amount_inc_tax) %>
           </dd>
         </div>
       </dl>
