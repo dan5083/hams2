@@ -58,7 +58,7 @@ Rails.application.routes.draw do
   end
 
   # 5. Release Notes (standalone routes for management) - PDFs for delivery docs
-  resources :release_notes, only: [:index, :show] do
+  resources :release_notes, only: [:index, :show, :edit, :update] do
     member do
       patch :void
       get :pdf              # Customer delivery/collection documentation
