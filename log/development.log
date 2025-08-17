@@ -14249,3 +14249,305 @@ Completed 200 OK in 73ms (Views: 44.3ms | ActiveRecord: 10.1ms (9 queries, 0 cac
 [dotenv] Loaded [33m.env[0m
 [dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
 [dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+Started GET "/" for 127.0.0.1 at 2025-08-17 14:22:21 +0100
+  [1m[36mActiveRecord::SchemaMigration Load (5.9ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+Processing by DashboardController#index as HTML
+  [1m[36mSession Load (4.7ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '6ec4d8a1-a4b9-4a6a-acc5-3b330f8088c4' LIMIT 1 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+  Rendering layout layouts/application.html.erb
+  Rendering dashboard/index.html.erb within layouts/application
+  [1m[36mXeroContact Exists? (3.1ms)[0m  [1m[34mSELECT 1 AS one FROM "xero_contacts" LIMIT 1 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:18
+  [1m[36mXeroContact Maximum (4.3ms)[0m  [1m[34mSELECT MAX("xero_contacts"."last_synced_at") FROM "xero_contacts" /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:19
+  [1m[36mOrganization Count (7.6ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:33
+  [1m[36mOrganization Count (0.4ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_customer" = TRUE /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:34
+  [1m[36mOrganization Count (0.4ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_supplier" = TRUE /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:35
+  [1m[36mXeroContact Count (0.4ms)[0m  [1m[34mSELECT COUNT(*) FROM "xero_contacts" /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:36
+  [1m[36mInvoice Count (6.8ms)[0m  [1m[34mSELECT COUNT(*) FROM "invoices" /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:46
+  [1m[36mCACHE Invoice Count (0.0ms)[0m  [1m[34mSELECT COUNT(*) FROM "invoices"[0m
+  ↳ app/views/dashboard/index.html.erb:47
+  [1m[36mInvoice Count (0.3ms)[0m  [1m[34mSELECT COUNT(*) FROM "invoices" WHERE "invoices"."xero_id" IS NOT NULL /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:48
+  [1m[36mInvoice Count (0.3ms)[0m  [1m[34mSELECT COUNT(*) FROM "invoices" WHERE "invoices"."xero_id" IS NULL /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:49
+  [1m[36mOrganization Count (0.4ms)[0m  [1m[34mSELECT COUNT(*) FROM "organizations" WHERE "organizations"."is_customer" = TRUE AND "organizations"."enabled" = TRUE /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:70
+  [1m[36mOrganization Exists? (0.6ms)[0m  [1m[34mSELECT 1 AS one FROM "organizations" LIMIT 1 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:77
+  [1m[36mOrganization Load (0.5ms)[0m  [1m[34mSELECT "organizations".* FROM "organizations" LIMIT 10 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:91
+  [1m[36mXeroContact Load (1.6ms)[0m  [1m[34mSELECT "xero_contacts".* FROM "xero_contacts" WHERE "xero_contacts"."id" = 'f0af60cf-b03c-4b63-8b05-b767941818a1' /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/views/dashboard/index.html.erb:91
+  Rendered dashboard/index.html.erb within layouts/application (Duration: 113.7ms | GC: 0.0ms)
+  [1m[36mUser Load (5.5ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."id" = '52d38d4d-3b20-4e3c-a6e7-b579d9dc53e5' LIMIT 1 /*action='index',application='Hams2',controller='dashboard'*/[0m
+  ↳ app/models/current.rb:3:in `user'
+  Rendered shared/_navbar.html.erb (Duration: 29.6ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 168.5ms | GC: 0.0ms)
+Completed 200 OK in 385ms (Views: 129.4ms | ActiveRecord: 119.9ms (16 queries, 1 cached) | GC: 0.0ms)
+
+
+Started GET "/favicon.ico" for 127.0.0.1 at 2025-08-17 14:22:21 +0100
+  
+ActionController::RoutingError (No route matches [GET] "/favicon.ico"):
+  
+Started GET "/customer_orders" for 127.0.0.1 at 2025-08-17 14:22:23 +0100
+Processing by CustomerOrdersController#index as HTML
+  [1m[36mSession Load (0.7ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '6ec4d8a1-a4b9-4a6a-acc5-3b330f8088c4' LIMIT 1 /*action='index',application='Hams2',controller='customer_orders'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+  Rendering layout layouts/application.html.erb
+  Rendering customer_orders/index.html.erb within layouts/application
+  [1m[36mOrganization Load (0.9ms)[0m  [1m[34mSELECT "organizations".* FROM "organizations" WHERE "organizations"."is_customer" = TRUE AND "organizations"."enabled" = TRUE ORDER BY "organizations"."name" ASC /*action='index',application='Hams2',controller='customer_orders'*/[0m
+  ↳ app/views/customer_orders/index.html.erb:22:in `map'
+  [1m[36mCustomerOrder Load (10.1ms)[0m  [1m[34mSELECT "customer_orders".* FROM "customer_orders" ORDER BY "customer_orders"."date_received" DESC /*action='index',application='Hams2',controller='customer_orders'*/[0m
+  ↳ app/views/customer_orders/index.html.erb:76
+  [1m[36mOrganization Load (0.6ms)[0m  [1m[34mSELECT "organizations".* FROM "organizations" WHERE "organizations"."id" = '6affe4b1-d24d-4655-b939-17f5aa01d88e' /*action='index',application='Hams2',controller='customer_orders'*/[0m
+  ↳ app/views/customer_orders/index.html.erb:76
+  [1m[36mWorksOrder Load (18.8ms)[0m  [1m[34mSELECT "works_orders".* FROM "works_orders" WHERE "works_orders"."customer_order_id" = 'd82c2929-308f-44a3-8b1e-dad1044cffe1' /*action='index',application='Hams2',controller='customer_orders'*/[0m
+  ↳ app/views/customer_orders/index.html.erb:76
+  [1m[36mWorksOrder Count (0.5ms)[0m  [1m[34mSELECT COUNT(*) FROM "works_orders" WHERE "works_orders"."customer_order_id" = 'd82c2929-308f-44a3-8b1e-dad1044cffe1' /*action='index',application='Hams2',controller='customer_orders'*/[0m
+  ↳ app/views/customer_orders/index.html.erb:88
+  [1m[36mWorksOrder Count (0.4ms)[0m  [1m[34mSELECT COUNT(*) FROM "works_orders" WHERE "works_orders"."customer_order_id" = 'd82c2929-308f-44a3-8b1e-dad1044cffe1' AND "works_orders"."voided" = FALSE /*action='index',application='Hams2',controller='customer_orders'*/[0m
+  ↳ app/views/customer_orders/index.html.erb:89
+  [1m[36mCACHE WorksOrder Count (0.0ms)[0m  [1m[34mSELECT COUNT(*) FROM "works_orders" WHERE "works_orders"."customer_order_id" = 'd82c2929-308f-44a3-8b1e-dad1044cffe1'[0m
+  ↳ app/views/customer_orders/index.html.erb:89
+  [1m[36mWorksOrder Sum (1.0ms)[0m  [1m[34mSELECT SUM("works_orders"."lot_price") FROM "works_orders" WHERE "works_orders"."customer_order_id" = 'd82c2929-308f-44a3-8b1e-dad1044cffe1' AND "works_orders"."voided" = FALSE /*action='index',application='Hams2',controller='customer_orders'*/[0m
+  ↳ app/models/customer_order.rb:65:in `total_value'
+  [1m[36mWorksOrder Exists? (0.6ms)[0m  [1m[34mSELECT 1 AS one FROM "works_orders" WHERE "works_orders"."customer_order_id" = 'd82c2929-308f-44a3-8b1e-dad1044cffe1' AND "works_orders"."voided" = FALSE LIMIT 1 /*action='index',application='Hams2',controller='customer_orders'*/[0m
+  ↳ app/models/customer_order.rb:73:in `outstanding?'
+  [1m[36mCACHE WorksOrder Exists? (0.0ms)[0m  [1m[34mSELECT 1 AS one FROM "works_orders" WHERE "works_orders"."customer_order_id" = 'd82c2929-308f-44a3-8b1e-dad1044cffe1' AND "works_orders"."voided" = FALSE LIMIT 1[0m
+  ↳ app/models/customer_order.rb:61:in `has_non_voided_works_orders?'
+  Rendered customer_orders/index.html.erb within layouts/application (Duration: 118.1ms | GC: 0.9ms)
+  [1m[36mUser Load (0.5ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."id" = '52d38d4d-3b20-4e3c-a6e7-b579d9dc53e5' LIMIT 1 /*action='index',application='Hams2',controller='customer_orders'*/[0m
+  ↳ app/models/current.rb:3:in `user'
+  Rendered shared/_navbar.html.erb (Duration: 3.5ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 123.6ms | GC: 0.9ms)
+Completed 200 OK in 152ms (Views: 82.7ms | ActiveRecord: 45.1ms (12 queries, 2 cached) | GC: 1.4ms)
+
+
+Started GET "/customer_orders" for 127.0.0.1 at 2025-08-17 14:22:24 +0100
+Processing by CustomerOrdersController#index as HTML
+  [1m[36mSession Load (0.8ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '6ec4d8a1-a4b9-4a6a-acc5-3b330f8088c4' LIMIT 1 /*action='index',application='Hams2',controller='customer_orders'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+  Rendering layout layouts/application.html.erb
+  Rendering customer_orders/index.html.erb within layouts/application
+  [1m[36mOrganization Load (0.5ms)[0m  [1m[34mSELECT "organizations".* FROM "organizations" WHERE "organizations"."is_customer" = TRUE AND "organizations"."enabled" = TRUE ORDER BY "organizations"."name" ASC /*action='index',application='Hams2',controller='customer_orders'*/[0m
+  ↳ app/views/customer_orders/index.html.erb:22:in `map'
+  [1m[36mCustomerOrder Load (0.6ms)[0m  [1m[34mSELECT "customer_orders".* FROM "customer_orders" ORDER BY "customer_orders"."date_received" DESC /*action='index',application='Hams2',controller='customer_orders'*/[0m
+  ↳ app/views/customer_orders/index.html.erb:76
+  [1m[36mOrganization Load (0.9ms)[0m  [1m[34mSELECT "organizations".* FROM "organizations" WHERE "organizations"."id" = '6affe4b1-d24d-4655-b939-17f5aa01d88e' /*action='index',application='Hams2',controller='customer_orders'*/[0m
+  ↳ app/views/customer_orders/index.html.erb:76
+  [1m[36mWorksOrder Load (1.0ms)[0m  [1m[34mSELECT "works_orders".* FROM "works_orders" WHERE "works_orders"."customer_order_id" = 'd82c2929-308f-44a3-8b1e-dad1044cffe1' /*action='index',application='Hams2',controller='customer_orders'*/[0m
+  ↳ app/views/customer_orders/index.html.erb:76
+  [1m[36mWorksOrder Count (0.5ms)[0m  [1m[34mSELECT COUNT(*) FROM "works_orders" WHERE "works_orders"."customer_order_id" = 'd82c2929-308f-44a3-8b1e-dad1044cffe1' /*action='index',application='Hams2',controller='customer_orders'*/[0m
+  ↳ app/views/customer_orders/index.html.erb:88
+  [1m[36mWorksOrder Count (0.5ms)[0m  [1m[34mSELECT COUNT(*) FROM "works_orders" WHERE "works_orders"."customer_order_id" = 'd82c2929-308f-44a3-8b1e-dad1044cffe1' AND "works_orders"."voided" = FALSE /*action='index',application='Hams2',controller='customer_orders'*/[0m
+  ↳ app/views/customer_orders/index.html.erb:89
+  [1m[36mCACHE WorksOrder Count (0.0ms)[0m  [1m[34mSELECT COUNT(*) FROM "works_orders" WHERE "works_orders"."customer_order_id" = 'd82c2929-308f-44a3-8b1e-dad1044cffe1'[0m
+  ↳ app/views/customer_orders/index.html.erb:89
+  [1m[36mWorksOrder Sum (0.5ms)[0m  [1m[34mSELECT SUM("works_orders"."lot_price") FROM "works_orders" WHERE "works_orders"."customer_order_id" = 'd82c2929-308f-44a3-8b1e-dad1044cffe1' AND "works_orders"."voided" = FALSE /*action='index',application='Hams2',controller='customer_orders'*/[0m
+  ↳ app/models/customer_order.rb:65:in `total_value'
+  [1m[36mWorksOrder Exists? (0.3ms)[0m  [1m[34mSELECT 1 AS one FROM "works_orders" WHERE "works_orders"."customer_order_id" = 'd82c2929-308f-44a3-8b1e-dad1044cffe1' AND "works_orders"."voided" = FALSE LIMIT 1 /*action='index',application='Hams2',controller='customer_orders'*/[0m
+  ↳ app/models/customer_order.rb:73:in `outstanding?'
+  [1m[36mCACHE WorksOrder Exists? (0.0ms)[0m  [1m[34mSELECT 1 AS one FROM "works_orders" WHERE "works_orders"."customer_order_id" = 'd82c2929-308f-44a3-8b1e-dad1044cffe1' AND "works_orders"."voided" = FALSE LIMIT 1[0m
+  ↳ app/models/customer_order.rb:61:in `has_non_voided_works_orders?'
+  Rendered customer_orders/index.html.erb within layouts/application (Duration: 27.6ms | GC: 0.0ms)
+  [1m[36mUser Load (0.6ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."id" = '52d38d4d-3b20-4e3c-a6e7-b579d9dc53e5' LIMIT 1 /*action='index',application='Hams2',controller='customer_orders'*/[0m
+  ↳ app/models/current.rb:3:in `user'
+  Rendered shared/_navbar.html.erb (Duration: 3.4ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 32.8ms | GC: 0.0ms)
+Completed 200 OK in 73ms (Views: 28.1ms | ActiveRecord: 6.0ms (12 queries, 2 cached) | GC: 0.0ms)
+
+
+Started GET "/works_orders" for 127.0.0.1 at 2025-08-17 14:22:24 +0100
+Processing by WorksOrdersController#index as HTML
+  [1m[36mSession Load (0.5ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '6ec4d8a1-a4b9-4a6a-acc5-3b330f8088c4' LIMIT 1 /*action='index',application='Hams2',controller='works_orders'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+  Rendering layout layouts/application.html.erb
+  Rendering works_orders/index.html.erb within layouts/application
+  [1m[36mWorksOrder Load (0.8ms)[0m  [1m[34mSELECT "works_orders".* FROM "works_orders" WHERE "works_orders"."voided" = FALSE ORDER BY "works_orders"."created_at" DESC /*action='index',application='Hams2',controller='works_orders'*/[0m
+  ↳ app/views/works_orders/index.html.erb:58
+  [1m[36mCustomerOrder Load (0.5ms)[0m  [1m[34mSELECT "customer_orders".* FROM "customer_orders" WHERE "customer_orders"."id" = 'd82c2929-308f-44a3-8b1e-dad1044cffe1' /*action='index',application='Hams2',controller='works_orders'*/[0m
+  ↳ app/views/works_orders/index.html.erb:58
+  [1m[36mPart Load (10.8ms)[0m  [1m[34mSELECT "parts".* FROM "parts" WHERE "parts"."id" = 'bbfa0ec3-38d5-4998-926c-31ebf9ff3ebc' /*action='index',application='Hams2',controller='works_orders'*/[0m
+  ↳ app/views/works_orders/index.html.erb:58
+  [1m[36mReleaseLevel Load (6.4ms)[0m  [1m[34mSELECT "release_levels".* FROM "release_levels" WHERE "release_levels"."id" = '25a0eb14-2b8d-4c0e-92d4-6bbaee4aba0a' /*action='index',application='Hams2',controller='works_orders'*/[0m
+  ↳ app/views/works_orders/index.html.erb:58
+  [1m[36mTransportMethod Load (6.5ms)[0m  [1m[34mSELECT "transport_methods".* FROM "transport_methods" WHERE "transport_methods"."id" = '3a28a8ef-6591-4538-adbd-1c19d7973efc' /*action='index',application='Hams2',controller='works_orders'*/[0m
+  ↳ app/views/works_orders/index.html.erb:58
+  [1m[36mOrganization Load (0.5ms)[0m  [1m[34mSELECT "organizations".* FROM "organizations" WHERE "organizations"."id" = '6affe4b1-d24d-4655-b939-17f5aa01d88e' LIMIT 1 /*action='index',application='Hams2',controller='works_orders'*/[0m
+  ↳ app/models/works_order.rb:38:in `customer'
+  Rendered works_orders/index.html.erb within layouts/application (Duration: 100.3ms | GC: 18.6ms)
+  [1m[36mUser Load (0.5ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."id" = '52d38d4d-3b20-4e3c-a6e7-b579d9dc53e5' LIMIT 1 /*action='index',application='Hams2',controller='works_orders'*/[0m
+  ↳ app/models/current.rb:3:in `user'
+  Rendered shared/_navbar.html.erb (Duration: 3.5ms | GC: 0.6ms)
+  Rendered layout layouts/application.html.erb (Duration: 105.4ms | GC: 19.2ms)
+Completed 200 OK in 128ms (Views: 70.3ms | ActiveRecord: 36.7ms (8 queries, 0 cached) | GC: 19.2ms)
+
+
+Started GET "/works_orders/909112d9-cc1e-439a-88fb-48cb781c31f2/edit" for 127.0.0.1 at 2025-08-17 14:22:26 +0100
+Processing by WorksOrdersController#edit as HTML
+  Parameters: {"id"=>"909112d9-cc1e-439a-88fb-48cb781c31f2"}
+  [1m[36mSession Load (1.3ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '6ec4d8a1-a4b9-4a6a-acc5-3b330f8088c4' LIMIT 1 /*action='edit',application='Hams2',controller='works_orders'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+  [1m[36mWorksOrder Load (0.9ms)[0m  [1m[34mSELECT "works_orders".* FROM "works_orders" WHERE "works_orders"."id" = '909112d9-cc1e-439a-88fb-48cb781c31f2' LIMIT 1 /*action='edit',application='Hams2',controller='works_orders'*/[0m
+  ↳ app/controllers/works_orders_controller.rb:150:in `set_works_order'
+  Rendering layout layouts/application.html.erb
+  Rendering works_orders/edit.html.erb within layouts/application
+  Rendered works_orders/_form.html.erb (Duration: 4.0ms | GC: 0.0ms)
+  Rendered works_orders/edit.html.erb within layouts/application (Duration: 7.8ms | GC: 0.7ms)
+  Rendered layout layouts/application.html.erb (Duration: 8.2ms | GC: 0.7ms)
+Completed 500 Internal Server Error in 71ms (ActiveRecord: 2.1ms (2 queries, 0 cached) | GC: 0.7ms)
+
+
+  
+ActionView::Template::Error (undefined method `map' for nil)
+Caused by: NoMethodError (undefined method `map' for nil)
+
+Information for: ActionView::Template::Error (undefined method `map' for nil):
+    35:           <p class="mt-1 text-xs text-gray-500">Pre-selected from the customer order you came from</p>
+    36:         <% else %>
+    37:           <%= form.select :customer_order_id,
+    38:               options_for_select([['Select Customer Order', '']] + @customer_orders.map { |co| ["#{co.customer.name} - #{co.number}", co.id] }, works_order.customer_order_id),
+    39:               {},
+    40:               {
+    41:                 class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+  
+app/views/works_orders/_form.html.erb:38
+app/views/works_orders/_form.html.erb:2
+app/views/works_orders/edit.html.erb:13
+
+Information for cause: NoMethodError (undefined method `map' for nil):
+  
+app/views/works_orders/_form.html.erb:38
+app/views/works_orders/_form.html.erb:2
+app/views/works_orders/edit.html.erb:13
+Started GET "/works_orders/909112d9-cc1e-439a-88fb-48cb781c31f2" for 127.0.0.1 at 2025-08-17 14:22:27 +0100
+Processing by WorksOrdersController#show as HTML
+  Parameters: {"id"=>"909112d9-cc1e-439a-88fb-48cb781c31f2"}
+  [1m[36mSession Load (1.2ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '6ec4d8a1-a4b9-4a6a-acc5-3b330f8088c4' LIMIT 1 /*action='show',application='Hams2',controller='works_orders'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+  [1m[36mWorksOrder Load (0.8ms)[0m  [1m[34mSELECT "works_orders".* FROM "works_orders" WHERE "works_orders"."id" = '909112d9-cc1e-439a-88fb-48cb781c31f2' LIMIT 1 /*action='show',application='Hams2',controller='works_orders'*/[0m
+  ↳ app/controllers/works_orders_controller.rb:150:in `set_works_order'
+  Rendering layout layouts/application.html.erb
+  Rendering works_orders/show.html.erb within layouts/application
+  [1m[36mCustomerOrder Load (1.5ms)[0m  [1m[34mSELECT "customer_orders".* FROM "customer_orders" WHERE "customer_orders"."id" = 'd82c2929-308f-44a3-8b1e-dad1044cffe1' LIMIT 1 /*action='show',application='Hams2',controller='works_orders'*/[0m
+  ↳ app/models/works_order.rb:38:in `customer'
+  [1m[36mOrganization Load (1.7ms)[0m  [1m[34mSELECT "organizations".* FROM "organizations" WHERE "organizations"."id" = '6affe4b1-d24d-4655-b939-17f5aa01d88e' LIMIT 1 /*action='show',application='Hams2',controller='works_orders'*/[0m
+  ↳ app/models/works_order.rb:38:in `customer'
+  [1m[36mPartProcessingInstruction Load (14.6ms)[0m  [1m[34mSELECT "part_processing_instructions".* FROM "part_processing_instructions" WHERE "part_processing_instructions"."id" = 'f85ad7df-6d39-4fdf-8b50-7a51a18f5947' LIMIT 1 /*action='show',application='Hams2',controller='works_orders'*/[0m
+  ↳ app/models/works_order.rb:59:in `specification'
+  [1m[36mReleaseLevel Load (1.0ms)[0m  [1m[34mSELECT "release_levels".* FROM "release_levels" WHERE "release_levels"."id" = '25a0eb14-2b8d-4c0e-92d4-6bbaee4aba0a' LIMIT 1 /*action='show',application='Hams2',controller='works_orders'*/[0m
+  ↳ app/views/works_orders/show.html.erb:128
+  [1m[36mTransportMethod Load (0.6ms)[0m  [1m[34mSELECT "transport_methods".* FROM "transport_methods" WHERE "transport_methods"."id" = '3a28a8ef-6591-4538-adbd-1c19d7973efc' LIMIT 1 /*action='show',application='Hams2',controller='works_orders'*/[0m
+  ↳ app/views/works_orders/show.html.erb:133
+  [1m[36mReleaseNote Exists? (9.3ms)[0m  [1m[34mSELECT 1 AS one FROM "release_notes" WHERE "release_notes"."works_order_id" = '909112d9-cc1e-439a-88fb-48cb781c31f2' LIMIT 1 /*action='show',application='Hams2',controller='works_orders'*/[0m
+  ↳ app/views/works_orders/show.html.erb:155
+  Rendered works_orders/show.html.erb within layouts/application (Duration: 95.7ms | GC: 6.2ms)
+  [1m[36mUser Load (2.2ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."id" = '52d38d4d-3b20-4e3c-a6e7-b579d9dc53e5' LIMIT 1 /*action='show',application='Hams2',controller='works_orders'*/[0m
+  ↳ app/models/current.rb:3:in `user'
+  Rendered shared/_navbar.html.erb (Duration: 4.7ms | GC: 0.3ms)
+  Rendered layout layouts/application.html.erb (Duration: 104.0ms | GC: 6.5ms)
+Completed 200 OK in 191ms (Views: 59.1ms | ActiveRecord: 48.6ms (9 queries, 0 cached) | GC: 8.6ms)
+
+
+Started GET "/works_orders/909112d9-cc1e-439a-88fb-48cb781c31f2/release_notes/new" for 127.0.0.1 at 2025-08-17 14:22:35 +0100
+Processing by ReleaseNotesController#new as HTML
+  Parameters: {"works_order_id"=>"909112d9-cc1e-439a-88fb-48cb781c31f2"}
+  [1m[36mSession Load (0.9ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '6ec4d8a1-a4b9-4a6a-acc5-3b330f8088c4' LIMIT 1 /*action='new',application='Hams2',controller='release_notes'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+  [1m[36mWorksOrder Load (0.7ms)[0m  [1m[34mSELECT "works_orders".* FROM "works_orders" WHERE "works_orders"."id" = '909112d9-cc1e-439a-88fb-48cb781c31f2' LIMIT 1 /*action='new',application='Hams2',controller='release_notes'*/[0m
+  ↳ app/controllers/release_notes_controller.rb:129:in `set_works_order'
+  [1m[36mUser Load (0.6ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."id" = '52d38d4d-3b20-4e3c-a6e7-b579d9dc53e5' LIMIT 1 /*action='new',application='Hams2',controller='release_notes'*/[0m
+  ↳ app/models/current.rb:3:in `user'
+Completed 406 Not Acceptable in 38ms (ActiveRecord: 2.1ms (3 queries, 0 cached) | GC: 0.0ms)
+
+
+  
+ActionController::MissingExactTemplate (ReleaseNotesController#new is missing a template for request formats: text/html):
+  
+actionpack (8.0.2) lib/action_controller/metal/implicit_render.rb:49:in `default_render'
+actionpack (8.0.2) lib/action_controller/metal/basic_implicit_render.rb:9:in `send_action'
+actionpack (8.0.2) lib/abstract_controller/base.rb:226:in `process_action'
+actionpack (8.0.2) lib/action_controller/metal/rendering.rb:193:in `process_action'
+actionpack (8.0.2) lib/abstract_controller/callbacks.rb:261:in `block in process_action'
+activesupport (8.0.2) lib/active_support/callbacks.rb:120:in `block in run_callbacks'
+turbo-rails (2.0.16) lib/turbo-rails.rb:24:in `with_request_id'
+turbo-rails (2.0.16) app/controllers/concerns/turbo/request_id_tracking.rb:10:in `turbo_tracking_request_id'
+activesupport (8.0.2) lib/active_support/callbacks.rb:129:in `block in run_callbacks'
+actiontext (8.0.2) lib/action_text/rendering.rb:25:in `with_renderer'
+actiontext (8.0.2) lib/action_text/engine.rb:71:in `block (4 levels) in <class:Engine>'
+activesupport (8.0.2) lib/active_support/callbacks.rb:129:in `instance_exec'
+activesupport (8.0.2) lib/active_support/callbacks.rb:129:in `block in run_callbacks'
+activesupport (8.0.2) lib/active_support/callbacks.rb:140:in `run_callbacks'
+actionpack (8.0.2) lib/abstract_controller/callbacks.rb:260:in `process_action'
+actionpack (8.0.2) lib/action_controller/metal/rescue.rb:27:in `process_action'
+actionpack (8.0.2) lib/action_controller/metal/instrumentation.rb:76:in `block in process_action'
+activesupport (8.0.2) lib/active_support/notifications.rb:210:in `block in instrument'
+activesupport (8.0.2) lib/active_support/notifications/instrumenter.rb:58:in `instrument'
+activesupport (8.0.2) lib/active_support/notifications.rb:210:in `instrument'
+actionpack (8.0.2) lib/action_controller/metal/instrumentation.rb:75:in `process_action'
+actionpack (8.0.2) lib/action_controller/metal/params_wrapper.rb:259:in `process_action'
+activerecord (8.0.2) lib/active_record/railties/controller_runtime.rb:39:in `process_action'
+actionpack (8.0.2) lib/abstract_controller/base.rb:163:in `process'
+actionview (8.0.2) lib/action_view/rendering.rb:40:in `process'
+actionpack (8.0.2) lib/action_controller/metal.rb:252:in `dispatch'
+actionpack (8.0.2) lib/action_controller/metal.rb:335:in `dispatch'
+actionpack (8.0.2) lib/action_dispatch/routing/route_set.rb:67:in `dispatch'
+actionpack (8.0.2) lib/action_dispatch/routing/route_set.rb:50:in `serve'
+actionpack (8.0.2) lib/action_dispatch/journey/router.rb:53:in `block in serve'
+actionpack (8.0.2) lib/action_dispatch/journey/router.rb:133:in `block in find_routes'
+actionpack (8.0.2) lib/action_dispatch/journey/router.rb:126:in `each'
+actionpack (8.0.2) lib/action_dispatch/journey/router.rb:126:in `find_routes'
+actionpack (8.0.2) lib/action_dispatch/journey/router.rb:34:in `serve'
+actionpack (8.0.2) lib/action_dispatch/routing/route_set.rb:908:in `call'
+railties (8.0.2) lib/rails/engine/lazy_route_set.rb:68:in `call'
+rack (3.2.0) lib/rack/tempfile_reaper.rb:20:in `call'
+rack (3.2.0) lib/rack/etag.rb:29:in `call'
+rack (3.2.0) lib/rack/conditional_get.rb:31:in `call'
+rack (3.2.0) lib/rack/head.rb:15:in `call'
+actionpack (8.0.2) lib/action_dispatch/http/permissions_policy.rb:38:in `call'
+actionpack (8.0.2) lib/action_dispatch/http/content_security_policy.rb:38:in `call'
+rack-session (2.1.1) lib/rack/session/abstract/id.rb:274:in `context'
+rack-session (2.1.1) lib/rack/session/abstract/id.rb:268:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/cookies.rb:706:in `call'
+activerecord (8.0.2) lib/active_record/migration.rb:671:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/callbacks.rb:31:in `block in call'
+activesupport (8.0.2) lib/active_support/callbacks.rb:100:in `run_callbacks'
+actionpack (8.0.2) lib/action_dispatch/middleware/callbacks.rb:30:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/executor.rb:16:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/actionable_exceptions.rb:18:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/debug_exceptions.rb:31:in `call'
+web-console (4.2.1) lib/web_console/middleware.rb:132:in `call_app'
+web-console (4.2.1) lib/web_console/middleware.rb:28:in `block in call'
+web-console (4.2.1) lib/web_console/middleware.rb:17:in `catch'
+web-console (4.2.1) lib/web_console/middleware.rb:17:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/show_exceptions.rb:32:in `call'
+railties (8.0.2) lib/rails/rack/logger.rb:41:in `call_app'
+railties (8.0.2) lib/rails/rack/logger.rb:29:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/remote_ip.rb:96:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/request_id.rb:34:in `call'
+rack (3.2.0) lib/rack/method_override.rb:28:in `call'
+rack (3.2.0) lib/rack/runtime.rb:24:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/server_timing.rb:61:in `block in call'
+actionpack (8.0.2) lib/action_dispatch/middleware/server_timing.rb:26:in `collect_events'
+actionpack (8.0.2) lib/action_dispatch/middleware/server_timing.rb:60:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/executor.rb:16:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/static.rb:27:in `call'
+rack (3.2.0) lib/rack/sendfile.rb:114:in `call'
+actionpack (8.0.2) lib/action_dispatch/middleware/host_authorization.rb:143:in `call'
+railties (8.0.2) lib/rails/engine.rb:535:in `call'
+puma (6.6.1) lib/puma/configuration.rb:279:in `call'
+puma (6.6.1) lib/puma/request.rb:99:in `block in handle_request'
+puma (6.6.1) lib/puma/thread_pool.rb:390:in `with_force_shutdown'
+puma (6.6.1) lib/puma/request.rb:98:in `handle_request'
+puma (6.6.1) lib/puma/server.rb:472:in `process_client'
+puma (6.6.1) lib/puma/server.rb:254:in `block in run'
+puma (6.6.1) lib/puma/thread_pool.rb:167:in `block in spawn_thread'

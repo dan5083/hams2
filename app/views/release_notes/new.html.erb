@@ -1,0 +1,38 @@
+<div class="container mx-auto px-4 py-6">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold text-gray-900">
+      New Release Note for WO<%= @works_order.number %>
+    </h1>
+    <div class="flex space-x-2">
+      <%= link_to "Back to Works Order", @works_order,
+          class: "bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" %>
+      <%= link_to "Back to Release Notes", release_notes_path,
+          class: "bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" %>
+    </div>
+  </div>
+
+  <!-- Works Order Summary -->
+  <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+    <h2 class="text-lg font-semibold text-gray-900 mb-3">Works Order Summary</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+      <div>
+        <span class="font-medium text-gray-500">Customer:</span>
+        <span class="text-gray-900"><%= @works_order.customer.name %></span>
+      </div>
+      <div>
+        <span class="font-medium text-gray-500">Part:</span>
+        <span class="text-gray-900 font-mono"><%= @works_order.part_number %>-<%= @works_order.part_issue %></span>
+      </div>
+      <div>
+        <span class="font-medium text-gray-500">Quantity Remaining:</span>
+        <span class="text-gray-900 font-semibold"><%= @works_order.quantity_remaining %></span>
+      </div>
+      <div class="md:col-span-3">
+        <span class="font-medium text-gray-500">Description:</span>
+        <span class="text-gray-900"><%= @works_order.part_description %></span>
+      </div>
+    </div>
+  </div>
+
+  <%= render 'form', release_note: @release_note, works_order: @works_order %>
+</div>

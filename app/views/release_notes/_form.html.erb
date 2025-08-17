@@ -1,0 +1,141 @@
+<div class="bg-white shadow rounded-lg p-6">
+  <%= form_with(model: [works_order, release_note], local: true, class: "space-y-6") do |form| %>
+    <% if release_note.errors.any? %>
+      <div class="bg-red-50 border border-red-200 rounded-md p-4">
+        <div class="flex">
+          <div class="ml-3">
+            <h3 class="text-sm font-medium text-red-800">
+              <%= pluralize(release_note.errors.count, "error") %> prohibited this release note from being saved:
+            </h3>
+            <div class="mt-2 text-sm text-red-700">
+              <ul class="list-disc pl-5 space-y-1">
+                <% release_note.errors.full_messages.each do |message| %>
+                  <li><%= message %></li>
+                <% end %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% end %>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Release Note Details -->
+      <div class="space-y-4">
+        <h3 class="text-lg font-medium text-gray-900">Release Note Details</h3>
+
+        <div>
+          <%= form.label :date, class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= form.date_field :date,
+              class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" %>
+        </div>
+
+        <div>
+          <%= form.label :quantity_accepted, "Quantity Accepted", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= form.number_field :quantity_accepted,
+              min: 0,
+              max: works_order.quantity_remaining + (release_note.persisted? ? release_note.quantity_accepted_was : 0),
+              class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" %>
+          <p class="mt-1 text-xs text-gray-500">
+            Maximum available: <%= works_order.quantity_remaining + (release_note.persisted? ? release_note.quantity_accepted_was : 0) %>
+          </p>
+        </div>
+
+        <div>
+          <%= form.label :quantity_rejected, "Quantity Rejected", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= form.number_field :quantity_rejected,
+              min: 0,
+              max: works_order.quantity_remaining + (release_note.persisted? ? release_note.quantity_rejected_was : 0),
+              class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" %>
+          <p class="mt-1 text-xs text-gray-500">
+            Maximum available: <%= works_order.quantity_remaining + (release_note.persisted? ? release_note.quantity_rejected_was : 0) %>
+          </p>
+        </div>
+
+        <div>
+          <%= form.label :remarks, class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= form.text_area :remarks,
+              rows: 4,
+              placeholder: "Optional remarks about this release...",
+              class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" %>
+        </div>
+
+        <div class="flex items-center">
+          <%= form.check_box :no_invoice,
+              class: "h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" %>
+          <%= form.label :no_invoice, "Do not invoice this release note",
+              class: "ml-2 block text-sm text-gray-900" %>
+          <p class="ml-2 text-xs text-gray-500">(Check if this should not be invoiced)</p>
+        </div>
+      </div>
+
+      <!-- Works Order Summary -->
+      <div class="space-y-4">
+        <h3 class="text-lg font-medium text-gray-900">Works Order Information</h3>
+
+        <div class="bg-gray-50 rounded-lg p-4 space-y-3">
+          <div>
+            <span class="text-sm font-medium text-gray-500">Works Order:</span>
+            <span class="text-sm text-gray-900 ml-2">WO<%= works_order.number %></span>
+          </div>
+
+          <div>
+            <span class="text-sm font-medium text-gray-500">Customer Order:</span>
+            <span class="text-sm text-gray-900 ml-2"><%= works_order.customer_order.number %></span>
+          </div>
+
+          <div>
+            <span class="text-sm font-medium text-gray-500">Customer:</span>
+            <span class="text-sm text-gray-900 ml-2"><%= works_order.customer.name %></span>
+          </div>
+
+          <div>
+            <span class="text-sm font-medium text-gray-500">Part:</span>
+            <span class="text-sm text-gray-900 ml-2 font-mono"><%= works_order.part_number %>-<%= works_order.part_issue %></span>
+          </div>
+
+          <div>
+            <span class="text-sm font-medium text-gray-500">Description:</span>
+            <span class="text-sm text-gray-900 ml-2"><%= works_order.part_description %></span>
+          </div>
+
+          <div>
+            <span class="text-sm font-medium text-gray-500">Specification:</span>
+            <span class="text-sm text-gray-900 ml-2"><%= works_order.specification %></span>
+          </div>
+
+          <div>
+            <span class="text-sm font-medium text-gray-500">Total Quantity:</span>
+            <span class="text-sm text-gray-900 ml-2"><%= works_order.quantity %></span>
+          </div>
+
+          <div>
+            <span class="text-sm font-medium text-gray-500">Already Released:</span>
+            <span class="text-sm text-gray-900 ml-2"><%= works_order.quantity_released %></span>
+          </div>
+
+          <div>
+            <span class="text-sm font-medium text-gray-500">Remaining:</span>
+            <span class="text-sm text-gray-900 ml-2 font-semibold text-green-600"><%= works_order.quantity_remaining %></span>
+          </div>
+
+          <% if works_order.special_instructions.present? %>
+            <div>
+              <span class="text-sm font-medium text-gray-500">Special Instructions:</span>
+              <div class="text-sm text-gray-900 mt-1">
+                <%= simple_format(works_order.special_instructions) %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex justify-end space-x-4 pt-6">
+      <%= link_to "Cancel", works_order,
+          class: "bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded" %>
+      <%= form.submit release_note.persisted? ? "Update Release Note" : "Create Release Note",
+          class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" %>
+    </div>
+  <% end %>
+</div>
