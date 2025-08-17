@@ -7,6 +7,12 @@
       <%= link_to "Route Card", route_card_works_order_path(@works_order),
           class: "bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded",
           target: "_blank" %>
+      <% if @works_order.quantity_released > 0 %>
+        <%= link_to "Book Out", book_out_works_order_path(@works_order),
+            method: :patch,
+            class: "bg-orange-500 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded",
+            data: { confirm: "Book out released items for delivery?" } %>
+      <% end %>
       <% if @works_order.can_be_completed? %>
         <%= link_to "Complete", complete_works_order_path(@works_order),
             method: :patch,
@@ -81,13 +87,13 @@
         <% if @works_order.each_price.present? %>
           <div>
             <dt class="text-sm font-medium text-gray-500">Each Price</dt>
-            <dd class="text-sm text-gray-900"><%= number_to_currency(@works_order.each_price) %></dd>
+            <dd class="text-sm text-gray-900">£<%= sprintf("%.2f", @works_order.each_price) %></dd>
           </div>
         <% end %>
 
         <div>
           <dt class="text-sm font-medium text-gray-500">Lot Price</dt>
-          <dd class="text-sm text-gray-900"><%= number_to_currency(@works_order.lot_price) %></dd>
+          <dd class="text-sm text-gray-900">£<%= sprintf("%.2f", @works_order.lot_price) %></dd>
         </div>
       </dl>
     </div>

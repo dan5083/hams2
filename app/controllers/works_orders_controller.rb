@@ -1,6 +1,6 @@
 # app/controllers/works_orders_controller.rb - Simplified version
 class WorksOrdersController < ApplicationController
-  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :complete]
+  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :complete, :book_out]
 
   def index
     @works_orders = WorksOrder.includes(:customer_order, :part, :release_level, :transport_method)
@@ -120,6 +120,27 @@ class WorksOrdersController < ApplicationController
       redirect_to @works_order, notice: 'Works order completed successfully.'
     else
       redirect_to @works_order, alert: 'Cannot complete works order - insufficient quantity released.'
+    end
+  end
+
+  def book_out
+    if @works_order.quantity_released > 0
+      begin
+        # Update the works order to mark items as booked out
+        @works_order.update!(
+          booked_out_at: Time.current,
+          booked_out_by: Current.user&.id
+        )
+
+        # You could also update individual release notes if needed
+        # @works_order.release_notes.active.update_all(booked_out_at: Time.current)
+
+        redirect_to @works_order, notice: "#{@works_order.quantity_released} items successfully booked out for delivery."
+      rescue ActiveRecord::RecordInvalid => e
+        redirect_to @works_order, alert: "Failed to book out items: #{e.message}"
+      end
+    else
+      redirect_to @works_order, alert: 'No items available to book out - no quantity has been released yet.'
     end
   end
 
