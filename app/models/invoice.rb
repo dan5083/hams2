@@ -1,4 +1,4 @@
-# app/models/invoice.rb
+# app/models/invoice.rb - FIXED number assignment timing
 class Invoice < ApplicationRecord
   belongs_to :customer, class_name: 'Organization'
   has_many :invoice_items, dependent: :destroy
@@ -21,8 +21,8 @@ class Invoice < ApplicationRecord
   scope :draft, -> { all }
 
   before_validation :set_defaults, if: :new_record?
+  before_validation :assign_next_number, if: :new_record?  # MOVED: Now runs before validation
   after_initialize :set_defaults, if: :new_record?
-  after_create :assign_next_number
 
   def display_name
     "INV#{number}"
@@ -119,7 +119,6 @@ class Invoice < ApplicationRecord
   end
 
   def assign_next_number
-    self.number = self.class.next_number
-    save!
+    self.number = self.class.next_number if number.blank?
   end
 end
