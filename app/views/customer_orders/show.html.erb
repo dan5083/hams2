@@ -83,7 +83,7 @@
 
         <div>
           <dt class="text-sm font-medium text-gray-500">Total Value</dt>
-          <dd class="text-sm text-gray-900 font-semibold text-lg"><%= number_to_currency(@customer_order.total_value) %></dd>
+          <dd class="text-sm text-gray-900 font-semibold text-lg">£<%= sprintf("%.2f", @customer_order.total_value) %></dd>
         </div>
       </dl>
     </div>
@@ -116,6 +116,9 @@
                 Quantity
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Progress
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -133,7 +136,21 @@
                   <%= works_order.part_number %>-<%= works_order.part_issue %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <%= works_order.quantity_released %>/<%= works_order.quantity %>
+                  <%= works_order.quantity %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <% if works_order.quantity_released > 0 %>
+                    <span class="text-green-600 font-medium">
+                      <%= works_order.quantity_released %> released
+                    </span>
+                    <% if works_order.quantity_remaining > 0 %>
+                      <span class="text-gray-500">
+                        (<%= works_order.quantity_remaining %> remaining)
+                      </span>
+                    <% end %>
+                  <% else %>
+                    <span class="text-gray-500">Not started</span>
+                  <% end %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                   <% if works_order.voided %>

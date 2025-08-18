@@ -91,7 +91,7 @@
               <% end %>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-              <%= number_to_currency(customer_order.total_value) %>
+              £<%= sprintf("%.2f", customer_order.total_value) %>
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
               <% if customer_order.voided %>
