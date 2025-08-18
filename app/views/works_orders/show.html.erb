@@ -8,7 +8,7 @@
           class: "bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded",
           target: "_blank" %>
       <% if @works_order.quantity_released > 0 %>
-        <%= link_to "Book Out", book_out_works_order_path(@works_order),
+        <%= button_to "Book Out", book_out_works_order_path(@works_order),
             method: :patch,
             class: "bg-orange-500 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded",
             data: { confirm: "Book out released items for delivery?" } %>
