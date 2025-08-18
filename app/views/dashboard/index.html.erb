@@ -8,19 +8,9 @@
       <p class="text-gray-600 mb-4">Connect to your Xero account to sync data.</p>
 
       <div class="space-y-3">
-        <% if @xero_connected %>
-          <div class="text-sm text-green-600 font-medium mb-2">
-            ✅ Connected to <%= @xero_tenant_name %>
-          </div>
-          <%= link_to auth_xero_path,
-              class: "inline-block bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded text-sm" do %>
-            🔄 Reconnect to Xero
-          <% end %>
-        <% else %>
-          <%= link_to auth_xero_path,
-              class: "inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm" do %>
-            🔗 Connect to Xero
-          <% end %>
+        <%= link_to auth_xero_path,
+            class: "inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm" do %>
+          🔗 Connect to Xero
         <% end %>
 
         <div class="text-sm text-gray-600">
@@ -172,7 +162,7 @@
       <div class="bg-white rounded-lg shadow p-6 text-center">
         <h2 class="text-xl font-semibold text-gray-900 mb-2">All Invoices Synced</h2>
         <p class="text-gray-600">
-          ✅ All <%= pluralize(Invoice.count, 'invoice') %> have been synced to Xero.
+          ✅ No invoices waiting to be synced to Xero.
           Create more invoices by staging them from works orders.
         </p>
       </div>
