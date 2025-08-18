@@ -8,10 +8,10 @@
           class: "bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded",
           target: "_blank" %>
       <% if @works_order.quantity_released > 0 && @works_order.release_notes.requires_invoicing.any? %>
-        <%= button_to "Create Invoice in Xero", create_invoice_works_order_path(@works_order),
+        <%= button_to "Stage Invoice", create_invoice_works_order_path(@works_order),
             method: :patch,
             class: "bg-orange-500 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded",
-            data: { confirm: "Create invoice in Xero for all uninvoiced release notes?" } %>
+            data: { confirm: "Create local invoice for all uninvoiced release notes?" } %>
       <% end %>
       <% if @works_order.can_be_completed? %>
         <%= link_to "Complete", complete_works_order_path(@works_order),
@@ -166,7 +166,7 @@
         <% if uninvoiced_release_notes.any? %>
           <div class="pt-2">
             <span class="text-sm text-orange-600 font-medium">
-              ⚠️ Ready to invoice <%= uninvoiced_release_notes.sum(:quantity_accepted) %> parts
+              ⚠️ Ready to stage <%= uninvoiced_release_notes.sum(:quantity_accepted) %> parts for invoicing
             </span>
           </div>
         <% elsif @works_order.quantity_released > 0 %>

@@ -8,9 +8,19 @@
       <p class="text-gray-600 mb-4">Connect to your Xero account to sync data.</p>
 
       <div class="space-y-3">
-        <%= link_to auth_xero_path,
-            class: "inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm" do %>
-          🔗 Connect to Xero
+        <% if @xero_connected %>
+          <div class="text-sm text-green-600 font-medium mb-2">
+            ✅ Connected to <%= @xero_tenant_name %>
+          </div>
+          <%= link_to auth_xero_path,
+              class: "inline-block bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded text-sm" do %>
+            🔄 Reconnect to Xero
+          <% end %>
+        <% else %>
+          <%= link_to auth_xero_path,
+              class: "inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm" do %>
+            🔗 Connect to Xero
+          <% end %>
         <% end %>
 
         <div class="text-sm text-gray-600">
@@ -46,7 +56,11 @@
         <div><strong>Total Invoices:</strong> <%= Invoice.count %></div>
         <div><strong>Draft:</strong> <%= Invoice.draft.count %></div>
         <div><strong>Synced with Xero:</strong> <%= Invoice.synced.count %></div>
-        <div><strong>Pending Sync:</strong> <%= Invoice.requiring_xero_sync.count %></div>
+        <div><strong>Pending Sync:</strong>
+          <span class="<%= @pending_invoices.any? ? 'text-orange-600 font-semibold' : '' %>">
+            <%= @pending_invoices.count %>
+          </span>
+        </div>
       </div>
     </div>
 
@@ -73,49 +87,142 @@
     </div>
   </div>
 
-  <!-- Recent Organizations -->
-  <% if Organization.any? %>
+  <!-- Invoice Management Section -->
+  <% if @pending_invoices.any? %>
     <div class="mt-8">
-      <h2 class="text-2xl font-bold text-gray-900 mb-4">Recent Customers</h2>
-      <div class="bg-white rounded-lg shadow overflow-hidden">
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Staged Invoices - Ready for Xero</h2>
+
+      <%= form_with url: push_selected_to_xero_invoices_path, method: :post, local: true, class: "bg-white rounded-lg shadow overflow-hidden" do |form| %>
+        <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+          <div class="flex justify-between items-center">
+            <div>
+              <p class="text-sm text-gray-600">
+                <%= pluralize(@pending_invoices.count, 'invoice') %> ready to push to Xero
+              </p>
+            </div>
+            <div class="flex space-x-3">
+              <% if @xero_connected %>
+                <%= form.submit "Push Selected to Xero",
+                    class: "bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded text-sm",
+                    id: "push-button",
+                    disabled: true %>
+              <% else %>
+                <%= link_to "Connect to Xero First", auth_xero_path,
+                    class: "bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm" %>
+              <% end %>
+              <button type="button"
+                      onclick="toggleAllInvoices()"
+                      class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded text-sm">
+                Select All
+              </button>
+            </div>
+          </div>
+        </div>
+
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Xero</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <% if @xero_connected %>
+                  Select
+                <% end %>
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200">
-            <% Organization.includes(:xero_contact).limit(10).each do |org| %>
-              <tr>
+            <% @pending_invoices.each do |invoice| %>
+              <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <% if @xero_connected %>
+                    <%= check_box_tag "invoice_ids[]", invoice.id, false,
+                        class: "invoice-checkbox h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded",
+                        onchange: "updatePushButton()" %>
+                  <% end %>
+                </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  <%= org.display_name %>
+                  INV<%= invoice.number %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <%= invoice.customer.name %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  <% if org.is_customer %>
-                    <span class="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">Customer</span>
-                  <% end %>
-                  <% if org.is_supplier %>
-                    <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">Supplier</span>
-                  <% end %>
+                  <%= invoice.date.strftime("%d/%m/%Y") %>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  <%= org.contact_email %>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  £<%= sprintf("%.2f", invoice.total_inc_tax) %>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  <% if org.synced_with_xero? %>
-                    <span class="text-green-600">✓ Synced</span>
-                  <% else %>
-                    <span class="text-gray-400">Manual</span>
-                  <% end %>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+                    Staged
+                  </span>
                 </td>
               </tr>
             <% end %>
           </tbody>
         </table>
+      <% end %>
+    </div>
+  <% elsif Invoice.any? %>
+    <div class="mt-8">
+      <div class="bg-white rounded-lg shadow p-6 text-center">
+        <h2 class="text-xl font-semibold text-gray-900 mb-2">All Invoices Synced</h2>
+        <p class="text-gray-600">
+          ✅ All <%= pluralize(Invoice.count, 'invoice') %> have been synced to Xero.
+          Create more invoices by staging them from works orders.
+        </p>
+      </div>
+    </div>
+  <% else %>
+    <div class="mt-8">
+      <div class="bg-white rounded-lg shadow p-6 text-center">
+        <h2 class="text-xl font-semibold text-gray-900 mb-2">No Invoices Yet</h2>
+        <p class="text-gray-600 mb-4">
+          Start by creating customer orders and works orders, then stage invoices for completed work.
+        </p>
+        <%= link_to "Create Customer Order", new_customer_order_path,
+            class: "bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded" %>
       </div>
     </div>
   <% end %>
 </div>
+
+<script>
+// Enable/disable push button based on selections
+function updatePushButton() {
+  const checkboxes = document.querySelectorAll('.invoice-checkbox:checked');
+  const pushButton = document.getElementById('push-button');
+
+  if (pushButton) {
+    pushButton.disabled = checkboxes.length === 0;
+    pushButton.textContent = checkboxes.length > 0
+      ? `Push ${checkboxes.length} Selected to Xero`
+      : 'Push Selected to Xero';
+  }
+}
+
+// Toggle all checkboxes
+function toggleAllInvoices() {
+  const checkboxes = document.querySelectorAll('.invoice-checkbox');
+  const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+
+  checkboxes.forEach(checkbox => {
+    checkbox.checked = !allChecked;
+  });
+
+  updatePushButton();
+
+  // Update button text
+  const toggleButton = event.target;
+  toggleButton.textContent = allChecked ? 'Select All' : 'Deselect All';
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+  updatePushButton();
+});
+</script>

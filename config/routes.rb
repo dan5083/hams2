@@ -80,6 +80,7 @@ Rails.application.routes.draw do
       get :new_manual       # For creating manual invoices
       post :create_manual
       post :create_from_release_notes # Bulk invoice creation
+      post :push_selected_to_xero     # NEW: Bulk push selected invoices to Xero
     end
 
     # Invoice items for partial invoicing

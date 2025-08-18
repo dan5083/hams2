@@ -125,105 +125,56 @@ class WorksOrdersController < ApplicationController
  end
 
  def create_invoice
-    Rails.logger.info "🚀 CREATE_INVOICE: Starting for WO#{@works_order.number}"
+    Rails.logger.info "🚀 STAGE_INVOICE: Starting for WO#{@works_order.number}"
 
     if @works_order.quantity_released <= 0
-      Rails.logger.info "❌ CREATE_INVOICE: No quantity released (#{@works_order.quantity_released})"
+      Rails.logger.info "❌ STAGE_INVOICE: No quantity released (#{@works_order.quantity_released})"
       redirect_to @works_order, alert: 'No items available to invoice - no quantity has been released yet.'
-      return
-    end
-
-    # Check Xero connection
-    unless session[:xero_token_set] && session[:xero_tenant_id]
-      Rails.logger.info "❌ CREATE_INVOICE: No Xero connection"
-      redirect_to @works_order, alert: 'Please connect to Xero first before creating invoices.'
       return
     end
 
     begin
       # Get all uninvoiced release notes for this works order
       uninvoiced_release_notes = @works_order.release_notes.requires_invoicing
-      Rails.logger.info "🔍 CREATE_INVOICE: Found #{uninvoiced_release_notes.count} uninvoiced release notes"
+      Rails.logger.info "🔍 STAGE_INVOICE: Found #{uninvoiced_release_notes.count} uninvoiced release notes"
 
       uninvoiced_release_notes.each do |rn|
         Rails.logger.info "  - RN#{rn.number}: #{rn.quantity_accepted} accepted, can_be_invoiced=#{rn.can_be_invoiced?}"
       end
 
       if uninvoiced_release_notes.empty?
-        Rails.logger.info "❌ CREATE_INVOICE: No uninvoiced release notes found"
+        Rails.logger.info "❌ STAGE_INVOICE: No uninvoiced release notes found"
         redirect_to @works_order, alert: 'No release notes available for invoicing.'
         return
       end
 
-      # Create local invoice from release notes
+      # Create local invoice from release notes (no Xero sync)
       customer = @works_order.customer
-      Rails.logger.info "🔍 CREATE_INVOICE: Customer: #{customer.name} (ID: #{customer.id})"
-      Rails.logger.info "🔍 CREATE_INVOICE: Customer has Xero contact: #{customer.xero_contact&.xero_id.present?}"
+      Rails.logger.info "🔍 STAGE_INVOICE: Customer: #{customer.name} (ID: #{customer.id})"
 
-      # Check if customer has Xero contact
-      unless customer.xero_contact&.xero_id
-        Rails.logger.info "❌ CREATE_INVOICE: Customer #{customer.name} has no Xero contact"
-        redirect_to @works_order,
-                    alert: "Customer #{customer.name} does not have a Xero contact. Please sync customers from Xero first."
-        return
-      end
-
-      Rails.logger.info "🔍 CREATE_INVOICE: Calling Invoice.create_from_release_notes..."
+      Rails.logger.info "🔍 STAGE_INVOICE: Calling Invoice.create_from_release_notes..."
       invoice = Invoice.create_from_release_notes(uninvoiced_release_notes, customer, Current.user)
 
       if invoice.nil?
-        Rails.logger.error "❌ CREATE_INVOICE: Invoice.create_from_release_notes returned nil"
-
-        # Let's check what went wrong by testing the conditions manually
-        Rails.logger.info "🔍 DEBUG: Testing release notes conditions..."
-
-        uninvoiced_release_notes.each_with_index do |rn, i|
-          Rails.logger.info "  Release Note #{i+1}: can_be_invoiced? = #{rn.can_be_invoiced?}"
-          Rails.logger.info "    - voided: #{rn.voided}"
-          Rails.logger.info "    - quantity_accepted: #{rn.quantity_accepted}"
-          Rails.logger.info "    - no_invoice: #{rn.no_invoice}"
-          Rails.logger.info "    - invoice_item present: #{rn.invoice_item.present?}"
-        end
-
-        # Try to create an invoice manually to see validation errors
-        Rails.logger.info "🔍 DEBUG: Testing invoice creation manually..."
-        test_invoice = Invoice.new(customer: customer, date: Date.current)
-        if test_invoice.valid?
-          Rails.logger.info "✅ DEBUG: Test invoice is valid"
-        else
-          Rails.logger.error "❌ DEBUG: Test invoice validation errors: #{test_invoice.errors.full_messages}"
-        end
-
-        redirect_to @works_order, alert: 'Failed to create invoice from release notes. Check logs for details.'
+        Rails.logger.error "❌ STAGE_INVOICE: Invoice.create_from_release_notes returned nil"
+        redirect_to @works_order, alert: 'Failed to create local invoice from release notes. Check logs for details.'
         return
       end
 
-      Rails.logger.info "✅ CREATE_INVOICE: Invoice INV#{invoice.number} created successfully"
-
-      # Push to Xero using existing service
-      Rails.logger.info "🔍 CREATE_INVOICE: Pushing to Xero..."
-      xero_service = XeroInvoiceService.new(session[:xero_token_set], session[:xero_tenant_id])
-      result = xero_service.push_invoice(invoice)
-
-      if result[:success]
-        Rails.logger.info "✅ CREATE_INVOICE: Xero push successful"
-        redirect_to @works_order,
-                    notice: "✅ #{result[:message]}! " \
-                            "Invoiced #{uninvoiced_release_notes.count} release note(s) " \
-                            "for #{uninvoiced_release_notes.sum(:quantity_accepted)} parts."
-      else
-        Rails.logger.error "❌ CREATE_INVOICE: Xero push failed: #{result[:error]}"
-        redirect_to @works_order,
-                    alert: "⚠️ Local invoice INV#{invoice.number} created, but failed to sync to Xero: #{result[:error]}. " \
-                          "Please try syncing manually from the invoices page."
-      end
-
-    rescue StandardError => e
-      Rails.logger.error "💥 CREATE_INVOICE: Exception occurred: #{e.message}"
-      Rails.logger.error "💥 CREATE_INVOICE: Backtrace: #{e.backtrace.first(10).join("\n")}"
+      Rails.logger.info "✅ STAGE_INVOICE: Local invoice INV#{invoice.number} created successfully"
 
       redirect_to @works_order,
-                  alert: "❌ Failed to create invoice: #{e.message}. Please try again or contact support."
+                  notice: "✅ Invoice INV#{invoice.number} staged successfully! " \
+                          "Staged #{uninvoiced_release_notes.count} release note(s) " \
+                          "for #{uninvoiced_release_notes.sum(:quantity_accepted)} parts. " \
+                          "Go to the dashboard to push invoices to Xero."
+
+    rescue StandardError => e
+      Rails.logger.error "💥 STAGE_INVOICE: Exception occurred: #{e.message}"
+      Rails.logger.error "💥 STAGE_INVOICE: Backtrace: #{e.backtrace.first(10).join("\n")}"
+
+      redirect_to @works_order,
+                  alert: "❌ Failed to stage invoice: #{e.message}. Please try again or contact support."
     end
   end
 
