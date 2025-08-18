@@ -67,6 +67,7 @@ class Invoice < ApplicationRecord
       },
       "InvoiceNumber" => display_name,
       "Date" => date.strftime("%Y-%m-%d"),
+      "DueDate" => (date + 30.days).strftime("%Y-%m-%d"), # Add 30 days payment terms
       "LineItems" => invoice_items.map(&:to_xero_line_item),
       "Status" => "AUTHORISED"
     }.compact

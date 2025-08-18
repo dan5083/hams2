@@ -40,7 +40,8 @@ class InvoiceItem < ApplicationRecord
       "Quantity" => quantity,
       "UnitAmount" => unit_price_ex_tax.to_f,
       "TaxType" => invoice.xero_tax_type,
-      "LineAmount" => line_amount_ex_tax.to_f
+      "LineAmount" => line_amount_ex_tax.to_f,
+      "AccountCode" => "200" # Standard sales/revenue account code
     }
   end
 
