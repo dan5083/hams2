@@ -61,6 +61,7 @@ class WorksOrdersController < ApplicationController
   end
 
   def edit
+    @customer_orders = [@works_order.customer_order] # For edit, just show the current customer order
     load_reference_data
   end
 
