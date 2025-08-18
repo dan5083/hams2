@@ -1,4 +1,4 @@
-# app/models/works_order.rb - Simplified PPI/part version for testing workflow
+# app/models/works_order.rb - Enhanced with invoicing methods
 class WorksOrder < ApplicationRecord
   belongs_to :customer_order
   belongs_to :part, optional: true # Make optional for now
@@ -107,6 +107,31 @@ class WorksOrder < ApplicationRecord
     else
       0
     end
+  end
+
+  # NEW: Invoicing-related methods
+  def can_be_invoiced?
+    quantity_released > 0 && uninvoiced_release_notes.any?
+  end
+
+  def uninvoiced_release_notes
+    release_notes.requires_invoicing
+  end
+
+  def invoiced_release_notes
+    release_notes.joins(:invoice_item)
+  end
+
+  def total_uninvoiced_quantity
+    uninvoiced_release_notes.sum(:quantity_accepted)
+  end
+
+  def total_invoiced_quantity
+    invoiced_release_notes.sum(:quantity_accepted)
+  end
+
+  def fully_invoiced?
+    quantity_released > 0 && uninvoiced_release_notes.empty?
   end
 
   def self.next_number

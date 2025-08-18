@@ -100,11 +100,11 @@
                 <%= link_to "Edit", edit_works_order_path(works_order), class: "text-yellow-600 hover:text-yellow-900" %>
                 <%= link_to "Route Card", route_card_works_order_path(works_order),
                     class: "text-green-600 hover:text-green-900", target: "_blank" %>
-                <% if works_order.quantity_released > 0 %>
-                  <%= button_to "Book Out", book_out_works_order_path(works_order),
+                <% if works_order.quantity_released > 0 && works_order.release_notes.requires_invoicing.any? %>
+                  <%= button_to "Create Invoice in Xero", create_invoice_works_order_path(works_order),
                       method: :patch,
                       class: "text-orange-600 hover:text-orange-900 bg-transparent border-0 underline cursor-pointer text-sm",
-                      data: { confirm: "Book out released items for delivery?" } %>
+                      data: { confirm: "Create invoice in Xero for all uninvoiced release notes?" } %>
                 <% end %>
                 <% if works_order.can_be_completed? %>
                   <%= link_to "Complete", complete_works_order_path(works_order),

@@ -15,7 +15,7 @@ class XeroInvoiceService
     Rails.logger.info "🚀 Pushing invoice #{invoice.id} to Xero..."
 
     begin
-      payload = invoice.to_xero_payload
+      payload = invoice.to_xero_invoice
       Rails.logger.info "Payload: #{payload.to_json}"
 
       response_data = create_invoice_in_xero(payload)
@@ -23,7 +23,7 @@ class XeroInvoiceService
       # Update invoice with Xero response
       invoice.update_from_xero_response(response_data)
 
-      Rails.logger.info "✅ Successfully pushed invoice #{invoice.display_number} to Xero"
+      Rails.logger.info "✅ Successfully pushed invoice #{invoice.display_name} to Xero"
 
       {
         success: true,
@@ -73,7 +73,7 @@ class XeroInvoiceService
       result = push_invoice(invoice)
       results << {
         invoice_id: invoice.id,
-        local_number: invoice.display_number,
+        local_number: invoice.display_name,
         **result
       }
 
@@ -156,67 +156,6 @@ class XeroInvoiceService
       return data['Invoices']&.first
     else
       raise "API call failed with status #{response.code}: #{response.body}"
-    end
-  end
-end
-
-# app/controllers/xero_invoices_controller.rb
-class XeroInvoicesController < ApplicationController
-  before_action :check_xero_connection
-
-  def push_single
-    invoice = Invoice.find(params[:id])
-
-    unless invoice.can_be_pushed_to_xero?
-      redirect_back(fallback_location: root_path, alert: "Invoice cannot be pushed to Xero")
-      return
-    end
-
-    service = XeroInvoiceService.new(session[:xero_token_set], session[:xero_tenant_id])
-    result = service.push_invoice(invoice)
-
-    if result[:success]
-      redirect_back(fallback_location: root_path, notice: result[:message])
-    else
-      redirect_back(fallback_location: root_path, alert: result[:message])
-    end
-  end
-
-  def push_batch
-    invoice_ids = params[:invoice_ids] || []
-
-    if invoice_ids.empty?
-      redirect_back(fallback_location: root_path, alert: "No invoices selected")
-      return
-    end
-
-    invoices = Invoice.where(id: invoice_ids).select(&:can_be_pushed_to_xero?)
-
-    if invoices.empty?
-      redirect_back(fallback_location: root_path, alert: "No eligible invoices to push")
-      return
-    end
-
-    service = XeroInvoiceService.new(session[:xero_token_set], session[:xero_tenant_id])
-    result = service.push_invoices_batch(invoices)
-
-    message = "Pushed #{result[:successful]} of #{result[:total]} invoices to Xero"
-    message += ". #{result[:failed]} failed." if result[:failed] > 0
-
-    redirect_back(fallback_location: root_path, notice: message)
-  end
-
-  def sync_status
-    # Sync back invoice status from Xero (for future implementation)
-    # This would fetch payment status, etc.
-    redirect_back(fallback_location: root_path, notice: "Invoice status sync not yet implemented")
-  end
-
-  private
-
-  def check_xero_connection
-    unless session[:xero_token_set] && session[:xero_tenant_id]
-      redirect_to root_path, alert: "Please connect to Xero first"
     end
   end
 end

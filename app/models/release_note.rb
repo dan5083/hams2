@@ -1,4 +1,4 @@
-# app/models/release_note.rb
+# app/models/release_note.rb - Verified and enhanced for invoicing
 class ReleaseNote < ApplicationRecord
   belongs_to :works_order
   belongs_to :issued_by, class_name: 'User'
@@ -12,13 +12,19 @@ class ReleaseNote < ApplicationRecord
 
   scope :active, -> { where(voided: false) }
   scope :voided, -> { where(voided: true) }
+
+  # VERIFIED: This scope correctly identifies release notes that need invoicing
   scope :requires_invoicing, -> {
     left_joins(:invoice_item)
-      .where(invoice_items: { id: nil })
-      .where(voided: false)
-      .where('quantity_accepted + quantity_rejected > 0')
-      .where.not(no_invoice: true)
+      .where(invoice_items: { id: nil })          # No invoice item exists
+      .where(voided: false)                       # Not voided
+      .where('quantity_accepted > 0')             # Has accepted quantity
+      .where.not(no_invoice: true)                # Not marked as no_invoice
   }
+
+  # NEW: Additional useful scopes for invoicing workflow
+  scope :invoiced, -> { joins(:invoice_item) }
+  scope :ready_for_invoice, -> { requires_invoicing }  # Alias for clarity
   scope :recent, -> { order(number: :desc) }
 
   before_validation :set_date, if: :new_record?
@@ -88,6 +94,23 @@ class ReleaseNote < ApplicationRecord
 
   def can_be_invoiced?
     !voided && quantity_accepted > 0 && !no_invoice
+  end
+
+  # NEW: Enhanced invoicing status methods
+  def invoiced?
+    invoice_item.present?
+  end
+
+  def ready_for_invoice?
+    can_be_invoiced? && invoice_item.blank?
+  end
+
+  def invoice_status
+    return :voided if voided
+    return :invoiced if invoiced?
+    return :ready if ready_for_invoice?
+    return :no_invoice if no_invoice
+    :unknown
   end
 
   def invoice_description

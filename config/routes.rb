@@ -45,7 +45,7 @@ Rails.application.routes.draw do
       get :route_card       # Shop floor manufacturing instructions (HTML + PDF)
       patch :complete
       patch :void
-      patch :book_out       # Book out released items for delivery
+      patch :create_invoice # CHANGED: was book_out, now create_invoice
     end
 
     # 5. Release Notes nested under works orders

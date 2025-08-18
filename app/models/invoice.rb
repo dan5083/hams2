@@ -72,6 +72,15 @@ class Invoice < ApplicationRecord
     }.compact
   end
 
+  # Methods for XeroInvoiceService compatibility
+  def can_be_pushed_to_xero?
+    requires_xero_sync? && customer.xero_contact&.xero_id.present?
+  end
+
+  def update_from_xero_response(response_data)
+    update!(xero_id: response_data['InvoiceID']) if response_data['InvoiceID']
+  end
+
   # Mike's creation method from release notes
   def self.create_from_release_notes(release_notes, customer, user = nil)
     return nil if release_notes.empty?

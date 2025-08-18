@@ -7,11 +7,11 @@
       <%= link_to "Route Card", route_card_works_order_path(@works_order),
           class: "bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded",
           target: "_blank" %>
-      <% if @works_order.quantity_released > 0 %>
-        <%= button_to "Book Out", book_out_works_order_path(@works_order),
+      <% if @works_order.quantity_released > 0 && @works_order.release_notes.requires_invoicing.any? %>
+        <%= button_to "Create Invoice in Xero", create_invoice_works_order_path(@works_order),
             method: :patch,
             class: "bg-orange-500 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded",
-            data: { confirm: "Book out released items for delivery?" } %>
+            data: { confirm: "Create invoice in Xero for all uninvoiced release notes?" } %>
       <% end %>
       <% if @works_order.can_be_completed? %>
         <%= link_to "Complete", complete_works_order_path(@works_order),
@@ -135,9 +135,53 @@
       </dl>
     </div>
 
+    <!-- Invoicing Status -->
+    <div class="bg-white shadow rounded-lg p-6">
+      <h2 class="text-xl font-semibold text-gray-900 mb-4">Invoicing Status</h2>
+
+      <dl class="space-y-3">
+        <% uninvoiced_release_notes = @works_order.release_notes.requires_invoicing %>
+        <% invoiced_release_notes = @works_order.release_notes.joins(:invoice_item) %>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Uninvoiced Release Notes</dt>
+          <dd class="text-sm text-gray-900 font-semibold <%= uninvoiced_release_notes.any? ? 'text-orange-600' : 'text-green-600' %>">
+            <%= uninvoiced_release_notes.count %>
+            <% if uninvoiced_release_notes.any? %>
+              (<%= uninvoiced_release_notes.sum(:quantity_accepted) %> parts)
+            <% end %>
+          </dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Invoiced Release Notes</dt>
+          <dd class="text-sm text-gray-900 font-semibold text-blue-600">
+            <%= invoiced_release_notes.count %>
+            <% if invoiced_release_notes.any? %>
+              (<%= invoiced_release_notes.sum(:quantity_accepted) %> parts)
+            <% end %>
+          </dd>
+        </div>
+
+        <% if uninvoiced_release_notes.any? %>
+          <div class="pt-2">
+            <span class="text-sm text-orange-600 font-medium">
+              ⚠️ Ready to invoice <%= uninvoiced_release_notes.sum(:quantity_accepted) %> parts
+            </span>
+          </div>
+        <% elsif @works_order.quantity_released > 0 %>
+          <div class="pt-2">
+            <span class="text-sm text-green-600 font-medium">
+              ✅ All released parts have been invoiced
+            </span>
+          </div>
+        <% end %>
+      </dl>
+    </div>
+
     <!-- Special Instructions -->
     <% if @works_order.special_instructions.present? %>
-      <div class="bg-white shadow rounded-lg p-6">
+      <div class="bg-white shadow rounded-lg p-6 lg:col-span-2">
         <h2 class="text-xl font-semibold text-gray-900 mb-4">Special Instructions</h2>
         <p class="text-sm text-gray-900"><%= simple_format(@works_order.special_instructions) %></p>
       </div>
@@ -170,7 +214,7 @@
                 Rejected
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
+                Invoice Status
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
@@ -201,9 +245,13 @@
                     <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
                       Invoiced
                     </span>
+                  <% elsif release_note.can_be_invoiced? %>
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+                      Ready to Invoice
+                    </span>
                   <% else %>
-                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                      Active
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                      No Invoice
                     </span>
                   <% end %>
                 </td>
