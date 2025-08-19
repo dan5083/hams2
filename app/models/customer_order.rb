@@ -1,3 +1,4 @@
+# app/models/customer_order.rb - Fixed outstanding logic
 class CustomerOrder < ApplicationRecord
   belongs_to :customer, class_name: 'Organization'
   has_many :works_orders, dependent: :restrict_with_error
@@ -10,16 +11,13 @@ class CustomerOrder < ApplicationRecord
   scope :voided, -> { where(voided: true) }
   scope :for_customer, ->(customer) { where(customer: customer) }
   scope :recent, -> { order(date_received: :desc) }
+
+  # FIXED: Outstanding logic - check for open works orders, not just any works orders
   scope :outstanding, -> {
-    left_joins(:works_orders)
-      .where(voided: false)
-      .where(
-        works_orders: { id: nil }
-      ).or(
-        where(voided: false)
-          .joins(:works_orders)
-          .where(works_orders: { voided: false })
-      ).distinct
+    where(voided: false).where(
+      'NOT EXISTS (SELECT 1 FROM works_orders WHERE works_orders.customer_order_id = customer_orders.id) OR ' +
+      'EXISTS (SELECT 1 FROM works_orders WHERE works_orders.customer_order_id = customer_orders.id AND works_orders.voided = false AND works_orders.is_open = true)'
+    )
   }
 
   after_initialize :set_defaults, if: :new_record?
@@ -69,8 +67,12 @@ class CustomerOrder < ApplicationRecord
     works_orders.active.sum(:quantity)
   end
 
+  # FIXED: Outstanding logic - should check for open works orders
   def outstanding?
-    !voided && (works_orders.empty? || works_orders.active.exists?)
+    return false if voided?
+
+    # Outstanding if: no works orders OR has open works orders
+    works_orders.empty? || works_orders.where(voided: false, is_open: true).exists?
   end
 
   def can_be_deleted?
