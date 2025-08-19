@@ -1,4 +1,4 @@
-<!-- Navigation Bar with inline styles for debugging -->
+<!-- Navigation Bar with logo -->
 <nav style="background-color: #2563eb; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
   <div style="max-width: 80rem; margin: 0 auto; padding: 0 1rem;">
     <div style="display: flex; justify-content: space-between; align-items: center; height: 4rem;">
@@ -6,6 +6,7 @@
       <!-- Logo/Brand -->
       <div style="display: flex; align-items: center;">
         <%= link_to root_path, style: "display: flex; align-items: center; color: white; text-decoration: none;" do %>
+          <%= image_tag "logo.svg", alt: "HAMS 2.0", style: "height: 2rem; width: auto; margin-right: 0.75rem;" %>
           <span style="font-size: 1.25rem; font-weight: bold;">HAMS 2.0</span>
         <% end %>
       </div>
