@@ -148,9 +148,9 @@ Rails.application.routes.draw do
   # Health check route
   get "up" => "rails/health#show", as: :rails_health_check
 
-  # PWA routes (commented out but available)
-  # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
-  # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
+  # PWA routes
+  get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
+  get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
   # Root route - Dashboard for authenticated users, login for unauthenticated
   root "dashboard#index"

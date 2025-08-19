@@ -6,9 +6,46 @@
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
 
+    <!-- PWA Meta Tags -->
+    <meta name="application-name" content="HAMS 2.0">
+    <meta name="description" content="Hard Anodising Management System - Streamline your anodising operations">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="HAMS 2.0">
+    <meta name="mobile-web-app-capable" content="yes">
+
+    <!-- PWA Manifest -->
+    <%= tag.link rel: "manifest", href: pwa_manifest_path, crossorigin: "use-credentials" %>
+
+    <!-- Icons for different devices -->
+    <%= tag.link rel: "icon", type: "image/x-icon", href: asset_path("icons/icon.ico") %>
+    <%= tag.link rel: "icon", type: "image/png", sizes: "192x192", href: asset_path("icons/icon-192x192.png") %>
+    <%= tag.link rel: "icon", type: "image/png", sizes: "512x512", href: asset_path("icons/icon-512x512.png") %>
+
+    <!-- Apple Touch Icons -->
+    <%= tag.link rel: "apple-touch-icon", href: asset_path("icons/icon-192x192.png") %>
+    <%= tag.link rel: "apple-touch-icon", sizes: "192x192", href: asset_path("icons/icon-192x192.png") %>
+
+    <!-- Stylesheets -->
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
     <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
+
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('<%= pwa_service_worker_path %>')
+            .then((registration) => {
+              console.log('ServiceWorker registration successful');
+            })
+            .catch((error) => {
+              console.log('ServiceWorker registration failed: ', error);
+            });
+        });
+      }
+    </script>
   </head>
 
   <body class="bg-gray-50 min-h-screen">

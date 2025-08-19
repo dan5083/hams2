@@ -1,22 +1,78 @@
 {
-  "name": "Hams2",
+  "name": "HAMS 2.0 - Hard Anodising Management System",
+  "short_name": "HAMS 2.0",
+  "description": "Hard Anodising Management System - Streamline your anodising operations with digital workflows",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "background_color": "#f9fafb",
+  "theme_color": "#2563eb",
+  "lang": "en-GB",
   "icons": [
     {
-      "src": "/icon.png",
+      "src": "<%= asset_path('icons/icon-192x192.png') %>",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "192x192",
+      "purpose": "any"
     },
     {
-      "src": "/icon.png",
+      "src": "<%= asset_path('icons/icon-512x512.png') %>",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "<%= asset_path('icons/icon-192x192.png') %>",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
+    },
+    {
+      "src": "<%= asset_path('icons/icon-512x512.png') %>",
       "type": "image/png",
       "sizes": "512x512",
       "purpose": "maskable"
     }
   ],
-  "start_url": "/",
-  "display": "standalone",
-  "scope": "/",
-  "description": "Hams2.",
-  "theme_color": "red",
-  "background_color": "red"
+  "categories": ["business", "productivity"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Customer Orders",
+      "short_name": "Orders",
+      "description": "View and manage customer orders",
+      "url": "/customer_orders",
+      "icons": [
+        {
+          "src": "<%= asset_path('icons/icon-192x192.png') %>",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Works Orders",
+      "short_name": "Works",
+      "description": "Manage works orders and production",
+      "url": "/works_orders",
+      "icons": [
+        {
+          "src": "<%= asset_path('icons/icon-192x192.png') %>",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Release Notes",
+      "short_name": "Releases",
+      "description": "Handle product releases and delivery",
+      "url": "/release_notes",
+      "icons": [
+        {
+          "src": "<%= asset_path('icons/icon-192x192.png') %>",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
 }
