@@ -27,8 +27,8 @@ class PartsController < ApplicationController
       )
     end
 
-    # For the filter dropdown
-    @customers = Organization.customers.enabled.order(:name)
+    # For the filter dropdown - show all organizations
+    @customers = Organization.enabled.order(:name)
   end
 
   def show
@@ -43,7 +43,7 @@ class PartsController < ApplicationController
 
   def new
     @part = Part.new
-    @customers = Organization.customers.enabled.order(:name)
+    @customers = Organization.enabled.order(:name)
   end
 
   def create
@@ -65,12 +65,12 @@ class PartsController < ApplicationController
       redirect_to @part, notice: 'Part was successfully created.'
     end
   rescue ActiveRecord::RecordInvalid
-    @customers = Organization.customers.enabled.order(:name)
+    @customers = Organization.enabled.order(:name)
     render :new, status: :unprocessable_entity
   end
 
   def edit
-    @customers = Organization.customers.enabled.order(:name)
+    @customers = Organization.enabled.order(:name)
   end
 
   def update
@@ -91,7 +91,7 @@ class PartsController < ApplicationController
     elsif @part.update(enabled: part_params[:enabled])
       redirect_to @part, notice: 'Part was successfully updated.'
     else
-      @customers = Organization.customers.enabled.order(:name)
+      @customers = Organization.enabled.order(:name)
       render :edit, status: :unprocessable_entity
     end
   end
