@@ -108,11 +108,8 @@ class XeroAuthController < ApplicationController
       Organization.destroy_all
 
       contact_count = 0
-     # In sync_contacts_from_xero method, add this debugging:
       contacts_data.each do |contact|
-        Rails.logger.info "Contact: #{contact['Name']} - Status: #{contact['ContactStatus']} - IsCustomer: #{contact['IsCustomer']} - IsSupplier: #{contact['IsSupplier']}"
-
-        # Skip archived contacts but include all others
+        # Skip archived contacts but include all others (customers, suppliers, and unassigned)
         next if contact['ContactStatus'] == 'ARCHIVED'
 
         Rails.logger.info "Creating contact: #{contact['Name']}"
