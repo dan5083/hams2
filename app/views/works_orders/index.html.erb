@@ -106,12 +106,7 @@
                       class: "text-orange-600 hover:text-orange-900 bg-transparent border-0 underline cursor-pointer text-sm",
                       data: { confirm: "Create local invoice for all uninvoiced release notes?" } %>
                 <% end %>
-                <% if works_order.can_be_completed? %>
-                  <%= link_to "Complete", complete_works_order_path(works_order),
-                      method: :patch,
-                      class: "text-purple-600 hover:text-purple-900",
-                      data: { confirm: "Are you sure you want to complete this works order?" } %>
-                <% end %>
+                <!-- REMOVED: Complete button - works orders now auto-complete -->
               </div>
             </td>
           </tr>

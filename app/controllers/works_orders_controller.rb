@@ -1,6 +1,6 @@
-# app/controllers/works_orders_controller.rb - Simplified version
+# app/controllers/works_orders_controller.rb - Removed complete action
 class WorksOrdersController < ApplicationController
- before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :complete, :create_invoice]
+ before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :create_invoice]
 
  def index
    @works_orders = WorksOrder.includes(:customer_order, :part, :release_level, :transport_method)
@@ -115,14 +115,7 @@ class WorksOrdersController < ApplicationController
    end
  end
 
- def complete
-   if @works_order.can_be_completed?
-     @works_order.complete!(Current.user)
-     redirect_to @works_order, notice: 'Works order completed successfully.'
-   else
-     redirect_to @works_order, alert: 'Cannot complete works order - insufficient quantity released.'
-   end
- end
+ # REMOVED: complete action - works orders now auto-complete
 
  def create_invoice
     Rails.logger.info "🚀 STAGE_INVOICE: Starting for WO#{@works_order.number}"

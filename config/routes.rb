@@ -43,7 +43,7 @@ Rails.application.routes.draw do
   resources :works_orders do
     member do
       get :route_card       # Shop floor manufacturing instructions (HTML + PDF)
-      patch :complete
+      # REMOVED: patch :complete - works orders now auto-complete
       patch :void
       patch :create_invoice # CHANGED: was book_out, now create_invoice
     end

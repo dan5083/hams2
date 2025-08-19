@@ -1,10 +1,10 @@
-# app/models/works_order.rb - Enhanced with invoicing methods
+# app/models/works_order.rb - Enhanced with auto-completion
 class WorksOrder < ApplicationRecord
   belongs_to :customer_order
-  belongs_to :part, optional: true # Make optional for now
+  belongs_to :part, optional: true
   belongs_to :release_level
   belongs_to :transport_method
-  belongs_to :ppi, class_name: 'PartProcessingInstruction', optional: true # Make optional for now
+  belongs_to :ppi, class_name: 'PartProcessingInstruction', optional: true
 
   has_many :release_notes, dependent: :restrict_with_error
 
@@ -21,13 +21,15 @@ class WorksOrder < ApplicationRecord
   scope :open, -> { where(is_open: true) }
   scope :closed, -> { where(is_open: false) }
   scope :for_customer, ->(customer) { joins(:customer_order).where(customer_orders: { customer: customer }) }
-  scope :requires_completion, -> { where(is_open: true).where('quantity_released >= quantity') }
 
   before_validation :calculate_pricing, if: :pricing_fields_changed?
   before_validation :set_part_details_from_ppi, if: :ppi_id_changed?
   before_validation :normalize_part_details
   before_validation :assign_next_number, if: :new_record?
   after_initialize :set_defaults, if: :new_record?
+
+  # AUTO-COMPLETION: Automatically close when fully released
+  after_update :auto_complete_if_fully_released
 
   def display_name
     "WO#{number} - #{part_number}"
@@ -54,7 +56,6 @@ class WorksOrder < ApplicationRecord
     customer_order.delivery_address
   end
 
-  # Get specification from PPI or use a default
   def specification
     ppi&.specification || "Process as per customer requirements for #{part_number}-#{part_issue}"
   end
@@ -67,8 +68,9 @@ class WorksOrder < ApplicationRecord
     quantity - quantity_released
   end
 
-  def requires_completion?
-    is_open && quantity_remaining <= 0
+  # NEW: Check if manufacturing is complete (all parts released)
+  def manufacturing_complete?
+    quantity_released >= quantity
   end
 
   def void!
@@ -80,19 +82,8 @@ class WorksOrder < ApplicationRecord
     end
   end
 
-  def complete!(user = nil)
-    transaction do
-      update!(is_open: false)
-      # Log completion if you have logging system
-    end
-  end
-
-  def can_be_completed?
-    is_open && quantity_remaining <= 0
-  end
-
   def calculate_quantity_released!
-    total = release_notes.active.sum(:quantity_accepted)
+    total = release_notes.active.sum(:quantity_accepted) + release_notes.active.sum(:quantity_rejected)
     update!(quantity_released: total)
     total
   end
@@ -109,7 +100,7 @@ class WorksOrder < ApplicationRecord
     end
   end
 
-  # NEW: Invoicing-related methods
+  # Invoicing-related methods
   def can_be_invoiced?
     quantity_released > 0 && uninvoiced_release_notes.any?
   end
@@ -167,7 +158,6 @@ class WorksOrder < ApplicationRecord
   end
 
   def normalize_part_details
-    # Normalize part number and issue to match Part model expectations
     self.part_number = Part.make_uniform(part_number) if part_number.present?
     self.part_issue = Part.make_uniform(part_issue) if part_issue.present?
     self.part_issue = 'A' if part_issue.blank?
@@ -185,6 +175,18 @@ class WorksOrder < ApplicationRecord
       end
     when 'lot'
       self.each_price = nil
+    end
+  end
+
+  # AUTO-COMPLETION LOGIC
+  def auto_complete_if_fully_released
+    # Only check if quantity_released actually changed
+    return unless quantity_released_previously_changed?
+
+    # Auto-close if manufacturing is complete and still open
+    if manufacturing_complete? && is_open?
+      Rails.logger.info "🔒 AUTO-COMPLETE: Closing WO#{number} - all #{quantity} parts released"
+      update_column(:is_open, false) # Use update_column to avoid triggering callbacks again
     end
   end
 end

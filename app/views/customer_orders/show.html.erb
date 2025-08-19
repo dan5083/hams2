@@ -77,6 +77,13 @@
         </div>
 
         <div>
+          <dt class="text-sm font-medium text-gray-500">Open Works Orders</dt>
+          <dd class="text-sm text-gray-900 font-semibold <%= @customer_order.works_orders.open.count > 0 ? 'text-orange-600' : 'text-green-600' %>">
+            <%= @customer_order.works_orders.open.count %>
+          </dd>
+        </div>
+
+        <div>
           <dt class="text-sm font-medium text-gray-500">Total Quantity</dt>
           <dd class="text-sm text-gray-900 font-semibold"><%= @customer_order.total_quantity %></dd>
         </div>
@@ -88,8 +95,6 @@
       </dl>
     </div>
   </div>
-
-
 
   <!-- Works Orders -->
   <div class="bg-white shadow rounded-lg p-6">
@@ -174,6 +179,7 @@
                       <%= link_to "Edit", edit_works_order_path(works_order), class: "text-yellow-600 hover:text-yellow-900" %>
                       <%= link_to "Route Card", route_card_works_order_path(works_order),
                           class: "text-green-600 hover:text-green-900", target: "_blank" %>
+                      <!-- REMOVED: Complete button - works orders now auto-complete -->
                     <% end %>
                   </div>
                 </td>
