@@ -27,8 +27,8 @@ class CustomerOrdersController < ApplicationController
       )
     end
 
-    # For the filter dropdown
-    @customers = Organization.customers.enabled.order(:name)
+    # For the filter dropdown - include all enabled organizations
+    @customers = Organization.enabled.order(:name)
   end
 
   def show
@@ -39,7 +39,8 @@ class CustomerOrdersController < ApplicationController
 
   def new
     @customer_order = CustomerOrder.new
-    @customers = Organization.customers.enabled.order(:name)
+    # Include all enabled organizations, not just those marked as customers
+    @customers = Organization.enabled.order(:name)
   end
 
   def create
@@ -48,20 +49,23 @@ class CustomerOrdersController < ApplicationController
     if @customer_order.save
       redirect_to @customer_order, notice: 'Customer order was successfully created.'
     else
-      @customers = Organization.customers.enabled.order(:name)
+      # Include all enabled organizations, not just those marked as customers
+      @customers = Organization.enabled.order(:name)
       render :new, status: :unprocessable_entity
     end
   end
 
   def edit
-    @customers = Organization.customers.enabled.order(:name)
+    # Include all enabled organizations, not just those marked as customers
+    @customers = Organization.enabled.order(:name)
   end
 
   def update
     if @customer_order.update(customer_order_params)
       redirect_to @customer_order, notice: 'Customer order was successfully updated.'
     else
-      @customers = Organization.customers.enabled.order(:name)
+      # Include all enabled organizations, not just those marked as customers
+      @customers = Organization.enabled.order(:name)
       render :edit, status: :unprocessable_entity
     end
   end
