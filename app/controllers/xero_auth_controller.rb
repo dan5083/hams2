@@ -55,12 +55,12 @@ class XeroAuthController < ApplicationController
       session[:xero_tenant_id] = tenant_id
       session[:xero_tenant_name] = tenant_name
 
-      Rails.logger.info "✅ Connected to #{tenant_name}, syncing customers..."
+      Rails.logger.info "✅ Connected to #{tenant_name}, syncing contacts..."
 
-      # Sync customers immediately
-      customer_count = sync_customers_from_xero(token_set, tenant_id)
+      # Sync all contacts immediately
+      contact_count = sync_contacts_from_xero(token_set, tenant_id)
 
-      redirect_to root_path, notice: "✅ Connected to #{tenant_name} and synced #{customer_count} customers!"
+      redirect_to root_path, notice: "✅ Connected to #{tenant_name} and synced #{contact_count} contacts!"
 
     rescue => e
       Rails.logger.error "Xero OAuth error: #{e.message}"
@@ -94,7 +94,9 @@ class XeroAuthController < ApplicationController
 
   private
 
-  def sync_customers_from_xero(token_set, tenant_id)
+  # Syncs all active contacts from Xero, regardless of customer/supplier status
+  # This allows the app to manage customer/supplier flags independently of Xero transaction history
+  def sync_contacts_from_xero(token_set, tenant_id)
     begin
       Rails.logger.info "Fetching contacts from Xero..."
 
@@ -105,12 +107,12 @@ class XeroAuthController < ApplicationController
       XeroContact.destroy_all
       Organization.destroy_all
 
-      customer_count = 0
+      contact_count = 0
       contacts_data.each do |contact|
-        # Only sync customers
-        next unless contact['IsCustomer'] == true
+        # Skip archived contacts but include all others (customers, suppliers, and unassigned)
+        next if contact['ContactStatus'] == 'ARCHIVED'
 
-        Rails.logger.info "Creating customer: #{contact['Name']}"
+        Rails.logger.info "Creating contact: #{contact['Name']}"
 
         # Create XeroContact record
         xero_contact = XeroContact.create!(
@@ -134,11 +136,11 @@ class XeroAuthController < ApplicationController
           xero_contact: xero_contact
         )
 
-        customer_count += 1
+        contact_count += 1
       end
 
-      Rails.logger.info "✅ Successfully synced #{customer_count} customers"
-      customer_count
+      Rails.logger.info "✅ Successfully synced #{contact_count} contacts"
+      contact_count
 
     rescue => e
       Rails.logger.error "Sync error: #{e.message}"
