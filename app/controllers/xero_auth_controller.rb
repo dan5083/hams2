@@ -103,6 +103,18 @@ class XeroAuthController < ApplicationController
       contacts_data = fetch_contacts_from_xero(token_set, tenant_id)
       Rails.logger.info "Found #{contacts_data.length} total contacts"
 
+      # Log summary of all contacts before processing
+      customers = contacts_data.select { |c| c['IsCustomer'] == true }
+      suppliers = contacts_data.select { |c| c['IsSupplier'] == true }
+      unassigned = contacts_data.select { |c| !c['IsCustomer'] && !c['IsSupplier'] }
+
+      Rails.logger.info "=== CONTACT SUMMARY ==="
+      Rails.logger.info "Total: #{contacts_data.length}, Customers: #{customers.length}, Suppliers: #{suppliers.length}, Unassigned: #{unassigned.length}"
+
+      # Log all contact names for debugging
+      Rails.logger.info "=== ALL CONTACT NAMES ==="
+      contacts_data.each { |c| Rails.logger.info "- #{c['Name']} (Customer: #{c['IsCustomer']}, Supplier: #{c['IsSupplier']}, Status: #{c['ContactStatus']})" }
+
       # Clear existing data
       XeroContact.destroy_all
       Organization.destroy_all
