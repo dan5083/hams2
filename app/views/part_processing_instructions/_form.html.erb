@@ -111,36 +111,132 @@
         </div>
       <% end %>
     </div>
+  </div>
 
-    <!-- Specification (full width) -->
-    <div class="mt-6">
-      <%= form.label :specification, class: "block text-sm font-medium text-gray-700 mb-1" %>
-      <%= form.text_area :specification,
-          placeholder: "Enter processing specification and requirements...",
-          rows: 4,
-          class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
-      <p class="mt-1 text-xs text-gray-500">Detailed specification for processing this part</p>
+  <!-- Operation Selection Section -->
+  <div class="bg-white shadow rounded-lg p-6">
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Operation Selection</h3>
+
+    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <!-- Anodising Type -->
+      <div>
+        <%= label_tag :anodising_type, "Anodising Type", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= select_tag :anodising_type,
+            options_for_select([
+              ['Standard', 'standard_anodising'],
+              ['Hard', 'hard_anodising'],
+              ['Chromic', 'chromic_anodising']
+            ], ppi.anodising_types.first),
+            {
+              multiple: true,
+              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+              id: "anodising_type"
+            } %>
+      </div>
+
+      <!-- Alloy -->
+      <div>
+        <%= label_tag :alloy, "Alloy", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= select_tag :alloy,
+            options_for_select(Operation.available_alloys.map { |a| [a.humanize, a] }, ppi.alloys.first),
+            {
+              multiple: true,
+              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+              id: "alloy"
+            } %>
+      </div>
+
+      <!-- Target Thickness -->
+      <div>
+        <%= label_tag :target_thickness, "Target Thickness (μm)", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= select_tag :target_thickness,
+            options_for_select(Operation.available_thicknesses.map { |t| ["#{t}μm", t] }, ppi.target_thicknesses.first),
+            {
+              multiple: true,
+              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+              id: "target_thickness"
+            } %>
+      </div>
+
+      <!-- Anodic Class -->
+      <div>
+        <%= label_tag :anodic_class, "Anodic Class", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= select_tag :anodic_class,
+            options_for_select([
+              ['Class 1 (Undyed)', 'class_1'],
+              ['Class 2 (Dyed)', 'class_2']
+            ], ppi.anodic_classes.first),
+            {
+              multiple: true,
+              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+              id: "anodic_class"
+            } %>
+      </div>
     </div>
 
-    <!-- Special Instructions (full width) -->
+    <!-- Available Operations -->
     <div class="mt-6">
-      <%= form.label :special_instructions, class: "block text-sm font-medium text-gray-700 mb-1" %>
-      <%= form.text_area :special_instructions,
-          placeholder: "Any special handling or processing instructions...",
-          rows: 3,
-          class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
-      <p class="mt-1 text-xs text-gray-500">Optional special instructions or notes</p>
+      <h4 class="text-md font-medium text-gray-900 mb-3">Available Operations</h4>
+      <div id="operations-container" class="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded p-3">
+        <p class="text-gray-500 text-sm">Select criteria above to see matching operations</p>
+      </div>
     </div>
+
+    <!-- Selected Operations -->
+    <div class="mt-6">
+      <h4 class="text-md font-medium text-gray-900 mb-3">Selected Operations (up to 3, in order)</h4>
+      <div id="selected-container" class="space-y-2 min-h-[60px] border border-gray-200 rounded p-3 bg-gray-50">
+        <% if ppi.selected_operations.any? %>
+          <% ppi.selected_operations.each_with_index do |op_id, index| %>
+            <% if operation = Operation.all_operations.find { |op| op.id == op_id } %>
+              <div class="bg-blue-100 border border-blue-300 rounded px-3 py-2 flex justify-between items-center" data-operation-id="<%= op_id %>">
+                <span class="text-sm"><strong><%= index + 1 %>.</strong> <%= operation.display_name %>: <%= operation.operation_text %></span>
+                <button type="button" class="text-red-600 hover:text-red-800 ml-2 remove-operation">×</button>
+              </div>
+            <% end %>
+          <% end %>
+        <% else %>
+          <p class="text-gray-500 text-sm">No operations selected</p>
+        <% end %>
+      </div>
+    </div>
+
+    <!-- Hidden field for selected operations -->
+    <%= hidden_field_tag "part_processing_instruction[customisation_data][operation_selection][selected_operations]",
+        ppi.selected_operations.to_json,
+        id: "selected_operations_field" %>
+  </div>
+
+  <!-- Specification (will be auto-generated from operations) -->
+  <div class="bg-white shadow rounded-lg p-6">
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Specification</h3>
+
+    <%= form.text_area :specification,
+        placeholder: "Will be automatically generated from selected operations...",
+        rows: 4,
+        class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-gray-50",
+        readonly: true %>
+    <p class="mt-1 text-xs text-gray-500">Auto-generated from selected operations</p>
+  </div>
+
+  <!-- Special Instructions (manual) -->
+  <div class="bg-white shadow rounded-lg p-6">
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Special Instructions</h3>
+
+    <%= form.text_area :special_instructions,
+        placeholder: "Any special handling or processing instructions...",
+        rows: 3,
+        class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
+    <p class="mt-1 text-xs text-gray-500">Optional special instructions or notes</p>
   </div>
 
   <!-- Information Box -->
   <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
     <div class="flex">
       <div class="ml-3">
-        <h3 class="text-sm font-medium text-blue-800">Testing Mode - Simple PPI Creation</h3>
+        <h3 class="text-sm font-medium text-blue-800">Operation-Based PPI Creation</h3>
         <div class="mt-2 text-sm text-blue-700">
-          <p>This is a simplified PPI creation form for testing the invoice workflow.
-          Fill in the basic details and you'll be able to create works orders for this part/customer combination.</p>
+          <p>Select your anodising criteria above and choose up to 3 operations in sequence. The specification will be automatically generated from your selections.</p>
         </div>
       </div>
     </div>
@@ -155,3 +251,136 @@
         class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" %>
   </div>
 <% end %>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const anodisingType = document.getElementById('anodising_type');
+  const alloy = document.getElementById('alloy');
+  const targetThickness = document.getElementById('target_thickness');
+  const anodicClass = document.getElementById('anodic_class');
+  const operationsContainer = document.getElementById('operations-container');
+  const selectedContainer = document.getElementById('selected-container');
+  const selectedOperationsField = document.getElementById('selected_operations_field');
+
+  let selectedOperations = [];
+
+  // Initialize with existing data
+  try {
+    const existingData = JSON.parse(selectedOperationsField.value || '[]');
+    selectedOperations = existingData;
+  } catch(e) {
+    selectedOperations = [];
+  }
+
+  // Filter operations when criteria change
+  function filterOperations() {
+    const criteria = {
+      anodising_types: Array.from(anodisingType.selectedOptions).map(o => o.value).filter(v => v),
+      alloys: Array.from(alloy.selectedOptions).map(o => o.value).filter(v => v),
+      target_thicknesses: Array.from(targetThickness.selectedOptions).map(o => parseFloat(o.value)).filter(v => !isNaN(v)),
+      anodic_classes: Array.from(anodicClass.selectedOptions).map(o => o.value).filter(v => v)
+    };
+
+    // Only filter if we have at least one criteria
+    if (criteria.anodising_types.length === 0 && criteria.alloys.length === 0 &&
+        criteria.target_thicknesses.length === 0 && criteria.anodic_classes.length === 0) {
+      operationsContainer.innerHTML = '<p class="text-gray-500 text-sm">Select criteria above to see matching operations</p>';
+      return;
+    }
+
+    // Make AJAX call to get filtered operations
+    fetch('/api/v1/operations/filter', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': document.querySelector('[name="csrf-token"]').getAttribute('content')
+      },
+      body: JSON.stringify(criteria)
+    })
+    .then(response => response.json())
+    .then(operations => {
+      displayOperations(operations);
+    })
+    .catch(error => {
+      console.error('Error filtering operations:', error);
+      operationsContainer.innerHTML = '<p class="text-red-500 text-sm">Error loading operations</p>';
+    });
+  }
+
+  function displayOperations(operations) {
+    if (operations.length === 0) {
+      operationsContainer.innerHTML = '<p class="text-gray-500 text-sm">No matching operations found</p>';
+      return;
+    }
+
+    operationsContainer.innerHTML = operations.map(op => `
+      <div class="bg-gray-50 border border-gray-200 rounded px-3 py-2 cursor-pointer hover:bg-gray-100 ${selectedOperations.includes(op.id) ? 'opacity-50' : ''}"
+           data-operation-id="${op.id}" onclick="selectOperation('${op.id}', this)">
+        <div class="flex justify-between items-start">
+          <div>
+            <span class="font-medium text-sm">${op.display_name}</span>
+            <p class="text-xs text-gray-600 mt-1">${op.operation_text}</p>
+            <p class="text-xs text-blue-600 mt-1">${op.vat_options_text}</p>
+          </div>
+          <button type="button" class="text-green-600 hover:text-green-800 ml-2">+</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  window.selectOperation = function(operationId, element) {
+    if (selectedOperations.includes(operationId)) return;
+    if (selectedOperations.length >= 3) {
+      alert('Maximum 3 operations allowed');
+      return;
+    }
+
+    selectedOperations.push(operationId);
+    updateSelectedOperations();
+    element.classList.add('opacity-50');
+  };
+
+  function updateSelectedOperations() {
+    selectedOperationsField.value = JSON.stringify(selectedOperations);
+
+    if (selectedOperations.length === 0) {
+      selectedContainer.innerHTML = '<p class="text-gray-500 text-sm">No operations selected</p>';
+      return;
+    }
+
+    // Get operation details and display
+    fetch('/api/v1/operations/details', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': document.querySelector('[name="csrf-token"]').getAttribute('content')
+      },
+      body: JSON.stringify({ operation_ids: selectedOperations })
+    })
+    .then(response => response.json())
+    .then(operations => {
+      selectedContainer.innerHTML = operations.map((op, index) => `
+        <div class="bg-blue-100 border border-blue-300 rounded px-3 py-2 flex justify-between items-center" data-operation-id="${op.id}">
+          <span class="text-sm"><strong>${index + 1}.</strong> ${op.display_name}: ${op.operation_text}</span>
+          <button type="button" class="text-red-600 hover:text-red-800 ml-2 remove-operation" onclick="removeOperation('${op.id}')">×</button>
+        </div>
+      `).join('');
+    });
+  }
+
+  window.removeOperation = function(operationId) {
+    selectedOperations = selectedOperations.filter(id => id !== operationId);
+    updateSelectedOperations();
+    filterOperations(); // Refresh to remove opacity
+  };
+
+  // Event listeners
+  anodisingType.addEventListener('change', filterOperations);
+  alloy.addEventListener('change', filterOperations);
+  targetThickness.addEventListener('change', filterOperations);
+  anodicClass.addEventListener('change', filterOperations);
+
+  // Initialize display
+  updateSelectedOperations();
+});
+</script>

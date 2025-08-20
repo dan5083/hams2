@@ -29,6 +29,13 @@ Rails.application.routes.draw do
     end
   end
 
+  resources :operations, only: [] do
+    collection do
+      post :filter
+      post :details
+    end
+  end
+
   # 2. Customer Orders - Booking in orders
   resources :customer_orders do
     member do

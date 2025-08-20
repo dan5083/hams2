@@ -160,7 +160,8 @@ class PartProcessingInstructionsController < ApplicationController
     params.require(:part_processing_instruction).permit(
       :customer_id, :part_number, :part_issue, :part_description,
       :specification, :special_instructions, :process_type, :enabled,
-      :part_id
+      :part_id,
+      customisation_data: {}
     )
   end
 

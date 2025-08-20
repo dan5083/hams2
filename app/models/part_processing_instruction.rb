@@ -13,7 +13,8 @@ class PartProcessingInstruction < ApplicationRecord
   validates :part_description, presence: true
   validates :specification, presence: true
   validates :process_type, inclusion: { in: ProcessBuilder.available_types }
-  # Temporarily removed for testing: validates :customisation_data, presence: true
+  validates :selected_operations, presence: true, if: :has_operation_selection?
+  validate :validate_selected_operations
 
   scope :enabled, -> { where(enabled: true) }
   scope :disabled, -> { where(enabled: false) }
@@ -22,11 +23,11 @@ class PartProcessingInstruction < ApplicationRecord
   scope :for_part_issue, ->(part_issue) { where("part_issue ILIKE ?", "%#{part_issue}%") }
 
   before_validation :set_part_from_details, if: :part_details_changed?
+  before_validation :build_specification_from_operations, if: :selected_operations_changed?
   after_initialize :set_defaults, if: :new_record?
   after_create :disable_replaced_ppi
 
   def self.create_from_data(data, user = nil)
-    # Ensure we have a part record
     part = Part.ensure(
       customer_id: data[:customer_id],
       part_number: data[:part_number],
@@ -80,6 +81,49 @@ class PartProcessingInstruction < ApplicationRecord
     enabled && part&.enabled && customer&.active?
   end
 
+  def get_operations
+    return [] unless operation_selection["selected_operations"].present?
+
+    all_ops = Operation.all_operations
+    operation_selection["selected_operations"].map do |op_id|
+      all_ops.find { |op| op.id == op_id }
+    end.compact
+  end
+
+  def operation_selection
+    customisation_data["operation_selection"] || {}
+  end
+
+  def operation_selection=(data)
+    customisation_data["operation_selection"] = data
+  end
+
+  def anodising_types
+    operation_selection["anodising_types"] || []
+  end
+
+  def alloys
+    operation_selection["alloys"] || []
+  end
+
+  def target_thicknesses
+    operation_selection["target_thicknesses"] || []
+  end
+
+  def anodic_classes
+    operation_selection["anodic_classes"] || []
+  end
+
+  def selected_operations
+    operation_selection["selected_operations"] || []
+  end
+
+  def operations_text
+    get_operations.map.with_index(1) do |operation, index|
+      "Operation #{index}: #{operation.operation_text}"
+    end.join("\n\n")
+  end
+
   private
 
   def set_defaults
@@ -104,5 +148,35 @@ class PartProcessingInstruction < ApplicationRecord
   def disable_replaced_ppi
     return unless replaces_id.present?
     replaces&.disable!
+  end
+
+  def has_operation_selection?
+    operation_selection.any?
+  end
+
+  def selected_operations_changed?
+    customisation_data_changed? && customisation_data_change&.any? { |before, after|
+      (before&.dig("operation_selection", "selected_operations") || []) != (after&.dig("operation_selection", "selected_operations") || [])
+    }
+  end
+
+  def build_specification_from_operations
+    return unless selected_operations.present?
+
+    self.specification = operations_text
+  end
+
+  def validate_selected_operations
+    return unless selected_operations.present?
+
+    if selected_operations.length > 3
+      errors.add(:base, "cannot select more than 3 operations")
+    end
+
+    all_op_ids = Operation.all_operations.map(&:id)
+    invalid_ids = selected_operations - all_op_ids
+    if invalid_ids.any?
+      errors.add(:base, "contains invalid operation IDs: #{invalid_ids.join(', ')}")
+    end
   end
 end

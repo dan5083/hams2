@@ -44,10 +44,10 @@
             Customer
           </th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-            Process Type
+            Operations
           </th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-            Specification
+            Process Details
           </th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
             Works Orders
@@ -69,11 +69,69 @@
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
               <%= ppi.customer.name %>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-              <%= ppi.process_type&.humanize %>
+            <td class="px-6 py-4 text-sm text-gray-900">
+              <% if ppi.selected_operations.any? %>
+                <div class="space-y-1">
+                  <% ppi.get_operations.each_with_index do |operation, index| %>
+                    <% if operation %>
+                      <div class="text-xs">
+                        <span class="font-medium text-blue-600"><%= index + 1 %>.</span>
+                        <span class="text-gray-700"><%= operation.display_name %></span>
+                      </div>
+                    <% end %>
+                  <% end %>
+                </div>
+              <% else %>
+                <span class="text-gray-400 text-xs">No operations selected</span>
+              <% end %>
             </td>
             <td class="px-6 py-4 text-sm text-gray-900">
-              <%= truncate(ppi.specification, length: 60) %>
+              <div class="space-y-1">
+                <!-- Anodising Types -->
+                <% if ppi.anodising_types.any? %>
+                  <div class="flex flex-wrap gap-1">
+                    <% ppi.anodising_types.each do |type| %>
+                      <span class="inline-flex px-1.5 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-800">
+                        <%= type.gsub('_anodising', '').capitalize %>
+                      </span>
+                    <% end %>
+                  </div>
+                <% end %>
+
+                <!-- Target Thicknesses -->
+                <% if ppi.target_thicknesses.any? %>
+                  <div class="flex flex-wrap gap-1">
+                    <% ppi.target_thicknesses.each do |thickness| %>
+                      <span class="inline-flex px-1.5 py-0.5 text-xs font-medium rounded bg-yellow-100 text-yellow-800">
+                        <%= thickness %>μm
+                      </span>
+                    <% end %>
+                  </div>
+                <% end %>
+
+                <!-- Alloys -->
+                <% if ppi.alloys.any? %>
+                  <div class="flex flex-wrap gap-1">
+                    <% ppi.alloys.first(2).each do |alloy| %>
+                      <span class="inline-flex px-1.5 py-0.5 text-xs font-medium rounded bg-green-100 text-green-800">
+                        <%= alloy.humanize %>
+                      </span>
+                    <% end %>
+                    <% if ppi.alloys.length > 2 %>
+                      <span class="inline-flex px-1.5 py-0.5 text-xs font-medium rounded bg-gray-100 text-gray-600">
+                        +<%= ppi.alloys.length - 2 %> more
+                      </span>
+                    <% end %>
+                  </div>
+                <% end %>
+
+                <!-- Fallback to process type if no operations -->
+                <% if ppi.selected_operations.empty? && ppi.process_type.present? %>
+                  <span class="inline-flex px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-800">
+                    <%= ppi.process_type.humanize %>
+                  </span>
+                <% end %>
+              </div>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
               <%= ppi.works_orders.active.count %>
@@ -96,16 +154,22 @@
               <div class="flex space-x-2">
                 <%= link_to "View", ppi, class: "text-blue-600 hover:text-blue-900" %>
                 <%= link_to "Edit", edit_part_processing_instruction_path(ppi), class: "text-yellow-600 hover:text-yellow-900" %>
-                <%= link_to ppi.enabled? ? "Disable" : "Enable",
+                <%= button_to ppi.enabled? ? "Disable" : "Enable",
                     toggle_enabled_part_processing_instruction_path(ppi),
                     method: :patch,
-                    class: ppi.enabled? ? "text-red-600 hover:text-red-900" : "text-green-600 hover:text-green-900",
-                    data: { confirm: "Are you sure you want to #{ppi.enabled? ? 'disable' : 'enable'} this PPI?" } %>
+                    form: {
+                      class: "inline",
+                      data: { confirm: "Are you sure you want to #{ppi.enabled? ? 'disable' : 'enable'} this PPI?" }
+                    },
+                    class: ppi.enabled? ? "text-red-600 hover:text-red-900" : "text-green-600 hover:text-green-900" %>
                 <% if ppi.can_be_deleted? %>
-                  <%= link_to "Delete", part_processing_instruction_path(ppi),
+                  <%= button_to "Delete", part_processing_instruction_path(ppi),
                       method: :delete,
-                      class: "text-red-600 hover:text-red-900",
-                      data: { confirm: "Are you sure you want to delete this PPI? This cannot be undone." } %>
+                      form: {
+                        class: "inline",
+                        data: { confirm: "Are you sure you want to delete this PPI? This cannot be undone." }
+                      },
+                      class: "text-red-600 hover:text-red-900" %>
                 <% end %>
               </div>
             </td>
@@ -129,9 +193,9 @@
       <div class="ml-3">
         <h3 class="text-sm font-medium text-blue-800">About Part Processing Instructions</h3>
         <div class="mt-2 text-sm text-blue-700">
-          <p>Part Processing Instructions (PPIs) define how specific parts should be processed for each customer.
-          Each PPI automatically creates the corresponding Part record and enables works order creation.
-          This is currently a simplified interface for testing the invoice workflow.</p>
+          <p>Part Processing Instructions (PPIs) now use operation-based selection. Choose your anodising criteria
+          and select up to 3 operations in sequence. The specification is automatically generated from your selections,
+          giving you precise control over the manufacturing process.</p>
         </div>
       </div>
     </div>
