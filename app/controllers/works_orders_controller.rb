@@ -1,4 +1,4 @@
-# app/controllers/works_orders_controller.rb - Removed complete action
+# app/controllers/works_orders_controller.rb - Updated build_operations_from_process method
 class WorksOrdersController < ApplicationController
  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :create_invoice]
 
@@ -114,8 +114,6 @@ class WorksOrdersController < ApplicationController
      end
    end
  end
-
- # REMOVED: complete action - works orders now auto-complete
 
  def create_invoice
     Rails.logger.info "🚀 STAGE_INVOICE: Starting for WO#{@works_order.number}"
@@ -262,18 +260,19 @@ class WorksOrdersController < ApplicationController
  end
 
  def build_operations_from_process(works_order)
-   # Simple default operation for route cards
-   [
+   # Get operations from the PPI
+   operations = works_order.ppi&.get_operations || []
+
+   # Create separate operation for each selected operation
+   operations.map.with_index do |operation, index|
      {
-       number: 1,
-       content: [
-         {
-           type: 'paragraph',
-           as_html: works_order.ppi&.specification || "Process as per customer requirements"
-         }
-       ],
+       number: index + 1,
+       content: [{
+         type: 'paragraph',
+         as_html: operation.operation_text  # Just the operation text, not display_name
+       }],
        all_variables: []
      }
-   ]
+   end
  end
 end
