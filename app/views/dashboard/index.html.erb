@@ -21,6 +21,14 @@
             Never
           <% end %>
         </div>
+
+        <!-- DEBUG: Show connection status -->
+        <div class="text-xs text-gray-500">
+          Connection: <%= @xero_connected ? "✅ Connected" : "❌ Not Connected" %>
+          <% if session[:xero_tenant_name] %>
+            <br>Tenant: <%= session[:xero_tenant_name] %>
+          <% end %>
+        </div>
       </div>
     </div>
 
@@ -91,31 +99,39 @@
               </p>
             </div>
             <div class="flex space-x-3">
-              <% if @xero_connected %>
-                <%= form.submit "Push Selected to Xero",
-                    class: "bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded text-sm",
-                    id: "push-button",
-                    disabled: true %>
-              <% else %>
+              <!-- FIXED: Always show the push button and checkboxes, but disable based on connection -->
+              <%= form.submit "Push Selected to Xero",
+                  class: "bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded text-sm #{'opacity-50 cursor-not-allowed' unless @xero_connected}",
+                  id: "push-button",
+                  disabled: !@xero_connected || true %>  <!-- Initially disabled until selection -->
+
+              <% unless @xero_connected %>
                 <%= link_to "Connect to Xero First", auth_xero_path,
                     class: "bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm" %>
               <% end %>
+
               <button type="button"
                       onclick="toggleAllInvoices()"
-                      class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded text-sm">
+                      class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded text-sm"
+                      <%= 'disabled' unless @xero_connected %>>
                 Select All
               </button>
             </div>
           </div>
+
+          <!-- Show connection warning if not connected -->
+          <% unless @xero_connected %>
+            <div class="mt-2 text-sm text-red-600">
+              ⚠️ Connect to Xero first to push invoices
+            </div>
+          <% end %>
         </div>
 
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                <% if @xero_connected %>
-                  Select
-                <% end %>
+                Select
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Invoice</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
@@ -128,11 +144,10 @@
             <% @pending_invoices.each do |invoice| %>
               <tr class="hover:bg-gray-50">
                 <td class="px-6 py-4 whitespace-nowrap">
-                  <% if @xero_connected %>
-                    <%= check_box_tag "invoice_ids[]", invoice.id, false,
-                        class: "invoice-checkbox h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded",
-                        onchange: "updatePushButton()" %>
-                  <% end %>
+                  <!-- SIMPLIFIED: Always show functional checkboxes -->
+                  <%= check_box_tag "invoice_ids[]", invoice.id, false,
+                      class: "invoice-checkbox h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded",
+                      onchange: "updatePushButton()" %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                   INV<%= invoice.number %>
@@ -182,20 +197,21 @@
 </div>
 
 <script>
-// Enable/disable push button based on selections
+// SIMPLIFIED: Just enable/disable based on selections - let backend handle connection
 function updatePushButton() {
   const checkboxes = document.querySelectorAll('.invoice-checkbox:checked');
   const pushButton = document.getElementById('push-button');
 
   if (pushButton) {
-    pushButton.disabled = checkboxes.length === 0;
-    pushButton.textContent = checkboxes.length > 0
+    const hasSelections = checkboxes.length > 0;
+    pushButton.disabled = !hasSelections;
+    pushButton.textContent = hasSelections
       ? `Push ${checkboxes.length} Selected to Xero`
       : 'Push Selected to Xero';
   }
 }
 
-// Toggle all checkboxes
+// SIMPLIFIED: Toggle all checkboxes
 function toggleAllInvoices() {
   const checkboxes = document.querySelectorAll('.invoice-checkbox');
   const allChecked = Array.from(checkboxes).every(cb => cb.checked);

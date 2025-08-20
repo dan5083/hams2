@@ -80,18 +80,19 @@ class InvoicesController < ApplicationController
       return
     end
 
-    # Check Xero connection
+    # IMPROVED: Check Xero connection with better error messages
     unless session[:xero_token_set] && session[:xero_tenant_id]
-      Rails.logger.info "❌ BULK_PUSH: No Xero connection"
-      redirect_to root_path, alert: 'Please connect to Xero first before pushing invoices.'
+      Rails.logger.info "❌ BULK_PUSH: No Xero connection in session"
+      redirect_to root_path,
+                  alert: '❌ Not connected to Xero. Please click "Connect to Xero" first, then try again.'
       return
     end
 
     begin
       # Get the selected invoices
       invoices = Invoice.requiring_xero_sync
-                       .where(id: invoice_ids)
-                       .includes(:customer)
+                      .where(id: invoice_ids)
+                      .includes(:customer)
 
       Rails.logger.info "🔍 BULK_PUSH: Found #{invoices.count} invoices to push"
 
@@ -105,13 +106,27 @@ class InvoicesController < ApplicationController
       if missing_contacts.any?
         customer_names = missing_contacts.map { |inv| inv.customer.name }.uniq.join(', ')
         redirect_to root_path,
-                    alert: "Cannot push invoices - customers missing Xero contacts: #{customer_names}. Please sync customers from Xero first."
+                    alert: "❌ Cannot push invoices - customers missing Xero contacts: #{customer_names}. Please sync customers from Xero first."
+        return
+      end
+
+      # Test Xero connection with a simple API call first
+      begin
+        Rails.logger.info "🔍 BULK_PUSH: Testing Xero API connection..."
+        xero_service = XeroInvoiceService.new(session[:xero_token_set], session[:xero_tenant_id])
+
+        # Try to create the service - this should validate the connection
+        # You might want to add a test method to XeroInvoiceService
+
+      rescue => connection_error
+        Rails.logger.error "❌ BULK_PUSH: Xero connection test failed: #{connection_error.message}"
+        redirect_to root_path,
+                    alert: "❌ Xero connection failed: #{connection_error.message}. Please reconnect to Xero and try again."
         return
       end
 
       # Push invoices to Xero using existing service
       Rails.logger.info "🔍 BULK_PUSH: Pushing #{invoices.count} invoices to Xero..."
-      xero_service = XeroInvoiceService.new(session[:xero_token_set], session[:xero_tenant_id])
 
       success_count = 0
       failed_count = 0
@@ -147,8 +162,17 @@ class InvoicesController < ApplicationController
       Rails.logger.error "💥 BULK_PUSH: Exception occurred: #{e.message}"
       Rails.logger.error "💥 BULK_PUSH: Backtrace: #{e.backtrace.first(10).join("\n")}"
 
-      redirect_to root_path,
-                  alert: "❌ Failed to push invoices to Xero: #{e.message}. Please try again or contact support."
+      # Provide helpful error messages based on the error type
+      error_message = case e.message
+      when /token/i, /unauthorized/i, /authentication/i
+        "❌ Xero authentication failed. Please reconnect to Xero and try again."
+      when /network/i, /timeout/i, /connection/i
+        "❌ Network error connecting to Xero. Please check your connection and try again."
+      else
+        "❌ Failed to push invoices to Xero: #{e.message}. Please try again or contact support."
+      end
+
+      redirect_to root_path, alert: error_message
     end
   end
 
