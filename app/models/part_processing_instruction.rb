@@ -115,7 +115,16 @@ class PartProcessingInstruction < ApplicationRecord
   end
 
   def selected_operations
-    operation_selection["selected_operations"] || []
+    ops = operation_selection["selected_operations"] || []
+    # Handle case where it might be stored as a JSON string
+    if ops.is_a?(String)
+      begin
+        ops = JSON.parse(ops)
+      rescue JSON::ParserError
+        ops = []
+      end
+    end
+    ops
   end
 
   def operations_text
