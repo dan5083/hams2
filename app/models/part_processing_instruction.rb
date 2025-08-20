@@ -82,10 +82,11 @@ class PartProcessingInstruction < ApplicationRecord
   end
 
   def get_operations
-    return [] unless operation_selection["selected_operations"].present?
+    ops = selected_operations # This now handles JSON string parsing
+    return [] unless ops.present?
 
     all_ops = Operation.all_operations
-    operation_selection["selected_operations"].map do |op_id|
+    ops.map do |op_id|
       all_ops.find { |op| op.id == op_id }
     end.compact
   end
