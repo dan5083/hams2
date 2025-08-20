@@ -82,24 +82,6 @@
             class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
       </div>
 
-      <!-- Process Type -->
-      <div>
-        <%= form.label :process_type, class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.select :process_type,
-            options_for_select([
-              ['Anodising', 'anodising'],
-              ['Hard Anodising', 'hard_anodising'],
-              ['Chromate Conversion', 'chromate_conversion'],
-              ['Passivation', 'passivation'],
-              ['Cleaning', 'cleaning'],
-              ['Custom', 'custom']
-            ], ppi.process_type || 'anodising'),
-            {},
-            {
-              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            } %>
-      </div>
-
       <!-- Enabled Status (for editing) -->
       <% if ppi.persisted? %>
         <div>
@@ -111,18 +93,99 @@
         </div>
       <% end %>
     </div>
+  </div>
 
-    <!-- Specification (full width) -->
-    <div class="mt-6">
+  <!-- Process Selection Section -->
+  <div class="bg-white shadow rounded-lg p-6">
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Process Selection</h3>
+
+    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <!-- Alloy Selection -->
+      <div>
+        <%= label_tag :alloy, "Alloy", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= select_tag :alloy,
+            options_for_select([['Select Alloy', '']] + @alloy_options, params[:alloy]),
+            {
+              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+              id: "alloy_select",
+              onchange: "suggestProcesses()"
+            } %>
+      </div>
+
+      <!-- Process Type Selection -->
+      <div>
+        <%= label_tag :process_type_selection, "Process Type", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= select_tag :process_type_selection,
+            options_for_select([['Select Process Type', '']] + @process_type_options, params[:process_type]),
+            {
+              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+              id: "process_type_select",
+              onchange: "suggestProcesses()"
+            } %>
+      </div>
+
+      <!-- Target Thickness -->
+      <div>
+        <%= label_tag :target_thickness, "Target Thickness (μm)", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= number_field_tag :target_thickness,
+            params[:target_thickness],
+            {
+              placeholder: "25",
+              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+              id: "thickness_input",
+              onchange: "suggestProcesses()",
+              step: 0.5
+            } %>
+        <p class="mt-1 text-xs text-gray-500">Optional - helps filter suggestions</p>
+      </div>
+
+      <!-- Anodic Class -->
+      <div>
+        <%= label_tag :anodic_class, "Anodic Class", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= select_tag :anodic_class,
+            options_for_select(@class_options, params[:anodic_class]),
+            {
+              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+              id: "class_select",
+              onchange: "suggestProcesses()"
+            } %>
+      </div>
+    </div>
+
+    <!-- Process Suggestions -->
+    <div id="process_suggestions" class="mt-6">
+      <% if @suggested_processes&.any? %>
+        <%= render 'process_suggestions', processes: @suggested_processes %>
+      <% else %>
+        <div class="text-center py-4 text-gray-500">
+          <p>Select alloy and process type to see suggested processes</p>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <!-- Specification Section -->
+  <div class="bg-white shadow rounded-lg p-6">
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Specification</h3>
+
+    <!-- Hidden field to store selected process ID -->
+    <%= hidden_field_tag :selected_process_id, "", id: "selected_process_id" %>
+
+    <!-- Process Type (hidden, will be set by process selection) -->
+    <%= form.hidden_field :process_type %>
+
+    <!-- Specification Text Area -->
+    <div>
       <%= form.label :specification, class: "block text-sm font-medium text-gray-700 mb-1" %>
       <%= form.text_area :specification,
           placeholder: "Enter processing specification and requirements...",
-          rows: 4,
-          class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
-      <p class="mt-1 text-xs text-gray-500">Detailed specification for processing this part</p>
+          rows: 6,
+          class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+          id: "specification_textarea" %>
+      <p class="mt-1 text-xs text-gray-500">This will become the operation text on route cards. Select a process above to auto-populate, or write custom specification.</p>
     </div>
 
-    <!-- Special Instructions (full width) -->
+    <!-- Special Instructions -->
     <div class="mt-6">
       <%= form.label :special_instructions, class: "block text-sm font-medium text-gray-700 mb-1" %>
       <%= form.text_area :special_instructions,
@@ -137,10 +200,11 @@
   <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
     <div class="flex">
       <div class="ml-3">
-        <h3 class="text-sm font-medium text-blue-800">Testing Mode - Simple PPI Creation</h3>
+        <h3 class="text-sm font-medium text-blue-800">Process Library Integration</h3>
         <div class="mt-2 text-sm text-blue-700">
-          <p>This is a simplified PPI creation form for testing the invoice workflow.
-          Fill in the basic details and you'll be able to create works orders for this part/customer combination.</p>
+          <p>Select your alloy and process type above to see suggested standard processes.
+          Selecting a process will automatically populate the specification field with the operation text
+          that will appear on route cards. You can still modify the specification as needed.</p>
         </div>
       </div>
     </div>
@@ -155,3 +219,64 @@
         class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" %>
   </div>
 <% end %>
+
+<!-- JavaScript for Process Suggestions -->
+<script>
+function suggestProcesses() {
+  const alloy = document.getElementById('alloy_select').value;
+  const processType = document.getElementById('process_type_select').value;
+  const thickness = document.getElementById('thickness_input').value;
+  const anodic_class = document.getElementById('class_select').value;
+
+  if (!alloy || !processType) {
+    document.getElementById('process_suggestions').innerHTML =
+      '<div class="text-center py-4 text-gray-500"><p>Select alloy and process type to see suggested processes</p></div>';
+    return;
+  }
+
+  const params = new URLSearchParams({
+    alloy: alloy,
+    process_type: processType
+  });
+
+  if (thickness) params.append('target_thickness', thickness);
+  if (anodic_class) params.append('anodic_class', anodic_class);
+
+  fetch(`<%= suggest_processes_part_processing_instructions_path %>?${params}`, {
+    headers: {
+      'Accept': 'text/html',
+      'X-Requested-With': 'XMLHttpRequest'
+    }
+  })
+  .then(response => response.text())
+  .then(html => {
+    document.getElementById('process_suggestions').innerHTML = html;
+  })
+  .catch(error => {
+    console.error('Error fetching processes:', error);
+    document.getElementById('process_suggestions').innerHTML =
+      '<div class="text-center py-4 text-red-500"><p>Error loading processes</p></div>';
+  });
+}
+
+function selectProcess(processId, operationText, processType) {
+  // Set the hidden field
+  document.getElementById('selected_process_id').value = processId;
+
+  // Update the process type hidden field
+  document.getElementById('part_processing_instruction_process_type').value = processType;
+
+  // Populate the specification textarea
+  document.getElementById('specification_textarea').value = operationText;
+
+  // Visual feedback - highlight selected process
+  document.querySelectorAll('.process-option').forEach(el => {
+    el.classList.remove('ring-2', 'ring-blue-500', 'bg-blue-50');
+  });
+
+  const selectedElement = document.querySelector(`[data-process-id="${processId}"]`);
+  if (selectedElement) {
+    selectedElement.classList.add('ring-2', 'ring-blue-500', 'bg-blue-50');
+  }
+}
+</script>
