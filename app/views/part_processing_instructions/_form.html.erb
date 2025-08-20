@@ -24,7 +24,7 @@
   <% end %>
 
   <div class="bg-white shadow rounded-lg p-6">
-    <h3 class="text-lg font-medium text-gray-900 mb-4">Part Processing Instruction Details</h3>
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Part</h3>
 
     <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
       <!-- Customer Selection -->
@@ -82,24 +82,6 @@
             class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
       </div>
 
-      <!-- Process Type -->
-      <div>
-        <%= form.label :process_type, class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.select :process_type,
-            options_for_select([
-              ['Anodising', 'anodising'],
-              ['Hard Anodising', 'hard_anodising'],
-              ['Chromate Conversion', 'chromate_conversion'],
-              ['Passivation', 'passivation'],
-              ['Cleaning', 'cleaning'],
-              ['Custom', 'custom']
-            ], ppi.process_type || 'anodising'),
-            {},
-            {
-              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            } %>
-      </div>
-
       <!-- Enabled Status (for editing) -->
       <% if ppi.persisted? %>
         <div>
@@ -113,65 +95,32 @@
     </div>
   </div>
 
-  <!-- Operation Selection Section -->
+  <!-- Main Treatment Selection -->
   <div class="bg-white shadow rounded-lg p-6">
-    <h3 class="text-lg font-medium text-gray-900 mb-4">Operation Selection</h3>
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Main Treatment Selection</h3>
+    <p class="text-sm text-gray-600 mb-4">Select up to 3 treatments (in the order you wish them to appear in the operations)</p>
 
-    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-      <!-- Anodising Type -->
-      <div>
-        <%= label_tag :anodising_type, "Anodising Type", class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= select_tag :anodising_type,
-            options_for_select([
-              ['Standard', 'standard_anodising'],
-              ['Hard', 'hard_anodising'],
-              ['Chromic', 'chromic_anodising']
-            ], ppi.anodising_types.first),
-            {
-              multiple: true,
-              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
-              id: "anodising_type"
-            } %>
-      </div>
+    <!-- Treatment Type Buttons -->
+    <div class="flex space-x-4 mb-6">
+      <button type="button" id="standard-btn" class="treatment-btn flex items-center justify-between px-4 py-2 border-2 border-gray-300 rounded-md hover:border-blue-500 transition-colors" data-treatment="standard_anodising">
+        <span>Standard</span>
+        <span class="count-badge ml-2 min-w-[24px] h-6 bg-gray-100 rounded-full flex items-center justify-center text-sm font-medium">0</span>
+      </button>
 
-      <!-- Alloy -->
-      <div>
-        <%= label_tag :alloy, "Alloy", class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= select_tag :alloy,
-            options_for_select(Operation.available_alloys.map { |a| [a.humanize, a] }, ppi.alloys.first),
-            {
-              multiple: true,
-              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
-              id: "alloy"
-            } %>
-      </div>
+      <button type="button" id="hard-btn" class="treatment-btn flex items-center justify-between px-4 py-2 border-2 border-gray-300 rounded-md hover:border-blue-500 transition-colors" data-treatment="hard_anodising">
+        <span>Hard</span>
+        <span class="count-badge ml-2 min-w-[24px] h-6 bg-gray-100 rounded-full flex items-center justify-center text-sm font-medium">0</span>
+      </button>
 
-      <!-- Target Thickness -->
-      <div>
-        <%= label_tag :target_thickness, "Target Thickness (μm)", class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= select_tag :target_thickness,
-            options_for_select(Operation.available_thicknesses.map { |t| ["#{t}μm", t] }, ppi.target_thicknesses.first),
-            {
-              multiple: true,
-              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
-              id: "target_thickness"
-            } %>
-      </div>
+      <button type="button" id="chromic-btn" class="treatment-btn flex items-center justify-between px-4 py-2 border-2 border-gray-300 rounded-md hover:border-blue-500 transition-colors" data-treatment="chromic_anodising">
+        <span>Chromic</span>
+        <span class="count-badge ml-2 min-w-[24px] h-6 bg-gray-100 rounded-full flex items-center justify-center text-sm font-medium">0</span>
+      </button>
+    </div>
 
-      <!-- Anodic Class -->
-      <div>
-        <%= label_tag :anodic_class, "Anodic Class", class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= select_tag :anodic_class,
-            options_for_select([
-              ['Class 1 (Undyed)', 'class_1'],
-              ['Class 2 (Dyed)', 'class_2']
-            ], ppi.anodic_classes.first),
-            {
-              multiple: true,
-              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
-              id: "anodic_class"
-            } %>
-      </div>
+    <!-- Dynamic Treatment Criteria -->
+    <div id="treatment-criteria-container" class="space-y-6">
+      <p class="text-gray-500 text-sm">Select treatment types above to configure criteria</p>
     </div>
 
     <!-- Available Operations -->
@@ -254,15 +203,15 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  const anodisingType = document.getElementById('anodising_type');
-  const alloy = document.getElementById('alloy');
-  const targetThickness = document.getElementById('target_thickness');
-  const anodicClass = document.getElementById('anodic_class');
+  const selectedOperationsField = document.getElementById('selected_operations_field');
   const operationsContainer = document.getElementById('operations-container');
   const selectedContainer = document.getElementById('selected-container');
-  const selectedOperationsField = document.getElementById('selected_operations_field');
+  const treatmentButtons = document.querySelectorAll('.treatment-btn');
+  const treatmentCriteriaContainer = document.getElementById('treatment-criteria-container');
 
   let selectedOperations = [];
+  let treatmentCounts = { standard_anodising: 0, hard_anodising: 0, chromic_anodising: 0 };
+  let totalTreatments = 0;
 
   // Initialize with existing data
   try {
@@ -272,24 +221,138 @@ document.addEventListener('DOMContentLoaded', function() {
     selectedOperations = [];
   }
 
-  // Filter operations when criteria change
-  function filterOperations() {
+  // Treatment button click handlers
+  treatmentButtons.forEach(button => {
+    button.addEventListener('click', function() {
+      const treatment = this.dataset.treatment;
+      const countBadge = this.querySelector('.count-badge');
+
+      if (totalTreatments >= 3) {
+        alert('Maximum 3 treatments allowed');
+        return;
+      }
+
+      if (treatmentCounts[treatment] === 0) {
+        treatmentCounts[treatment] = 1;
+        totalTreatments++;
+
+        // Update button appearance
+        this.classList.remove('border-gray-300');
+        this.classList.add('border-blue-500', 'bg-blue-50');
+        countBadge.classList.remove('bg-gray-100');
+        countBadge.classList.add('bg-blue-500', 'text-white');
+        countBadge.textContent = '1';
+
+        updateTreatmentCriteria();
+      }
+    });
+  });
+
+  function updateTreatmentCriteria() {
+    const activeTreatments = Object.keys(treatmentCounts).filter(t => treatmentCounts[t] > 0);
+
+    if (activeTreatments.length === 0) {
+      treatmentCriteriaContainer.innerHTML = '<p class="text-gray-500 text-sm">Select treatment types above to configure criteria</p>';
+      return;
+    }
+
+    treatmentCriteriaContainer.innerHTML = activeTreatments.map((treatment, index) => {
+      const treatmentName = treatment.replace('_anodising', '').charAt(0).toUpperCase() + treatment.replace('_anodising', '').slice(1);
+
+      return `
+        <div class="border border-gray-200 rounded-lg p-4">
+          <h4 class="font-medium text-gray-900 mb-3">${treatmentName} Treatment ${index + 1}</h4>
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <!-- Alloy -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Alloy</label>
+              <select class="alloy-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" data-treatment="${treatment}">
+                <option value="">Select alloy...</option>
+                <option value="6000_series">6000 Series</option>
+                <option value="7075">7075</option>
+                <option value="2014">2014</option>
+                <option value="5083">5083</option>
+                <option value="titanium">Titanium</option>
+                <option value="general">General</option>
+              </select>
+            </div>
+
+            <!-- Target Thickness -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Target Thickness (μm)</label>
+              <select class="thickness-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" data-treatment="${treatment}">
+                <option value="">Select thickness...</option>
+                <option value="5">5μm</option>
+                <option value="10">10μm</option>
+                <option value="15">15μm</option>
+                <option value="20">20μm</option>
+                <option value="25">25μm</option>
+                <option value="30">30μm</option>
+                <option value="40">40μm</option>
+                <option value="50">50μm</option>
+                <option value="60">60μm</option>
+              </select>
+            </div>
+
+            <!-- Anodic Class -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Anodic Class</label>
+              <select class="anodic-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" data-treatment="${treatment}">
+                <option value="">Select class...</option>
+                <option value="class_1">Class 1 (Undyed)</option>
+                <option value="class_2">Class 2 (Dyed)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Operations for this treatment -->
+          <div class="mt-4">
+            <h5 class="text-sm font-medium text-gray-700 mb-2">Available Operations</h5>
+            <div class="operations-list-${index} space-y-1 max-h-32 overflow-y-auto border border-gray-200 rounded p-2 bg-gray-50">
+              <p class="text-gray-500 text-xs">Select criteria above to see operations</p>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Add event listeners to the new selects
+    addSelectEventListeners();
+  }
+
+  function addSelectEventListeners() {
+    const allSelects = treatmentCriteriaContainer.querySelectorAll('select');
+    allSelects.forEach(select => {
+      select.addEventListener('change', filterOperationsForTreatment);
+    });
+  }
+
+  function filterOperationsForTreatment(event) {
+    const select = event.target;
+    const treatment = select.dataset.treatment;
+    const treatmentIndex = Object.keys(treatmentCounts).filter(t => treatmentCounts[t] > 0).indexOf(treatment);
+    const operationsList = document.querySelector(`.operations-list-${treatmentIndex}`);
+
+    // Get all criteria for this treatment
+    const alloySelect = treatmentCriteriaContainer.querySelector(`.alloy-select[data-treatment="${treatment}"]`);
+    const thicknessSelect = treatmentCriteriaContainer.querySelector(`.thickness-select[data-treatment="${treatment}"]`);
+    const anodicSelect = treatmentCriteriaContainer.querySelector(`.anodic-select[data-treatment="${treatment}"]`);
+
     const criteria = {
-      anodising_types: Array.from(anodisingType.selectedOptions).map(o => o.value).filter(v => v),
-      alloys: Array.from(alloy.selectedOptions).map(o => o.value).filter(v => v),
-      target_thicknesses: Array.from(targetThickness.selectedOptions).map(o => parseFloat(o.value)).filter(v => !isNaN(v)),
-      anodic_classes: Array.from(anodicClass.selectedOptions).map(o => o.value).filter(v => v)
+      anodising_types: [treatment],
+      alloys: alloySelect.value ? [alloySelect.value] : [],
+      target_thicknesses: thicknessSelect.value ? [parseFloat(thicknessSelect.value)] : [],
+      anodic_classes: anodicSelect.value ? [anodicSelect.value] : []
     };
 
-    // Only filter if we have at least one criteria
-    if (criteria.anodising_types.length === 0 && criteria.alloys.length === 0 &&
-        criteria.target_thicknesses.length === 0 && criteria.anodic_classes.length === 0) {
-      operationsContainer.innerHTML = '<p class="text-gray-500 text-sm">Select criteria above to see matching operations</p>';
+    // Only filter if we have some criteria
+    if (!criteria.alloys.length && !criteria.target_thicknesses.length && !criteria.anodic_classes.length) {
+      operationsList.innerHTML = '<p class="text-gray-500 text-xs">Select criteria above to see operations</p>';
       return;
     }
 
     // Make AJAX call to get filtered operations
-    fetch('/api/v1/operations/filter', {
+    fetch('/operations/filter', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -299,31 +362,28 @@ document.addEventListener('DOMContentLoaded', function() {
     })
     .then(response => response.json())
     .then(operations => {
-      displayOperations(operations);
+      displayOperationsForTreatment(operations, operationsList, treatment);
     })
     .catch(error => {
       console.error('Error filtering operations:', error);
-      operationsContainer.innerHTML = '<p class="text-red-500 text-sm">Error loading operations</p>';
+      operationsList.innerHTML = '<p class="text-red-500 text-xs">Error loading operations</p>';
     });
   }
 
-  function displayOperations(operations) {
+  function displayOperationsForTreatment(operations, container, treatment) {
     if (operations.length === 0) {
-      operationsContainer.innerHTML = '<p class="text-gray-500 text-sm">No matching operations found</p>';
+      container.innerHTML = '<p class="text-gray-500 text-xs">No matching operations found</p>';
       return;
     }
 
-    operationsContainer.innerHTML = operations.map(op => `
-      <div class="bg-gray-50 border border-gray-200 rounded px-3 py-2 cursor-pointer hover:bg-gray-100 ${selectedOperations.includes(op.id) ? 'opacity-50' : ''}"
+    container.innerHTML = operations.map(op => `
+      <div class="bg-white border border-gray-200 rounded px-2 py-1 cursor-pointer hover:bg-gray-50 text-xs ${selectedOperations.includes(op.id) ? 'opacity-50' : ''}"
            data-operation-id="${op.id}" onclick="selectOperation('${op.id}', this)">
-        <div class="flex justify-between items-start">
-          <div>
-            <span class="font-medium text-sm">${op.display_name}</span>
-            <p class="text-xs text-gray-600 mt-1">${op.operation_text}</p>
-            <p class="text-xs text-blue-600 mt-1">${op.vat_options_text}</p>
-          </div>
-          <button type="button" class="text-green-600 hover:text-green-800 ml-2">+</button>
+        <div class="flex justify-between items-center">
+          <span class="font-medium">${op.display_name}</span>
+          <button type="button" class="text-green-600 hover:text-green-800">+</button>
         </div>
+        <p class="text-gray-600 mt-1">${op.operation_text}</p>
       </div>
     `).join('');
   }
@@ -349,7 +409,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Get operation details and display
-    fetch('/api/v1/operations/details', {
+    fetch('/operations/details', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -371,14 +431,11 @@ document.addEventListener('DOMContentLoaded', function() {
   window.removeOperation = function(operationId) {
     selectedOperations = selectedOperations.filter(id => id !== operationId);
     updateSelectedOperations();
-    filterOperations(); // Refresh to remove opacity
+    // Refresh all operations lists to remove opacity
+    document.querySelectorAll(`[data-operation-id="${operationId}"]`).forEach(el => {
+      el.classList.remove('opacity-50');
+    });
   };
-
-  // Event listeners
-  anodisingType.addEventListener('change', filterOperations);
-  alloy.addEventListener('change', filterOperations);
-  targetThickness.addEventListener('change', filterOperations);
-  anodicClass.addEventListener('change', filterOperations);
 
   // Initialize display
   updateSelectedOperations();
