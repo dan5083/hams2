@@ -16,6 +16,9 @@ module Hams2
     # Common ones are `templates`, `generators`, or `middleware`, for example.
     config.autoload_lib(ignore: %w[assets tasks])
 
+    # Don't autoload operation library - we load these manually
+    config.autoload_paths.delete("#{root}/app/operation_library")
+
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files
