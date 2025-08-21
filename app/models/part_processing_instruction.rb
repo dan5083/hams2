@@ -134,6 +134,44 @@ class PartProcessingInstruction < ApplicationRecord
     end.join("\n\n")
   end
 
+  def build_route_card_operations
+    # Get operations from this PPI
+    operations = get_operations
+
+    # Create separate operation for each selected operation
+    operations.map.with_index do |operation, index|
+      {
+        number: index + 1,
+        content: [{
+          type: 'paragraph',
+          as_html: operation.operation_text  # Just the operation text, not display_name
+        }],
+        all_variables: []
+      }
+    end
+  end
+
+  def operations_summary
+    operations = get_operations
+    return "No operations selected" if operations.empty?
+
+    operations.map(&:display_name).join(" → ")
+  end
+
+  # Class method for real-time simulation during PPI building
+  def self.simulate_operations_summary(operation_ids)
+    return "No operations selected" if operation_ids.blank?
+
+    all_ops = Operation.all_operations
+    operations = operation_ids.map do |op_id|
+      all_ops.find { |op| op.id == op_id }
+    end.compact
+
+    return "Invalid operations" if operations.empty?
+
+    operations.map(&:display_name).join(" → ")
+  end
+
   private
 
   def set_defaults

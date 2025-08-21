@@ -134,6 +134,14 @@
     <!-- Selected Operations -->
     <div class="mt-6">
       <h4 class="text-md font-medium text-gray-900 mb-3">Selected Operations (up to 3, in order)</h4>
+
+      <!-- Live Process Preview -->
+      <div class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
+        <div id="operations-preview" class="text-sm">
+          <span class="text-gray-500">No operations selected</span>
+        </div>
+      </div>
+
       <div id="selected-container" class="space-y-2 min-h-[60px] border border-gray-200 rounded p-3 bg-gray-50">
         <% if ppi.selected_operations.any? %>
           <% ppi.selected_operations.each_with_index do |op_id, index| %>
@@ -397,6 +405,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     selectedOperations.push(operationId);
     updateSelectedOperations();
+    updateOperationsPreview();
     element.classList.add('opacity-50');
   };
 
@@ -431,13 +440,48 @@ document.addEventListener('DOMContentLoaded', function() {
   window.removeOperation = function(operationId) {
     selectedOperations = selectedOperations.filter(id => id !== operationId);
     updateSelectedOperations();
+    updateOperationsPreview();
     // Refresh all operations lists to remove opacity
     document.querySelectorAll(`[data-operation-id="${operationId}"]`).forEach(el => {
       el.classList.remove('opacity-50');
     });
   };
 
+  function updateOperationsPreview() {
+    const previewElement = document.getElementById('operations-preview');
+
+    if (selectedOperations.length === 0) {
+      previewElement.innerHTML = '<span class="text-gray-500">No operations selected</span>';
+      return;
+    }
+
+    // Make AJAX call to get live preview
+    fetch('/operations/summary', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': document.querySelector('[name="csrf-token"]').getAttribute('content')
+      },
+      body: JSON.stringify({ operation_ids: selectedOperations })
+    })
+    .then(response => response.json())
+    .then(data => {
+      previewElement.innerHTML = `
+        <div class="flex items-center space-x-2">
+          <span class="font-medium text-blue-800">Process Flow:</span>
+          <span class="text-blue-700">${data.summary}</span>
+          <span class="text-xs text-blue-600">(${selectedOperations.length}/3 operations)</span>
+        </div>
+      `;
+    })
+    .catch(error => {
+      console.error('Error updating preview:', error);
+      previewElement.innerHTML = '<span class="text-red-500">Error loading preview</span>';
+    });
+  }
+
   // Initialize display
   updateSelectedOperations();
+  updateOperationsPreview();
 });
 </script>

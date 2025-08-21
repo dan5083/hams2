@@ -33,6 +33,7 @@ Rails.application.routes.draw do
     collection do
       post :filter
       post :details
+      post :summary
     end
   end
 

@@ -89,7 +89,7 @@ class WorksOrdersController < ApplicationController
  end
 
  def route_card
-   @operations = build_operations_from_process(@works_order)
+   @operations = @works_order.ppi&.build_route_card_operations || []
 
    respond_to do |format|
      format.html { render layout: false }
@@ -257,22 +257,5 @@ class WorksOrdersController < ApplicationController
 
  def part_details_changed?
    @works_order.part_number_changed? || @works_order.part_issue_changed?
- end
-
- def build_operations_from_process(works_order)
-   # Get operations from the PPI
-   operations = works_order.ppi&.get_operations || []
-
-   # Create separate operation for each selected operation
-   operations.map.with_index do |operation, index|
-     {
-       number: index + 1,
-       content: [{
-         type: 'paragraph',
-         as_html: operation.operation_text  # Just the operation text, not display_name
-       }],
-       all_variables: []
-     }
-   end
  end
 end

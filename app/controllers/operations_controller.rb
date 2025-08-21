@@ -77,6 +77,12 @@ class OperationsController < ApplicationController
     render json: results
   end
 
+  def summary
+    operation_ids = params[:operation_ids] || []
+    summary = PartProcessingInstruction.simulate_operations_summary(operation_ids)
+    render json: { summary: summary }
+  end
+
   private
 
   def filter_params
