@@ -148,7 +148,7 @@
             <% if operation = Operation.all_operations.find { |op| op.id == op_id } %>
               <div class="bg-blue-100 border border-blue-300 rounded px-3 py-2 flex justify-between items-center" data-operation-id="<%= op_id %>">
                 <span class="text-sm"><strong><%= index + 1 %>.</strong> <%= operation.display_name %>: <%= operation.operation_text %></span>
-                <button type="button" class="text-red-600 hover:text-red-800 ml-2 remove-operation-btn" data-operation-id="<%= op_id %>">×</button>
+                <button type="button" class="text-red-600 hover:text-red-800 ml-2 remove-operation">×</button>
               </div>
             <% end %>
           <% end %>
@@ -210,11 +210,8 @@
 <% end %>
 
 <script>
-document.addEventListener('turbo:load', function() {
-  // Only initialize if we're on the PPI form page
+document.addEventListener('DOMContentLoaded', function() {
   const selectedOperationsField = document.getElementById('selected_operations_field');
-  if (!selectedOperationsField) return; // Exit if not on PPI form
-
   const operationsContainer = document.getElementById('operations-container');
   const selectedContainer = document.getElementById('selected-container');
   const treatmentButtons = document.querySelectorAll('.treatment-btn');
@@ -234,35 +231,30 @@ document.addEventListener('turbo:load', function() {
 
   // Treatment button click handlers
   treatmentButtons.forEach(button => {
-    // Remove any existing listeners to avoid duplicates
-    button.removeEventListener('click', handleTreatmentClick);
-    button.addEventListener('click', handleTreatmentClick);
+    button.addEventListener('click', function() {
+      const treatment = this.dataset.treatment;
+      const countBadge = this.querySelector('.count-badge');
+
+      if (totalTreatments >= 3) {
+        alert('Maximum 3 treatments allowed');
+        return;
+      }
+
+      if (treatmentCounts[treatment] === 0) {
+        treatmentCounts[treatment] = 1;
+        totalTreatments++;
+
+        // Update button appearance
+        this.classList.remove('border-gray-300');
+        this.classList.add('border-blue-500', 'bg-blue-50');
+        countBadge.classList.remove('bg-gray-100');
+        countBadge.classList.add('bg-blue-500', 'text-white');
+        countBadge.textContent = '1';
+
+        updateTreatmentCriteria();
+      }
+    });
   });
-
-  function handleTreatmentClick(event) {
-    const button = event.currentTarget;
-    const treatment = button.dataset.treatment;
-    const countBadge = button.querySelector('.count-badge');
-
-    if (totalTreatments >= 3) {
-      alert('Maximum 3 treatments allowed');
-      return;
-    }
-
-    if (treatmentCounts[treatment] === 0) {
-      treatmentCounts[treatment] = 1;
-      totalTreatments++;
-
-      // Update button appearance
-      button.classList.remove('border-gray-300');
-      button.classList.add('border-blue-500', 'bg-blue-50');
-      countBadge.classList.remove('bg-gray-100');
-      countBadge.classList.add('bg-blue-500', 'text-white');
-      countBadge.textContent = '1';
-
-      updateTreatmentCriteria();
-    }
-  }
 
   function updateTreatmentCriteria() {
     const activeTreatments = Object.keys(treatmentCounts).filter(t => treatmentCounts[t] > 0);
@@ -339,7 +331,6 @@ document.addEventListener('turbo:load', function() {
   function addSelectEventListeners() {
     const allSelects = treatmentCriteriaContainer.querySelectorAll('select');
     allSelects.forEach(select => {
-      select.removeEventListener('change', filterOperationsForTreatment);
       select.addEventListener('change', filterOperationsForTreatment);
     });
   }
@@ -395,28 +386,17 @@ document.addEventListener('turbo:load', function() {
 
     container.innerHTML = operations.map(op => `
       <div class="bg-white border border-gray-200 rounded px-2 py-1 cursor-pointer hover:bg-gray-50 text-xs ${selectedOperations.includes(op.id) ? 'opacity-50' : ''}"
-           data-operation-id="${op.id}">
+           data-operation-id="${op.id}" onclick="selectOperation('${op.id}', this)">
         <div class="flex justify-between items-center">
           <span class="font-medium">${op.display_name}</span>
-          <button type="button" class="text-green-600 hover:text-green-800 select-operation-btn" data-operation-id="${op.id}">+</button>
+          <button type="button" class="text-green-600 hover:text-green-800">+</button>
         </div>
         <p class="text-gray-600 mt-1">${op.operation_text}</p>
       </div>
     `).join('');
-
-    // Add event listeners to the new operation buttons with a small delay to ensure DOM is updated
-    setTimeout(() => {
-      container.querySelectorAll('.select-operation-btn').forEach(btn => {
-        btn.addEventListener('click', function(e) {
-          e.preventDefault();
-          e.stopPropagation();
-          selectOperation(this.dataset.operationId, this.closest('[data-operation-id]'));
-        });
-      });
-    }, 10);
   }
 
-  function selectOperation(operationId, element) {
+  window.selectOperation = function(operationId, element) {
     if (selectedOperations.includes(operationId)) return;
     if (selectedOperations.length >= 3) {
       alert('Maximum 3 operations allowed');
@@ -427,7 +407,7 @@ document.addEventListener('turbo:load', function() {
     updateSelectedOperations();
     updateOperationsPreview();
     element.classList.add('opacity-50');
-  }
+  };
 
   function updateSelectedOperations() {
     selectedOperationsField.value = JSON.stringify(selectedOperations);
@@ -451,18 +431,13 @@ document.addEventListener('turbo:load', function() {
       selectedContainer.innerHTML = operations.map((op, index) => `
         <div class="bg-blue-100 border border-blue-300 rounded px-3 py-2 flex justify-between items-center" data-operation-id="${op.id}">
           <span class="text-sm"><strong>${index + 1}.</strong> ${op.display_name}: ${op.operation_text}</span>
-          <button type="button" class="text-red-600 hover:text-red-800 ml-2 remove-operation-btn" data-operation-id="${op.id}">×</button>
+          <button type="button" class="text-red-600 hover:text-red-800 ml-2 remove-operation" onclick="removeOperation('${op.id}')">×</button>
         </div>
       `).join('');
-
-      // Add event listeners to remove buttons
-      selectedContainer.querySelectorAll('.remove-operation-btn').forEach(btn => {
-        btn.addEventListener('click', handleRemoveClick);
-      });
     });
   }
 
-  function removeOperation(operationId) {
+  window.removeOperation = function(operationId) {
     selectedOperations = selectedOperations.filter(id => id !== operationId);
     updateSelectedOperations();
     updateOperationsPreview();
@@ -470,7 +445,7 @@ document.addEventListener('turbo:load', function() {
     document.querySelectorAll(`[data-operation-id="${operationId}"]`).forEach(el => {
       el.classList.remove('opacity-50');
     });
-  }
+  };
 
   function updateOperationsPreview() {
     const previewElement = document.getElementById('operations-preview');
@@ -505,22 +480,8 @@ document.addEventListener('turbo:load', function() {
     });
   }
 
-  // Add event listeners to any existing remove buttons (for edit forms)
-  function attachExistingRemoveListeners() {
-    selectedContainer.querySelectorAll('.remove-operation-btn').forEach(btn => {
-      btn.removeEventListener('click', handleRemoveClick);
-      btn.addEventListener('click', handleRemoveClick);
-    });
-  }
-
-  function handleRemoveClick(e) {
-    e.preventDefault();
-    removeOperation(this.dataset.operationId);
-  }
-
   // Initialize display
   updateSelectedOperations();
   updateOperationsPreview();
-  attachExistingRemoveListeners();
 });
 </script>
