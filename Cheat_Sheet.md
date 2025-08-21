@@ -3,8 +3,13 @@ tree -I "node_modules|.git|.DS_Store|*.log|coverage|build|dist|tmp"
 # Show all models with filenames as headers:
 for file in app/models/[a-e]*.rb; do echo "=== $file ==="; cat "$file"; echo; done
 for file in app/models/[f-j]*.rb; do echo "=== $file ==="; cat "$file"; echo; done
-for file in app/models/[k-z]*.rb; do echo "=== $file ==="; cat "$file"; echo; done
+for file in app/models/[k-p]*.rb; do echo "=== $file ==="; cat "$file"; echo; done
+for file in app/models/[q-z]*.rb; do echo "=== $file ==="; cat "$file"; echo; done
 
+# Show operation library base file
+echo "=== app/operation_library/operation.rb ==="
+cat "app/operation_library/operation.rb"
+echo
 
 # Show controllers.rb files starting with a-i
 for file in app/controllers/[a-i]*.rb; do
@@ -35,7 +40,10 @@ for f in app/views/artifacts/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; d
 for f in app/views/customer_orders/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
 for f in app/views/dashboard/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
 for f in app/views/layouts/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/part_processing_instructions/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
+
+for f in app/views/part_processing_instructions/[_a-f]*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
+for f in app/views/part_processing_instructions/[g-z]*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
+
 for f in app/views/parts/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
 for f in app/views/passwords/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
 for f in app/views/passwords_mailer/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done

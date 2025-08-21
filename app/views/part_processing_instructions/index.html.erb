@@ -76,7 +76,13 @@
                     <% if operation %>
                       <div class="text-xs">
                         <span class="font-medium text-blue-600"><%= index + 1 %>.</span>
-                        <span class="text-gray-700"><%= operation.display_name %></span>
+                        <span class="text-gray-700">
+                          <% if operation.process_type == 'chemical_conversion' %>
+                            <%= operation.id.humanize %>
+                          <% else %>
+                            <%= operation.display_name %>
+                          <% end %>
+                        </span>
                       </div>
                     <% end %>
                   <% end %>
@@ -87,18 +93,30 @@
             </td>
             <td class="px-6 py-4 text-sm text-gray-900">
               <div class="space-y-1">
-                <!-- Anodising Types -->
+                <!-- Treatment Types (updated name) -->
                 <% if ppi.anodising_types.any? %>
                   <div class="flex flex-wrap gap-1">
                     <% ppi.anodising_types.each do |type| %>
-                      <span class="inline-flex px-1.5 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-800">
-                        <%= type.gsub('_anodising', '').capitalize %>
+                      <%
+                        badge_color = case type
+                        when 'chemical_conversion'
+                          'bg-orange-100 text-orange-800'
+                        when 'hard_anodising'
+                          'bg-purple-100 text-purple-800'
+                        when 'chromic_anodising'
+                          'bg-green-100 text-green-800'
+                        else
+                          'bg-blue-100 text-blue-800'
+                        end
+                      %>
+                      <span class="inline-flex px-1.5 py-0.5 text-xs font-medium rounded <%= badge_color %>">
+                        <%= type.gsub('_anodising', '').gsub('_', ' ').titleize %>
                       </span>
                     <% end %>
                   </div>
                 <% end %>
 
-                <!-- Target Thicknesses -->
+                <!-- Target Thicknesses (only show if any exist) -->
                 <% if ppi.target_thicknesses.any? %>
                   <div class="flex flex-wrap gap-1">
                     <% ppi.target_thicknesses.each do |thickness| %>
@@ -109,7 +127,7 @@
                   </div>
                 <% end %>
 
-                <!-- Alloys -->
+                <!-- Alloys (only show if any exist) -->
                 <% if ppi.alloys.any? %>
                   <div class="flex flex-wrap gap-1">
                     <% ppi.alloys.first(2).each do |alloy| %>
@@ -193,9 +211,9 @@
       <div class="ml-3">
         <h3 class="text-sm font-medium text-blue-800">About Part Processing Instructions</h3>
         <div class="mt-2 text-sm text-blue-700">
-          <p>Part Processing Instructions (PPIs) now use operation-based selection. Choose your anodising criteria
-          and select up to 3 operations in sequence. The specification is automatically generated from your selections,
-          giving you precise control over the manufacturing process.</p>
+          <p>Part Processing Instructions (PPIs) use operation-based selection. Choose your treatment criteria
+          and select up to 3 operations in sequence. Supports anodising, chemical conversion, and other surface treatments.
+          The specification is automatically generated from your selections.</p>
         </div>
       </div>
     </div>

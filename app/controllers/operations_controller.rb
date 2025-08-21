@@ -8,7 +8,7 @@ class OperationsController < ApplicationController
     # Start with all operations
     operations = Operation.all_operations
 
-    # Filter by anodising types
+    # Filter by anodising types (now includes chemical_conversion)
     if criteria[:anodising_types].present?
       operations = operations.select { |op| criteria[:anodising_types].include?(op.process_type) }
     end
@@ -23,18 +23,25 @@ class OperationsController < ApplicationController
       operations = operations.select { |op| (op.anodic_classes & criteria[:anodic_classes]).any? }
     end
 
-    # Filter by target thickness (with tolerance)
+    # Filter by target thickness (with tolerance) - skip for chemical conversion
     if criteria[:target_thicknesses].present?
       operations = operations.select do |op|
-        criteria[:target_thicknesses].any? do |target|
-          (op.target_thickness - target).abs <= 2.5
+        # Skip thickness filtering for chemical conversion
+        if op.process_type == 'chemical_conversion'
+          true
+        else
+          criteria[:target_thicknesses].any? do |target|
+            (op.target_thickness - target).abs <= 2.5
+          end
         end
       end
 
-      # Sort by closest thickness match
+      # Sort by closest thickness match (but only for non-chemical conversion)
       if criteria[:target_thicknesses].length == 1
         target = criteria[:target_thicknesses].first
-        operations = operations.sort_by { |op| (op.target_thickness - target).abs }
+        operations = operations.sort_by do |op|
+          op.process_type == 'chemical_conversion' ? 0 : (op.target_thickness - target).abs
+        end
       end
     end
 
@@ -48,7 +55,8 @@ class OperationsController < ApplicationController
         target_thickness: op.target_thickness,
         process_type: op.process_type,
         alloys: op.alloys,
-        anodic_classes: op.anodic_classes
+        anodic_classes: op.anodic_classes,
+        specifications: op.specifications
       }
     end
 
@@ -69,7 +77,8 @@ class OperationsController < ApplicationController
           operation_text: operation.operation_text,
           vat_options_text: operation.vat_options_text,
           target_thickness: operation.target_thickness,
-          process_type: operation.process_type
+          process_type: operation.process_type,
+          specifications: operation.specifications
         }
       end
     end.compact

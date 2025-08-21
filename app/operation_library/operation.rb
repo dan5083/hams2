@@ -1,8 +1,8 @@
 # app/operation_library/operation.rb
 class Operation
-  attr_accessor :id, :alloys, :process_type, :anodic_classes, :target_thickness, :vat_numbers, :operation_text
+  attr_accessor :id, :alloys, :process_type, :anodic_classes, :target_thickness, :vat_numbers, :operation_text, :specifications
 
-  def initialize(id:, alloys:, process_type:, anodic_classes:, target_thickness:, vat_numbers:, operation_text:)
+  def initialize(id:, process_type:, operation_text:, specifications: nil, alloys: [], anodic_classes: [], target_thickness: 0, vat_numbers: [])
     @id = id
     @alloys = alloys
     @process_type = process_type
@@ -10,6 +10,7 @@ class Operation
     @target_thickness = target_thickness
     @vat_numbers = vat_numbers
     @operation_text = operation_text
+    @specifications = specifications
   end
 
   # Class methods to get all operations from all files
@@ -19,15 +20,10 @@ class Operation
 
   def self.load_all_operations
     operations = []
-
-    # Load anodising operations
     operations += OperationLibrary::AnodisingStandard.operations if defined?(OperationLibrary::AnodisingStandard)
     operations += OperationLibrary::AnodisingHard.operations if defined?(OperationLibrary::AnodisingHard)
     operations += OperationLibrary::AnodisingChromic.operations if defined?(OperationLibrary::AnodisingChromic)
-
-    # Future: operations += OperationLibrary::ChemicalConversion.operations
-    # Future: operations += OperationLibrary::ElectrolessNickel.operations
-
+    operations += OperationLibrary::ChemicalConversions.operations if defined?(OperationLibrary::ChemicalConversions)
     operations
   end
 
@@ -73,7 +69,11 @@ class Operation
 
   # Instance methods
   def display_name
-    "#{id} (#{target_thickness}μm)"
+    if target_thickness > 0
+      "#{id} (#{target_thickness}μm)"
+    else
+      id.humanize
+    end
   end
 
   def vat_options_text
