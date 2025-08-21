@@ -5,3 +5,4 @@ require Rails.root.join('app', 'operation_library', 'operations', 'hard_anodisin
 require Rails.root.join('app', 'operation_library', 'operations', 'chromic_anodising')
 require Rails.root.join('app', 'operation_library', 'operations', 'chemical_conversions')
 require Rails.root.join('app', 'operation_library', 'operations', 'rinse_operations')
+require Rails.root.join('app', 'operation_library', 'operations', 'electroless_nickel_plate')
