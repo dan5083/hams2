@@ -455,10 +455,7 @@ document.addEventListener('turbo:load', function() {
 
       // Add event listeners to remove buttons
       selectedContainer.querySelectorAll('.remove-operation-btn').forEach(btn => {
-        btn.addEventListener('click', function(e) {
-          e.preventDefault();
-          removeOperation(this.dataset.operationId);
-        });
+        btn.addEventListener('click', handleRemoveClick);
       });
     });
   }
@@ -506,8 +503,22 @@ document.addEventListener('turbo:load', function() {
     });
   }
 
+  // Add event listeners to any existing remove buttons (for edit forms)
+  function attachExistingRemoveListeners() {
+    selectedContainer.querySelectorAll('.remove-operation-btn').forEach(btn => {
+      btn.removeEventListener('click', handleRemoveClick);
+      btn.addEventListener('click', handleRemoveClick);
+    });
+  }
+
+  function handleRemoveClick(e) {
+    e.preventDefault();
+    removeOperation(this.dataset.operationId);
+  }
+
   // Initialize display
   updateSelectedOperations();
   updateOperationsPreview();
+  attachExistingRemoveListeners();
 });
 </script>
