@@ -32,6 +32,8 @@ for file in app/controllers/[q-z]*.rb; do
   echo
 done
 
+# Remember config/initializers/operation_library.rb
+
 # Routes & Schema
 echo "=== db/schema.rb ==="; cat db/schema.rb; echo; echo "=== config/routes.rb ==="; cat config/routes.rb; echo
 

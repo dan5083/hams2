@@ -1,6 +1,6 @@
-# app/controllers/operations_controller.rb
+# app/controllers/operations_controller.rb - Enhanced for ENP support
 class OperationsController < ApplicationController
-  skip_before_action :verify_authenticity_token, only: [:filter, :details, :summary, :preview_with_rinses]
+  skip_before_action :verify_authenticity_token, only: [:filter, :details, :summary, :preview_with_rinses, :calculate_enp_time]
 
   def filter
     criteria = filter_params
@@ -8,7 +8,7 @@ class OperationsController < ApplicationController
     # Start with all operations
     operations = Operation.all_operations
 
-    # Filter by anodising types (now includes chemical_conversion)
+    # Filter by anodising types (now includes ENP)
     if criteria[:anodising_types].present?
       operations = operations.select { |op| criteria[:anodising_types].include?(op.process_type) }
     end
@@ -23,11 +23,16 @@ class OperationsController < ApplicationController
       operations = operations.select { |op| (op.anodic_classes & criteria[:anodic_classes]).any? }
     end
 
-    # Filter by target thickness (with tolerance) - skip for chemical conversion
+    # Filter by ENP types
+    if criteria[:enp_types].present?
+      operations = operations.select { |op| criteria[:enp_types].include?(op.enp_type) }
+    end
+
+    # Filter by target thickness (with tolerance) - skip for chemical conversion and ENP
     if criteria[:target_thicknesses].present?
       operations = operations.select do |op|
-        # Skip thickness filtering for chemical conversion
-        if op.process_type == 'chemical_conversion'
+        # Skip thickness filtering for chemical conversion and ENP
+        if op.process_type == 'chemical_conversion' || op.process_type == 'electroless_nickel_plating'
           true
         else
           criteria[:target_thicknesses].any? do |target|
@@ -36,11 +41,15 @@ class OperationsController < ApplicationController
         end
       end
 
-      # Sort by closest thickness match (but only for non-chemical conversion)
+      # Sort by closest thickness match (but only for anodising operations)
       if criteria[:target_thicknesses].length == 1
         target = criteria[:target_thicknesses].first
         operations = operations.sort_by do |op|
-          op.process_type == 'chemical_conversion' ? 0 : (op.target_thickness - target).abs
+          if op.process_type == 'chemical_conversion' || op.process_type == 'electroless_nickel_plating'
+            0
+          else
+            (op.target_thickness - target).abs
+          end
         end
       end
     end
@@ -56,7 +65,9 @@ class OperationsController < ApplicationController
         process_type: op.process_type,
         alloys: op.alloys,
         anodic_classes: op.anodic_classes,
-        specifications: op.specifications
+        specifications: op.specifications,
+        enp_type: op.enp_type,
+        deposition_rate_range: op.deposition_rate_range
       }
     end
 
@@ -78,7 +89,9 @@ class OperationsController < ApplicationController
           vat_options_text: operation.vat_options_text,
           target_thickness: operation.target_thickness,
           process_type: operation.process_type,
-          specifications: operation.specifications
+          specifications: operation.specifications,
+          enp_type: operation.enp_type,
+          deposition_rate_range: operation.deposition_rate_range
         }
       end
     end.compact
@@ -99,6 +112,36 @@ class OperationsController < ApplicationController
     render json: { operations: operations_with_auto_ops }
   end
 
+  # NEW: Calculate ENP plating time
+  def calculate_enp_time
+    operation_id = params[:operation_id]
+    target_thickness = params[:target_thickness]&.to_f
+
+    if operation_id.blank? || target_thickness.blank? || target_thickness <= 0
+      render json: { error: 'Invalid parameters' }, status: 400
+      return
+    end
+
+    operation = Operation.all_operations.find { |op| op.id == operation_id }
+
+    if operation.nil? || !operation.electroless_nickel_plating?
+      render json: { error: 'Operation not found or not ENP' }, status: 404
+      return
+    end
+
+    time_data = operation.calculate_plating_time(target_thickness)
+
+    if time_data
+      render json: {
+        operation_id: operation_id,
+        target_thickness: target_thickness,
+        time_estimate: time_data
+      }
+    else
+      render json: { error: 'Unable to calculate plating time' }, status: 500
+    end
+  end
+
   private
 
   def filter_params
@@ -106,7 +149,8 @@ class OperationsController < ApplicationController
       anodising_types: [],
       alloys: [],
       target_thicknesses: [],
-      anodic_classes: []
+      anodic_classes: [],
+      enp_types: []
     )
   end
 end

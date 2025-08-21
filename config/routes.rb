@@ -35,6 +35,7 @@ Rails.application.routes.draw do
       post :details
       post :summary
       post :preview_with_auto_ops
+      post :calculate_enp_time
     end
   end
 
