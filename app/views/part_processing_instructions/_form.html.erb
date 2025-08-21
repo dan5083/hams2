@@ -404,14 +404,16 @@ document.addEventListener('turbo:load', function() {
       </div>
     `).join('');
 
-    // Add event listeners to the new operation buttons
-    container.querySelectorAll('.select-operation-btn').forEach(btn => {
-      btn.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        selectOperation(this.dataset.operationId, this.closest('[data-operation-id]'));
+    // Add event listeners to the new operation buttons with a small delay to ensure DOM is updated
+    setTimeout(() => {
+      container.querySelectorAll('.select-operation-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          selectOperation(this.dataset.operationId, this.closest('[data-operation-id]'));
+        });
       });
-    });
+    }, 10);
   }
 
   function selectOperation(operationId, element) {
