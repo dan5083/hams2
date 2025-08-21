@@ -484,8 +484,8 @@ document.addEventListener('turbo:load', function() {
       return;
     }
 
-    // Get operation details with rinses and display
-    fetch('/operations/details', {
+    // Get operation details with auto-ops and display
+    fetch('/operations/preview_with_auto_ops', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -494,14 +494,47 @@ document.addEventListener('turbo:load', function() {
       body: JSON.stringify({ operation_ids: selectedOperations })
     })
     .then(response => response.json())
-    .then(operations => {
-      // For now, just show user operations - we'll enhance this to show rinses
-      selectedContainer.innerHTML = operations.map((op, index) => `
-        <div class="bg-blue-100 border border-blue-300 rounded px-3 py-2 flex justify-between items-center" data-operation-id="${op.id}">
-          <span class="text-sm"><strong>${index + 1}.</strong> ${op.display_name || op.id.replace(/_/g, ' ')}: ${op.operation_text}</span>
-          <button type="button" class="text-red-600 hover:text-red-800 ml-2 remove-operation" onclick="removeOperation('${op.id}')">×</button>
-        </div>
-      `).join('');
+    .then(data => {
+      const operations = data.operations || [];
+      selectedContainer.innerHTML = operations.map((op, index) => {
+        const isAutoInserted = op.auto_inserted;
+        const bgColor = isAutoInserted ? 'bg-gray-100 border border-gray-300' : 'bg-blue-100 border border-blue-300';
+        const textColor = isAutoInserted ? 'italic text-gray-600' : 'text-gray-900';
+        const autoLabel = isAutoInserted ? '<span class="text-xs text-gray-500 ml-2">(auto-inserted)</span>' : '';
+        const removeButton = isAutoInserted ? '' : `<button type="button" class="text-red-600 hover:text-red-800 ml-2 remove-operation" onclick="removeOperation('${op.id}')">×</button>`;
+
+        return `
+          <div class="${bgColor} rounded px-3 py-2 flex justify-between items-center" data-operation-id="${op.id}">
+            <span class="text-sm ${textColor}">
+              <strong>${index + 1}.</strong>
+              ${op.display_name}: ${op.operation_text}
+              ${autoLabel}
+            </span>
+            ${removeButton}
+          </div>
+        `;
+      }).join('');
+    })
+    .catch(error => {
+      console.error('Error loading operations with auto-ops:', error);
+      // Fallback to basic display
+      fetch('/operations/details', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': document.querySelector('[name="csrf-token"]').getAttribute('content')
+        },
+        body: JSON.stringify({ operation_ids: selectedOperations })
+      })
+      .then(response => response.json())
+      .then(operations => {
+        selectedContainer.innerHTML = operations.map((op, index) => `
+          <div class="bg-blue-100 border border-blue-300 rounded px-3 py-2 flex justify-between items-center" data-operation-id="${op.id}">
+            <span class="text-sm"><strong>${index + 1}.</strong> ${op.display_name || op.id.replace(/_/g, ' ')}: ${op.operation_text}</span>
+            <button type="button" class="text-red-600 hover:text-red-800 ml-2 remove-operation" onclick="removeOperation('${op.id}')">×</button>
+          </div>
+        `).join('');
+      });
     });
   }
 
