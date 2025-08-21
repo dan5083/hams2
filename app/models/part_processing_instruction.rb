@@ -100,12 +100,12 @@ class PartProcessingInstruction < ApplicationRecord
     operations_with_rinses = []
     contains_enp = contains_electroless_nickel_plating?
 
-    user_operations.each_with_index do |operation, index|
+    user_operations.each do |operation|
       # Add the user operation
       operations_with_rinses << operation
 
-      # Add rinse after this operation (but not after the last operation)
-      if index < user_operations.length - 1 && OperationLibrary::RinseOperations.operation_requires_rinse?(operation)
+      # Add rinse after this operation if it requires one
+      if OperationLibrary::RinseOperations.operation_requires_rinse?(operation)
         rinse_operation = OperationLibrary::RinseOperations.get_rinse_operation(
           operation,
           ppi_contains_electroless_nickel: contains_enp
@@ -211,11 +211,11 @@ class PartProcessingInstruction < ApplicationRecord
     summary_parts = []
     contains_enp = operations.any? { |op| op.process_type == 'electroless_nickel_plating' }
 
-    operations.each_with_index do |operation, index|
+    operations.each do |operation|
       summary_parts << operation.display_name
 
-      # Add rinse preview (but not after the last operation)
-      if index < operations.length - 1 && OperationLibrary::RinseOperations.operation_requires_rinse?(operation)
+      # Add rinse preview after each operation that requires one
+      if OperationLibrary::RinseOperations.operation_requires_rinse?(operation)
         rinse_operation = OperationLibrary::RinseOperations.get_rinse_operation(
           operation,
           ppi_contains_electroless_nickel: contains_enp
