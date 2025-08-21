@@ -1,6 +1,6 @@
-# app/controllers/operations_controller.rb - Enhanced for ENP support
+# app/controllers/operations_controller.rb - FIXED for ENP filtering
 class OperationsController < ApplicationController
-  skip_before_action :verify_authenticity_token, only: [:filter, :details, :summary, :preview_with_rinses, :calculate_enp_time]
+  skip_before_action :verify_authenticity_token, only: [:filter, :details, :summary, :preview_with_rinses]
 
   def filter
     criteria = filter_params
@@ -23,9 +23,9 @@ class OperationsController < ApplicationController
       operations = operations.select { |op| (op.anodic_classes & criteria[:anodic_classes]).any? }
     end
 
-    # Filter by ENP types
+    # FIXED: Filter by ENP types (note: JavaScript sends enp_types array, but we check enp_type attribute)
     if criteria[:enp_types].present?
-      operations = operations.select { |op| criteria[:enp_types].include?(op.enp_type) }
+      operations = operations.select { |op| op.enp_type.present? && criteria[:enp_types].include?(op.enp_type) }
     end
 
     # Filter by target thickness (with tolerance) - skip for chemical conversion and ENP
@@ -71,6 +71,14 @@ class OperationsController < ApplicationController
       }
     end
 
+    # DEBUG: Log the filtering for ENP
+    if criteria[:anodising_types]&.include?('electroless_nickel_plating')
+      Rails.logger.info "🔍 ENP FILTER DEBUG:"
+      Rails.logger.info "  - Input criteria: #{criteria.inspect}"
+      Rails.logger.info "  - Found #{results.length} operations"
+      Rails.logger.info "  - Results: #{results.map { |r| "#{r[:id]} (#{r[:enp_type]})" }.join(', ')}"
+    end
+
     render json: results
   end
 
@@ -105,41 +113,10 @@ class OperationsController < ApplicationController
     render json: { summary: summary }
   end
 
-  # NEW: Preview operations with auto-inserted operations for form display
   def preview_with_auto_ops
     operation_ids = params[:operation_ids] || []
     operations_with_auto_ops = PartProcessingInstruction.simulate_operations_with_auto_ops(operation_ids)
     render json: { operations: operations_with_auto_ops }
-  end
-
-  # NEW: Calculate ENP plating time
-  def calculate_enp_time
-    operation_id = params[:operation_id]
-    target_thickness = params[:target_thickness]&.to_f
-
-    if operation_id.blank? || target_thickness.blank? || target_thickness <= 0
-      render json: { error: 'Invalid parameters' }, status: 400
-      return
-    end
-
-    operation = Operation.all_operations.find { |op| op.id == operation_id }
-
-    if operation.nil? || !operation.electroless_nickel_plating?
-      render json: { error: 'Operation not found or not ENP' }, status: 404
-      return
-    end
-
-    time_data = operation.calculate_plating_time(target_thickness)
-
-    if time_data
-      render json: {
-        operation_id: operation_id,
-        target_thickness: target_thickness,
-        time_estimate: time_data
-      }
-    else
-      render json: { error: 'Unable to calculate plating time' }, status: 500
-    end
   end
 
   private
@@ -150,7 +127,7 @@ class OperationsController < ApplicationController
       alloys: [],
       target_thicknesses: [],
       anodic_classes: [],
-      enp_types: []
+      enp_types: []  # FIXED: This needs to be plural to match JavaScript
     )
   end
 end
