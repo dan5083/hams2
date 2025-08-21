@@ -81,6 +81,7 @@ class PartProcessingInstruction < ApplicationRecord
     enabled && part&.enabled && customer&.active?
   end
 
+  # Get selected operations (user-chosen operations only)
   def get_operations
     ops = selected_operations # This now handles JSON string parsing
     return [] unless ops.present?
@@ -89,6 +90,39 @@ class PartProcessingInstruction < ApplicationRecord
     ops.map do |op_id|
       all_ops.find { |op| op.id == op_id }
     end.compact
+  end
+
+  # Get operations with auto-inserted rinses
+  def get_operations_with_rinses
+    user_operations = get_operations
+    return [] if user_operations.empty?
+
+    operations_with_rinses = []
+    contains_enp = contains_electroless_nickel_plating?
+
+    user_operations.each_with_index do |operation, index|
+      # Add the user operation
+      operations_with_rinses << operation
+
+      # Add rinse after this operation (but not after the last operation)
+      if index < user_operations.length - 1 && OperationLibrary::RinseOperations.operation_requires_rinse?(operation)
+        rinse_operation = OperationLibrary::RinseOperations.get_rinse_operation(
+          operation,
+          ppi_contains_electroless_nickel: contains_enp
+        )
+        operations_with_rinses << rinse_operation if rinse_operation
+      end
+    end
+
+    operations_with_rinses
+  end
+
+  # Check if this PPI contains electroless nickel plating
+  def contains_electroless_nickel_plating?
+    selected_operations.any? do |op_id|
+      operation = Operation.all_operations.find { |op| op.id == op_id }
+      operation&.process_type == 'electroless_nickel_plating'
+    end
   end
 
   def operation_selection
@@ -128,37 +162,41 @@ class PartProcessingInstruction < ApplicationRecord
     ops
   end
 
+  # Operations text with auto-inserted rinses
   def operations_text
-    get_operations.map.with_index(1) do |operation, index|
+    get_operations_with_rinses.map.with_index(1) do |operation, index|
       "Operation #{index}: #{operation.operation_text}"
     end.join("\n\n")
   end
 
+  # Build route card operations with auto-inserted rinses
   def build_route_card_operations
-    # Get operations from this PPI
-    operations = get_operations
+    # Get operations with rinses included
+    operations_with_rinses = get_operations_with_rinses
 
-    # Create separate operation for each selected operation
-    operations.map.with_index do |operation, index|
+    # Create separate operation for each operation (including auto-inserted rinses)
+    operations_with_rinses.map.with_index do |operation, index|
       {
         number: index + 1,
         content: [{
           type: 'paragraph',
-          as_html: operation.operation_text  # Just the operation text, not display_name
+          as_html: operation.operation_text
         }],
-        all_variables: []
+        all_variables: [],
+        auto_inserted: operation.auto_inserted? # Mark auto-inserted operations
       }
     end
   end
 
+  # Operations summary with auto-inserted rinses
   def operations_summary
-    operations = get_operations
-    return "No operations selected" if operations.empty?
+    operations_with_rinses = get_operations_with_rinses
+    return "No operations selected" if operations_with_rinses.empty?
 
-    operations.map(&:display_name).join(" → ")
+    operations_with_rinses.map(&:display_name).join(" → ")
   end
 
-  # Class method for real-time simulation during PPI building
+  # Class method for real-time simulation during PPI building (user operations only)
   def self.simulate_operations_summary(operation_ids)
     return "No operations selected" if operation_ids.blank?
 
@@ -169,7 +207,24 @@ class PartProcessingInstruction < ApplicationRecord
 
     return "Invalid operations" if operations.empty?
 
-    operations.map(&:display_name).join(" → ")
+    # For simulation, show what it would look like with rinses
+    summary_parts = []
+    contains_enp = operations.any? { |op| op.process_type == 'electroless_nickel_plating' }
+
+    operations.each_with_index do |operation, index|
+      summary_parts << operation.display_name
+
+      # Add rinse preview (but not after the last operation)
+      if index < operations.length - 1 && OperationLibrary::RinseOperations.operation_requires_rinse?(operation)
+        rinse_operation = OperationLibrary::RinseOperations.get_rinse_operation(
+          operation,
+          ppi_contains_electroless_nickel: contains_enp
+        )
+        summary_parts << rinse_operation.display_name if rinse_operation
+      end
+    end
+
+    summary_parts.join(" → ")
   end
 
   private

@@ -24,12 +24,13 @@ class Operation
     operations += OperationLibrary::AnodisingHard.operations if defined?(OperationLibrary::AnodisingHard)
     operations += OperationLibrary::AnodisingChromic.operations if defined?(OperationLibrary::AnodisingChromic)
     operations += OperationLibrary::ChemicalConversions.operations if defined?(OperationLibrary::ChemicalConversions)
+    operations += OperationLibrary::RinseOperations.operations if defined?(OperationLibrary::RinseOperations)
     operations
   end
 
-  # Filter operations by criteria
+  # Filter operations by criteria (excluding rinse operations from normal filtering)
   def self.find_matching(process_type: nil, alloy: nil, target_thickness: nil, anodic_class: nil)
-    matching = all_operations
+    matching = all_operations.reject { |op| op.process_type == 'rinse' } # Exclude rinses from normal filtering
 
     matching = matching.select { |op| op.process_type == process_type } if process_type.present?
     matching = matching.select { |op| op.alloys.include?(alloy) } if alloy.present?
@@ -42,7 +43,6 @@ class Operation
         # Exact match or within reasonable tolerance (±2.5μm)
         (op.target_thickness - target).abs <= 2.5
       end
-
       # Sort by closest thickness match first
       matching = matching.sort_by { |op| (op.target_thickness - target).abs }
     end
@@ -50,26 +50,40 @@ class Operation
     matching
   end
 
-  # Get available options for dropdowns
+  # Get available options for dropdowns (excluding rinse operations)
   def self.available_process_types
-    all_operations.map(&:process_type).uniq.sort
+    all_operations.reject { |op| op.process_type == 'rinse' }.map(&:process_type).uniq.sort
   end
 
   def self.available_alloys
-    all_operations.flat_map(&:alloys).uniq.sort
+    all_operations.reject { |op| op.process_type == 'rinse' }.flat_map(&:alloys).uniq.sort
   end
 
   def self.available_anodic_classes
-    all_operations.flat_map(&:anodic_classes).uniq.sort
+    all_operations.reject { |op| op.process_type == 'rinse' }.flat_map(&:anodic_classes).uniq.sort
   end
 
   def self.available_thicknesses
-    all_operations.map(&:target_thickness).uniq.select { |t| t > 0 }.sort
+    all_operations.reject { |op| op.process_type == 'rinse' }.map(&:target_thickness).uniq.select { |t| t > 0 }.sort
+  end
+
+  # Get rinse operations specifically
+  def self.rinse_operations
+    all_operations.select { |op| op.process_type == 'rinse' }
   end
 
   # Instance methods
   def display_name
-    if target_thickness > 0
+    if process_type == 'rinse'
+      case id
+      when 'CASCADE_RINSE'
+        'Cascade Rinse'
+      when 'RO_RINSE'
+        'RO Rinse'
+      else
+        'Rinse'
+      end
+    elsif target_thickness > 0
       "#{id} (#{target_thickness}μm)"
     else
       id.humanize
@@ -105,7 +119,18 @@ class Operation
       anodic_classes: anodic_classes,
       target_thickness: target_thickness,
       vat_numbers: vat_numbers,
-      operation_text: operation_text
+      operation_text: operation_text,
+      specifications: specifications
     }
+  end
+
+  # Check if this operation is a rinse
+  def rinse?
+    process_type == 'rinse'
+  end
+
+  # Check if this operation is auto-inserted (rinse operations are auto-inserted)
+  def auto_inserted?
+    rinse?
   end
 end

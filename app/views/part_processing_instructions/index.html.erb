@@ -70,13 +70,14 @@
               <%= ppi.customer.name %>
             </td>
             <td class="px-6 py-4 text-sm text-gray-900">
-              <% if ppi.selected_operations.any? %>
+              <% operations_with_rinses = ppi.get_operations_with_rinses %>
+              <% if operations_with_rinses.any? %>
                 <div class="space-y-1">
-                  <% ppi.get_operations.each_with_index do |operation, index| %>
+                  <% operations_with_rinses.each_with_index do |operation, index| %>
                     <% if operation %>
                       <div class="text-xs">
                         <span class="font-medium text-blue-600"><%= index + 1 %>.</span>
-                        <span class="text-gray-700">
+                        <span class="text-gray-700 <%= 'italic text-gray-500' if operation.auto_inserted? %>">
                           <% if operation.process_type == 'chemical_conversion' %>
                             <%= operation.id.humanize %>
                           <% else %>
@@ -185,7 +186,7 @@
                       method: :delete,
                       form: {
                         class: "inline",
-                        data: { confirm: "Are you sure you want to delete this PPI? This cannot be undone." }
+                        data: { confirm: "Are you sure you want to delete this PPI? This cannot undone." }
                       },
                       class: "text-red-600 hover:text-red-900" %>
                 <% end %>
@@ -212,7 +213,8 @@
         <h3 class="text-sm font-medium text-blue-800">About Part Processing Instructions</h3>
         <div class="mt-2 text-sm text-blue-700">
           <p>Part Processing Instructions (PPIs) use operation-based selection. Choose your treatment criteria
-          and select up to 3 operations in sequence. Supports anodising, chemical conversion, and other surface treatments.
+          and select up to 3 operations in sequence. Rinse operations are automatically inserted between chemical processes.
+          Supports anodising, chemical conversion, and other surface treatments.
           The specification is automatically generated from your selections.</p>
         </div>
       </div>
