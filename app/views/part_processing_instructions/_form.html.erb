@@ -97,24 +97,29 @@
 
   <!-- Main Treatment Selection -->
   <div class="bg-white shadow rounded-lg p-6">
-    <h3 class="text-lg font-medium text-gray-900 mb-4">Main Treatment Selection</h3>
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Treatment Selection</h3>
     <p class="text-sm text-gray-600 mb-4">Select up to 3 treatments (in the order you wish them to appear in the operations)</p>
 
     <!-- Treatment Type Buttons -->
-    <div class="flex space-x-4 mb-6">
-      <button type="button" id="standard-btn" class="treatment-btn flex items-center justify-between px-4 py-2 border-2 border-gray-300 rounded-md hover:border-blue-500 transition-colors" data-treatment="standard_anodising">
+    <div class="grid grid-cols-2 gap-3 mb-6 sm:grid-cols-4">
+      <button type="button" id="standard-btn" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-blue-500 transition-colors text-sm" data-treatment="standard_anodising">
         <span>Standard</span>
-        <span class="count-badge ml-2 min-w-[24px] h-6 bg-gray-100 rounded-full flex items-center justify-center text-sm font-medium">0</span>
+        <span class="count-badge ml-2 min-w-[20px] h-5 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">0</span>
       </button>
 
-      <button type="button" id="hard-btn" class="treatment-btn flex items-center justify-between px-4 py-2 border-2 border-gray-300 rounded-md hover:border-blue-500 transition-colors" data-treatment="hard_anodising">
+      <button type="button" id="hard-btn" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-purple-500 transition-colors text-sm" data-treatment="hard_anodising">
         <span>Hard</span>
-        <span class="count-badge ml-2 min-w-[24px] h-6 bg-gray-100 rounded-full flex items-center justify-center text-sm font-medium">0</span>
+        <span class="count-badge ml-2 min-w-[20px] h-5 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">0</span>
       </button>
 
-      <button type="button" id="chromic-btn" class="treatment-btn flex items-center justify-between px-4 py-2 border-2 border-gray-300 rounded-md hover:border-blue-500 transition-colors" data-treatment="chromic_anodising">
+      <button type="button" id="chromic-btn" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-green-500 transition-colors text-sm" data-treatment="chromic_anodising">
         <span>Chromic</span>
-        <span class="count-badge ml-2 min-w-[24px] h-6 bg-gray-100 rounded-full flex items-center justify-center text-sm font-medium">0</span>
+        <span class="count-badge ml-2 min-w-[20px] h-5 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">0</span>
+      </button>
+
+      <button type="button" id="chemical-btn" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-orange-500 transition-colors text-sm" data-treatment="chemical_conversion">
+        <span>Chemical Conv.</span>
+        <span class="count-badge ml-2 min-w-[20px] h-5 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">0</span>
       </button>
     </div>
 
@@ -193,7 +198,7 @@
       <div class="ml-3">
         <h3 class="text-sm font-medium text-blue-800">Operation-Based PPI Creation</h3>
         <div class="mt-2 text-sm text-blue-700">
-          <p>Select your anodising criteria above and choose up to 3 operations in sequence. The specification will be automatically generated from your selections.</p>
+          <p>Select your treatment criteria above and choose up to 3 operations in sequence. Supports anodising, chemical conversion, and other surface treatments. The specification will be automatically generated from your selections.</p>
         </div>
       </div>
     </div>
@@ -218,7 +223,7 @@ document.addEventListener('turbo:load', function() {
   const treatmentCriteriaContainer = document.getElementById('treatment-criteria-container');
 
   let selectedOperations = [];
-  let treatmentCounts = { standard_anodising: 0, hard_anodising: 0, chromic_anodising: 0 };
+  let treatmentCounts = { standard_anodising: 0, hard_anodising: 0, chromic_anodising: 0, chemical_conversion: 0 };
   let totalTreatments = 0;
 
   // Initialize with existing data
@@ -244,11 +249,18 @@ document.addEventListener('turbo:load', function() {
         treatmentCounts[treatment] = 1;
         totalTreatments++;
 
-        // Update button appearance
+        // Update button appearance with treatment-specific colors
         this.classList.remove('border-gray-300');
-        this.classList.add('border-blue-500', 'bg-blue-50');
+        const colors = {
+          'standard_anodising': ['border-blue-500', 'bg-blue-50', 'bg-blue-500'],
+          'hard_anodising': ['border-purple-500', 'bg-purple-50', 'bg-purple-500'],
+          'chromic_anodising': ['border-green-500', 'bg-green-50', 'bg-green-500'],
+          'chemical_conversion': ['border-orange-500', 'bg-orange-50', 'bg-orange-500']
+        };
+
+        this.classList.add(colors[treatment][0], colors[treatment][1]);
         countBadge.classList.remove('bg-gray-100');
-        countBadge.classList.add('bg-blue-500', 'text-white');
+        countBadge.classList.add(colors[treatment][2], 'text-white');
         countBadge.textContent = '1';
 
         updateTreatmentCriteria();
@@ -265,7 +277,25 @@ document.addEventListener('turbo:load', function() {
     }
 
     treatmentCriteriaContainer.innerHTML = activeTreatments.map((treatment, index) => {
-      const treatmentName = treatment.replace('_anodising', '').charAt(0).toUpperCase() + treatment.replace('_anodising', '').slice(1);
+      const treatmentName = treatment.replace('_anodising', '').replace('_conversion', '').charAt(0).toUpperCase() + treatment.replace('_anodising', '').replace('_conversion', '').slice(1);
+
+      // Chemical conversion doesn't need alloy/thickness selection
+      if (treatment === 'chemical_conversion') {
+        return `
+          <div class="border border-orange-200 rounded-lg p-4 bg-orange-50">
+            <h4 class="font-medium text-gray-900 mb-3">${treatmentName} Treatment ${index + 1}</h4>
+            <p class="text-sm text-gray-600 mb-3">Chemical conversion operations will be available below - no additional criteria needed.</p>
+
+            <!-- Operations for this treatment -->
+            <div class="mt-4">
+              <h5 class="text-sm font-medium text-gray-700 mb-2">Available Operations</h5>
+              <div class="operations-list-${index} space-y-1 max-h-32 overflow-y-auto border border-gray-200 rounded p-2 bg-white">
+                <p class="text-gray-500 text-xs">Loading chemical conversion operations...</p>
+              </div>
+            </div>
+          </div>
+        `;
+      }
 
       return `
         <div class="border border-gray-200 rounded-lg p-4">
@@ -324,8 +354,9 @@ document.addEventListener('turbo:load', function() {
       `;
     }).join('');
 
-    // Add event listeners to the new selects
+    // Add event listeners to the new selects and load chemical conversion operations
     addSelectEventListeners();
+    loadChemicalConversionOperations();
   }
 
   function addSelectEventListeners() {
@@ -335,11 +366,41 @@ document.addEventListener('turbo:load', function() {
     });
   }
 
+  function loadChemicalConversionOperations() {
+    const activeTreatments = Object.keys(treatmentCounts).filter(t => treatmentCounts[t] > 0);
+    const chemicalIndex = activeTreatments.indexOf('chemical_conversion');
+
+    if (chemicalIndex !== -1) {
+      const operationsList = document.querySelector(`.operations-list-${chemicalIndex}`);
+
+      // Fetch all chemical conversion operations
+      fetch('/operations/filter', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': document.querySelector('[name="csrf-token"]').getAttribute('content')
+        },
+        body: JSON.stringify({ anodising_types: ['chemical_conversion'] })
+      })
+      .then(response => response.json())
+      .then(operations => {
+        displayOperationsForTreatment(operations, operationsList, 'chemical_conversion');
+      })
+      .catch(error => {
+        console.error('Error loading chemical conversion operations:', error);
+        operationsList.innerHTML = '<p class="text-red-500 text-xs">Error loading operations</p>';
+      });
+    }
+  }
+
   function filterOperationsForTreatment(event) {
     const select = event.target;
     const treatment = select.dataset.treatment;
     const treatmentIndex = Object.keys(treatmentCounts).filter(t => treatmentCounts[t] > 0).indexOf(treatment);
     const operationsList = document.querySelector(`.operations-list-${treatmentIndex}`);
+
+    // Skip filtering for chemical conversion
+    if (treatment === 'chemical_conversion') return;
 
     // Get all criteria for this treatment
     const alloySelect = treatmentCriteriaContainer.querySelector(`.alloy-select[data-treatment="${treatment}"]`);
@@ -384,16 +445,20 @@ document.addEventListener('turbo:load', function() {
       return;
     }
 
-    container.innerHTML = operations.map(op => `
-      <div class="bg-white border border-gray-200 rounded px-2 py-1 cursor-pointer hover:bg-gray-50 text-xs ${selectedOperations.includes(op.id) ? 'opacity-50' : ''}"
-           data-operation-id="${op.id}" onclick="selectOperation('${op.id}', this)">
-        <div class="flex justify-between items-center">
-          <span class="font-medium">${op.display_name}</span>
-          <button type="button" class="text-green-600 hover:text-green-800">+</button>
+    container.innerHTML = operations.map(op => {
+      const displayText = treatment === 'chemical_conversion' ? op.id.replace(/_/g, ' ') : op.display_name;
+      return `
+        <div class="bg-white border border-gray-200 rounded px-2 py-1 cursor-pointer hover:bg-gray-50 text-xs ${selectedOperations.includes(op.id) ? 'opacity-50' : ''}"
+             data-operation-id="${op.id}" onclick="selectOperation('${op.id}', this)">
+          <div class="flex justify-between items-center">
+            <span class="font-medium">${displayText}</span>
+            <button type="button" class="text-green-600 hover:text-green-800">+</button>
+          </div>
+          <p class="text-gray-600 mt-1">${op.operation_text}</p>
+          ${op.specifications ? `<p class="text-purple-600 text-xs mt-1">${op.specifications}</p>` : ''}
         </div>
-        <p class="text-gray-600 mt-1">${op.operation_text}</p>
-      </div>
-    `).join('');
+      `;
+    }).join('');
   }
 
   window.selectOperation = function(operationId, element) {
@@ -430,7 +495,7 @@ document.addEventListener('turbo:load', function() {
     .then(operations => {
       selectedContainer.innerHTML = operations.map((op, index) => `
         <div class="bg-blue-100 border border-blue-300 rounded px-3 py-2 flex justify-between items-center" data-operation-id="${op.id}">
-          <span class="text-sm"><strong>${index + 1}.</strong> ${op.display_name}: ${op.operation_text}</span>
+          <span class="text-sm"><strong>${index + 1}.</strong> ${op.display_name || op.id.replace(/_/g, ' ')}: ${op.operation_text}</span>
           <button type="button" class="text-red-600 hover:text-red-800 ml-2 remove-operation" onclick="removeOperation('${op.id}')">×</button>
         </div>
       `).join('');
