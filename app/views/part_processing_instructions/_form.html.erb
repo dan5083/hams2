@@ -136,29 +136,32 @@
       </div>
     </div>
 
-    <!-- Selected Operations -->
+    <!-- Selected Treatments -->
     <div class="mt-6">
-      <h4 class="text-md font-medium text-gray-900 mb-3">Selected Operations (up to 3, in order)</h4>
-
-      <!-- Live Process Preview -->
-      <div class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
-        <div id="operations-preview" class="text-sm">
-          <span class="text-gray-500">No operations selected</span>
-        </div>
-      </div>
+      <h4 class="text-md font-medium text-gray-900 mb-3">Selected Treatments (up to 3, in order)</h4>
 
       <div id="selected-container" class="space-y-2 min-h-[60px] border border-gray-200 rounded p-3 bg-gray-50">
-        <% if ppi.selected_operations.any? %>
-          <% ppi.selected_operations.each_with_index do |op_id, index| %>
-            <% if operation = Operation.all_operations.find { |op| op.id == op_id } %>
-              <div class="bg-blue-100 border border-blue-300 rounded px-3 py-2 flex justify-between items-center" data-operation-id="<%= op_id %>">
-                <span class="text-sm"><strong><%= index + 1 %>.</strong> <%= operation.display_name %>: <%= operation.operation_text %></span>
-                <button type="button" class="text-red-600 hover:text-red-800 ml-2 remove-operation">×</button>
+        <% operations_with_auto_ops = ppi.respond_to?(:get_operations_with_auto_ops) ? ppi.get_operations_with_auto_ops : [] %>
+        <% if operations_with_auto_ops.any? %>
+          <% operations_with_auto_ops.each_with_index do |operation, index| %>
+            <% if operation %>
+              <% is_auto_inserted = operation.respond_to?(:auto_inserted?) && operation.auto_inserted? %>
+              <div class="<%= is_auto_inserted ? 'bg-gray-100 border border-gray-300' : 'bg-blue-100 border border-blue-300' %> rounded px-3 py-2 flex justify-between items-center" data-operation-id="<%= operation.id %>">
+                <span class="text-sm <%= 'italic text-gray-600' if is_auto_inserted %>">
+                  <strong><%= index + 1 %>.</strong>
+                  <%= operation.display_name %>: <%= operation.operation_text %>
+                  <% if is_auto_inserted %>
+                    <span class="text-xs text-gray-500 ml-2">(auto-inserted)</span>
+                  <% end %>
+                </span>
+                <% unless is_auto_inserted %>
+                  <button type="button" class="text-red-600 hover:text-red-800 ml-2 remove-operation" data-operation-id="<%= operation.id %>">×</button>
+                <% end %>
               </div>
             <% end %>
           <% end %>
         <% else %>
-          <p class="text-gray-500 text-sm">No operations selected</p>
+          <p class="text-gray-500 text-sm">No treatments selected</p>
         <% end %>
       </div>
     </div>
@@ -198,7 +201,7 @@
       <div class="ml-3">
         <h3 class="text-sm font-medium text-blue-800">Operation-Based PPI Creation</h3>
         <div class="mt-2 text-sm text-blue-700">
-          <p>Select your treatment criteria above and choose up to 3 operations in sequence. Supports anodising, chemical conversion, and other surface treatments. The specification will be automatically generated from your selections.</p>
+          <p>Select your treatment criteria above and choose up to 3 operations in sequence. Auto-operations (like rinses) are automatically inserted between chemical processes. Supports anodising, chemical conversion, and other surface treatments. The specification will be automatically generated from your selections.</p>
         </div>
       </div>
     </div>
@@ -470,7 +473,6 @@ document.addEventListener('turbo:load', function() {
 
     selectedOperations.push(operationId);
     updateSelectedOperations();
-    updateOperationsPreview();
     element.classList.add('opacity-50');
   };
 
@@ -478,11 +480,11 @@ document.addEventListener('turbo:load', function() {
     selectedOperationsField.value = JSON.stringify(selectedOperations);
 
     if (selectedOperations.length === 0) {
-      selectedContainer.innerHTML = '<p class="text-gray-500 text-sm">No operations selected</p>';
+      selectedContainer.innerHTML = '<p class="text-gray-500 text-sm">No treatments selected</p>';
       return;
     }
 
-    // Get operation details and display
+    // Get operation details with rinses and display
     fetch('/operations/details', {
       method: 'POST',
       headers: {
@@ -493,6 +495,7 @@ document.addEventListener('turbo:load', function() {
     })
     .then(response => response.json())
     .then(operations => {
+      // For now, just show user operations - we'll enhance this to show rinses
       selectedContainer.innerHTML = operations.map((op, index) => `
         <div class="bg-blue-100 border border-blue-300 rounded px-3 py-2 flex justify-between items-center" data-operation-id="${op.id}">
           <span class="text-sm"><strong>${index + 1}.</strong> ${op.display_name || op.id.replace(/_/g, ' ')}: ${op.operation_text}</span>
@@ -505,48 +508,13 @@ document.addEventListener('turbo:load', function() {
   window.removeOperation = function(operationId) {
     selectedOperations = selectedOperations.filter(id => id !== operationId);
     updateSelectedOperations();
-    updateOperationsPreview();
     // Refresh all operations lists to remove opacity
     document.querySelectorAll(`[data-operation-id="${operationId}"]`).forEach(el => {
       el.classList.remove('opacity-50');
     });
   };
 
-  function updateOperationsPreview() {
-    const previewElement = document.getElementById('operations-preview');
-
-    if (selectedOperations.length === 0) {
-      previewElement.innerHTML = '<span class="text-gray-500">No operations selected</span>';
-      return;
-    }
-
-    // Make AJAX call to get live preview
-    fetch('/operations/summary', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-Token': document.querySelector('[name="csrf-token"]').getAttribute('content')
-      },
-      body: JSON.stringify({ operation_ids: selectedOperations })
-    })
-    .then(response => response.json())
-    .then(data => {
-      previewElement.innerHTML = `
-        <div class="flex items-center space-x-2">
-          <span class="font-medium text-blue-800">Process Flow:</span>
-          <span class="text-blue-700">${data.summary}</span>
-          <span class="text-xs text-blue-600">(${selectedOperations.length}/3 operations)</span>
-        </div>
-      `;
-    })
-    .catch(error => {
-      console.error('Error updating preview:', error);
-      previewElement.innerHTML = '<span class="text-red-500">Error loading preview</span>';
-    });
-  }
-
   // Initialize display
   updateSelectedOperations();
-  updateOperationsPreview();
 });
 </script>

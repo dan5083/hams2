@@ -92,37 +92,54 @@ class PartProcessingInstruction < ApplicationRecord
     end.compact
   end
 
-  # Get operations with auto-inserted rinses
-  def get_operations_with_rinses
+  # Get operations with auto-inserted operations (rinses, pre-treatments, etc.)
+  def get_operations_with_auto_ops
     user_operations = get_operations
     return [] if user_operations.empty?
 
-    operations_with_rinses = []
-    contains_enp = contains_electroless_nickel_plating?
+    operations_with_auto_ops = []
+    has_special_requirements = has_special_auto_op_requirements?
 
     user_operations.each do |operation|
       # Add the user operation
-      operations_with_rinses << operation
+      operations_with_auto_ops << operation
 
-      # Add rinse after this operation if it requires one
-      if OperationLibrary::RinseOperations.operation_requires_rinse?(operation)
-        rinse_operation = OperationLibrary::RinseOperations.get_rinse_operation(
-          operation,
-          ppi_contains_electroless_nickel: contains_enp
-        )
-        operations_with_rinses << rinse_operation if rinse_operation
-      end
+      # Add auto-operations after this operation if it requires them
+      auto_ops = get_auto_operations_after(operation, has_special_requirements)
+      operations_with_auto_ops.concat(auto_ops)
     end
 
-    operations_with_rinses
+    operations_with_auto_ops
   end
 
-  # Check if this PPI contains electroless nickel plating
-  def contains_electroless_nickel_plating?
+  # Check if this PPI has special auto-operation requirements (electroless nickel plating, etc.)
+  def has_special_auto_op_requirements?
     selected_operations.any? do |op_id|
       operation = Operation.all_operations.find { |op| op.id == op_id }
       operation&.process_type == 'electroless_nickel_plating'
     end
+  end
+
+  # Get auto-operations that should be inserted after a given operation
+  def get_auto_operations_after(operation, has_special_requirements = false)
+    auto_ops = []
+
+    # Add rinse operations (first type of auto-operation)
+    if OperationLibrary::RinseOperations.operation_requires_rinse?(operation)
+      rinse_operation = OperationLibrary::RinseOperations.get_rinse_operation(
+        operation,
+        ppi_contains_electroless_nickel: has_special_requirements
+      )
+      auto_ops << rinse_operation if rinse_operation
+    end
+
+    # Future auto-operations can be added here:
+    # - Drying operations
+    # - Quality checks
+    # - Pre-treatments
+    # - etc.
+
+    auto_ops
   end
 
   def operation_selection
@@ -162,20 +179,20 @@ class PartProcessingInstruction < ApplicationRecord
     ops
   end
 
-  # Operations text with auto-inserted rinses
+  # Operations text with auto-inserted operations
   def operations_text
-    get_operations_with_rinses.map.with_index(1) do |operation, index|
+    get_operations_with_auto_ops.map.with_index(1) do |operation, index|
       "Operation #{index}: #{operation.operation_text}"
     end.join("\n\n")
   end
 
-  # Build route card operations with auto-inserted rinses
+  # Build route card operations with auto-inserted operations
   def build_route_card_operations
-    # Get operations with rinses included
-    operations_with_rinses = get_operations_with_rinses
+    # Get operations with auto-ops included
+    operations_with_auto_ops = get_operations_with_auto_ops
 
-    # Create separate operation for each operation (including auto-inserted rinses)
-    operations_with_rinses.map.with_index do |operation, index|
+    # Create separate operation for each operation (including auto-inserted ones)
+    operations_with_auto_ops.map.with_index do |operation, index|
       {
         number: index + 1,
         content: [{
@@ -188,43 +205,68 @@ class PartProcessingInstruction < ApplicationRecord
     end
   end
 
-  # Operations summary with auto-inserted rinses
+  # Operations summary with auto-inserted operations
   def operations_summary
-    operations_with_rinses = get_operations_with_rinses
-    return "No operations selected" if operations_with_rinses.empty?
+    operations_with_auto_ops = get_operations_with_auto_ops
+    return "No operations selected" if operations_with_auto_ops.empty?
 
-    operations_with_rinses.map(&:display_name).join(" → ")
+    operations_with_auto_ops.map(&:display_name).join(" → ")
   end
 
-  # Class method for real-time simulation during PPI building (user operations only)
-  def self.simulate_operations_summary(operation_ids)
-    return "No operations selected" if operation_ids.blank?
+  # Class method for real-time simulation during PPI building
+  # Returns detailed operation data for form preview (including auto-operations)
+  def self.simulate_operations_with_auto_ops(operation_ids)
+    return [] if operation_ids.blank?
 
     all_ops = Operation.all_operations
-    operations = operation_ids.map do |op_id|
+    user_operations = operation_ids.map do |op_id|
       all_ops.find { |op| op.id == op_id }
     end.compact
 
-    return "Invalid operations" if operations.empty?
+    return [] if user_operations.empty?
 
-    # For simulation, show what it would look like with rinses
-    summary_parts = []
-    contains_enp = operations.any? { |op| op.process_type == 'electroless_nickel_plating' }
+    # Build operations with auto-ops for preview
+    operations_with_auto_ops = []
+    has_special_requirements = user_operations.any? { |op| op.process_type == 'electroless_nickel_plating' }
 
-    operations.each do |operation|
-      summary_parts << operation.display_name
+    user_operations.each do |operation|
+      # Add the user operation
+      operations_with_auto_ops << {
+        id: operation.id,
+        display_name: operation.display_name,
+        operation_text: operation.operation_text,
+        auto_inserted: false
+      }
 
-      # Add rinse preview after each operation that requires one
+      # Add auto-operations after this operation
+      # For now, just rinse operations, but extensible for future auto-ops
       if OperationLibrary::RinseOperations.operation_requires_rinse?(operation)
         rinse_operation = OperationLibrary::RinseOperations.get_rinse_operation(
           operation,
-          ppi_contains_electroless_nickel: contains_enp
+          ppi_contains_electroless_nickel: has_special_requirements
         )
-        summary_parts << rinse_operation.display_name if rinse_operation
+        if rinse_operation
+          operations_with_auto_ops << {
+            id: rinse_operation.id,
+            display_name: rinse_operation.display_name,
+            operation_text: rinse_operation.operation_text,
+            auto_inserted: true
+          }
+        end
       end
+
+      # Future auto-operations can be added here
     end
 
-    summary_parts.join(" → ")
+    operations_with_auto_ops
+  end
+
+  # Legacy method for summary text (keep for compatibility)
+  def self.simulate_operations_summary(operation_ids)
+    operations_with_auto_ops = simulate_operations_with_auto_ops(operation_ids)
+    return "No operations selected" if operations_with_auto_ops.empty?
+
+    operations_with_auto_ops.map { |op| op[:display_name] }.join(" → ")
   end
 
   private

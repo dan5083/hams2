@@ -70,10 +70,10 @@
               <%= ppi.customer.name %>
             </td>
             <td class="px-6 py-4 text-sm text-gray-900">
-              <% operations_with_rinses = ppi.get_operations_with_rinses %>
-              <% if operations_with_rinses.any? %>
+              <% operations_with_auto_ops = ppi.get_operations_with_auto_ops %>
+              <% if operations_with_auto_ops.any? %>
                 <div class="space-y-1">
-                  <% operations_with_rinses.each_with_index do |operation, index| %>
+                  <% operations_with_auto_ops.each_with_index do |operation, index| %>
                     <% if operation %>
                       <div class="text-xs">
                         <span class="font-medium text-blue-600"><%= index + 1 %>.</span>
@@ -213,7 +213,7 @@
         <h3 class="text-sm font-medium text-blue-800">About Part Processing Instructions</h3>
         <div class="mt-2 text-sm text-blue-700">
           <p>Part Processing Instructions (PPIs) use operation-based selection. Choose your treatment criteria
-          and select up to 3 operations in sequence. Rinse operations are automatically inserted between chemical processes.
+          and select up to 3 operations in sequence. Auto-operations (like rinses) are automatically inserted between chemical processes.
           Supports anodising, chemical conversion, and other surface treatments.
           The specification is automatically generated from your selections.</p>
         </div>

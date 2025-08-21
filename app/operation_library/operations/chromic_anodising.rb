@@ -1,4 +1,4 @@
-# app/operation_library/anodising/chromic_anodising.rb
+# app/operation_library/operations/chromic_anodising.rb
 module OperationLibrary
   class AnodisingChromic
     def self.operations

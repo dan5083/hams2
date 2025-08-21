@@ -34,6 +34,7 @@ Rails.application.routes.draw do
       post :filter
       post :details
       post :summary
+      post :preview_with_auto_ops
     end
   end
 

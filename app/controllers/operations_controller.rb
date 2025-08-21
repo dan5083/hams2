@@ -1,6 +1,6 @@
 # app/controllers/operations_controller.rb
 class OperationsController < ApplicationController
-  skip_before_action :verify_authenticity_token, only: [:filter, :details]
+  skip_before_action :verify_authenticity_token, only: [:filter, :details, :summary, :preview_with_rinses]
 
   def filter
     criteria = filter_params
@@ -90,6 +90,13 @@ class OperationsController < ApplicationController
     operation_ids = params[:operation_ids] || []
     summary = PartProcessingInstruction.simulate_operations_summary(operation_ids)
     render json: { summary: summary }
+  end
+
+  # NEW: Preview operations with auto-inserted operations for form display
+  def preview_with_auto_ops
+    operation_ids = params[:operation_ids] || []
+    operations_with_auto_ops = PartProcessingInstruction.simulate_operations_with_auto_ops(operation_ids)
+    render json: { operations: operations_with_auto_ops }
   end
 
   private
