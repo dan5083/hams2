@@ -1,15 +1,11 @@
 <%# app/views/part_processing_instructions/_form.html.erb %>
 <%= form_with model: ppi, local: true, class: "space-y-6",
     data: {
-      controller: "ppi-form--treatment-selection ppi-form--operations-filter ppi-form--operation-selection ppi-form--enp-calculator",
-      ppi_form__operations_filter_filter_path_value: "/operations/filter",
-      ppi_form__operations_filter_csrf_token_value: form_authenticity_token,
-      ppi_form__operation_selection_preview_path_value: "/operations/preview_with_auto_ops",
-      ppi_form__operation_selection_csrf_token_value: form_authenticity_token,
-      ppi_form__treatment_selection_outlet: ".ppi-form--treatment-selection",
-      ppi_form__operations_filter_outlet: ".ppi-form--operations-filter",
-      ppi_form__operation_selection_outlet: ".ppi-form--operation-selection",
-      ppi_form__enp_calculator_outlet: ".ppi-form--enp-calculator"
+      controller: "ppi-treatment-selection ppi-operations-filter ppi-operation-selection ppi-enp-calculator",
+      ppi_operations_filter_filter_path_value: "/operations/filter",
+      ppi_operations_filter_csrf_token_value: form_authenticity_token,
+      ppi_operation_selection_preview_path_value: "/operations/preview_with_auto_ops",
+      ppi_operation_selection_csrf_token_value: form_authenticity_token
     } do |form| %>
   <% if @part.present? %>
     <%= hidden_field_tag :part_id, @part.id %>
@@ -140,7 +136,7 @@
     </div>
 
     <!-- Dynamic Treatment Criteria -->
-    <div data-ppi-form--treatment-selection-target="criteriaContainer" class="space-y-6">
+    <div data-ppi-treatment-selection-target="criteriaContainer" class="space-y-6">
       <p class="text-gray-500 text-sm">Select treatment types above to configure criteria</p>
     </div>
 
@@ -148,7 +144,7 @@
     <div class="mt-6">
       <h4 class="text-md font-medium text-gray-900 mb-3">Operations Preview</h4>
 
-      <div data-ppi-form--operation-selection-target="selectedContainer" class="space-y-2 min-h-[60px] border border-gray-200 rounded p-3 bg-gray-50">
+      <div data-ppi-operation-selection-target="selectedContainer" class="space-y-2 min-h-[60px] border border-gray-200 rounded p-3 bg-gray-50">
         <% operations_with_auto_ops = ppi.respond_to?(:get_operations_with_auto_ops) ? ppi.get_operations_with_auto_ops : [] %>
         <% if operations_with_auto_ops.any? %>
           <% operations_with_auto_ops.each_with_index do |operation, index| %>
@@ -163,7 +159,7 @@
                   <% end %>
                 </span>
                 <% unless is_auto_inserted %>
-                  <button type="button" class="text-red-600 hover:text-red-800 ml-2" data-action="click->ppi-form--operation-selection#removeOperation" data-ppi-form--operation-selection-operation-id-param="<%= operation.id %>">×</button>
+                  <button type="button" class="text-red-600 hover:text-red-800 ml-2" data-action="click->ppi-operation-selection#removeOperation" data-ppi-operation-selection-operation-id-param="<%= operation.id %>">×</button>
                 <% end %>
               </div>
             <% end %>
@@ -177,7 +173,7 @@
     <!-- Hidden field for selected operations -->
     <%= hidden_field_tag "part_processing_instruction[customisation_data][operation_selection][selected_operations]",
         ppi.selected_operations.to_json,
-        data: { ppi_form__operation_selection_target: "selectedOperationsField" } %>
+        data: { ppi_operation_selection_target: "selectedOperationsField" } %>
   </div>
 
   <!-- Specification (will be auto-generated from operations) -->
