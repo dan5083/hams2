@@ -130,7 +130,7 @@ class PartProcessingInstruction < ApplicationRecord
       operations_with_auto_ops << degrease_operation
     end
 
-    # 6. Add user operations and their rinses, plus ENP Strip Mask operations
+    # 6. Add user operations and their rinses
     user_operations.each do |operation|
       # Add the user operation with interpolated text
       operations_with_auto_ops << operation
@@ -145,18 +145,18 @@ class PartProcessingInstruction < ApplicationRecord
           operations_with_auto_ops << rinse_operation
         end
       end
-
-      # Add ENP Strip Mask operations after ENP operations
-      if operation.process_type == 'electroless_nickel_plating' && has_enp_strip_mask_operations?
-        enp_strip_operations = get_enp_strip_mask_operations_for_sequence
-        operations_with_auto_ops += enp_strip_operations
-      end
     end
 
-    # 7. Auto-insert unjig before final inspection
+    # 7. Auto-insert unjig before ENP Strip Mask operations
     if OperationLibrary::JigUnjig.unjigging_required?(user_operations)
       unjig_operation = OperationLibrary::JigUnjig.get_unjig_operation
       operations_with_auto_ops << unjig_operation
+    end
+
+    # 7.5. Add ENP Strip Mask operations after unjig
+    if has_enp_strip_mask_operations?
+      enp_strip_operations = get_enp_strip_mask_operations_for_sequence
+      operations_with_auto_ops += enp_strip_operations
     end
 
     # 8. Auto-insert final inspection before pack
@@ -394,21 +394,9 @@ class PartProcessingInstruction < ApplicationRecord
           }
         end
       end
-
-      # Add ENP Strip Mask operations after ENP operations
-      if operation.process_type == 'electroless_nickel_plating' && has_enp_strip_mask
-        enp_strip_operations.each do |enp_strip_op|
-          operations_with_auto_ops << {
-            id: enp_strip_op.id,
-            display_name: enp_strip_op.display_name,
-            operation_text: enp_strip_op.operation_text,
-            auto_inserted: false
-          }
-        end
-      end
     end
 
-    # 7. Auto-insert unjig before final inspection
+    # 7. Auto-insert unjig before ENP Strip Mask operations
     if OperationLibrary::JigUnjig.unjigging_required?(user_operations)
       unjig_operation = OperationLibrary::JigUnjig.get_unjig_operation
       operations_with_auto_ops << {
@@ -417,6 +405,18 @@ class PartProcessingInstruction < ApplicationRecord
         operation_text: unjig_operation.operation_text,
         auto_inserted: true
       }
+    end
+
+    # 7.5. Add ENP Strip Mask operations after unjig
+    if has_enp_strip_mask
+      enp_strip_operations.each do |enp_strip_op|
+        operations_with_auto_ops << {
+          id: enp_strip_op.id,
+          display_name: enp_strip_op.display_name,
+          operation_text: enp_strip_op.operation_text,
+          auto_inserted: false
+        }
+      end
     end
 
     # 8. Auto-insert final inspection before pack
