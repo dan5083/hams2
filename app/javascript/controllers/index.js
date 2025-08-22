@@ -2,11 +2,11 @@
 import { application } from "controllers/application"
 import { eagerLoadControllersFrom } from "@hotwired/stimulus-loading"
 
-// Import nested PPI form controllers manually
-import PpiFormTreatmentSelectionController from "./ppi_form/treatment_selection_controller"
-import PpiFormOperationsFilterController from "./ppi_form/operations_filter_controller"
-import PpiFormOperationSelectionController from "./ppi_form/operation_selection_controller"
-import PpiFormEnpCalculatorController from "./ppi_form/enp_calculator_controller"
+// Import nested PPI form controllers with correct paths
+import PpiFormTreatmentSelectionController from "controllers/ppi_form/treatment_selection_controller"
+import PpiFormOperationsFilterController from "controllers/ppi_form/operations_filter_controller"
+import PpiFormOperationSelectionController from "controllers/ppi_form/operation_selection_controller"
+import PpiFormEnpCalculatorController from "controllers/ppi_form/enp_calculator_controller"
 
 // Register nested controllers with explicit names
 application.register("ppi-form--treatment-selection", PpiFormTreatmentSelectionController)
