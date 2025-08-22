@@ -226,10 +226,22 @@ class PartProcessingInstruction < ApplicationRecord
 
     return [] if user_operations.empty?
 
-    # Build operations with auto-ops for preview
+    # Check if degreasing should be auto-inserted at the beginning
     operations_with_auto_ops = []
     has_special_requirements = user_operations.any? { |op| op.process_type == 'electroless_nickel_plating' }
 
+    # Auto-insert degrease at the beginning if needed
+    if OperationLibrary::DegreaseOperations.degreasing_required?(user_operations)
+      degrease_operation = OperationLibrary::DegreaseOperations.get_degrease_operation
+      operations_with_auto_ops << {
+        id: degrease_operation.id,
+        display_name: degrease_operation.display_name,
+        operation_text: degrease_operation.operation_text,
+        auto_inserted: true
+      }
+    end
+
+    # Add user operations and their rinses
     user_operations.each do |operation|
       # Add the user operation with interpolated text
       operations_with_auto_ops << {
