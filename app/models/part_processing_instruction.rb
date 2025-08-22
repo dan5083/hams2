@@ -215,10 +215,11 @@ class PartProcessingInstruction < ApplicationRecord
 
   # Class method for real-time simulation during PPI building
   # Returns detailed operation data for form preview (including auto-operations)
-  def self.simulate_operations_with_auto_ops(operation_ids)
+  def self.simulate_operations_with_auto_ops(operation_ids, target_thickness = nil)
     return [] if operation_ids.blank?
 
-    all_ops = Operation.all_operations
+    # Get operations with thickness for ENP interpolation
+    all_ops = Operation.all_operations(target_thickness)
     user_operations = operation_ids.map do |op_id|
       all_ops.find { |op| op.id == op_id }
     end.compact
@@ -230,11 +231,11 @@ class PartProcessingInstruction < ApplicationRecord
     has_special_requirements = user_operations.any? { |op| op.process_type == 'electroless_nickel_plating' }
 
     user_operations.each do |operation|
-      # Add the user operation
+      # Add the user operation with interpolated text
       operations_with_auto_ops << {
         id: operation.id,
         display_name: operation.display_name,
-        operation_text: operation.operation_text,
+        operation_text: operation.operation_text, # Now includes interpolated time for ENP
         auto_inserted: false
       }
 
@@ -261,9 +262,9 @@ class PartProcessingInstruction < ApplicationRecord
     operations_with_auto_ops
   end
 
-  # Legacy method for summary text (keep for compatibility)
-  def self.simulate_operations_summary(operation_ids)
-    operations_with_auto_ops = simulate_operations_with_auto_ops(operation_ids)
+  # Update this method to accept thickness parameter
+  def self.simulate_operations_summary(operation_ids, target_thickness = nil)
+    operations_with_auto_ops = simulate_operations_with_auto_ops(operation_ids, target_thickness)
     return "No operations selected" if operations_with_auto_ops.empty?
 
     operations_with_auto_ops.map { |op| op[:display_name] }.join(" → ")
