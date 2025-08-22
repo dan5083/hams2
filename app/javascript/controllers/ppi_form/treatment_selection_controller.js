@@ -1,4 +1,4 @@
-// app/javascript/controllers/ppi_form/treatment_selection_controller.js
+// app/javascript/controllers/treatment_selection_controller.js
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
@@ -10,6 +10,7 @@ export default class extends Controller {
   }
 
   connect() {
+    console.log("🔍 Treatment Selection Controller connected")
     this.treatmentCounts = {
       standard_anodising: 0,
       hard_anodising: 0,
@@ -29,9 +30,11 @@ export default class extends Controller {
 
   handleTreatmentClick(event) {
     event.preventDefault()
+    console.log("🔍 Treatment button clicked")
     const button = event.currentTarget
     const treatment = button.dataset.treatment
     const countBadge = button.querySelector('.count-badge')
+    console.log("🔍 Treatment:", treatment)
 
     if (this.totalTreatments >= this.maxTreatmentsValue) {
       alert(`Maximum ${this.maxTreatmentsValue} treatments allowed`)
@@ -66,7 +69,9 @@ export default class extends Controller {
   }
 
   updateTreatmentCriteria() {
+    console.log("🔍 updateTreatmentCriteria called")
     const activeTreatments = this.getActiveTreatments()
+    console.log("🔍 Active treatments:", activeTreatments)
 
     if (activeTreatments.length === 0) {
       this.criteriaContainerTarget.innerHTML =
@@ -213,24 +218,35 @@ export default class extends Controller {
   }
 
   addSelectEventListeners() {
+    console.log("🔍 addSelectEventListeners called")
     const allSelects = this.criteriaContainerTarget.querySelectorAll('select')
     const allInputs = this.criteriaContainerTarget.querySelectorAll('input')
+    console.log("🔍 Found selects:", allSelects.length)
+    console.log("🔍 Found inputs:", allInputs.length)
 
     allSelects.forEach(select => {
-      select.addEventListener('change', (e) => this.handleCriteriaChange(e))
+      select.addEventListener('change', (e) => {
+        console.log("🔍 Select changed:", e.target.value, "treatment:", e.target.dataset.treatment)
+        this.handleCriteriaChange(e)
+      })
     })
 
     allInputs.forEach(input => {
-      input.addEventListener('input', (e) => this.handleCriteriaChange(e))
+      input.addEventListener('input', (e) => {
+        console.log("🔍 Input changed:", e.target.value, "treatment:", e.target.dataset.treatment)
+        this.handleCriteriaChange(e)
+      })
     })
   }
 
   handleCriteriaChange(event) {
+    console.log("🔍 handleCriteriaChange called")
     this.notifyTreatmentChanged()
 
     // Special handling for ENP thickness changes
     if (event.target.classList.contains('thickness-input') &&
         event.target.dataset.treatment === 'electroless_nickel_plating') {
+      console.log("🔍 ENP thickness changed:", event.target.value)
       this.notifyENPThicknessChanged(event.target.value)
     }
   }
@@ -299,15 +315,22 @@ export default class extends Controller {
 
   // Event dispatching to communicate with other controllers
   notifyTreatmentChanged() {
+    console.log("🔍 Dispatching treatmentChanged event")
+    const criteria = this.getAllCriteria()
+    const activeTreatments = this.getActiveTreatments()
+    console.log("🔍 Event detail - criteria:", criteria)
+    console.log("🔍 Event detail - activeTreatments:", activeTreatments)
+
     this.dispatch("treatmentChanged", {
       detail: {
-        criteria: this.getAllCriteria(),
-        activeTreatments: this.getActiveTreatments()
+        criteria: criteria,
+        activeTreatments: activeTreatments
       }
     })
   }
 
   notifyENPThicknessChanged(thickness) {
+    console.log("🔍 Dispatching enpThicknessChanged event, thickness:", thickness)
     this.dispatch("enpThicknessChanged", {
       detail: {
         thickness: parseFloat(thickness),
