@@ -216,63 +216,81 @@ class PartProcessingInstruction < ApplicationRecord
   # Class method for real-time simulation during PPI building
   # Returns detailed operation data for form preview (including auto-operations)
   def self.simulate_operations_with_auto_ops(operation_ids, target_thickness = nil)
-    return [] if operation_ids.blank?
+  return [] if operation_ids.blank?
 
-    # Get operations with thickness for ENP interpolation
-    all_ops = Operation.all_operations(target_thickness)
-    user_operations = operation_ids.map do |op_id|
-      all_ops.find { |op| op.id == op_id }
-    end.compact
+  # Get operations with thickness for ENP interpolation
+  all_ops = Operation.all_operations(target_thickness)
+  user_operations = operation_ids.map do |op_id|
+    all_ops.find { |op| op.id == op_id }
+  end.compact
 
-    return [] if user_operations.empty?
+  return [] if user_operations.empty?
 
-    # Check if degreasing should be auto-inserted at the beginning
-    operations_with_auto_ops = []
-    has_special_requirements = user_operations.any? { |op| op.process_type == 'electroless_nickel_plating' }
+  operations_with_auto_ops = []
+  has_special_requirements = user_operations.any? { |op| op.process_type == 'electroless_nickel_plating' }
 
-    # Auto-insert degrease at the beginning if needed
-    if OperationLibrary::DegreaseOperations.degreasing_required?(user_operations)
-      degrease_operation = OperationLibrary::DegreaseOperations.get_degrease_operation
-      operations_with_auto_ops << {
-        id: degrease_operation.id,
-        display_name: degrease_operation.display_name,
-        operation_text: degrease_operation.operation_text,
-        auto_inserted: true
-      }
-    end
-
-    # Add user operations and their rinses
-    user_operations.each do |operation|
-      # Add the user operation with interpolated text
-      operations_with_auto_ops << {
-        id: operation.id,
-        display_name: operation.display_name,
-        operation_text: operation.operation_text, # Now includes interpolated time for ENP
-        auto_inserted: false
-      }
-
-      # Add auto-operations after this operation
-      # For now, just rinse operations, but extensible for future auto-ops
-      if OperationLibrary::RinseOperations.operation_requires_rinse?(operation)
-        rinse_operation = OperationLibrary::RinseOperations.get_rinse_operation(
-          operation,
-          ppi_contains_electroless_nickel: has_special_requirements
-        )
-        if rinse_operation
-          operations_with_auto_ops << {
-            id: rinse_operation.id,
-            display_name: rinse_operation.display_name,
-            operation_text: rinse_operation.operation_text,
-            auto_inserted: true
-          }
-        end
-      end
-
-      # Future auto-operations can be added here
-    end
-
-    operations_with_auto_ops
+  # 1. Auto-insert contract review at the very beginning (always required)
+  if OperationLibrary::ContractReviewOperations.contract_review_required?(user_operations)
+    contract_review_operation = OperationLibrary::ContractReviewOperations.get_contract_review_operation
+    operations_with_auto_ops << {
+      id: contract_review_operation.id,
+      display_name: contract_review_operation.display_name,
+      operation_text: contract_review_operation.operation_text,
+      auto_inserted: true
+    }
   end
+
+  # 2. Auto-insert degrease after contract review if needed for surface treatments
+  if OperationLibrary::DegreaseOperations.degreasing_required?(user_operations)
+    degrease_operation = OperationLibrary::DegreaseOperations.get_degrease_operation
+    operations_with_auto_ops << {
+      id: degrease_operation.id,
+      display_name: degrease_operation.display_name,
+      operation_text: degrease_operation.operation_text,
+      auto_inserted: true
+    }
+  end
+
+  # 3. Add user operations and their rinses
+  user_operations.each do |operation|
+    # Add the user operation with interpolated text
+    operations_with_auto_ops << {
+      id: operation.id,
+      display_name: operation.display_name,
+      operation_text: operation.operation_text, # Now includes interpolated time for ENP
+      auto_inserted: false
+    }
+
+    # Add rinse operations after chemical processes
+    if OperationLibrary::RinseOperations.operation_requires_rinse?(operation)
+      rinse_operation = OperationLibrary::RinseOperations.get_rinse_operation(
+        operation,
+        ppi_contains_electroless_nickel: has_special_requirements
+      )
+      if rinse_operation
+        operations_with_auto_ops << {
+          id: rinse_operation.id,
+          display_name: rinse_operation.display_name,
+          operation_text: rinse_operation.operation_text,
+          auto_inserted: true
+        }
+      end
+    end
+  end
+
+  # 4. Auto-insert pack at the very end (always required)
+  if OperationLibrary::PackOperations.pack_required?(operations_with_auto_ops.map { |op| OpenStruct.new(process_type: op[:id] == 'PACK' ? 'pack' : 'other') })
+    pack_operation = OperationLibrary::PackOperations.get_pack_operation
+    operations_with_auto_ops << {
+      id: pack_operation.id,
+      display_name: pack_operation.display_name,
+      operation_text: pack_operation.operation_text,
+      auto_inserted: true
+    }
+  end
+
+  operations_with_auto_ops
+end
 
   # Update this method to accept thickness parameter
   def self.simulate_operations_summary(operation_ids, target_thickness = nil)

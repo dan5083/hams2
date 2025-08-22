@@ -31,6 +31,7 @@ class Operation
 
   def self.load_all_operations(target_thickness = nil)
     operations = []
+    operations += OperationLibrary::ContractReviewOperations.operations if defined?(OperationLibrary::ContractReviewOperations)
     operations += OperationLibrary::DegreaseOperations.operations if defined?(OperationLibrary::DegreaseOperations)
     operations += OperationLibrary::AnodisingStandard.operations if defined?(OperationLibrary::AnodisingStandard)
     operations += OperationLibrary::AnodisingHard.operations if defined?(OperationLibrary::AnodisingHard)
@@ -43,12 +44,14 @@ class Operation
     end
 
     operations += OperationLibrary::RinseOperations.operations if defined?(OperationLibrary::RinseOperations)
+    operations += OperationLibrary::PackOperations.operations if defined?(OperationLibrary::PackOperations)
     operations
   end
 
-  # Filter operations by criteria (excluding rinse and degrease operations from normal filtering)
+  # Filter operations by criteria (excluding auto-inserted operations from normal filtering)
   def self.find_matching(process_type: nil, alloy: nil, target_thickness: nil, anodic_class: nil, enp_type: nil)
-    matching = all_operations(target_thickness).reject { |op| op.process_type == 'rinse' || op.process_type == 'degrease' }
+    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack']
+    matching = all_operations(target_thickness).reject { |op| auto_inserted_types.include?(op.process_type) }
 
     matching = matching.select { |op| op.process_type == process_type } if process_type.present?
     matching = matching.select { |op| op.alloys.include?(alloy) } if alloy.present?
@@ -80,21 +83,25 @@ class Operation
     matching
   end
 
-  # Get available options for dropdowns (excluding rinse and degrease operations)
+  # Get available options for dropdowns (excluding auto-inserted operations)
   def self.available_process_types
-    all_operations.reject { |op| op.process_type == 'rinse' || op.process_type == 'degrease' }.map(&:process_type).uniq.sort
+    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack']
+    all_operations.reject { |op| auto_inserted_types.include?(op.process_type) }.map(&:process_type).uniq.sort
   end
 
   def self.available_alloys
-    all_operations.reject { |op| op.process_type == 'rinse' || op.process_type == 'degrease' }.flat_map(&:alloys).uniq.sort
+    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack']
+    all_operations.reject { |op| auto_inserted_types.include?(op.process_type) }.flat_map(&:alloys).uniq.sort
   end
 
   def self.available_anodic_classes
-    all_operations.reject { |op| op.process_type == 'rinse' || op.process_type == 'degrease' }.flat_map(&:anodic_classes).uniq.sort
+    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack']
+    all_operations.reject { |op| auto_inserted_types.include?(op.process_type) }.flat_map(&:anodic_classes).uniq.sort
   end
 
   def self.available_thicknesses
-    all_operations.reject { |op| op.process_type == 'rinse' || op.process_type == 'degrease' }.map(&:target_thickness).uniq.select { |t| t > 0 }.sort
+    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack']
+    all_operations.reject { |op| auto_inserted_types.include?(op.process_type) }.map(&:target_thickness).uniq.select { |t| t > 0 }.sort
   end
 
   def self.available_enp_types
@@ -116,8 +123,12 @@ class Operation
 
   # Instance methods
   def display_name
-    if process_type == 'degrease'
+    if process_type == 'contract_review'
+      'Contract Review'
+    elsif process_type == 'degrease'
       'Degrease'
+    elsif process_type == 'pack'
+      'Pack'
     elsif process_type == 'rinse'
       case id
       when 'CASCADE_RINSE'
@@ -200,9 +211,9 @@ class Operation
     process_type == 'electroless_nickel_plating'
   end
 
-  # Check if this operation is auto-inserted (rinse and degrease operations are auto-inserted)
+  # Check if this operation is auto-inserted
   def auto_inserted?
-    rinse? || degrease?
+    ['rinse', 'degrease', 'contract_review', 'pack'].include?(process_type)
   end
 
   # Calculate plating time for ENP operations

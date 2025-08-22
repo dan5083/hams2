@@ -11,7 +11,7 @@ module OperationLibrary
       electroless_nickel_plating
     ].freeze
 
-    # Define which process types are extreme pH processes that require cascade rinse
+    # Define which process types are extreme pH processes that require cascade rinse (dichromate coming soon!!)
     EXTREME_PH_PROCESSES = %w[
       etch
       standard_anodising
@@ -25,7 +25,7 @@ module OperationLibrary
         Operation.new(
           id: 'RINSE',
           process_type: 'rinse',
-          operation_text: 'Cold water rinse'
+          operation_text: 'Rinse in clean swill'
         ),
 
         # Cascade rinse - for extreme pH processes (neutralizing + clean swill)
