@@ -1,4 +1,4 @@
-# app/controllers/operations_controller.rb - Enhanced for degrease, ENP thickness interpolation, and jig selection
+# app/controllers/operations_controller.rb - Enhanced for ENP Strip Mask, degrease, ENP thickness interpolation, and jig selection
 class OperationsController < ApplicationController
   skip_before_action :verify_authenticity_token, only: [:filter, :details, :summary, :preview_with_auto_ops]
 
@@ -11,7 +11,7 @@ class OperationsController < ApplicationController
     # Start with all operations - pass thickness to ENP operations
     operations = Operation.all_operations(target_thickness)
 
-    # Filter by anodising types (now includes ENP) - exclude auto-inserted operations
+    # Filter by anodising types (now includes ENP and ENP Strip Mask) - exclude auto-inserted operations
     if criteria[:anodising_types].present?
       operations = operations.select { |op| criteria[:anodising_types].include?(op.process_type) }
     end
@@ -34,11 +34,13 @@ class OperationsController < ApplicationController
       operations = operations.select { |op| op.enp_type.present? && criteria[:enp_types].include?(op.enp_type) }
     end
 
-    # Filter by target thickness (with tolerance) - skip for chemical conversion and ENP
+    # Filter by target thickness (with tolerance) - skip for chemical conversion, ENP, and ENP Strip Mask
     if criteria[:target_thicknesses].present?
       operations = operations.select do |op|
-        # Skip thickness filtering for chemical conversion and ENP (already handled above)
-        if op.process_type == 'chemical_conversion' || op.process_type == 'electroless_nickel_plating'
+        # Skip thickness filtering for chemical conversion, ENP, and ENP Strip Mask (already handled above)
+        if op.process_type == 'chemical_conversion' ||
+           op.process_type == 'electroless_nickel_plating' ||
+           ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type)
           true
         else
           criteria[:target_thicknesses].any? do |target|
@@ -51,7 +53,9 @@ class OperationsController < ApplicationController
       if criteria[:target_thicknesses].length == 1
         target = criteria[:target_thicknesses].first
         operations = operations.sort_by do |op|
-          if op.process_type == 'chemical_conversion' || op.process_type == 'electroless_nickel_plating'
+          if op.process_type == 'chemical_conversion' ||
+             op.process_type == 'electroless_nickel_plating' ||
+             ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type)
             0
           else
             (op.target_thickness - target).abs
@@ -94,10 +98,18 @@ class OperationsController < ApplicationController
   def details
     operation_ids = params[:operation_ids] || []
     target_thickness = params[:target_thickness]&.to_f
+    enp_strip_type = params[:enp_strip_type] || 'nitric'
+
+    # Handle ENP Strip Mask operations with correct strip type
+    expanded_operation_ids = expand_enp_strip_mask_operations(operation_ids, enp_strip_type)
 
     all_operations = Operation.all_operations(target_thickness)
 
-    results = operation_ids.map do |op_id|
+    # Add ENP Strip Mask operations with correct strip type
+    enp_strip_operations = get_enp_strip_mask_operations(enp_strip_type)
+    all_operations += enp_strip_operations
+
+    results = expanded_operation_ids.map do |op_id|
       operation = all_operations.find { |op| op.id == op_id }
       if operation
         {
@@ -122,9 +134,18 @@ class OperationsController < ApplicationController
     operation_ids = params[:operation_ids] || []
     target_thickness = params[:target_thickness]&.to_f
     selected_jig_type = params[:selected_jig_type]
+    enp_strip_type = params[:enp_strip_type] || 'nitric'
 
-    # Pass thickness for ENP operation text interpolation and jig type for jig interpolation
-    summary = PartProcessingInstruction.simulate_operations_summary(operation_ids, target_thickness, selected_jig_type)
+    # Handle ENP Strip Mask operations
+    expanded_operation_ids = expand_enp_strip_mask_operations(operation_ids, enp_strip_type)
+
+    # Pass thickness for ENP operation text interpolation, jig type for jig interpolation, and ENP strip type
+    summary = PartProcessingInstruction.simulate_operations_summary(
+      expanded_operation_ids,
+      target_thickness,
+      selected_jig_type,
+      enp_strip_type
+    )
     render json: { summary: summary }
   end
 
@@ -132,9 +153,19 @@ class OperationsController < ApplicationController
     operation_ids = params[:operation_ids] || []
     target_thickness = params[:target_thickness]&.to_f
     selected_jig_type = params[:selected_jig_type]
+    enp_strip_type = params[:enp_strip_type] || 'nitric'
 
-    # Pass thickness for ENP operation text interpolation, jig type for jig interpolation, and include auto-insertion
-    operations_with_auto_ops = PartProcessingInstruction.simulate_operations_with_auto_ops(operation_ids, target_thickness, selected_jig_type)
+    # Handle ENP Strip Mask operations
+    expanded_operation_ids = expand_enp_strip_mask_operations(operation_ids, enp_strip_type)
+
+    # Pass all parameters including ENP strip type for complete operation simulation
+    operations_with_auto_ops = PartProcessingInstruction.simulate_operations_with_auto_ops(
+      expanded_operation_ids,
+      target_thickness,
+      selected_jig_type,
+      enp_strip_type
+    )
+
     render json: { operations: operations_with_auto_ops }
   end
 
@@ -148,5 +179,54 @@ class OperationsController < ApplicationController
       anodic_classes: [],
       enp_types: []
     )
+  end
+
+  # Expand ENP Strip Mask operation IDs to include all 5 operations
+  def expand_enp_strip_mask_operations(operation_ids, enp_strip_type)
+    expanded_ids = []
+
+    operation_ids.each do |op_id|
+      if enp_strip_mask_operation?(op_id)
+        # Replace any ENP Strip Mask operation with the complete sequence
+        unless expanded_ids.any? { |id| enp_strip_mask_operation?(id) }
+          expanded_ids += get_enp_strip_mask_operation_ids(enp_strip_type)
+        end
+      else
+        expanded_ids << op_id
+      end
+    end
+
+    expanded_ids
+  end
+
+  # Check if operation ID is part of ENP Strip Mask sequence
+  def enp_strip_mask_operation?(operation_id)
+    enp_strip_mask_ids = [
+      'ENP_MASK',
+      'ENP_MASKING_CHECK',
+      'ENP_STRIP_NITRIC',
+      'ENP_STRIP_METEX',
+      'ENP_STRIP_MASKING',
+      'ENP_MASKING_CHECK_FINAL'
+    ]
+    enp_strip_mask_ids.include?(operation_id)
+  end
+
+  # Get ENP Strip Mask operation IDs for given strip type
+  def get_enp_strip_mask_operation_ids(strip_type)
+    if defined?(OperationLibrary::EnpStripMask)
+      OperationLibrary::EnpStripMask.get_operation_ids(strip_type)
+    else
+      []
+    end
+  end
+
+  # Get ENP Strip Mask operations for given strip type
+  def get_enp_strip_mask_operations(strip_type)
+    if defined?(OperationLibrary::EnpStripMask)
+      OperationLibrary::EnpStripMask.operations(strip_type)
+    else
+      []
+    end
   end
 end

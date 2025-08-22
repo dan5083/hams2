@@ -1,4 +1,4 @@
-# app/operation_library/operation.rb - Updated to handle all auto-inserted operations
+# app/operation_library/operation.rb - Updated to handle ENP Strip Mask operations
 class Operation
   attr_accessor :id, :alloys, :process_type, :anodic_classes, :target_thickness, :vat_numbers,
                 :operation_text, :specifications, :enp_type, :deposition_rate_range, :time
@@ -45,6 +45,12 @@ class Operation
       operations += OperationLibrary::ElectrolessNickelPlate.operations(target_thickness)
     end
 
+    # Add ENP Strip Mask operations (default to nitric strip type)
+    if defined?(OperationLibrary::EnpStripMask)
+      operations += OperationLibrary::EnpStripMask.operations('nitric')
+      operations += OperationLibrary::EnpStripMask.operations('metex_dekote')
+    end
+
     operations += OperationLibrary::RinseOperations.operations if defined?(OperationLibrary::RinseOperations)
     operations += OperationLibrary::PackOperations.operations if defined?(OperationLibrary::PackOperations)
     operations
@@ -64,17 +70,19 @@ class Operation
     if target_thickness.present?
       target = target_thickness.to_f
       matching = matching.select do |op|
-        # Skip thickness filtering for electroless nickel plating and chemical conversion
-        if op.process_type == 'electroless_nickel_plating' || op.process_type == 'chemical_conversion'
+        # Skip thickness filtering for electroless nickel plating, chemical conversion, and ENP strip mask
+        if op.process_type == 'electroless_nickel_plating' || op.process_type == 'chemical_conversion' ||
+           ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type)
           true
         else
           # Exact match or within reasonable tolerance (±2.5μm)
           (op.target_thickness - target).abs <= 2.5
         end
       end
-      # Sort by closest thickness match (but only for non-ENP/chemical conversion)
+      # Sort by closest thickness match (but only for non-ENP/chemical conversion/ENP strip mask)
       matching = matching.sort_by do |op|
-        if op.process_type == 'electroless_nickel_plating' || op.process_type == 'chemical_conversion'
+        if op.process_type == 'electroless_nickel_plating' || op.process_type == 'chemical_conversion' ||
+           ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type)
           0
         else
           (op.target_thickness - target).abs
@@ -131,6 +139,10 @@ class Operation
     all_operations.select { |op| op.process_type == 'electroless_nickel_plating' }
   end
 
+  def self.enp_strip_mask_operations
+    all_operations.select { |op| ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type) }
+  end
+
   # Instance methods
   def display_name
     if process_type == 'contract_review'
@@ -149,6 +161,21 @@ class Operation
       'Degrease'
     elsif process_type == 'pack'
       'Pack'
+    elsif process_type == 'mask'
+      'ENP Mask'
+    elsif process_type == 'masking_check'
+      'Masking Check'
+    elsif process_type == 'strip'
+      case id
+      when 'ENP_STRIP_NITRIC'
+        'ENP Strip (Nitric)'
+      when 'ENP_STRIP_METEX'
+        'ENP Strip (Metex)'
+      else
+        'Strip'
+      end
+    elsif process_type == 'strip_masking'
+      'Strip Masking'
     elsif process_type == 'rinse'
       case id
       when 'CASCADE_RINSE'
@@ -194,7 +221,8 @@ class Operation
     return false if anodic_class.present? && !anodic_classes.include?(anodic_class)
     return false if enp_type.present? && self.enp_type != enp_type
 
-    if target_thickness.present? && self.process_type != 'electroless_nickel_plating' && self.process_type != 'chemical_conversion'
+    if target_thickness.present? && self.process_type != 'electroless_nickel_plating' &&
+       self.process_type != 'chemical_conversion' && !['mask', 'masking_check', 'strip', 'strip_masking'].include?(self.process_type)
       target = target_thickness.to_f
       return false if (self.target_thickness - target).abs > 2.5
     end
@@ -241,6 +269,10 @@ class Operation
 
   def electroless_nickel_plating?
     process_type == 'electroless_nickel_plating'
+  end
+
+  def enp_strip_mask?
+    ['mask', 'masking_check', 'strip', 'strip_masking'].include?(process_type)
   end
 
   # Check if this operation is auto-inserted

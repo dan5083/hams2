@@ -120,7 +120,7 @@
     <p class="text-sm text-gray-600 mb-4">Select up to 3 treatments (in the order you wish them to appear in the operations)</p>
 
     <!-- Treatment Type Buttons -->
-    <div class="grid grid-cols-2 gap-3 mb-6 sm:grid-cols-5">
+    <div class="grid grid-cols-2 gap-3 mb-6 sm:grid-cols-6">
       <button type="button" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-blue-500 transition-colors text-sm" data-treatment="standard_anodising">
         <span>Standard</span>
         <span class="count-badge ml-2 min-w-[20px] h-5 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">0</span>
@@ -145,6 +145,26 @@
         <span>ENP</span>
         <span class="count-badge ml-2 min-w-[20px] h-5 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">0</span>
       </button>
+
+      <button type="button" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-pink-500 transition-colors text-sm" data-treatment="enp_strip_mask" data-ppi-form-target="enpStripMaskBtn" style="display: none;">
+        <span>ENP Strip</span>
+        <span class="count-badge ml-2 min-w-[20px] h-5 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">0</span>
+      </button>
+    </div>
+
+    <!-- ENP Strip Type Selection (shown when ENP Strip Mask is selected) -->
+    <div data-ppi-form-target="enpStripTypeContainer" class="mb-6" style="display: none;">
+      <h4 class="text-md font-medium text-gray-900 mb-3">ENP Strip Type</h4>
+      <div class="flex space-x-4">
+        <label class="flex items-center">
+          <input type="radio" name="enp_strip_type" value="nitric" checked class="form-radio text-pink-600" data-ppi-form-target="enpStripTypeRadio">
+          <span class="ml-2 text-sm text-gray-700">Nitric Acid (Standard)</span>
+        </label>
+        <label class="flex items-center">
+          <input type="radio" name="enp_strip_type" value="metex_dekote" class="form-radio text-pink-600" data-ppi-form-target="enpStripTypeRadio">
+          <span class="ml-2 text-sm text-gray-700">Metex Dekote (Ferrous)</span>
+        </label>
+      </div>
     </div>
 
     <!-- Dynamic Treatment Criteria -->
@@ -194,6 +214,11 @@
     <%= hidden_field_tag "part_processing_instruction[customisation_data][operation_selection][selected_operations]",
         ppi.selected_operations.to_json,
         data: { ppi_form_target: "selectedOperationsField" } %>
+
+    <!-- Hidden field for ENP strip type -->
+    <%= hidden_field_tag "part_processing_instruction[customisation_data][operation_selection][enp_strip_type]",
+        'nitric',
+        data: { ppi_form_target: "enpStripTypeField" } %>
   </div>
 
   <!-- Specification (will be auto-generated from operations) -->
@@ -226,7 +251,7 @@
       <div class="ml-3">
         <h3 class="text-sm font-medium text-blue-800">Operation-Based PPI Creation</h3>
         <div class="mt-2 text-sm text-blue-700">
-          <p>Select your treatment criteria above and choose up to 3 operations in sequence. Auto-operations (inspections, jigging, rinses, etc.) are automatically inserted in the correct sequence. The selected jig type will be used for all jigging operations. Supports anodising, chemical conversion, ENP, and other surface treatments. The specification will be automatically generated from your selections.</p>
+          <p>Select your treatment criteria above and choose up to 3 operations in sequence. Auto-operations (inspections, jigging, rinses, etc.) are automatically inserted in the correct sequence. The selected jig type will be used for all jigging operations. Supports anodising, chemical conversion, ENP, and ENP strip/mask operations. The specification will be automatically generated from your selections.</p>
         </div>
       </div>
     </div>

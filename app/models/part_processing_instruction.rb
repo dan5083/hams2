@@ -130,7 +130,7 @@ class PartProcessingInstruction < ApplicationRecord
       operations_with_auto_ops << degrease_operation
     end
 
-    # 6. Add user operations and their rinses
+    # 6. Add user operations and their rinses, plus ENP Strip Mask operations
     user_operations.each do |operation|
       # Add the user operation with interpolated text
       operations_with_auto_ops << operation
@@ -144,6 +144,12 @@ class PartProcessingInstruction < ApplicationRecord
         if rinse_operation
           operations_with_auto_ops << rinse_operation
         end
+      end
+
+      # Add ENP Strip Mask operations after ENP operations
+      if operation.process_type == 'electroless_nickel_plating' && has_enp_strip_mask_operations?
+        enp_strip_operations = get_enp_strip_mask_operations_for_sequence
+        operations_with_auto_ops += enp_strip_operations
       end
     end
 
@@ -176,9 +182,36 @@ class PartProcessingInstruction < ApplicationRecord
     end
   end
 
+  # Check if ENP Strip Mask operations are selected
+  def has_enp_strip_mask_operations?
+    enp_strip_mask_ids = [
+      'ENP_MASK', 'ENP_MASKING_CHECK', 'ENP_STRIP_NITRIC',
+      'ENP_STRIP_METEX', 'ENP_STRIP_MASKING', 'ENP_MASKING_CHECK_FINAL'
+    ]
+    selected_operations.any? { |op_id| enp_strip_mask_ids.include?(op_id) }
+  end
+
+  # Get ENP Strip Mask operations for insertion into sequence
+  def get_enp_strip_mask_operations_for_sequence
+    return [] unless has_enp_strip_mask_operations? && defined?(OperationLibrary::EnpStripMask)
+
+    strip_type = selected_enp_strip_type || 'nitric'
+    OperationLibrary::EnpStripMask.operations(strip_type)
+  end
+
   # Get the selected jig type for interpolation
   def selected_jig_type
     operation_selection["selected_jig_type"]
+  end
+
+  # Get the selected ENP strip type
+  def selected_enp_strip_type
+    operation_selection["enp_strip_type"] || 'nitric'
+  end
+
+  # Set the ENP strip type
+  def selected_enp_strip_type=(strip_type)
+    operation_selection["enp_strip_type"] = strip_type
   end
 
   def operation_selection
@@ -254,12 +287,21 @@ class PartProcessingInstruction < ApplicationRecord
 
   # Class method for real-time simulation during PPI building
   # Returns detailed operation data for form preview (including auto-operations)
-  def self.simulate_operations_with_auto_ops(operation_ids, target_thickness = nil, selected_jig_type = nil)
+  def self.simulate_operations_with_auto_ops(operation_ids, target_thickness = nil, selected_jig_type = nil, enp_strip_type = 'nitric')
     return [] if operation_ids.blank?
 
     # Get operations with thickness for ENP interpolation
     all_ops = Operation.all_operations(target_thickness)
-    user_operations = operation_ids.map do |op_id|
+
+    # Add ENP Strip Mask operations if needed
+    if defined?(OperationLibrary::EnpStripMask)
+      all_ops += OperationLibrary::EnpStripMask.operations('nitric')
+      all_ops += OperationLibrary::EnpStripMask.operations('metex_dekote')
+    end
+
+    # Expand ENP Strip Mask operations and filter to selected ones
+    expanded_operation_ids = expand_enp_strip_mask_operations(operation_ids, enp_strip_type)
+    user_operations = expanded_operation_ids.map do |op_id|
       all_ops.find { |op| op.id == op_id }
     end.compact
 
@@ -267,6 +309,7 @@ class PartProcessingInstruction < ApplicationRecord
 
     operations_with_auto_ops = []
     has_special_requirements = user_operations.any? { |op| op.process_type == 'electroless_nickel_plating' }
+    has_enp_strip_mask = user_operations.any? { |op| ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type) }
 
     # 1. Auto-insert contract review at the very beginning (always required)
     if OperationLibrary::ContractReviewOperations.contract_review_required?(user_operations)
@@ -323,8 +366,11 @@ class PartProcessingInstruction < ApplicationRecord
       }
     end
 
-    # 6. Add user operations and their rinses
-    user_operations.each do |operation|
+    # 6. Add user operations and their rinses, handling ENP Strip Mask separately
+    user_operations_without_enp_strip = user_operations.reject { |op| ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type) }
+    enp_strip_operations = user_operations.select { |op| ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type) }
+
+    user_operations_without_enp_strip.each do |operation|
       # Add the user operation with interpolated text
       operations_with_auto_ops << {
         id: operation.id,
@@ -345,6 +391,18 @@ class PartProcessingInstruction < ApplicationRecord
             display_name: rinse_operation.display_name,
             operation_text: rinse_operation.operation_text,
             auto_inserted: true
+          }
+        end
+      end
+
+      # Add ENP Strip Mask operations after ENP operations
+      if operation.process_type == 'electroless_nickel_plating' && has_enp_strip_mask
+        enp_strip_operations.each do |enp_strip_op|
+          operations_with_auto_ops << {
+            id: enp_strip_op.id,
+            display_name: enp_strip_op.display_name,
+            operation_text: enp_strip_op.operation_text,
+            auto_inserted: false
           }
         end
       end
@@ -386,12 +444,36 @@ class PartProcessingInstruction < ApplicationRecord
     operations_with_auto_ops
   end
 
-  # Update this method to accept thickness and jig type parameters
-  def self.simulate_operations_summary(operation_ids, target_thickness = nil, selected_jig_type = nil)
-    operations_with_auto_ops = simulate_operations_with_auto_ops(operation_ids, target_thickness, selected_jig_type)
+  # Update this method to accept thickness, jig type, and ENP strip type parameters
+  def self.simulate_operations_summary(operation_ids, target_thickness = nil, selected_jig_type = nil, enp_strip_type = 'nitric')
+    operations_with_auto_ops = simulate_operations_with_auto_ops(operation_ids, target_thickness, selected_jig_type, enp_strip_type)
     return "No operations selected" if operations_with_auto_ops.empty?
 
     operations_with_auto_ops.map { |op| op[:display_name] }.join(" → ")
+  end
+
+  # Expand ENP Strip Mask operations to full sequence
+  def self.expand_enp_strip_mask_operations(operation_ids, enp_strip_type)
+    return operation_ids unless defined?(OperationLibrary::EnpStripMask)
+
+    expanded_ids = []
+    enp_strip_mask_ids = [
+      'ENP_MASK', 'ENP_MASKING_CHECK', 'ENP_STRIP_NITRIC',
+      'ENP_STRIP_METEX', 'ENP_STRIP_MASKING', 'ENP_MASKING_CHECK_FINAL'
+    ]
+
+    operation_ids.each do |op_id|
+      if enp_strip_mask_ids.include?(op_id)
+        # Replace any ENP Strip Mask operation with the complete sequence
+        unless expanded_ids.any? { |id| enp_strip_mask_ids.include?(id) }
+          expanded_ids += OperationLibrary::EnpStripMask.get_operation_ids(enp_strip_type)
+        end
+      else
+        expanded_ids << op_id
+      end
+    end
+
+    expanded_ids
   end
 
   private
@@ -439,11 +521,25 @@ class PartProcessingInstruction < ApplicationRecord
   def validate_selected_operations
     return unless selected_operations.present?
 
-    if selected_operations.length > 3
-      errors.add(:base, "cannot select more than 3 operations")
+    # Count non-ENP Strip Mask operations for the 3-operation limit
+    enp_strip_mask_ids = [
+      'ENP_MASK', 'ENP_MASKING_CHECK', 'ENP_STRIP_NITRIC',
+      'ENP_STRIP_METEX', 'ENP_STRIP_MASKING', 'ENP_MASKING_CHECK_FINAL'
+    ]
+
+    non_enp_strip_operations = selected_operations.reject { |op_id| enp_strip_mask_ids.include?(op_id) }
+
+    if non_enp_strip_operations.length > 3
+      errors.add(:base, "cannot select more than 3 main operations (ENP Strip Mask operations don't count toward this limit)")
     end
 
     all_op_ids = Operation.all_operations.map(&:id)
+    # Add ENP Strip Mask operation IDs if available
+    if defined?(OperationLibrary::EnpStripMask)
+      all_op_ids += OperationLibrary::EnpStripMask.operations('nitric').map(&:id)
+      all_op_ids += OperationLibrary::EnpStripMask.operations('metex_dekote').map(&:id)
+    end
+
     invalid_ids = selected_operations - all_op_ids
     if invalid_ids.any?
       errors.add(:base, "contains invalid operation IDs: #{invalid_ids.join(', ')}")

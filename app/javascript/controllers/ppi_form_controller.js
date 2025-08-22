@@ -7,7 +7,11 @@ export default class extends Controller {
     "operationsContainer",
     "selectedContainer",
     "treatmentCriteriaContainer",
-    "specificationField"
+    "specificationField",
+    "enpStripMaskBtn",
+    "enpStripTypeContainer",
+    "enpStripTypeRadio",
+    "enpStripTypeField"
   ]
 
   static values = {
@@ -25,14 +29,17 @@ export default class extends Controller {
       hard_anodising: 0,
       chromic_anodising: 0,
       chemical_conversion: 0,
-      electroless_nickel_plating: 0
+      electroless_nickel_plating: 0,
+      enp_strip_mask: 0
     }
     this.totalTreatments = 0
     this.maxTreatments = 3
+    this.enpStripType = 'nitric' // Default strip type
 
     this.initializeExistingData()
     this.setupTreatmentButtons()
     this.setupJigDropdownListener()
+    this.setupENPStripTypeListener()
   }
 
   // Initialize with existing selected operations
@@ -41,6 +48,7 @@ export default class extends Controller {
       const existingData = JSON.parse(this.selectedOperationsFieldTarget.value || '[]')
       this.selectedOperations = existingData
       this.updateSelectedOperations()
+      this.checkENPStripAvailability()
     } catch(e) {
       console.error("Error parsing existing operations:", e)
       this.selectedOperations = []
@@ -67,12 +75,38 @@ export default class extends Controller {
     }
   }
 
+  // Set up ENP strip type radio button listener
+  setupENPStripTypeListener() {
+    if (this.hasEnpStripTypeRadioTarget) {
+      this.enpStripTypeRadioTargets.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+          this.enpStripType = e.target.value
+          this.enpStripTypeFieldTarget.value = this.enpStripType
+          console.log(`ENP Strip type changed to: ${this.enpStripType}`)
+
+          // If ENP Strip Mask is already selected, update the operations
+          if (this.treatmentCounts.enp_strip_mask > 0) {
+            this.updateENPStripMaskOperations()
+          }
+        })
+      })
+    }
+  }
+
   // Handle treatment button clicks
   handleTreatmentClick(event) {
     event.preventDefault()
     const button = event.currentTarget
     const treatment = button.dataset.treatment
     const countBadge = button.querySelector('.count-badge')
+
+    // Special handling for ENP Strip Mask
+    if (treatment === 'enp_strip_mask') {
+      if (this.treatmentCounts.enp_strip_mask === 0) {
+        this.selectENPStripMask(button, countBadge)
+      }
+      return
+    }
 
     if (this.totalTreatments >= this.maxTreatments) {
       alert(`Maximum ${this.maxTreatments} treatments allowed`)
@@ -84,7 +118,117 @@ export default class extends Controller {
       this.totalTreatments++
       this.updateButtonAppearance(button, treatment, countBadge)
       this.updateTreatmentCriteria()
+      this.checkENPStripAvailability()
     }
+  }
+
+  // Select ENP Strip Mask (adds all 5 operations)
+  selectENPStripMask(button, countBadge) {
+    this.treatmentCounts.enp_strip_mask = 1
+    this.updateButtonAppearance(button, 'enp_strip_mask', countBadge)
+    this.showENPStripTypeSelection()
+    this.addENPStripMaskOperations()
+  }
+
+  // Show ENP strip type selection
+  showENPStripTypeSelection() {
+    if (this.hasEnpStripTypeContainerTarget) {
+      this.enpStripTypeContainerTarget.style.display = 'block'
+    }
+  }
+
+  // Hide ENP strip type selection
+  hideENPStripTypeSelection() {
+    if (this.hasEnpStripTypeContainerTarget) {
+      this.enpStripTypeContainerTarget.style.display = 'none'
+    }
+  }
+
+  // Add all 5 ENP Strip Mask operations
+  addENPStripMaskOperations() {
+    const enpStripOperations = this.getENPStripMaskOperationIds(this.enpStripType)
+
+    // Remove any existing ENP Strip Mask operations first
+    this.removeENPStripMaskOperations()
+
+    // Add new operations
+    enpStripOperations.forEach(opId => {
+      if (!this.selectedOperations.includes(opId)) {
+        this.selectedOperations.push(opId)
+      }
+    })
+
+    this.updateSelectedOperations()
+    console.log(`Added ENP Strip Mask operations (${this.enpStripType}):`, enpStripOperations)
+  }
+
+  // Update ENP Strip Mask operations when type changes
+  updateENPStripMaskOperations() {
+    if (this.treatmentCounts.enp_strip_mask > 0) {
+      this.addENPStripMaskOperations()
+    }
+  }
+
+  // Remove ENP Strip Mask operations
+  removeENPStripMaskOperations() {
+    const allENPStripOperations = [
+      'ENP_MASK',
+      'ENP_MASKING_CHECK',
+      'ENP_STRIP_NITRIC',
+      'ENP_STRIP_METEX',
+      'ENP_STRIP_MASKING',
+      'ENP_MASKING_CHECK_FINAL'
+    ]
+
+    this.selectedOperations = this.selectedOperations.filter(id =>
+      !allENPStripOperations.includes(id)
+    )
+  }
+
+  // Get operation IDs for ENP Strip Mask sequence
+  getENPStripMaskOperationIds(stripType) {
+    const stripOperation = stripType === 'metex_dekote' ? 'ENP_STRIP_METEX' : 'ENP_STRIP_NITRIC'
+
+    return [
+      'ENP_MASK',
+      'ENP_MASKING_CHECK',
+      stripOperation,
+      'ENP_STRIP_MASKING',
+      'ENP_MASKING_CHECK_FINAL'
+    ]
+  }
+
+  // Check if ENP Strip Mask should be available
+  checkENPStripAvailability() {
+    const hasENPOperations = this.selectedOperations.some(opId =>
+      ['HIGH_PHOS_VANDALLOY_4100', 'MEDIUM_PHOS_NICKLAD_767', 'LOW_PHOS_NICKLAD_ELV_824', 'PTFE_NICKLAD_ICE'].includes(opId)
+    )
+
+    if (this.hasEnpStripMaskBtnTarget) {
+      if (hasENPOperations) {
+        this.enpStripMaskBtnTarget.style.display = 'block'
+      } else {
+        this.enpStripMaskBtnTarget.style.display = 'none'
+        // If ENP Strip Mask was selected but ENP is removed, deselect it
+        if (this.treatmentCounts.enp_strip_mask > 0) {
+          this.deselectENPStripMask()
+        }
+      }
+    }
+  }
+
+  // Deselect ENP Strip Mask
+  deselectENPStripMask() {
+    this.treatmentCounts.enp_strip_mask = 0
+    this.removeENPStripMaskOperations()
+    this.hideENPStripTypeSelection()
+
+    // Reset button appearance
+    const button = this.enpStripMaskBtnTarget
+    const countBadge = button.querySelector('.count-badge')
+    this.resetButtonAppearance(button, countBadge)
+
+    this.updateSelectedOperations()
   }
 
   // Update button visual state
@@ -96,20 +240,41 @@ export default class extends Controller {
       'hard_anodising': ['border-purple-500', 'bg-purple-50', 'bg-purple-500'],
       'chromic_anodising': ['border-green-500', 'bg-green-50', 'bg-green-500'],
       'chemical_conversion': ['border-orange-500', 'bg-orange-50', 'bg-orange-500'],
-      'electroless_nickel_plating': ['border-indigo-500', 'bg-indigo-50', 'bg-indigo-500']
+      'electroless_nickel_plating': ['border-indigo-500', 'bg-indigo-50', 'bg-indigo-500'],
+      'enp_strip_mask': ['border-pink-500', 'bg-pink-50', 'bg-pink-500']
     }
 
     const [borderColor, bgColor, badgeColor] = colors[treatment]
     button.classList.add(borderColor, bgColor)
     countBadge.classList.remove('bg-gray-100')
     countBadge.classList.add(badgeColor, 'text-white')
-    countBadge.textContent = '1'
+    countBadge.textContent = treatment === 'enp_strip_mask' ? '5' : '1'
+  }
+
+  // Reset button appearance
+  resetButtonAppearance(button, countBadge) {
+    // Remove all color classes
+    const colorClasses = [
+      'border-blue-500', 'bg-blue-50', 'bg-blue-500',
+      'border-purple-500', 'bg-purple-50', 'bg-purple-500',
+      'border-green-500', 'bg-green-50', 'bg-green-500',
+      'border-orange-500', 'bg-orange-50', 'bg-orange-500',
+      'border-indigo-500', 'bg-indigo-50', 'bg-indigo-500',
+      'border-pink-500', 'bg-pink-50', 'bg-pink-500'
+    ]
+
+    button.classList.remove(...colorClasses)
+    button.classList.add('border-gray-300')
+
+    countBadge.classList.remove('bg-blue-500', 'bg-purple-500', 'bg-green-500', 'bg-orange-500', 'bg-indigo-500', 'bg-pink-500', 'text-white')
+    countBadge.classList.add('bg-gray-100')
+    countBadge.textContent = '0'
   }
 
   // Update treatment criteria section
   updateTreatmentCriteria() {
     const activeTreatments = Object.keys(this.treatmentCounts)
-      .filter(t => this.treatmentCounts[t] > 0)
+      .filter(t => this.treatmentCounts[t] > 0 && t !== 'enp_strip_mask') // Exclude ENP Strip Mask from criteria
 
     if (activeTreatments.length === 0) {
       this.treatmentCriteriaContainerTarget.innerHTML =
@@ -294,7 +459,7 @@ export default class extends Controller {
 
   // Calculate plating time for ENP
   calculatePlatingTime() {
-    const activeTreatments = Object.keys(this.treatmentCounts).filter(t => this.treatmentCounts[t] > 0)
+    const activeTreatments = Object.keys(this.treatmentCounts).filter(t => this.treatmentCounts[t] > 0 && t !== 'enp_strip_mask')
     const enpIndex = activeTreatments.indexOf('electroless_nickel_plating')
 
     if (enpIndex === -1) return
@@ -375,7 +540,7 @@ export default class extends Controller {
 
   // Load chemical conversion operations
   async loadChemicalConversionOperations() {
-    const activeTreatments = Object.keys(this.treatmentCounts).filter(t => this.treatmentCounts[t] > 0)
+    const activeTreatments = Object.keys(this.treatmentCounts).filter(t => this.treatmentCounts[t] > 0 && t !== 'enp_strip_mask')
     const chemicalIndex = activeTreatments.indexOf('chemical_conversion')
 
     if (chemicalIndex === -1) return
@@ -393,7 +558,7 @@ export default class extends Controller {
 
   // Load ENP operations
   async loadENPOperations() {
-    const activeTreatments = Object.keys(this.treatmentCounts).filter(t => this.treatmentCounts[t] > 0)
+    const activeTreatments = Object.keys(this.treatmentCounts).filter(t => this.treatmentCounts[t] > 0 && t !== 'enp_strip_mask')
     const enpIndex = activeTreatments.indexOf('electroless_nickel_plating')
 
     if (enpIndex === -1) return
@@ -424,7 +589,7 @@ export default class extends Controller {
     if (treatment === 'chemical_conversion') return // Already loaded
 
     const treatmentIndex = Object.keys(this.treatmentCounts)
-      .filter(t => this.treatmentCounts[t] > 0)
+      .filter(t => this.treatmentCounts[t] > 0 && t !== 'enp_strip_mask')
       .indexOf(treatment)
     const operationsList = this.element.querySelector(`.operations-list-${treatmentIndex}`)
 
@@ -535,18 +700,37 @@ export default class extends Controller {
     this.selectedOperations.push(operationId)
     this.updateSelectedOperations()
     element.classList.add('opacity-50')
+
+    // Check if ENP operations were added to show ENP Strip Mask
+    this.checkENPStripAvailability()
   }
 
   // Remove an operation
   removeOperation(event) {
     const operationId = event.params.operationId
-    this.selectedOperations = this.selectedOperations.filter(id => id !== operationId)
-    this.updateSelectedOperations()
 
-    // Remove opacity from all matching elements
-    this.element.querySelectorAll(`[data-operation-id="${operationId}"]`).forEach(el => {
-      el.classList.remove('opacity-50')
-    })
+    // Check if this is an ENP Strip Mask operation
+    const enpStripOperations = [
+      'ENP_MASK', 'ENP_MASKING_CHECK', 'ENP_STRIP_NITRIC',
+      'ENP_STRIP_METEX', 'ENP_STRIP_MASKING', 'ENP_MASKING_CHECK_FINAL'
+    ]
+
+    if (enpStripOperations.includes(operationId)) {
+      // If removing any ENP Strip Mask operation, remove all and deselect the treatment
+      this.deselectENPStripMask()
+    } else {
+      // Normal operation removal
+      this.selectedOperations = this.selectedOperations.filter(id => id !== operationId)
+      this.updateSelectedOperations()
+
+      // Remove opacity from all matching elements
+      this.element.querySelectorAll(`[data-operation-id="${operationId}"]`).forEach(el => {
+        el.classList.remove('opacity-50')
+      })
+
+      // Check ENP Strip availability after removing operations
+      this.checkENPStripAvailability()
+    }
   }
 
   // Update selected operations display
@@ -573,6 +757,11 @@ export default class extends Controller {
         requestData.selected_jig_type = jigSelect.value
       }
 
+      // Add ENP strip type for ENP Strip Mask operations
+      if (this.treatmentCounts.enp_strip_mask > 0) {
+        requestData.enp_strip_type = this.enpStripType
+      }
+
       const response = await fetch(this.previewPathValue, {
         method: 'POST',
         headers: {
@@ -587,11 +776,26 @@ export default class extends Controller {
 
       this.selectedContainerTarget.innerHTML = operations.map((op, index) => {
         const isAutoInserted = op.auto_inserted
-        const bgColor = isAutoInserted ? 'bg-gray-100 border border-gray-300' : 'bg-blue-100 border border-blue-300'
-        const textColor = isAutoInserted ? 'italic text-gray-600' : 'text-gray-900'
-        const autoLabel = isAutoInserted ? '<span class="text-xs text-gray-500 ml-2">(auto-inserted)</span>' : ''
-        const removeButton = isAutoInserted ? '' :
-          `<button type="button" class="text-red-600 hover:text-red-800 ml-2" data-action="click->ppi-form#removeOperation" data-ppi-form-operation-id-param="${op.id}">×</button>`
+        const isENPStripMask = ['ENP_MASK', 'ENP_MASKING_CHECK', 'ENP_STRIP_NITRIC', 'ENP_STRIP_METEX', 'ENP_STRIP_MASKING', 'ENP_MASKING_CHECK_FINAL'].includes(op.id)
+
+        let bgColor, textColor, removeButton
+
+        if (isAutoInserted) {
+          bgColor = 'bg-gray-100 border border-gray-300'
+          textColor = 'italic text-gray-600'
+          removeButton = ''
+        } else if (isENPStripMask) {
+          bgColor = 'bg-pink-100 border border-pink-300'
+          textColor = 'text-gray-900'
+          removeButton = `<button type="button" class="text-red-600 hover:text-red-800 ml-2" data-action="click->ppi-form#removeOperation" data-ppi-form-operation-id-param="${op.id}">×</button>`
+        } else {
+          bgColor = 'bg-blue-100 border border-blue-300'
+          textColor = 'text-gray-900'
+          removeButton = `<button type="button" class="text-red-600 hover:text-red-800 ml-2" data-action="click->ppi-form#removeOperation" data-ppi-form-operation-id-param="${op.id}">×</button>`
+        }
+
+        const autoLabel = isAutoInserted ? '<span class="text-xs text-gray-500 ml-2">(auto-inserted)</span>' :
+                          isENPStripMask ? '<span class="text-xs text-pink-600 ml-2">(ENP strip/mask)</span>' : ''
 
         return `
           <div class="${bgColor} rounded px-3 py-2 flex justify-between items-center" data-operation-id="${op.id}">
