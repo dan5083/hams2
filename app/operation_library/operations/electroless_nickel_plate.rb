@@ -1,8 +1,8 @@
 # app/operation_library/operations/electroless_nickel_plate.rb
 module OperationLibrary
   class ElectrolessNickelPlate
-    def self.operations
-      [
+    def self.operations(target_thickness_um = nil)
+      base_operations = [
         # High Phosphorous - Vandalloy 4100
         Operation.new(
           id: 'HIGH_PHOS_VANDALLOY_4100',
@@ -12,7 +12,7 @@ module OperationLibrary
           target_thickness: nil, # Calculated based on time
           deposition_rate_range: [12.0, 14.1], # μm/hour
           vat_numbers: [7, 8],
-          operation_text: "Electroless nickel plate in Vandalloy 4100 (High Phos) at 82-91°C. Deposition rate: 12.0-14.1 μm/hour"
+          operation_text: "Electroless nickel plate in Vandalloy 4100 (High Phos) at 82-91°C. Deposition rate: 12.0-14.1 μm/hour. Time for {THICKNESS}μm: {TIME_RANGE}"
         ),
 
         # Medium Phosphorous - Nicklad 767
@@ -24,7 +24,7 @@ module OperationLibrary
           target_thickness: nil, # Calculated based on time
           deposition_rate_range: [13.3, 17.1], # μm/hour
           vat_numbers: [7, 8],
-          operation_text: "Electroless nickel plate in Nicklad 767 (Medium Phos) at 82-91°C. Deposition rate: 13.3-17.1 μm/hour"
+          operation_text: "Electroless nickel plate in Nicklad 767 (Medium Phos) at 82-91°C. Deposition rate: 13.3-17.1 μm/hour. Time for {THICKNESS}μm: {TIME_RANGE}"
         ),
 
         # Low Phosphorous - Nicklad ELV 824
@@ -36,7 +36,7 @@ module OperationLibrary
           target_thickness: nil, # Calculated based on time
           deposition_rate_range: [6.8, 18.2], # μm/hour (wide range due to process variability)
           vat_numbers: [7, 8],
-          operation_text: "Electroless nickel plate in Nicklad ELV 824 (Low Phos) at 82-91°C. Deposition rate: 6.8-18.2 μm/hour"
+          operation_text: "Electroless nickel plate in Nicklad ELV 824 (Low Phos) at 82-91°C. Deposition rate: 6.8-18.2 μm/hour. Time for {THICKNESS}μm: {TIME_RANGE}"
         ),
 
         # PTFE Composite - Nicklad Ice
@@ -48,14 +48,30 @@ module OperationLibrary
           target_thickness: nil, # Calculated based on time
           deposition_rate_range: [5.0, 11.0], # μm/hour
           vat_numbers: [7, 8],
-          operation_text: "Electroless nickel plate in Nicklad Ice (PTFE composite) at 82-88°C. Deposition rate: 5.0-11.0 μm/hour"
+          operation_text: "Electroless nickel plate in Nicklad Ice (PTFE composite) at 82-88°C. Deposition rate: 5.0-11.0 μm/hour. Time for {THICKNESS}μm: {TIME_RANGE}"
         )
       ]
+
+      # If thickness is provided, interpolate time estimates into operation text
+      if target_thickness_um.present? && target_thickness_um > 0
+        base_operations.map do |operation|
+          enhanced_operation = operation.dup
+
+          time_data = calculate_plating_time(operation.id, target_thickness_um)
+          if time_data
+            enhanced_operation.operation_text = "#{operation.operation_text}. Time for #{target_thickness_um}μm: #{time_data[:formatted_time_range]}"
+          end
+
+          enhanced_operation
+        end
+      else
+        base_operations
+      end
     end
 
     # Helper method to calculate plating time for a given thickness
     def self.calculate_plating_time(operation_id, target_thickness_um)
-      operation = operations.find { |op| op.id == operation_id }
+      operation = operations(nil).find { |op| op.id == operation_id } # Get base operations without interpolation
       return nil unless operation&.deposition_rate_range
 
       min_rate, max_rate = operation.deposition_rate_range
@@ -80,13 +96,13 @@ module OperationLibrary
 
     def self.format_time(hours)
       if hours < 1
-        "#{(hours * 60).round} minutes"
+        "#{(hours * 60).round} min"
       elsif hours == hours.to_i
-        "#{hours.to_i} #{'hour'.pluralize(hours.to_i)}"
+        "#{hours.to_i}h"
       else
         h = hours.to_i
         m = ((hours - h) * 60).round
-        "#{h} #{'hour'.pluralize(h)} #{m} #{'minute'.pluralize(m)}"
+        "#{h}h #{m}m"
       end
     end
   end

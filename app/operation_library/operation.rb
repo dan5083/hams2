@@ -1,4 +1,4 @@
-# app/operation_library/operation.rb - Updated to include electroless nickel plating
+# app/operation_library/operation.rb - Updated to handle thickness parameter
 class Operation
   attr_accessor :id, :alloys, :process_type, :anodic_classes, :target_thickness, :vat_numbers,
                 :operation_text, :specifications, :enp_type, :deposition_rate_range
@@ -19,24 +19,34 @@ class Operation
   end
 
   # Class methods to get all operations from all files
-  def self.all_operations
-    @all_operations ||= load_all_operations
+  def self.all_operations(target_thickness = nil)
+    # Don't memoize when thickness is provided (ENP needs fresh interpolation)
+    if target_thickness.present?
+      load_all_operations(target_thickness)
+    else
+      @all_operations ||= load_all_operations(nil)
+    end
   end
 
-  def self.load_all_operations
+  def self.load_all_operations(target_thickness = nil)
     operations = []
     operations += OperationLibrary::AnodisingStandard.operations if defined?(OperationLibrary::AnodisingStandard)
     operations += OperationLibrary::AnodisingHard.operations if defined?(OperationLibrary::AnodisingHard)
     operations += OperationLibrary::AnodisingChromic.operations if defined?(OperationLibrary::AnodisingChromic)
     operations += OperationLibrary::ChemicalConversions.operations if defined?(OperationLibrary::ChemicalConversions)
-    operations += OperationLibrary::ElectrolessNickelPlate.operations if defined?(OperationLibrary::ElectrolessNickelPlate)
+
+    # Pass thickness to ENP operations for time interpolation
+    if defined?(OperationLibrary::ElectrolessNickelPlate)
+      operations += OperationLibrary::ElectrolessNickelPlate.operations(target_thickness)
+    end
+
     operations += OperationLibrary::RinseOperations.operations if defined?(OperationLibrary::RinseOperations)
     operations
   end
 
   # Filter operations by criteria (excluding rinse operations from normal filtering)
   def self.find_matching(process_type: nil, alloy: nil, target_thickness: nil, anodic_class: nil, enp_type: nil)
-    matching = all_operations.reject { |op| op.process_type == 'rinse' } # Exclude rinses from normal filtering
+    matching = all_operations(target_thickness).reject { |op| op.process_type == 'rinse' } # Exclude rinses from normal filtering
 
     matching = matching.select { |op| op.process_type == process_type } if process_type.present?
     matching = matching.select { |op| op.alloys.include?(alloy) } if alloy.present?
@@ -55,7 +65,7 @@ class Operation
           (op.target_thickness - target).abs <= 2.5
         end
       end
-      # Sort by closest thickness match first (but only for non-ENP/chemical conversion)
+      # Sort by closest thickness match (but only for non-ENP/chemical conversion)
       matching = matching.sort_by do |op|
         if op.process_type == 'electroless_nickel_plating' || op.process_type == 'chemical_conversion'
           0

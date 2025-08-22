@@ -456,6 +456,17 @@ document.addEventListener('turbo:load', function() {
       input.addEventListener('input', function(event) {
         if (event.target.classList.contains('thickness-input')) {
           calculatePlatingTime();
+          // CRITICAL: Reload ENP operations with new thickness for interpolation
+          if (event.target.dataset.treatment === 'electroless_nickel_plating') {
+            loadENPOperations();
+            // Also update selected operations preview if any ENP operations are selected
+            const hasENPSelected = selectedOperations.some(id =>
+              id.includes('PHOS') || id.includes('PTFE') || id.includes('NICKLAD') || id.includes('VANDALLOY')
+            );
+            if (hasENPSelected) {
+              updateSelectedOperations();
+            }
+          }
         }
         filterOperationsForTreatment(event);
       });
@@ -572,15 +583,28 @@ document.addEventListener('turbo:load', function() {
 
     if (enpIndex !== -1) {
       const operationsList = document.querySelector(`.operations-list-${enpIndex}`);
+      const thicknessInput = treatmentCriteriaContainer.querySelector('.thickness-input[data-treatment="electroless_nickel_plating"]');
 
-      // Fetch all ENP operations
+      // Get current thickness value for interpolation
+      const thickness = thicknessInput && thicknessInput.value ? parseFloat(thicknessInput.value) : null;
+
+      const criteria = {
+        anodising_types: ['electroless_nickel_plating']
+      };
+
+      // Add thickness if available for time interpolation
+      if (thickness && thickness > 0) {
+        criteria.target_thicknesses = [thickness];
+      }
+
+      // Fetch ENP operations with thickness for interpolated text
       fetch('/operations/filter', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-CSRF-Token': document.querySelector('[name="csrf-token"]').getAttribute('content')
         },
-        body: JSON.stringify({ anodising_types: ['electroless_nickel_plating'] })
+        body: JSON.stringify(criteria)
       })
       .then(response => response.json())
       .then(operations => {
@@ -602,7 +626,7 @@ document.addEventListener('turbo:load', function() {
     // Skip filtering for chemical conversion (already loaded)
     if (treatment === 'chemical_conversion') return;
 
-    // For ENP, handle different criteria
+    // For ENP, handle different criteria INCLUDING THICKNESS
     if (treatment === 'electroless_nickel_plating') {
       const alloySelect = treatmentCriteriaContainer.querySelector(`.alloy-select[data-treatment="${treatment}"]`);
       const enpTypeSelect = treatmentCriteriaContainer.querySelector(`.enp-type-select[data-treatment="${treatment}"]`);
@@ -612,17 +636,11 @@ document.addEventListener('turbo:load', function() {
         anodising_types: [treatment],
         alloys: alloySelect && alloySelect.value ? [alloySelect.value] : [],
         enp_types: enpTypeSelect && enpTypeSelect.value ? [enpTypeSelect.value] : [],
+        // CRITICAL: Pass thickness to get interpolated operation text
         target_thicknesses: thicknessInput && thicknessInput.value ? [parseFloat(thicknessInput.value)] : []
       };
 
-      // Only filter if we have some criteria
-      if (!criteria.alloys.length && !criteria.enp_types.length && !criteria.target_thicknesses.length) {
-        // Still show all ENP operations if no criteria selected
-        loadENPOperations();
-        return;
-      }
-
-      // Make AJAX call to get filtered operations
+      // Always load ENP operations (even without criteria) to show interpolated text
       fetch('/operations/filter', {
         method: 'POST',
         headers: {
@@ -722,6 +740,17 @@ document.addEventListener('turbo:load', function() {
       return;
     }
 
+    // Get thickness for ENP operations in preview
+    const thicknessInput = treatmentCriteriaContainer.querySelector('.thickness-input[data-treatment="electroless_nickel_plating"]');
+    const thickness = thicknessInput && thicknessInput.value ? parseFloat(thicknessInput.value) : null;
+
+    const requestData = { operation_ids: selectedOperations };
+
+    // Add thickness if available for ENP interpolation in preview
+    if (thickness && thickness > 0) {
+      requestData.target_thickness = thickness;
+    }
+
     // Get operation details with auto-ops and display
     fetch('/operations/preview_with_auto_ops', {
       method: 'POST',
@@ -729,7 +758,7 @@ document.addEventListener('turbo:load', function() {
         'Content-Type': 'application/json',
         'X-CSRF-Token': document.querySelector('[name="csrf-token"]').getAttribute('content')
       },
-      body: JSON.stringify({ operation_ids: selectedOperations })
+      body: JSON.stringify(requestData)
     })
     .then(response => response.json())
     .then(data => {
@@ -755,7 +784,7 @@ document.addEventListener('turbo:load', function() {
     })
     .catch(error => {
       console.error('Error loading operations with auto-ops:', error);
-      // Fallback to basic display
+      // Fallback without thickness
       fetch('/operations/details', {
         method: 'POST',
         headers: {

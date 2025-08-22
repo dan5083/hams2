@@ -1,12 +1,15 @@
-# app/controllers/operations_controller.rb - FIXED for ENP filtering
+# app/controllers/operations_controller.rb - Enhanced for ENP thickness interpolation
 class OperationsController < ApplicationController
   skip_before_action :verify_authenticity_token, only: [:filter, :details, :summary, :preview_with_rinses]
 
   def filter
     criteria = filter_params
 
-    # Start with all operations
-    operations = Operation.all_operations
+    # Extract thickness for ENP operations
+    target_thickness = criteria[:target_thicknesses]&.first
+
+    # Start with all operations - pass thickness to ENP operations
+    operations = Operation.all_operations(target_thickness)
 
     # Filter by anodising types (now includes ENP)
     if criteria[:anodising_types].present?
@@ -23,7 +26,7 @@ class OperationsController < ApplicationController
       operations = operations.select { |op| (op.anodic_classes & criteria[:anodic_classes]).any? }
     end
 
-    # FIXED: Filter by ENP types (note: JavaScript sends enp_types array, but we check enp_type attribute)
+    # Filter by ENP types
     if criteria[:enp_types].present?
       operations = operations.select { |op| op.enp_type.present? && criteria[:enp_types].include?(op.enp_type) }
     end
@@ -31,7 +34,7 @@ class OperationsController < ApplicationController
     # Filter by target thickness (with tolerance) - skip for chemical conversion and ENP
     if criteria[:target_thicknesses].present?
       operations = operations.select do |op|
-        # Skip thickness filtering for chemical conversion and ENP
+        # Skip thickness filtering for chemical conversion and ENP (already handled above)
         if op.process_type == 'chemical_conversion' || op.process_type == 'electroless_nickel_plating'
           true
         else
@@ -59,7 +62,7 @@ class OperationsController < ApplicationController
       {
         id: op.id,
         display_name: op.display_name,
-        operation_text: op.operation_text,
+        operation_text: op.operation_text, # Now includes interpolated time for ENP
         vat_options_text: op.vat_options_text,
         target_thickness: op.target_thickness,
         process_type: op.process_type,
@@ -71,12 +74,14 @@ class OperationsController < ApplicationController
       }
     end
 
-    # DEBUG: Log the filtering for ENP
+    # DEBUG: Log ENP operations with interpolated text
     if criteria[:anodising_types]&.include?('electroless_nickel_plating')
       Rails.logger.info "🔍 ENP FILTER DEBUG:"
-      Rails.logger.info "  - Input criteria: #{criteria.inspect}"
+      Rails.logger.info "  - Thickness: #{target_thickness}μm"
       Rails.logger.info "  - Found #{results.length} operations"
-      Rails.logger.info "  - Results: #{results.map { |r| "#{r[:id]} (#{r[:enp_type]})" }.join(', ')}"
+      results.each do |result|
+        Rails.logger.info "  - #{result[:id]}: #{result[:operation_text][0..80]}..."
+      end
     end
 
     render json: results
@@ -84,8 +89,9 @@ class OperationsController < ApplicationController
 
   def details
     operation_ids = params[:operation_ids] || []
+    target_thickness = params[:target_thickness]&.to_f
 
-    all_operations = Operation.all_operations
+    all_operations = Operation.all_operations(target_thickness)
 
     results = operation_ids.map do |op_id|
       operation = all_operations.find { |op| op.id == op_id }
@@ -93,7 +99,7 @@ class OperationsController < ApplicationController
         {
           id: operation.id,
           display_name: operation.display_name,
-          operation_text: operation.operation_text,
+          operation_text: operation.operation_text, # Includes interpolated time if ENP
           vat_options_text: operation.vat_options_text,
           target_thickness: operation.target_thickness,
           process_type: operation.process_type,
@@ -109,13 +115,19 @@ class OperationsController < ApplicationController
 
   def summary
     operation_ids = params[:operation_ids] || []
-    summary = PartProcessingInstruction.simulate_operations_summary(operation_ids)
+    target_thickness = params[:target_thickness]&.to_f
+
+    # Pass thickness for ENP operation text interpolation
+    summary = PartProcessingInstruction.simulate_operations_summary(operation_ids, target_thickness)
     render json: { summary: summary }
   end
 
   def preview_with_auto_ops
     operation_ids = params[:operation_ids] || []
-    operations_with_auto_ops = PartProcessingInstruction.simulate_operations_with_auto_ops(operation_ids)
+    target_thickness = params[:target_thickness]&.to_f
+
+    # Pass thickness for ENP operation text interpolation
+    operations_with_auto_ops = PartProcessingInstruction.simulate_operations_with_auto_ops(operation_ids, target_thickness)
     render json: { operations: operations_with_auto_ops }
   end
 
@@ -127,7 +139,7 @@ class OperationsController < ApplicationController
       alloys: [],
       target_thicknesses: [],
       anodic_classes: [],
-      enp_types: []  # FIXED: This needs to be plural to match JavaScript
+      enp_types: []
     )
   end
 end
