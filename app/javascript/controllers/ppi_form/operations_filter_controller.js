@@ -1,4 +1,4 @@
-// app/javascript/controllers/ppi_form/operations_filter_controller.js
+// app/javascript/controllers/operations_filter_controller.js
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
@@ -17,27 +17,40 @@ export default class extends Controller {
   }
 
   async handleTreatmentChanged(detail) {
+    console.log("🔍 handleTreatmentChanged called with:", detail)
     const { criteria, activeTreatments } = detail
+    console.log("🔍 criteria:", criteria)
+    console.log("🔍 activeTreatments:", activeTreatments)
 
     // Load operations for each active treatment
     for (const criteriaData of criteria) {
+      console.log("🔍 Loading operations for:", criteriaData)
       await this.loadOperationsForTreatment(criteriaData)
     }
   }
 
   async loadOperationsForTreatment({ treatment, treatmentIndex, criteria }) {
+    console.log(`🔍 loadOperationsForTreatment called for ${treatment}, index ${treatmentIndex}`)
     const operationsList = this.element.querySelector(`.operations-list[data-treatment="${treatment}"][data-treatment-index="${treatmentIndex}"]`)
+    console.log("🔍 Found operations list container:", !!operationsList)
 
-    if (!operationsList) return
+    if (!operationsList) {
+      console.log("🔍 No operations list container found")
+      return
+    }
 
     try {
       // Special handling for different treatment types
       if (treatment === 'chemical_conversion') {
+        console.log("🔍 Loading chemical conversion operations")
         await this.loadChemicalConversionOperations(operationsList)
       } else if (!this.hasCriteria(criteria, treatment)) {
+        console.log("🔍 No criteria, showing placeholder")
         operationsList.innerHTML = '<p class="text-gray-500 text-xs">Select criteria above to see operations</p>'
       } else {
+        console.log("🔍 Fetching operations with criteria:", criteria)
         const operations = await this.fetchOperations(criteria)
+        console.log("🔍 Received operations:", operations.length)
         this.displayOperationsInContainer(operations, operationsList, treatment)
       }
     } catch (error) {
