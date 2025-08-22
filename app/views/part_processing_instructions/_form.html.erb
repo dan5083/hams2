@@ -1,5 +1,12 @@
 <%# app/views/part_processing_instructions/_form.html.erb %>
-<%= form_with model: ppi, local: true, class: "space-y-6" do |form| %>
+<%= form_with model: ppi, local: true, class: "space-y-6",
+    data: {
+      controller: "ppi-form",
+      ppi_form_filter_path_value: operations_filter_path,
+      ppi_form_details_path_value: operations_details_path,
+      ppi_form_preview_path_value: operations_preview_with_auto_ops_path,
+      ppi_form_csrf_token_value: form_authenticity_token
+    } do |form| %>
   <% if @part.present? %>
     <%= hidden_field_tag :part_id, @part.id %>
   <% end %>
@@ -36,7 +43,7 @@
             {
               class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm #{'bg-gray-100' if @part.present?}",
               required: true,
-              disabled: ppi.persisted? || @part.present? # Can't change if editing or from specific part
+              disabled: ppi.persisted? || @part.present?
             } %>
         <% if ppi.persisted? || @part.present? %>
           <p class="mt-1 text-xs text-gray-500">Customer cannot be changed</p>
@@ -102,41 +109,41 @@
 
     <!-- Treatment Type Buttons -->
     <div class="grid grid-cols-2 gap-3 mb-6 sm:grid-cols-5">
-      <button type="button" id="standard-btn" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-blue-500 transition-colors text-sm" data-treatment="standard_anodising">
+      <button type="button" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-blue-500 transition-colors text-sm" data-treatment="standard_anodising">
         <span>Standard</span>
         <span class="count-badge ml-2 min-w-[20px] h-5 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">0</span>
       </button>
 
-      <button type="button" id="hard-btn" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-purple-500 transition-colors text-sm" data-treatment="hard_anodising">
+      <button type="button" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-purple-500 transition-colors text-sm" data-treatment="hard_anodising">
         <span>Hard</span>
         <span class="count-badge ml-2 min-w-[20px] h-5 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">0</span>
       </button>
 
-      <button type="button" id="chromic-btn" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-green-500 transition-colors text-sm" data-treatment="chromic_anodising">
+      <button type="button" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-green-500 transition-colors text-sm" data-treatment="chromic_anodising">
         <span>Chromic</span>
         <span class="count-badge ml-2 min-w-[20px] h-5 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">0</span>
       </button>
 
-      <button type="button" id="chemical-btn" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-orange-500 transition-colors text-sm" data-treatment="chemical_conversion">
+      <button type="button" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-orange-500 transition-colors text-sm" data-treatment="chemical_conversion">
         <span>Chemical Conv.</span>
         <span class="count-badge ml-2 min-w-[20px] h-5 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">0</span>
       </button>
 
-      <button type="button" id="enp-btn" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-indigo-500 transition-colors text-sm" data-treatment="electroless_nickel_plating">
+      <button type="button" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-indigo-500 transition-colors text-sm" data-treatment="electroless_nickel_plating">
         <span>ENP</span>
         <span class="count-badge ml-2 min-w-[20px] h-5 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">0</span>
       </button>
     </div>
 
     <!-- Dynamic Treatment Criteria -->
-    <div id="treatment-criteria-container" class="space-y-6">
+    <div data-ppi-form-target="treatmentCriteriaContainer" class="space-y-6">
       <p class="text-gray-500 text-sm">Select treatment types above to configure criteria</p>
     </div>
 
     <!-- Available Operations -->
     <div class="mt-6">
       <h4 class="text-md font-medium text-gray-900 mb-3">Available Operations</h4>
-      <div id="operations-container" class="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded p-3">
+      <div data-ppi-form-target="operationsContainer" class="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded p-3">
         <p class="text-gray-500 text-sm">Select criteria above to see matching operations</p>
       </div>
     </div>
@@ -145,7 +152,7 @@
     <div class="mt-6">
       <h4 class="text-md font-medium text-gray-900 mb-3">Operations Preview</h4>
 
-      <div id="selected-container" class="space-y-2 min-h-[60px] border border-gray-200 rounded p-3 bg-gray-50">
+      <div data-ppi-form-target="selectedContainer" class="space-y-2 min-h-[60px] border border-gray-200 rounded p-3 bg-gray-50">
         <% operations_with_auto_ops = ppi.respond_to?(:get_operations_with_auto_ops) ? ppi.get_operations_with_auto_ops : [] %>
         <% if operations_with_auto_ops.any? %>
           <% operations_with_auto_ops.each_with_index do |operation, index| %>
@@ -160,7 +167,7 @@
                   <% end %>
                 </span>
                 <% unless is_auto_inserted %>
-                  <button type="button" class="text-red-600 hover:text-red-800 ml-2 remove-operation" data-operation-id="<%= operation.id %>">×</button>
+                  <button type="button" class="text-red-600 hover:text-red-800 ml-2" data-action="click->ppi-form#removeOperation" data-ppi-form-operation-id-param="<%= operation.id %>">×</button>
                 <% end %>
               </div>
             <% end %>
@@ -174,7 +181,7 @@
     <!-- Hidden field for selected operations -->
     <%= hidden_field_tag "part_processing_instruction[customisation_data][operation_selection][selected_operations]",
         ppi.selected_operations.to_json,
-        id: "selected_operations_field" %>
+        data: { ppi_form_target: "selectedOperationsField" } %>
   </div>
 
   <!-- Specification (will be auto-generated from operations) -->
@@ -185,7 +192,8 @@
         placeholder: "Will be automatically generated from selected operations...",
         rows: 4,
         class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-gray-50",
-        readonly: true %>
+        readonly: true,
+        data: { ppi_form_target: "specificationField" } %>
     <p class="mt-1 text-xs text-gray-500">Auto-generated from selected operations</p>
   </div>
 
@@ -221,600 +229,3 @@
         class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" %>
   </div>
 <% end %>
-
-<script>
-document.addEventListener('turbo:load', function() {
-  const selectedOperationsField = document.getElementById('selected_operations_field');
-  const operationsContainer = document.getElementById('operations-container');
-  const selectedContainer = document.getElementById('selected-container');
-  const treatmentButtons = document.querySelectorAll('.treatment-btn');
-  const treatmentCriteriaContainer = document.getElementById('treatment-criteria-container');
-
-  let selectedOperations = [];
-  let treatmentCounts = {
-    standard_anodising: 0,
-    hard_anodising: 0,
-    chromic_anodising: 0,
-    chemical_conversion: 0,
-    electroless_nickel_plating: 0
-  };
-  let totalTreatments = 0;
-
-  // Initialize with existing data
-  try {
-    const existingData = JSON.parse(selectedOperationsField.value || '[]');
-    selectedOperations = existingData;
-  } catch(e) {
-    selectedOperations = [];
-  }
-
-  // Treatment button click handlers
-  treatmentButtons.forEach(button => {
-    button.addEventListener('click', function() {
-      const treatment = this.dataset.treatment;
-      const countBadge = this.querySelector('.count-badge');
-
-      if (totalTreatments >= 3) {
-        alert('Maximum 3 treatments allowed');
-        return;
-      }
-
-      if (treatmentCounts[treatment] === 0) {
-        treatmentCounts[treatment] = 1;
-        totalTreatments++;
-
-        // Update button appearance with treatment-specific colors
-        this.classList.remove('border-gray-300');
-        const colors = {
-          'standard_anodising': ['border-blue-500', 'bg-blue-50', 'bg-blue-500'],
-          'hard_anodising': ['border-purple-500', 'bg-purple-50', 'bg-purple-500'],
-          'chromic_anodising': ['border-green-500', 'bg-green-50', 'bg-green-500'],
-          'chemical_conversion': ['border-orange-500', 'bg-orange-50', 'bg-orange-500'],
-          'electroless_nickel_plating': ['border-indigo-500', 'bg-indigo-50', 'bg-indigo-500']
-        };
-
-        this.classList.add(colors[treatment][0], colors[treatment][1]);
-        countBadge.classList.remove('bg-gray-100');
-        countBadge.classList.add(colors[treatment][2], 'text-white');
-        countBadge.textContent = '1';
-
-        updateTreatmentCriteria();
-      }
-    });
-  });
-
-  function updateTreatmentCriteria() {
-    const activeTreatments = Object.keys(treatmentCounts).filter(t => treatmentCounts[t] > 0);
-
-    if (activeTreatments.length === 0) {
-      treatmentCriteriaContainer.innerHTML = '<p class="text-gray-500 text-sm">Select treatment types above to configure criteria</p>';
-      return;
-    }
-
-    treatmentCriteriaContainer.innerHTML = activeTreatments.map((treatment, index) => {
-      const treatmentName = treatment.replace('_anodising', '').replace('_conversion', '').replace('_nickel_plating', '').charAt(0).toUpperCase() + treatment.replace('_anodising', '').replace('_conversion', '').replace('_nickel_plating', '').slice(1);
-
-      // Chemical conversion doesn't need alloy/thickness selection
-      if (treatment === 'chemical_conversion') {
-        return `
-          <div class="border border-orange-200 rounded-lg p-4 bg-orange-50">
-            <h4 class="font-medium text-gray-900 mb-3">${treatmentName} Treatment ${index + 1}</h4>
-            <p class="text-sm text-gray-600 mb-3">Chemical conversion operations will be available below - no additional criteria needed.</p>
-
-            <!-- Operations for this treatment -->
-            <div class="mt-4">
-              <h5 class="text-sm font-medium text-gray-700 mb-2">Available Operations</h5>
-              <div class="operations-list-${index} space-y-1 max-h-32 overflow-y-auto border border-gray-200 rounded p-2 bg-white">
-                <p class="text-gray-500 text-xs">Loading chemical conversion operations...</p>
-              </div>
-            </div>
-          </div>
-        `;
-      }
-
-      // ENP treatment with specific criteria
-      if (treatment === 'electroless_nickel_plating') {
-        return `
-          <div class="border border-indigo-200 rounded-lg p-4 bg-indigo-50">
-            <h4 class="font-medium text-gray-900 mb-3">${treatmentName} Treatment ${index + 1}</h4>
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <!-- Alloy -->
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Alloy/Material</label>
-                <select class="alloy-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" data-treatment="${treatment}">
-                  <option value="">Select material...</option>
-                  <option value="steel">Steel</option>
-                  <option value="stainless_steel">Stainless Steel</option>
-                  <option value="316_stainless_steel">316 Stainless Steel</option>
-                  <option value="aluminium">Aluminium</option>
-                  <option value="copper">Copper</option>
-                  <option value="brass">Brass</option>
-                  <option value="2000_series_alloys">2000 Series Alloys</option>
-                  <option value="cast_aluminium_william_cope">Cast Aluminium (William Cope)</option>
-                  <option value="mclaren_sta142_procedure_d">McLaren STA142 Procedure D</option>
-                </select>
-              </div>
-
-              <!-- ENP Type -->
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">ENP Type</label>
-                <select class="enp-type-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" data-treatment="${treatment}">
-                  <option value="">Select ENP type...</option>
-                  <option value="high_phosphorous">High Phosphorous</option>
-                  <option value="medium_phosphorous">Medium Phosphorous</option>
-                  <option value="low_phosphorous">Low Phosphorous</option>
-                  <option value="ptfe_composite">PTFE Composite</option>
-                </select>
-              </div>
-
-              <!-- Target Thickness (for time calculation) -->
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Target Thickness (μm)</label>
-                <input type="number"
-                       class="thickness-input mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                       data-treatment="${treatment}"
-                       placeholder="e.g., 25"
-                       min="1"
-                       max="100">
-                <p class="text-xs text-gray-500 mt-1">Used for time calculation</p>
-              </div>
-            </div>
-
-            <!-- Operations for this treatment -->
-            <div class="mt-4">
-              <h5 class="text-sm font-medium text-gray-700 mb-2">Available Operations</h5>
-              <div class="operations-list-${index} space-y-1 max-h-32 overflow-y-auto border border-gray-200 rounded p-2 bg-white">
-                <p class="text-gray-500 text-xs">Select criteria above to see ENP operations</p>
-              </div>
-            </div>
-
-            <!-- Plating Time Estimate -->
-            <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
-              <h6 class="text-sm font-medium text-blue-800 mb-1">Plating Time Estimate</h6>
-              <div class="plating-time-estimate text-sm text-blue-700">
-                Enter thickness above to see time estimate
-              </div>
-            </div>
-          </div>
-        `;
-      }
-
-      // Standard anodising treatments
-      return `
-        <div class="border border-gray-200 rounded-lg p-4">
-          <h4 class="font-medium text-gray-900 mb-3">${treatmentName} Treatment ${index + 1}</h4>
-          <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <!-- Alloy -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Alloy</label>
-              <select class="alloy-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" data-treatment="${treatment}">
-                <option value="">Select alloy...</option>
-                <option value="6000_series">6000 Series</option>
-                <option value="7075">7075</option>
-                <option value="2014">2014</option>
-                <option value="5083">5083</option>
-                <option value="titanium">Titanium</option>
-                <option value="general">General</option>
-              </select>
-            </div>
-
-            <!-- Target Thickness -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Target Thickness (μm)</label>
-              <select class="thickness-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" data-treatment="${treatment}">
-                <option value="">Select thickness...</option>
-                <option value="5">5μm</option>
-                <option value="10">10μm</option>
-                <option value="15">15μm</option>
-                <option value="20">20μm</option>
-                <option value="25">25μm</option>
-                <option value="30">30μm</option>
-                <option value="40">40μm</option>
-                <option value="50">50μm</option>
-                <option value="60">60μm</option>
-              </select>
-            </div>
-
-            <!-- Anodic Class -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Anodic Class</label>
-              <select class="anodic-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" data-treatment="${treatment}">
-                <option value="">Select class...</option>
-                <option value="class_1">Class 1 (Undyed)</option>
-                <option value="class_2">Class 2 (Dyed)</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Operations for this treatment -->
-          <div class="mt-4">
-            <h5 class="text-sm font-medium text-gray-700 mb-2">Available Operations</h5>
-            <div class="operations-list-${index} space-y-1 max-h-32 overflow-y-auto border border-gray-200 rounded p-2 bg-gray-50">
-              <p class="text-gray-500 text-xs">Select criteria above to see operations</p>
-            </div>
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    // Add event listeners to the new selects and load operations for special treatments
-    addSelectEventListeners();
-    loadChemicalConversionOperations();
-    loadENPOperations();
-    calculatePlatingTime();
-  }
-
-  function addSelectEventListeners() {
-    const allSelects = treatmentCriteriaContainer.querySelectorAll('select');
-    const allInputs = treatmentCriteriaContainer.querySelectorAll('input');
-
-    allSelects.forEach(select => {
-      select.addEventListener('change', filterOperationsForTreatment);
-    });
-
-    allInputs.forEach(input => {
-      input.addEventListener('input', function(event) {
-        if (event.target.classList.contains('thickness-input')) {
-          calculatePlatingTime();
-          // CRITICAL: Reload ENP operations with new thickness for interpolation
-          if (event.target.dataset.treatment === 'electroless_nickel_plating') {
-            loadENPOperations();
-            // Also update selected operations preview if any ENP operations are selected
-            const hasENPSelected = selectedOperations.some(id =>
-              id.includes('PHOS') || id.includes('PTFE') || id.includes('NICKLAD') || id.includes('VANDALLOY')
-            );
-            if (hasENPSelected) {
-              updateSelectedOperations();
-            }
-          }
-        }
-        filterOperationsForTreatment(event);
-      });
-    });
-  }
-
-  function calculatePlatingTime() {
-    const activeTreatments = Object.keys(treatmentCounts).filter(t => treatmentCounts[t] > 0);
-    const enpIndex = activeTreatments.indexOf('electroless_nickel_plating');
-
-    if (enpIndex !== -1) {
-      const thicknessInput = treatmentCriteriaContainer.querySelector('.thickness-input[data-treatment="electroless_nickel_plating"]');
-      const enpTypeSelect = treatmentCriteriaContainer.querySelector('.enp-type-select[data-treatment="electroless_nickel_plating"]');
-      const timeEstimateDiv = treatmentCriteriaContainer.querySelector('.plating-time-estimate');
-
-      if (thicknessInput && timeEstimateDiv && enpTypeSelect) {
-        const thickness = parseFloat(thicknessInput.value);
-        const enpType = enpTypeSelect.value;
-
-        if (thickness && thickness > 0 && enpType) {
-          // Calculate based on ENP type using realistic deposition rates
-          let minRate, maxRate, typeName;
-
-          switch(enpType) {
-            case 'high_phosphorous':
-              minRate = 12.0;
-              maxRate = 14.1;
-              typeName = 'High Phos (Vandalloy 4100)';
-              break;
-            case 'medium_phosphorous':
-              minRate = 13.3;
-              maxRate = 17.1;
-              typeName = 'Medium Phos (Nicklad 767)';
-              break;
-            case 'low_phosphorous':
-              minRate = 6.8;
-              maxRate = 18.2;
-              typeName = 'Low Phos (Nicklad ELV 824)';
-              break;
-            case 'ptfe_composite':
-              minRate = 5.0;
-              maxRate = 11.0;
-              typeName = 'PTFE Composite (Nicklad Ice)';
-              break;
-            default:
-              minRate = 12.0;
-              maxRate = 15.0;
-              typeName = 'General ENP';
-          }
-
-          const minTimeHours = thickness / maxRate;
-          const maxTimeHours = thickness / minRate;
-          const avgTimeHours = (minTimeHours + maxTimeHours) / 2;
-
-          const formatTime = (hours) => {
-            if (hours < 1) {
-              return `${Math.round(hours * 60)} min`;
-            } else if (hours < 2) {
-              const h = Math.floor(hours);
-              const m = Math.round((hours - h) * 60);
-              return `${h}h ${m}m`;
-            } else {
-              return `${hours.toFixed(1)}h`;
-            }
-          };
-
-          timeEstimateDiv.innerHTML = `
-            <div class="space-y-1">
-              <div><strong>${typeName}</strong></div>
-              <div>Time range: <strong>${formatTime(minTimeHours)} - ${formatTime(maxTimeHours)}</strong></div>
-              <div>Average: <strong>${formatTime(avgTimeHours)}</strong></div>
-              <div class="text-xs text-blue-600">Rate: ${minRate}-${maxRate} μm/hour at 82-91°C</div>
-            </div>
-          `;
-        } else if (thickness && thickness > 0) {
-          timeEstimateDiv.innerHTML = 'Select ENP type above for accurate time estimate';
-        } else {
-          timeEstimateDiv.innerHTML = 'Enter thickness and select ENP type for time estimate';
-        }
-      }
-    }
-  }
-
-  function loadChemicalConversionOperations() {
-    const activeTreatments = Object.keys(treatmentCounts).filter(t => treatmentCounts[t] > 0);
-    const chemicalIndex = activeTreatments.indexOf('chemical_conversion');
-
-    if (chemicalIndex !== -1) {
-      const operationsList = document.querySelector(`.operations-list-${chemicalIndex}`);
-
-      // Fetch all chemical conversion operations
-      fetch('/operations/filter', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': document.querySelector('[name="csrf-token"]').getAttribute('content')
-        },
-        body: JSON.stringify({ anodising_types: ['chemical_conversion'] })
-      })
-      .then(response => response.json())
-      .then(operations => {
-        displayOperationsForTreatment(operations, operationsList, 'chemical_conversion');
-      })
-      .catch(error => {
-        console.error('Error loading chemical conversion operations:', error);
-        operationsList.innerHTML = '<p class="text-red-500 text-xs">Error loading operations</p>';
-      });
-    }
-  }
-
-  function loadENPOperations() {
-    const activeTreatments = Object.keys(treatmentCounts).filter(t => treatmentCounts[t] > 0);
-    const enpIndex = activeTreatments.indexOf('electroless_nickel_plating');
-
-    if (enpIndex !== -1) {
-      const operationsList = document.querySelector(`.operations-list-${enpIndex}`);
-      const thicknessInput = treatmentCriteriaContainer.querySelector('.thickness-input[data-treatment="electroless_nickel_plating"]');
-
-      // Get current thickness value for interpolation
-      const thickness = thicknessInput && thicknessInput.value ? parseFloat(thicknessInput.value) : null;
-
-      const criteria = {
-        anodising_types: ['electroless_nickel_plating']
-      };
-
-      // Add thickness if available for time interpolation
-      if (thickness && thickness > 0) {
-        criteria.target_thicknesses = [thickness];
-      }
-
-      // Fetch ENP operations with thickness for interpolated text
-      fetch('/operations/filter', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': document.querySelector('[name="csrf-token"]').getAttribute('content')
-        },
-        body: JSON.stringify(criteria)
-      })
-      .then(response => response.json())
-      .then(operations => {
-        displayOperationsForTreatment(operations, operationsList, 'electroless_nickel_plating');
-      })
-      .catch(error => {
-        console.error('Error loading ENP operations:', error);
-        operationsList.innerHTML = '<p class="text-red-500 text-xs">Error loading operations</p>';
-      });
-    }
-  }
-
-  function filterOperationsForTreatment(event) {
-    const select = event.target;
-    const treatment = select.dataset.treatment;
-    const treatmentIndex = Object.keys(treatmentCounts).filter(t => treatmentCounts[t] > 0).indexOf(treatment);
-    const operationsList = document.querySelector(`.operations-list-${treatmentIndex}`);
-
-    // Skip filtering for chemical conversion (already loaded)
-    if (treatment === 'chemical_conversion') return;
-
-    // For ENP, handle different criteria INCLUDING THICKNESS
-    if (treatment === 'electroless_nickel_plating') {
-      const alloySelect = treatmentCriteriaContainer.querySelector(`.alloy-select[data-treatment="${treatment}"]`);
-      const enpTypeSelect = treatmentCriteriaContainer.querySelector(`.enp-type-select[data-treatment="${treatment}"]`);
-      const thicknessInput = treatmentCriteriaContainer.querySelector(`.thickness-input[data-treatment="${treatment}"]`);
-
-      const criteria = {
-        anodising_types: [treatment],
-        alloys: alloySelect && alloySelect.value ? [alloySelect.value] : [],
-        enp_types: enpTypeSelect && enpTypeSelect.value ? [enpTypeSelect.value] : [],
-        // CRITICAL: Pass thickness to get interpolated operation text
-        target_thicknesses: thicknessInput && thicknessInput.value ? [parseFloat(thicknessInput.value)] : []
-      };
-
-      // Always load ENP operations (even without criteria) to show interpolated text
-      fetch('/operations/filter', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': document.querySelector('[name="csrf-token"]').getAttribute('content')
-        },
-        body: JSON.stringify(criteria)
-      })
-      .then(response => response.json())
-      .then(operations => {
-        displayOperationsForTreatment(operations, operationsList, treatment);
-      })
-      .catch(error => {
-        console.error('Error filtering ENP operations:', error);
-        operationsList.innerHTML = '<p class="text-red-500 text-xs">Error loading operations</p>';
-      });
-      return;
-    }
-
-    // Standard anodising treatments
-    const alloySelect = treatmentCriteriaContainer.querySelector(`.alloy-select[data-treatment="${treatment}"]`);
-    const thicknessSelect = treatmentCriteriaContainer.querySelector(`.thickness-select[data-treatment="${treatment}"]`);
-    const anodicSelect = treatmentCriteriaContainer.querySelector(`.anodic-select[data-treatment="${treatment}"]`);
-
-    const criteria = {
-      anodising_types: [treatment],
-      alloys: alloySelect.value ? [alloySelect.value] : [],
-      target_thicknesses: thicknessSelect.value ? [parseFloat(thicknessSelect.value)] : [],
-      anodic_classes: anodicSelect.value ? [anodicSelect.value] : []
-    };
-
-    // Only filter if we have some criteria
-    if (!criteria.alloys.length && !criteria.target_thicknesses.length && !criteria.anodic_classes.length) {
-      operationsList.innerHTML = '<p class="text-gray-500 text-xs">Select criteria above to see operations</p>';
-      return;
-    }
-
-    // Make AJAX call to get filtered operations
-    fetch('/operations/filter', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-Token': document.querySelector('[name="csrf-token"]').getAttribute('content')
-      },
-      body: JSON.stringify(criteria)
-    })
-    .then(response => response.json())
-    .then(operations => {
-      displayOperationsForTreatment(operations, operationsList, treatment);
-    })
-    .catch(error => {
-      console.error('Error filtering operations:', error);
-      operationsList.innerHTML = '<p class="text-red-500 text-xs">Error loading operations</p>';
-    });
-  }
-
-  function displayOperationsForTreatment(operations, container, treatment) {
-    if (operations.length === 0) {
-      container.innerHTML = '<p class="text-gray-500 text-xs">No matching operations found</p>';
-      return;
-    }
-
-    container.innerHTML = operations.map(op => {
-      const displayText = (treatment === 'chemical_conversion' || treatment === 'electroless_nickel_plating') ?
-        op.id.replace(/_/g, ' ') : op.display_name;
-      return `
-        <div class="bg-white border border-gray-200 rounded px-2 py-1 cursor-pointer hover:bg-gray-50 text-xs ${selectedOperations.includes(op.id) ? 'opacity-50' : ''}"
-             data-operation-id="${op.id}" onclick="selectOperation('${op.id}', this)">
-          <div class="flex justify-between items-center">
-            <span class="font-medium">${displayText}</span>
-            <button type="button" class="text-green-600 hover:text-green-800">+</button>
-          </div>
-          <p class="text-gray-600 mt-1">${op.operation_text}</p>
-          ${op.specifications ? `<p class="text-purple-600 text-xs mt-1">${op.specifications}</p>` : ''}
-        </div>
-      `;
-    }).join('');
-  }
-
-  window.selectOperation = function(operationId, element) {
-    if (selectedOperations.includes(operationId)) return;
-    if (selectedOperations.length >= 3) {
-      alert('Maximum 3 operations allowed');
-      return;
-    }
-
-    selectedOperations.push(operationId);
-    updateSelectedOperations();
-    element.classList.add('opacity-50');
-  };
-
-  function updateSelectedOperations() {
-    selectedOperationsField.value = JSON.stringify(selectedOperations);
-
-    if (selectedOperations.length === 0) {
-      selectedContainer.innerHTML = '<p class="text-gray-500 text-sm">No treatments selected</p>';
-      return;
-    }
-
-    // Get thickness for ENP operations in preview
-    const thicknessInput = treatmentCriteriaContainer.querySelector('.thickness-input[data-treatment="electroless_nickel_plating"]');
-    const thickness = thicknessInput && thicknessInput.value ? parseFloat(thicknessInput.value) : null;
-
-    const requestData = { operation_ids: selectedOperations };
-
-    // Add thickness if available for ENP interpolation in preview
-    if (thickness && thickness > 0) {
-      requestData.target_thickness = thickness;
-    }
-
-    // Get operation details with auto-ops and display
-    fetch('/operations/preview_with_auto_ops', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-Token': document.querySelector('[name="csrf-token"]').getAttribute('content')
-      },
-      body: JSON.stringify(requestData)
-    })
-    .then(response => response.json())
-    .then(data => {
-      const operations = data.operations || [];
-      selectedContainer.innerHTML = operations.map((op, index) => {
-        const isAutoInserted = op.auto_inserted;
-        const bgColor = isAutoInserted ? 'bg-gray-100 border border-gray-300' : 'bg-blue-100 border border-blue-300';
-        const textColor = isAutoInserted ? 'italic text-gray-600' : 'text-gray-900';
-        const autoLabel = isAutoInserted ? '<span class="text-xs text-gray-500 ml-2">(auto-inserted)</span>' : '';
-        const removeButton = isAutoInserted ? '' : `<button type="button" class="text-red-600 hover:text-red-800 ml-2 remove-operation" onclick="removeOperation('${op.id}')">×</button>`;
-
-        return `
-          <div class="${bgColor} rounded px-3 py-2 flex justify-between items-center" data-operation-id="${op.id}">
-            <span class="text-sm ${textColor}">
-              <strong>${index + 1}.</strong>
-              ${op.display_name}: ${op.operation_text}
-              ${autoLabel}
-            </span>
-            ${removeButton}
-          </div>
-        `;
-      }).join('');
-    })
-    .catch(error => {
-      console.error('Error loading operations with auto-ops:', error);
-      // Fallback without thickness
-      fetch('/operations/details', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': document.querySelector('[name="csrf-token"]').getAttribute('content')
-        },
-        body: JSON.stringify({ operation_ids: selectedOperations })
-      })
-      .then(response => response.json())
-      .then(operations => {
-        selectedContainer.innerHTML = operations.map((op, index) => `
-          <div class="bg-blue-100 border border-blue-300 rounded px-3 py-2 flex justify-between items-center" data-operation-id="${op.id}">
-            <span class="text-sm"><strong>${index + 1}.</strong> ${op.display_name || op.id.replace(/_/g, ' ')}: ${op.operation_text}</span>
-            <button type="button" class="text-red-600 hover:text-red-800 ml-2 remove-operation" onclick="removeOperation('${op.id}')">×</button>
-          </div>
-        `).join('');
-      });
-    });
-  }
-
-  window.removeOperation = function(operationId) {
-    selectedOperations = selectedOperations.filter(id => id !== operationId);
-    updateSelectedOperations();
-    // Refresh all operations lists to remove opacity
-    document.querySelectorAll(`[data-operation-id="${operationId}"]`).forEach(el => {
-      el.classList.remove('opacity-50');
-    });
-  };
-
-  // Initialize display
-  updateSelectedOperations();
-});
-</script>

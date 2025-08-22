@@ -29,6 +29,7 @@ Rails.application.routes.draw do
     end
   end
 
+  # Operations endpoints for AJAX functionality (PPI form and others)
   resources :operations, only: [] do
     collection do
       post :filter
