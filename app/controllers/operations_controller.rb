@@ -1,6 +1,6 @@
-# app/controllers/operations_controller.rb - Enhanced for degrease and ENP thickness interpolation
+# app/controllers/operations_controller.rb - Enhanced for degrease, ENP thickness interpolation, and jig selection
 class OperationsController < ApplicationController
-  skip_before_action :verify_authenticity_token, only: [:filter, :details, :summary, :preview_with_rinses]
+  skip_before_action :verify_authenticity_token, only: [:filter, :details, :summary, :preview_with_auto_ops]
 
   def filter
     criteria = filter_params
@@ -121,18 +121,20 @@ class OperationsController < ApplicationController
   def summary
     operation_ids = params[:operation_ids] || []
     target_thickness = params[:target_thickness]&.to_f
+    selected_jig_type = params[:selected_jig_type]
 
-    # Pass thickness for ENP operation text interpolation
-    summary = PartProcessingInstruction.simulate_operations_summary(operation_ids, target_thickness)
+    # Pass thickness for ENP operation text interpolation and jig type for jig interpolation
+    summary = PartProcessingInstruction.simulate_operations_summary(operation_ids, target_thickness, selected_jig_type)
     render json: { summary: summary }
   end
 
   def preview_with_auto_ops
     operation_ids = params[:operation_ids] || []
     target_thickness = params[:target_thickness]&.to_f
+    selected_jig_type = params[:selected_jig_type]
 
-    # Pass thickness for ENP operation text interpolation and include auto-insertion of degrease/rinse
-    operations_with_auto_ops = PartProcessingInstruction.simulate_operations_with_auto_ops(operation_ids, target_thickness)
+    # Pass thickness for ENP operation text interpolation, jig type for jig interpolation, and include auto-insertion
+    operations_with_auto_ops = PartProcessingInstruction.simulate_operations_with_auto_ops(operation_ids, target_thickness, selected_jig_type)
     render json: { operations: operations_with_auto_ops }
   end
 

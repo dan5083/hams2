@@ -32,6 +32,7 @@ export default class extends Controller {
 
     this.initializeExistingData()
     this.setupTreatmentButtons()
+    this.setupJigDropdownListener()
   }
 
   // Initialize with existing selected operations
@@ -51,6 +52,19 @@ export default class extends Controller {
     this.element.querySelectorAll('.treatment-btn').forEach(button => {
       button.addEventListener('click', (e) => this.handleTreatmentClick(e))
     })
+  }
+
+  // Set up jig dropdown change listener
+  setupJigDropdownListener() {
+    const jigSelect = this.element.querySelector('select[name*="selected_jig_type"]')
+    if (jigSelect) {
+      jigSelect.addEventListener('change', () => {
+        // Update the preview when jig selection changes
+        if (this.selectedOperations.length > 0) {
+          this.updateSelectedOperations()
+        }
+      })
+    }
   }
 
   // Handle treatment button clicks
@@ -551,6 +565,12 @@ export default class extends Controller {
       const thicknessInput = this.treatmentCriteriaContainerTarget.querySelector('.thickness-input[data-treatment="electroless_nickel_plating"]')
       if (thicknessInput?.value) {
         requestData.target_thickness = parseFloat(thicknessInput.value)
+      }
+
+      // Add selected jig type for jig interpolation
+      const jigSelect = this.element.querySelector('select[name*="selected_jig_type"]')
+      if (jigSelect?.value) {
+        requestData.selected_jig_type = jigSelect.value
       }
 
       const response = await fetch(this.previewPathValue, {

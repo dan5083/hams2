@@ -9,3 +9,5 @@ require Rails.root.join('app', 'operation_library', 'operations', 'electroless_n
 require Rails.root.join('app', 'operation_library', 'operations', 'degrease_operations')
 require Rails.root.join('app', 'operation_library', 'operations', 'contract_review_operations')
 require Rails.root.join('app', 'operation_library', 'operations', 'pack_operations')
+require Rails.root.join('app', 'operation_library', 'operations', 'inspect_final_inspect_vat_inspect')
+require Rails.root.join('app', 'operation_library', 'operations', 'jig_unjig')

@@ -92,7 +92,7 @@ class PartProcessingInstruction < ApplicationRecord
     end.compact
   end
 
-  # Get operations with auto-inserted operations (rinses, pre-treatments, etc.)
+  # Get operations with auto-inserted operations (inspections, jigs, rinses, etc.)
   def get_operations_with_auto_ops
     user_operations = get_operations
     return [] if user_operations.empty?
@@ -100,13 +100,69 @@ class PartProcessingInstruction < ApplicationRecord
     operations_with_auto_ops = []
     has_special_requirements = has_special_auto_op_requirements?
 
+    # 1. Auto-insert contract review at the very beginning (always required)
+    if OperationLibrary::ContractReviewOperations.contract_review_required?(user_operations)
+      contract_review_operation = OperationLibrary::ContractReviewOperations.get_contract_review_operation
+      operations_with_auto_ops << contract_review_operation
+    end
+
+    # 2. Auto-insert incoming inspection after contract review
+    if OperationLibrary::InspectFinalInspectVatInspect.incoming_inspection_required?(user_operations)
+      incoming_inspection_operation = OperationLibrary::InspectFinalInspectVatInspect.get_incoming_inspection_operation
+      operations_with_auto_ops << incoming_inspection_operation
+    end
+
+    # 3. Auto-insert VAT inspection before degrease
+    if OperationLibrary::InspectFinalInspectVatInspect.vat_inspection_required?(user_operations)
+      vat_inspection_operation = OperationLibrary::InspectFinalInspectVatInspect.get_vat_inspection_operation
+      operations_with_auto_ops << vat_inspection_operation
+    end
+
+    # 4. Auto-insert jig operation before degrease
+    if OperationLibrary::JigUnjig.jigging_required?(user_operations)
+      jig_operation = OperationLibrary::JigUnjig.get_jig_operation(selected_jig_type)
+      operations_with_auto_ops << jig_operation
+    end
+
+    # 5. Auto-insert degrease after jig if needed for surface treatments
+    if OperationLibrary::DegreaseOperations.degreasing_required?(user_operations)
+      degrease_operation = OperationLibrary::DegreaseOperations.get_degrease_operation
+      operations_with_auto_ops << degrease_operation
+    end
+
+    # 6. Add user operations and their rinses
     user_operations.each do |operation|
-      # Add the user operation
+      # Add the user operation with interpolated text
       operations_with_auto_ops << operation
 
-      # Add auto-operations after this operation if it requires them
-      auto_ops = get_auto_operations_after(operation, has_special_requirements)
-      operations_with_auto_ops.concat(auto_ops)
+      # Add rinse operations after chemical processes
+      if OperationLibrary::RinseOperations.operation_requires_rinse?(operation)
+        rinse_operation = OperationLibrary::RinseOperations.get_rinse_operation(
+          operation,
+          ppi_contains_electroless_nickel: has_special_requirements
+        )
+        if rinse_operation
+          operations_with_auto_ops << rinse_operation
+        end
+      end
+    end
+
+    # 7. Auto-insert unjig before final inspection
+    if OperationLibrary::JigUnjig.unjigging_required?(user_operations)
+      unjig_operation = OperationLibrary::JigUnjig.get_unjig_operation
+      operations_with_auto_ops << unjig_operation
+    end
+
+    # 8. Auto-insert final inspection before pack
+    if OperationLibrary::InspectFinalInspectVatInspect.final_inspection_required?(user_operations)
+      final_inspection_operation = OperationLibrary::InspectFinalInspectVatInspect.get_final_inspection_operation
+      operations_with_auto_ops << final_inspection_operation
+    end
+
+    # 9. Auto-insert pack at the very end (always required)
+    if OperationLibrary::PackOperations.pack_required?(operations_with_auto_ops)
+      pack_operation = OperationLibrary::PackOperations.get_pack_operation
+      operations_with_auto_ops << pack_operation
     end
 
     operations_with_auto_ops
@@ -120,26 +176,9 @@ class PartProcessingInstruction < ApplicationRecord
     end
   end
 
-  # Get auto-operations that should be inserted after a given operation
-  def get_auto_operations_after(operation, has_special_requirements = false)
-    auto_ops = []
-
-    # Add rinse operations (first type of auto-operation)
-    if OperationLibrary::RinseOperations.operation_requires_rinse?(operation)
-      rinse_operation = OperationLibrary::RinseOperations.get_rinse_operation(
-        operation,
-        ppi_contains_electroless_nickel: has_special_requirements
-      )
-      auto_ops << rinse_operation if rinse_operation
-    end
-
-    # Future auto-operations can be added here:
-    # - Drying operations
-    # - Quality checks
-    # - Pre-treatments
-    # - etc.
-
-    auto_ops
+  # Get the selected jig type for interpolation
+  def selected_jig_type
+    operation_selection["selected_jig_type"]
   end
 
   def operation_selection
@@ -216,81 +255,136 @@ class PartProcessingInstruction < ApplicationRecord
   # Class method for real-time simulation during PPI building
   # Returns detailed operation data for form preview (including auto-operations)
   def self.simulate_operations_with_auto_ops(operation_ids, target_thickness = nil)
-  return [] if operation_ids.blank?
+    return [] if operation_ids.blank?
 
-  # Get operations with thickness for ENP interpolation
-  all_ops = Operation.all_operations(target_thickness)
-  user_operations = operation_ids.map do |op_id|
-    all_ops.find { |op| op.id == op_id }
-  end.compact
+    # Get operations with thickness for ENP interpolation
+    all_ops = Operation.all_operations(target_thickness)
+    user_operations = operation_ids.map do |op_id|
+      all_ops.find { |op| op.id == op_id }
+    end.compact
 
-  return [] if user_operations.empty?
+    return [] if user_operations.empty?
 
-  operations_with_auto_ops = []
-  has_special_requirements = user_operations.any? { |op| op.process_type == 'electroless_nickel_plating' }
+    operations_with_auto_ops = []
+    has_special_requirements = user_operations.any? { |op| op.process_type == 'electroless_nickel_plating' }
 
-  # 1. Auto-insert contract review at the very beginning (always required)
-  if OperationLibrary::ContractReviewOperations.contract_review_required?(user_operations)
-    contract_review_operation = OperationLibrary::ContractReviewOperations.get_contract_review_operation
-    operations_with_auto_ops << {
-      id: contract_review_operation.id,
-      display_name: contract_review_operation.display_name,
-      operation_text: contract_review_operation.operation_text,
-      auto_inserted: true
-    }
-  end
+    # 1. Auto-insert contract review at the very beginning (always required)
+    if OperationLibrary::ContractReviewOperations.contract_review_required?(user_operations)
+      contract_review_operation = OperationLibrary::ContractReviewOperations.get_contract_review_operation
+      operations_with_auto_ops << {
+        id: contract_review_operation.id,
+        display_name: contract_review_operation.display_name,
+        operation_text: contract_review_operation.operation_text,
+        auto_inserted: true
+      }
+    end
 
-  # 2. Auto-insert degrease after contract review if needed for surface treatments
-  if OperationLibrary::DegreaseOperations.degreasing_required?(user_operations)
-    degrease_operation = OperationLibrary::DegreaseOperations.get_degrease_operation
-    operations_with_auto_ops << {
-      id: degrease_operation.id,
-      display_name: degrease_operation.display_name,
-      operation_text: degrease_operation.operation_text,
-      auto_inserted: true
-    }
-  end
+    # 2. Auto-insert incoming inspection after contract review
+    if OperationLibrary::InspectFinalInspectVatInspect.incoming_inspection_required?(user_operations)
+      incoming_inspection_operation = OperationLibrary::InspectFinalInspectVatInspect.get_incoming_inspection_operation
+      operations_with_auto_ops << {
+        id: incoming_inspection_operation.id,
+        display_name: incoming_inspection_operation.display_name,
+        operation_text: incoming_inspection_operation.operation_text,
+        auto_inserted: true
+      }
+    end
 
-  # 3. Add user operations and their rinses
-  user_operations.each do |operation|
-    # Add the user operation with interpolated text
-    operations_with_auto_ops << {
-      id: operation.id,
-      display_name: operation.display_name,
-      operation_text: operation.operation_text, # Now includes interpolated time for ENP
-      auto_inserted: false
-    }
+    # 3. Auto-insert VAT inspection before degrease
+    if OperationLibrary::InspectFinalInspectVatInspect.vat_inspection_required?(user_operations)
+      vat_inspection_operation = OperationLibrary::InspectFinalInspectVatInspect.get_vat_inspection_operation
+      operations_with_auto_ops << {
+        id: vat_inspection_operation.id,
+        display_name: vat_inspection_operation.display_name,
+        operation_text: vat_inspection_operation.operation_text,
+        auto_inserted: true
+      }
+    end
 
-    # Add rinse operations after chemical processes
-    if OperationLibrary::RinseOperations.operation_requires_rinse?(operation)
-      rinse_operation = OperationLibrary::RinseOperations.get_rinse_operation(
-        operation,
-        ppi_contains_electroless_nickel: has_special_requirements
-      )
-      if rinse_operation
-        operations_with_auto_ops << {
-          id: rinse_operation.id,
-          display_name: rinse_operation.display_name,
-          operation_text: rinse_operation.operation_text,
-          auto_inserted: true
-        }
+    # 4. Auto-insert jig operation before degrease (placeholder for now)
+    if OperationLibrary::JigUnjig.jigging_required?(user_operations)
+      jig_operation = OperationLibrary::JigUnjig.get_jig_operation
+      operations_with_auto_ops << {
+        id: jig_operation.id,
+        display_name: jig_operation.display_name,
+        operation_text: jig_operation.operation_text,
+        auto_inserted: true
+      }
+    end
+
+    # 5. Auto-insert degrease after jig if needed for surface treatments
+    if OperationLibrary::DegreaseOperations.degreasing_required?(user_operations)
+      degrease_operation = OperationLibrary::DegreaseOperations.get_degrease_operation
+      operations_with_auto_ops << {
+        id: degrease_operation.id,
+        display_name: degrease_operation.display_name,
+        operation_text: degrease_operation.operation_text,
+        auto_inserted: true
+      }
+    end
+
+    # 6. Add user operations and their rinses
+    user_operations.each do |operation|
+      # Add the user operation with interpolated text
+      operations_with_auto_ops << {
+        id: operation.id,
+        display_name: operation.display_name,
+        operation_text: operation.operation_text, # Now includes interpolated time for ENP
+        auto_inserted: false
+      }
+
+      # Add rinse operations after chemical processes
+      if OperationLibrary::RinseOperations.operation_requires_rinse?(operation)
+        rinse_operation = OperationLibrary::RinseOperations.get_rinse_operation(
+          operation,
+          ppi_contains_electroless_nickel: has_special_requirements
+        )
+        if rinse_operation
+          operations_with_auto_ops << {
+            id: rinse_operation.id,
+            display_name: rinse_operation.display_name,
+            operation_text: rinse_operation.operation_text,
+            auto_inserted: true
+          }
+        end
       end
     end
-  end
 
-  # 4. Auto-insert pack at the very end (always required)
-  if OperationLibrary::PackOperations.pack_required?(operations_with_auto_ops.map { |op| OpenStruct.new(process_type: op[:id] == 'PACK' ? 'pack' : 'other') })
-    pack_operation = OperationLibrary::PackOperations.get_pack_operation
-    operations_with_auto_ops << {
-      id: pack_operation.id,
-      display_name: pack_operation.display_name,
-      operation_text: pack_operation.operation_text,
-      auto_inserted: true
-    }
-  end
+    # 7. Auto-insert unjig before final inspection
+    if OperationLibrary::JigUnjig.unjigging_required?(user_operations)
+      unjig_operation = OperationLibrary::JigUnjig.get_unjig_operation
+      operations_with_auto_ops << {
+        id: unjig_operation.id,
+        display_name: unjig_operation.display_name,
+        operation_text: unjig_operation.operation_text,
+        auto_inserted: true
+      }
+    end
 
-  operations_with_auto_ops
-end
+    # 8. Auto-insert final inspection before pack
+    if OperationLibrary::InspectFinalInspectVatInspect.final_inspection_required?(user_operations)
+      final_inspection_operation = OperationLibrary::InspectFinalInspectVatInspect.get_final_inspection_operation
+      operations_with_auto_ops << {
+        id: final_inspection_operation.id,
+        display_name: final_inspection_operation.display_name,
+        operation_text: final_inspection_operation.operation_text,
+        auto_inserted: true
+      }
+    end
+
+    # 9. Auto-insert pack at the very end (always required)
+    if OperationLibrary::PackOperations.pack_required?(operations_with_auto_ops.map { |op| OpenStruct.new(process_type: op[:id] == 'PACK' ? 'pack' : 'other') })
+      pack_operation = OperationLibrary::PackOperations.get_pack_operation
+      operations_with_auto_ops << {
+        id: pack_operation.id,
+        display_name: pack_operation.display_name,
+        operation_text: pack_operation.operation_text,
+        auto_inserted: true
+      }
+    end
+
+    operations_with_auto_ops
+  end
 
   # Update this method to accept thickness parameter
   def self.simulate_operations_summary(operation_ids, target_thickness = nil)

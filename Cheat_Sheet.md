@@ -58,21 +58,16 @@ for f in app/views/transport_methods/*.html.erb; do echo "=== $f ==="; cat "$f";
 for f in app/views/works_orders/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
 for f in app/views/xero_auth/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
 
+# Show all js controllers with filenames as headers:
+for file in app/javascript/controllers/**/[a-z]*_controller.js; do echo "=== $file ==="; cat "$file"; echo; done
+
 
 <!-- # See the helpers
 for file in app/helpers/*.rb; do echo "=== $file ==="; cat "$file"; echo; done -->
 <!-- # See the logic classes for recovery tracking
 for file in app/logic/*.rb; do echo "=== $file ==="; cat "$file"; echo; done -->
 
-<!-- # Show all js controllers with filenames as headers:
-# JS Controllers [a-b]:
-for file in app/javascript/controllers/**/[a-b]*_controller.js; do echo "=== $file ==="; cat "$file"; echo; done
-# JS Controllers [c-i]:
-for file in app/javascript/controllers/**/[c-i]*_controller.js; do echo "=== $file ==="; cat "$file"; echo; done
-# JS Controllers [j-q]:
 
-# JS Controllers [r–z]:
-for f in app/javascript/controllers/**/[r-z]*_controller.js; do echo "=== $f ==="; cat "$f"; echo; done
 
 # For all CSS files in stylesheets/Components A
 for file in app/assets/stylesheets/components/[a]*.css; do echo "=== $file ==="; cat "$file"; echo; done
