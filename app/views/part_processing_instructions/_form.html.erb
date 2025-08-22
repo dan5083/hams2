@@ -2,9 +2,9 @@
 <%= form_with model: ppi, local: true, class: "space-y-6",
     data: {
       controller: "ppi-form",
-      ppi_form_filter_path_value: operations_filter_path,
-      ppi_form_details_path_value: operations_details_path,
-      ppi_form_preview_path_value: operations_preview_with_auto_ops_path,
+      ppi_form_filter_path_value: "/operations/filter",
+      ppi_form_details_path_value: "/operations/details",
+      ppi_form_preview_path_value: "/operations/preview_with_auto_ops",
       ppi_form_csrf_token_value: form_authenticity_token
     } do |form| %>
   <% if @part.present? %>
