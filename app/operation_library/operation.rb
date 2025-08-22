@@ -1,11 +1,11 @@
-# app/operation_library/operation.rb - Updated to handle thickness parameter
+# app/operation_library/operation.rb - Updated to handle degrease operations
 class Operation
   attr_accessor :id, :alloys, :process_type, :anodic_classes, :target_thickness, :vat_numbers,
-                :operation_text, :specifications, :enp_type, :deposition_rate_range
+                :operation_text, :specifications, :enp_type, :deposition_rate_range, :time
 
   def initialize(id:, process_type:, operation_text:, specifications: nil, alloys: [],
                  anodic_classes: [], target_thickness: 0, vat_numbers: [],
-                 enp_type: nil, deposition_rate_range: nil)
+                 enp_type: nil, deposition_rate_range: nil, time: nil)
     @id = id
     @alloys = alloys
     @process_type = process_type
@@ -16,6 +16,7 @@ class Operation
     @specifications = specifications
     @enp_type = enp_type
     @deposition_rate_range = deposition_rate_range
+    @time = time
   end
 
   # Class methods to get all operations from all files
@@ -30,6 +31,7 @@ class Operation
 
   def self.load_all_operations(target_thickness = nil)
     operations = []
+    operations += OperationLibrary::DegreaseOperations.operations if defined?(OperationLibrary::DegreaseOperations)
     operations += OperationLibrary::AnodisingStandard.operations if defined?(OperationLibrary::AnodisingStandard)
     operations += OperationLibrary::AnodisingHard.operations if defined?(OperationLibrary::AnodisingHard)
     operations += OperationLibrary::AnodisingChromic.operations if defined?(OperationLibrary::AnodisingChromic)
@@ -44,9 +46,9 @@ class Operation
     operations
   end
 
-  # Filter operations by criteria (excluding rinse operations from normal filtering)
+  # Filter operations by criteria (excluding rinse and degrease operations from normal filtering)
   def self.find_matching(process_type: nil, alloy: nil, target_thickness: nil, anodic_class: nil, enp_type: nil)
-    matching = all_operations(target_thickness).reject { |op| op.process_type == 'rinse' } # Exclude rinses from normal filtering
+    matching = all_operations(target_thickness).reject { |op| op.process_type == 'rinse' || op.process_type == 'degrease' }
 
     matching = matching.select { |op| op.process_type == process_type } if process_type.present?
     matching = matching.select { |op| op.alloys.include?(alloy) } if alloy.present?
@@ -78,40 +80,45 @@ class Operation
     matching
   end
 
-  # Get available options for dropdowns (excluding rinse operations)
+  # Get available options for dropdowns (excluding rinse and degrease operations)
   def self.available_process_types
-    all_operations.reject { |op| op.process_type == 'rinse' }.map(&:process_type).uniq.sort
+    all_operations.reject { |op| op.process_type == 'rinse' || op.process_type == 'degrease' }.map(&:process_type).uniq.sort
   end
 
   def self.available_alloys
-    all_operations.reject { |op| op.process_type == 'rinse' }.flat_map(&:alloys).uniq.sort
+    all_operations.reject { |op| op.process_type == 'rinse' || op.process_type == 'degrease' }.flat_map(&:alloys).uniq.sort
   end
 
   def self.available_anodic_classes
-    all_operations.reject { |op| op.process_type == 'rinse' }.flat_map(&:anodic_classes).uniq.sort
+    all_operations.reject { |op| op.process_type == 'rinse' || op.process_type == 'degrease' }.flat_map(&:anodic_classes).uniq.sort
   end
 
   def self.available_thicknesses
-    all_operations.reject { |op| op.process_type == 'rinse' }.map(&:target_thickness).uniq.select { |t| t > 0 }.sort
+    all_operations.reject { |op| op.process_type == 'rinse' || op.process_type == 'degrease' }.map(&:target_thickness).uniq.select { |t| t > 0 }.sort
   end
 
   def self.available_enp_types
     all_operations.select { |op| op.process_type == 'electroless_nickel_plating' }.map(&:enp_type).uniq.compact.sort
   end
 
-  # Get rinse operations specifically
+  # Get specific operation types
   def self.rinse_operations
     all_operations.select { |op| op.process_type == 'rinse' }
   end
 
-  # Get electroless nickel plating operations specifically
+  def self.degrease_operations
+    all_operations.select { |op| op.process_type == 'degrease' }
+  end
+
   def self.electroless_nickel_operations
     all_operations.select { |op| op.process_type == 'electroless_nickel_plating' }
   end
 
   # Instance methods
   def display_name
-    if process_type == 'rinse'
+    if process_type == 'degrease'
+      'Degrease'
+    elsif process_type == 'rinse'
       case id
       when 'CASCADE_RINSE'
         'Cascade Rinse'
@@ -143,8 +150,10 @@ class Operation
   def vat_options_text
     if vat_numbers.length == 1
       "Vat #{vat_numbers.first}"
-    else
+    elsif vat_numbers.length > 1
       "Vats #{vat_numbers.join(', ')}"
+    else
+      "" # No vat specified (e.g., for degrease operations)
     end
   end
 
@@ -173,23 +182,27 @@ class Operation
       operation_text: operation_text,
       specifications: specifications,
       enp_type: enp_type,
-      deposition_rate_range: deposition_rate_range
+      deposition_rate_range: deposition_rate_range,
+      time: time
     }
   end
 
-  # Check if this operation is a rinse
+  # Check operation types
+  def degrease?
+    process_type == 'degrease'
+  end
+
   def rinse?
     process_type == 'rinse'
   end
 
-  # Check if this operation is electroless nickel plating
   def electroless_nickel_plating?
     process_type == 'electroless_nickel_plating'
   end
 
-  # Check if this operation is auto-inserted (rinse operations are auto-inserted)
+  # Check if this operation is auto-inserted (rinse and degrease operations are auto-inserted)
   def auto_inserted?
-    rinse?
+    rinse? || degrease?
   end
 
   # Calculate plating time for ENP operations

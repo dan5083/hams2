@@ -1,4 +1,4 @@
-# app/controllers/operations_controller.rb - Enhanced for ENP thickness interpolation
+# app/controllers/operations_controller.rb - Enhanced for degrease and ENP thickness interpolation
 class OperationsController < ApplicationController
   skip_before_action :verify_authenticity_token, only: [:filter, :details, :summary, :preview_with_rinses]
 
@@ -11,10 +11,13 @@ class OperationsController < ApplicationController
     # Start with all operations - pass thickness to ENP operations
     operations = Operation.all_operations(target_thickness)
 
-    # Filter by anodising types (now includes ENP)
+    # Filter by anodising types (now includes ENP) - exclude auto-inserted operations
     if criteria[:anodising_types].present?
       operations = operations.select { |op| criteria[:anodising_types].include?(op.process_type) }
     end
+
+    # Exclude auto-inserted operations (degrease and rinse) from manual selection
+    operations = operations.reject { |op| op.auto_inserted? }
 
     # Filter by alloys
     if criteria[:alloys].present?
@@ -70,7 +73,8 @@ class OperationsController < ApplicationController
         anodic_classes: op.anodic_classes,
         specifications: op.specifications,
         enp_type: op.enp_type,
-        deposition_rate_range: op.deposition_rate_range
+        deposition_rate_range: op.deposition_rate_range,
+        time: op.time
       }
     end
 
@@ -105,7 +109,8 @@ class OperationsController < ApplicationController
           process_type: operation.process_type,
           specifications: operation.specifications,
           enp_type: operation.enp_type,
-          deposition_rate_range: operation.deposition_rate_range
+          deposition_rate_range: operation.deposition_rate_range,
+          time: operation.time
         }
       end
     end.compact
@@ -126,7 +131,7 @@ class OperationsController < ApplicationController
     operation_ids = params[:operation_ids] || []
     target_thickness = params[:target_thickness]&.to_f
 
-    # Pass thickness for ENP operation text interpolation
+    # Pass thickness for ENP operation text interpolation and include auto-insertion of degrease/rinse
     operations_with_auto_ops = PartProcessingInstruction.simulate_operations_with_auto_ops(operation_ids, target_thickness)
     render json: { operations: operations_with_auto_ops }
   end
