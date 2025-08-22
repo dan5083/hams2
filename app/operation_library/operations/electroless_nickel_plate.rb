@@ -52,29 +52,50 @@ module OperationLibrary
         )
       ]
 
-      # If thickness is provided, interpolate time estimates into operation text
+      # Interpolate thickness and time into template placeholders
       if target_thickness_um.present? && target_thickness_um > 0
         base_operations.map do |operation|
           enhanced_operation = operation.dup
 
           time_data = calculate_plating_time(operation.id, target_thickness_um)
           if time_data
-            enhanced_operation.operation_text = "#{operation.operation_text}. Time for #{target_thickness_um}μm: #{time_data[:formatted_time_range]}"
+            enhanced_operation.operation_text = operation.operation_text
+              .gsub('{THICKNESS}', target_thickness_um.to_s)
+              .gsub('{TIME_RANGE}', time_data[:formatted_time_range])
+          else
+            # Fallback if time calculation fails
+            enhanced_operation.operation_text = operation.operation_text
+              .gsub('{THICKNESS}', target_thickness_um.to_s)
+              .gsub('{TIME_RANGE}', 'calculation unavailable')
           end
 
           enhanced_operation
         end
       else
-        base_operations
+        # If no thickness provided, remove template placeholders
+        base_operations.map do |operation|
+          fallback_operation = operation.dup
+          fallback_operation.operation_text = operation.operation_text
+            .gsub('. Time for {THICKNESS}μm: {TIME_RANGE}', '')
+          fallback_operation
+        end
       end
     end
 
     # Helper method to calculate plating time for a given thickness
     def self.calculate_plating_time(operation_id, target_thickness_um)
-      operation = operations(nil).find { |op| op.id == operation_id } # Get base operations without interpolation
-      return nil unless operation&.deposition_rate_range
+      # Use a simple array lookup to avoid recursion issues
+      base_operations = [
+        { id: 'HIGH_PHOS_VANDALLOY_4100', deposition_rate_range: [12.0, 14.1] },
+        { id: 'MEDIUM_PHOS_NICKLAD_767', deposition_rate_range: [13.3, 17.1] },
+        { id: 'LOW_PHOS_NICKLAD_ELV_824', deposition_rate_range: [6.8, 18.2] },
+        { id: 'PTFE_NICKLAD_ICE', deposition_rate_range: [5.0, 11.0] }
+      ]
 
-      min_rate, max_rate = operation.deposition_rate_range
+      operation_data = base_operations.find { |op| op[:id] == operation_id }
+      return nil unless operation_data&.dig(:deposition_rate_range)
+
+      min_rate, max_rate = operation_data[:deposition_rate_range]
 
       # Calculate time range (min time with max rate, max time with min rate)
       min_time_hours = target_thickness_um / max_rate
