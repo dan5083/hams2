@@ -254,7 +254,7 @@ class PartProcessingInstruction < ApplicationRecord
 
   # Class method for real-time simulation during PPI building
   # Returns detailed operation data for form preview (including auto-operations)
-  def self.simulate_operations_with_auto_ops(operation_ids, target_thickness = nil)
+  def self.simulate_operations_with_auto_ops(operation_ids, target_thickness = nil, selected_jig_type = nil)
     return [] if operation_ids.blank?
 
     # Get operations with thickness for ENP interpolation
@@ -301,9 +301,9 @@ class PartProcessingInstruction < ApplicationRecord
       }
     end
 
-    # 4. Auto-insert jig operation before degrease (placeholder for now)
+    # 4. Auto-insert jig operation before degrease (with selected jig type)
     if OperationLibrary::JigUnjig.jigging_required?(user_operations)
-      jig_operation = OperationLibrary::JigUnjig.get_jig_operation
+      jig_operation = OperationLibrary::JigUnjig.get_jig_operation(selected_jig_type)
       operations_with_auto_ops << {
         id: jig_operation.id,
         display_name: jig_operation.display_name,
@@ -386,9 +386,9 @@ class PartProcessingInstruction < ApplicationRecord
     operations_with_auto_ops
   end
 
-  # Update this method to accept thickness parameter
-  def self.simulate_operations_summary(operation_ids, target_thickness = nil)
-    operations_with_auto_ops = simulate_operations_with_auto_ops(operation_ids, target_thickness)
+  # Update this method to accept thickness and jig type parameters
+  def self.simulate_operations_summary(operation_ids, target_thickness = nil, selected_jig_type = nil)
+    operations_with_auto_ops = simulate_operations_with_auto_ops(operation_ids, target_thickness, selected_jig_type)
     return "No operations selected" if operations_with_auto_ops.empty?
 
     operations_with_auto_ops.map { |op| op[:display_name] }.join(" → ")
