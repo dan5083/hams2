@@ -1,4 +1,4 @@
-# app/controllers/operations_controller.rb - Enhanced for masking and stripping operations
+# app/controllers/operations_controller.rb - Enhanced for masking removal operations
 class OperationsController < ApplicationController
   skip_before_action :verify_authenticity_token, only: [:filter, :details, :summary, :preview_with_auto_ops]
 
@@ -11,8 +11,10 @@ class OperationsController < ApplicationController
     # Start with all operations - pass thickness to ENP operations
     operations = Operation.all_operations(target_thickness)
 
-    # Add masking and stripping operations
-    operations << OperationLibrary::Masking.get_masking_operation({})
+    # Add masking operations (including removal operations)
+    operations += OperationLibrary::Masking.operations
+
+    # Add stripping operations
     operations << OperationLibrary::Stripping.get_stripping_operation(nil, nil)
 
     # Filter by anodising types (now includes ENP, ENP Strip Mask, masking, and stripping) - exclude auto-inserted operations
@@ -20,7 +22,7 @@ class OperationsController < ApplicationController
       operations = operations.select { |op| criteria[:anodising_types].include?(op.process_type) }
     end
 
-    # Exclude auto-inserted operations (degrease and rinse) from manual selection
+    # Exclude auto-inserted operations (degrease, rinse, masking removal) from manual selection
     operations = operations.reject { |op| op.auto_inserted? }
 
     # Filter by alloys (not applicable to masking/stripping)
@@ -120,10 +122,13 @@ class OperationsController < ApplicationController
     enp_strip_operations = get_enp_strip_mask_operations(enp_strip_type)
     all_operations += enp_strip_operations
 
-    # Add masking and stripping operations with interpolation
-    masking_op = OperationLibrary::Masking.get_masking_operation(masking_methods)
+    # Add masking operations (including removal operations) with interpolation
+    masking_ops = OperationLibrary::Masking.operations(masking_methods)
+    all_operations += masking_ops
+
+    # Add stripping operations with interpolation
     stripping_op = OperationLibrary::Stripping.get_stripping_operation(stripping_type, stripping_method)
-    all_operations += [masking_op, stripping_op]
+    all_operations += [stripping_op]
 
     results = expanded_operation_ids.map do |op_id|
       operation = all_operations.find { |op| op.id == op_id }

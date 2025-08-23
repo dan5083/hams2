@@ -154,19 +154,31 @@ class PartProcessingInstruction < ApplicationRecord
       operations_with_auto_ops << unjig_operation
     end
 
-    # 7.5. Add ENP Strip Mask operations after unjig
+    # 7.5. Auto-insert masking removal after unjig (only for tape/lacquer, not bungs)
+    if OperationLibrary::Masking.masking_removal_required?(user_operations, selected_masking_methods)
+      masking_removal_operation = OperationLibrary::Masking.get_masking_removal_operation
+      operations_with_auto_ops << masking_removal_operation
+
+      # Auto-insert masking removal check after masking removal
+      if OperationLibrary::Masking.masking_removal_check_required?(user_operations, selected_masking_methods)
+        masking_removal_check_operation = OperationLibrary::Masking.get_masking_removal_check_operation
+        operations_with_auto_ops << masking_removal_check_operation
+      end
+    end
+
+    # 8. Add ENP Strip Mask operations after unjig/masking removal
     if has_enp_strip_mask_operations?
       enp_strip_operations = get_enp_strip_mask_operations_for_sequence
       operations_with_auto_ops += enp_strip_operations
     end
 
-    # 8. Auto-insert final inspection before pack
+    # 9. Auto-insert final inspection before pack
     if OperationLibrary::InspectFinalInspectVatInspect.final_inspection_required?(user_operations)
       final_inspection_operation = OperationLibrary::InspectFinalInspectVatInspect.get_final_inspection_operation
       operations_with_auto_ops << final_inspection_operation
     end
 
-    # 9. Auto-insert pack at the very end (always required)
+    # 10. Auto-insert pack at the very end (always required)
     if OperationLibrary::PackOperations.pack_required?(operations_with_auto_ops)
       pack_operation = OperationLibrary::PackOperations.get_pack_operation
       operations_with_auto_ops << pack_operation
@@ -376,7 +388,6 @@ class PartProcessingInstruction < ApplicationRecord
     has_enp_strip_mask = user_operations.any? { |op| ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type) }
 
     # Follow same auto-insertion logic as instance method...
-    # [Same auto-insertion logic as get_operations_with_auto_ops but for simulation]
 
     # 1. Contract review
     if OperationLibrary::ContractReviewOperations.contract_review_required?(user_operations)
@@ -495,7 +506,29 @@ class PartProcessingInstruction < ApplicationRecord
       }
     end
 
-    # 7.5. ENP Strip Mask operations
+    # 7.5. Masking removal operations (only for tape/lacquer, not bungs)
+    if OperationLibrary::Masking.masking_removal_required?(user_operations, masking_methods)
+      masking_removal_operation = OperationLibrary::Masking.get_masking_removal_operation
+      operations_with_auto_ops << {
+        id: masking_removal_operation.id,
+        display_name: masking_removal_operation.display_name,
+        operation_text: masking_removal_operation.operation_text,
+        auto_inserted: true
+      }
+
+      # Masking removal check
+      if OperationLibrary::Masking.masking_removal_check_required?(user_operations, masking_methods)
+        masking_removal_check_operation = OperationLibrary::Masking.get_masking_removal_check_operation
+        operations_with_auto_ops << {
+          id: masking_removal_check_operation.id,
+          display_name: masking_removal_check_operation.display_name,
+          operation_text: masking_removal_check_operation.operation_text,
+          auto_inserted: true
+        }
+      end
+    end
+
+    # 8. ENP Strip Mask operations
     if has_enp_strip_mask
       enp_strip_operations.each do |enp_strip_op|
         operations_with_auto_ops << {
@@ -507,7 +540,7 @@ class PartProcessingInstruction < ApplicationRecord
       end
     end
 
-    # 8. Final inspection
+    # 9. Final inspection
     if OperationLibrary::InspectFinalInspectVatInspect.final_inspection_required?(user_operations)
       final_inspection_operation = OperationLibrary::InspectFinalInspectVatInspect.get_final_inspection_operation
       operations_with_auto_ops << {
@@ -518,7 +551,7 @@ class PartProcessingInstruction < ApplicationRecord
       }
     end
 
-    # 9. Pack
+    # 10. Pack
     if OperationLibrary::PackOperations.pack_required?(operations_with_auto_ops.map { |op| OpenStruct.new(process_type: op[:id] == 'PACK' ? 'pack' : 'other') })
       pack_operation = OperationLibrary::PackOperations.get_pack_operation
       operations_with_auto_ops << {

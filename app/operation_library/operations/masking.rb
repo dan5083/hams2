@@ -14,6 +14,20 @@ module OperationLibrary
           id: 'MASKING',
           process_type: 'masking',
           operation_text: build_masking_text(selected_methods)
+        ),
+
+        # Masking removal operation - auto-inserted after unjig
+        Operation.new(
+          id: 'MASKING_REMOVAL',
+          process_type: 'masking_removal',
+          operation_text: 'Peel off masking (where possible); remove persistant lacquer in ULTRALAC REDUCER, and residue with MEK.'
+        ),
+
+        # Masking removal check - auto-inserted after masking removal
+        Operation.new(
+          id: 'MASKING_REMOVAL_CHECK',
+          process_type: 'masking_removal_check',
+          operation_text: 'Masking removal check - ensure all masking material and residue has been completely removed. Check for any lacquer or adhesive residue on part surfaces.'
         )
       ]
     end
@@ -66,6 +80,34 @@ module OperationLibrary
     # Check if any masking methods are selected
     def self.masking_selected?(masking_data)
       masking_data.is_a?(Hash) && masking_data.any? { |method, location| method.present? }
+    end
+
+    # Check if masking removal is required (only for tape and lacquer, not bungs)
+    def self.masking_removal_required?(operations_sequence, masking_methods = {})
+      return false if operations_sequence.empty?
+
+      # Check if any masking operations are in the sequence
+      has_masking = operations_sequence.any? { |op| op.process_type == 'masking' }
+      return false unless has_masking
+
+      # Only require removal for tape and lacquer, not bungs
+      removal_methods = ['pc21_polyester_tape', '45_stopping_off_lacquer']
+      masking_methods.keys.any? { |method| removal_methods.include?(method) }
+    end
+
+    # Check if masking removal check is required (when masking removal is present or will be inserted)
+    def self.masking_removal_check_required?(operations_sequence)
+      masking_removal_required?(operations_sequence)
+    end
+
+    # Get the masking removal operation
+    def self.get_masking_removal_operation
+      operations.find { |op| op.id == 'MASKING_REMOVAL' }
+    end
+
+    # Get the masking removal check operation
+    def self.get_masking_removal_check_operation
+      operations.find { |op| op.id == 'MASKING_REMOVAL_CHECK' }
     end
   end
 end
