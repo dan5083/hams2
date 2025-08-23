@@ -154,7 +154,13 @@ class PartProcessingInstruction < ApplicationRecord
       operations_with_auto_ops << unjig_operation
     end
 
-    # 7.5. Add ENP Strip Mask operations after unjig
+    # 7.5. Auto-insert masking removal operations before final inspection (tape/lacquer only)
+    if OperationLibrary::Masking.masking_removal_required?(selected_operations, selected_masking_methods)
+      masking_removal_ops = OperationLibrary::Masking.get_masking_removal_operations
+      operations_with_auto_ops += masking_removal_ops
+    end
+
+    # 7.75. Add ENP Strip Mask operations after unjig
     if has_enp_strip_mask_operations?
       enp_strip_operations = get_enp_strip_mask_operations_for_sequence
       operations_with_auto_ops += enp_strip_operations
@@ -495,7 +501,20 @@ class PartProcessingInstruction < ApplicationRecord
       }
     end
 
-    # 7.5. ENP Strip Mask operations
+    # 7.5. Masking removal operations (tape/lacquer only)
+    if OperationLibrary::Masking.masking_removal_required?(expanded_operation_ids, masking_methods)
+      masking_removal_ops = OperationLibrary::Masking.get_masking_removal_operations
+      masking_removal_ops.each do |masking_removal_op|
+        operations_with_auto_ops << {
+          id: masking_removal_op.id,
+          display_name: masking_removal_op.display_name,
+          operation_text: masking_removal_op.operation_text,
+          auto_inserted: true
+        }
+      end
+    end
+
+    # 7.75. ENP Strip Mask operations
     if has_enp_strip_mask
       enp_strip_operations.each do |enp_strip_op|
         operations_with_auto_ops << {
