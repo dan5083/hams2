@@ -14,6 +14,20 @@ module OperationLibrary
           id: 'MASKING',
           process_type: 'masking',
           operation_text: build_masking_text(selected_methods)
+        ),
+
+        # Masking removal operation - auto-inserted after unjig
+        Operation.new(
+          id: 'MASKING_REMOVAL',
+          process_type: 'masking_removal',
+          operation_text: 'Peel off masking (where possible); dissolve remaining lacquer in ULTRALAC REDUCER. Remove residue with MEK.'
+        ),
+
+        # Masking removal check - auto-inserted after masking removal
+        Operation.new(
+          id: 'MASKING_REMOVAL_CHECK',
+          process_type: 'masking_removal_check',
+          operation_text: 'Masking removal check - ensure all masking material and residue has been completely removed. Check for any lacquer or adhesive residue on part surfaces.'
         )
       ]
     end
@@ -67,5 +81,20 @@ module OperationLibrary
     def self.masking_selected?(masking_data)
       masking_data.is_a?(Hash) && masking_data.any? { |method, location| method.present? }
     end
+
+    # Check if masking removal is required (tape/lacquer only, not bungs)
+    def self.masking_removal_required?(selected_operations, masking_methods)
+      return false unless selected_operations.include?('MASKING')
+
+      removable_methods = ['pc21_polyester_tape', '45_stopping_off_lacquer']
+      masking_methods.keys.any? { |method| removable_methods.include?(method) }
+    end
+
+    # Get the operations for masking removal
+    def self.get_masking_removal_operations
+      operations.select { |op| ['MASKING_REMOVAL', 'MASKING_REMOVAL_CHECK'].include?(op.id) }
+    end
+
+
   end
 end

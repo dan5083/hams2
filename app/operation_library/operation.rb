@@ -1,4 +1,4 @@
-# app/operation_library/operation.rb - Updated to handle ENP Strip Mask operations
+# app/operation_library/operation.rb - Updated to handle ENP Strip Mask operations and masking removal
 class Operation
   attr_accessor :id, :alloys, :process_type, :anodic_classes, :target_thickness, :vat_numbers,
                 :operation_text, :specifications, :enp_type, :deposition_rate_range, :time
@@ -53,12 +53,19 @@ class Operation
 
     operations += OperationLibrary::RinseOperations.operations if defined?(OperationLibrary::RinseOperations)
     operations += OperationLibrary::PackOperations.operations if defined?(OperationLibrary::PackOperations)
+
+    # Add masking operations (including removal operations)
+    operations += OperationLibrary::Masking.operations if defined?(OperationLibrary::Masking)
+
+    # Add stripping operations
+    operations += OperationLibrary::Stripping.operations if defined?(OperationLibrary::Stripping)
+
     operations
   end
 
   # Filter operations by criteria (excluding auto-inserted operations from normal filtering)
   def self.find_matching(process_type: nil, alloy: nil, target_thickness: nil, anodic_class: nil, enp_type: nil)
-    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig']
+    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check']
     matching = all_operations(target_thickness).reject { |op| auto_inserted_types.include?(op.process_type) }
 
     matching = matching.select { |op| op.process_type == process_type } if process_type.present?
@@ -70,8 +77,9 @@ class Operation
     if target_thickness.present?
       target = target_thickness.to_f
       matching = matching.select do |op|
-        # Skip thickness filtering for electroless nickel plating, chemical conversion, and ENP strip mask
+        # Skip thickness filtering for electroless nickel plating, chemical conversion, masking, stripping, and ENP strip mask
         if op.process_type == 'electroless_nickel_plating' || op.process_type == 'chemical_conversion' ||
+           op.process_type == 'masking' || op.process_type == 'stripping' ||
            ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type)
           true
         else
@@ -79,9 +87,10 @@ class Operation
           (op.target_thickness - target).abs <= 2.5
         end
       end
-      # Sort by closest thickness match (but only for non-ENP/chemical conversion/ENP strip mask)
+      # Sort by closest thickness match (but only for non-ENP/chemical conversion/masking/stripping/ENP strip mask)
       matching = matching.sort_by do |op|
         if op.process_type == 'electroless_nickel_plating' || op.process_type == 'chemical_conversion' ||
+           op.process_type == 'masking' || op.process_type == 'stripping' ||
            ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type)
           0
         else
@@ -95,22 +104,22 @@ class Operation
 
   # Get available options for dropdowns (excluding auto-inserted operations)
   def self.available_process_types
-    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig']
+    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check']
     all_operations.reject { |op| auto_inserted_types.include?(op.process_type) }.map(&:process_type).uniq.sort
   end
 
   def self.available_alloys
-    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig']
+    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check']
     all_operations.reject { |op| auto_inserted_types.include?(op.process_type) }.flat_map(&:alloys).uniq.sort
   end
 
   def self.available_anodic_classes
-    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig']
+    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check']
     all_operations.reject { |op| auto_inserted_types.include?(op.process_type) }.flat_map(&:anodic_classes).uniq.sort
   end
 
   def self.available_thicknesses
-    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig']
+    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check']
     all_operations.reject { |op| auto_inserted_types.include?(op.process_type) }.map(&:target_thickness).uniq.select { |t| t > 0 }.sort
   end
 
@@ -143,6 +152,10 @@ class Operation
     all_operations.select { |op| ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type) }
   end
 
+  def self.masking_operations
+    all_operations.select { |op| ['masking', 'masking_removal', 'masking_removal_check'].include?(op.process_type) }
+  end
+
   # Instance methods
   def display_name
     if process_type == 'contract_review'
@@ -161,6 +174,10 @@ class Operation
       'Degrease'
     elsif process_type == 'pack'
       'Pack'
+    elsif process_type == 'masking_removal'
+      'Masking Removal'
+    elsif process_type == 'masking_removal_check'
+      'Masking Removal Check'
     elsif process_type == 'mask'
       'ENP Mask'
     elsif process_type == 'masking_check'
@@ -222,7 +239,8 @@ class Operation
     return false if enp_type.present? && self.enp_type != enp_type
 
     if target_thickness.present? && self.process_type != 'electroless_nickel_plating' &&
-       self.process_type != 'chemical_conversion' && !['mask', 'masking_check', 'strip', 'strip_masking'].include?(self.process_type)
+       self.process_type != 'chemical_conversion' &&
+       !['mask', 'masking_check', 'strip', 'strip_masking', 'masking', 'stripping'].include?(self.process_type)
       target = target_thickness.to_f
       return false if (self.target_thickness - target).abs > 2.5
     end
@@ -275,9 +293,21 @@ class Operation
     ['mask', 'masking_check', 'strip', 'strip_masking'].include?(process_type)
   end
 
+  def masking?
+    process_type == 'masking'
+  end
+
+  def masking_removal?
+    ['masking_removal', 'masking_removal_check'].include?(process_type)
+  end
+
+  def stripping?
+    process_type == 'stripping'
+  end
+
   # Check if this operation is auto-inserted
   def auto_inserted?
-    ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig'].include?(process_type)
+    ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check'].include?(process_type)
   end
 
   # Calculate plating time for ENP operations
