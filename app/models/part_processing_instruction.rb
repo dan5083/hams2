@@ -130,10 +130,11 @@ class PartProcessingInstruction < ApplicationRecord
       operations_with_auto_ops << degrease_operation
     end
 
-    # 6. Add user operations and their rinses
-    user_operations.each do |operation|
+    # 6. Add user operations in the order selected, with auto-operations between them
+    user_operations.each_with_index do |operation, index|
       # Add the user operation with interpolated text
-      operations_with_auto_ops << operation
+      final_operation = build_final_operation(operation)
+      operations_with_auto_ops << final_operation
 
       # Add rinse operations after chemical processes
       if OperationLibrary::RinseOperations.operation_requires_rinse?(operation)
@@ -174,6 +175,24 @@ class PartProcessingInstruction < ApplicationRecord
     operations_with_auto_ops
   end
 
+  # Build final operation with interpolations for masking and stripping
+  def build_final_operation(operation)
+    case operation.process_type
+    when 'masking'
+      # Build masking operation with selected methods and locations
+      masking_methods = selected_masking_methods
+      OperationLibrary::Masking.get_masking_operation(masking_methods)
+    when 'stripping'
+      # Build stripping operation with selected type and method
+      stripping_type = selected_stripping_type
+      stripping_method = selected_stripping_method
+      OperationLibrary::Stripping.get_stripping_operation(stripping_type, stripping_method)
+    else
+      # Return operation as-is for other types
+      operation
+    end
+  end
+
   # Check if this PPI has special auto-operation requirements (electroless nickel plating, etc.)
   def has_special_auto_op_requirements?
     selected_operations.any? do |op_id|
@@ -212,6 +231,34 @@ class PartProcessingInstruction < ApplicationRecord
   # Set the ENP strip type
   def selected_enp_strip_type=(strip_type)
     operation_selection["enp_strip_type"] = strip_type
+  end
+
+  # Masking methods and locations
+  def selected_masking_methods
+    masking_data = operation_selection["masking_methods"] || {}
+    # Filter out empty values and return hash of method => location
+    masking_data.select { |method, location| method.present? }
+  end
+
+  def selected_masking_methods=(methods_hash)
+    operation_selection["masking_methods"] = methods_hash || {}
+  end
+
+  # Stripping type and method
+  def selected_stripping_type
+    operation_selection["stripping_type"]
+  end
+
+  def selected_stripping_type=(type)
+    operation_selection["stripping_type"] = type
+  end
+
+  def selected_stripping_method
+    operation_selection["stripping_method"]
+  end
+
+  def selected_stripping_method=(method)
+    operation_selection["stripping_method"] = method
   end
 
   def operation_selection
@@ -287,7 +334,7 @@ class PartProcessingInstruction < ApplicationRecord
 
   # Class method for real-time simulation during PPI building
   # Returns detailed operation data for form preview (including auto-operations)
-  def self.simulate_operations_with_auto_ops(operation_ids, target_thickness = nil, selected_jig_type = nil, enp_strip_type = 'nitric')
+  def self.simulate_operations_with_auto_ops(operation_ids, target_thickness = nil, selected_jig_type = nil, enp_strip_type = 'nitric', masking_methods = {}, stripping_type = nil, stripping_method = nil)
     return [] if operation_ids.blank?
 
     # Get operations with thickness for ENP interpolation
@@ -297,6 +344,23 @@ class PartProcessingInstruction < ApplicationRecord
     if defined?(OperationLibrary::EnpStripMask)
       all_ops += OperationLibrary::EnpStripMask.operations('nitric')
       all_ops += OperationLibrary::EnpStripMask.operations('metex_dekote')
+    end
+
+    # Add masking and stripping operations
+    if masking_methods.present?
+      masking_op = OperationLibrary::Masking.get_masking_operation(masking_methods)
+      all_ops << masking_op
+    else
+      # Add placeholder masking operation
+      all_ops << OperationLibrary::Masking.get_masking_operation({})
+    end
+
+    if stripping_type.present?
+      stripping_op = OperationLibrary::Stripping.get_stripping_operation(stripping_type, stripping_method)
+      all_ops << stripping_op
+    else
+      # Add placeholder stripping operation
+      all_ops << OperationLibrary::Stripping.get_stripping_operation(nil, nil)
     end
 
     # Expand ENP Strip Mask operations and filter to selected ones
@@ -311,7 +375,10 @@ class PartProcessingInstruction < ApplicationRecord
     has_special_requirements = user_operations.any? { |op| op.process_type == 'electroless_nickel_plating' }
     has_enp_strip_mask = user_operations.any? { |op| ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type) }
 
-    # 1. Auto-insert contract review at the very beginning (always required)
+    # Follow same auto-insertion logic as instance method...
+    # [Same auto-insertion logic as get_operations_with_auto_ops but for simulation]
+
+    # 1. Contract review
     if OperationLibrary::ContractReviewOperations.contract_review_required?(user_operations)
       contract_review_operation = OperationLibrary::ContractReviewOperations.get_contract_review_operation
       operations_with_auto_ops << {
@@ -322,7 +389,7 @@ class PartProcessingInstruction < ApplicationRecord
       }
     end
 
-    # 2. Auto-insert incoming inspection after contract review
+    # 2. Incoming inspection
     if OperationLibrary::InspectFinalInspectVatInspect.incoming_inspection_required?(user_operations)
       incoming_inspection_operation = OperationLibrary::InspectFinalInspectVatInspect.get_incoming_inspection_operation
       operations_with_auto_ops << {
@@ -333,7 +400,7 @@ class PartProcessingInstruction < ApplicationRecord
       }
     end
 
-    # 3. Auto-insert VAT inspection before degrease
+    # 3. VAT inspection
     if OperationLibrary::InspectFinalInspectVatInspect.vat_inspection_required?(user_operations)
       vat_inspection_operation = OperationLibrary::InspectFinalInspectVatInspect.get_vat_inspection_operation
       operations_with_auto_ops << {
@@ -344,7 +411,7 @@ class PartProcessingInstruction < ApplicationRecord
       }
     end
 
-    # 4. Auto-insert jig operation before degrease (with selected jig type)
+    # 4. Jig operation
     if OperationLibrary::JigUnjig.jigging_required?(user_operations)
       jig_operation = OperationLibrary::JigUnjig.get_jig_operation(selected_jig_type)
       operations_with_auto_ops << {
@@ -355,7 +422,7 @@ class PartProcessingInstruction < ApplicationRecord
       }
     end
 
-    # 5. Auto-insert degrease after jig if needed for surface treatments
+    # 5. Degrease
     if OperationLibrary::DegreaseOperations.degreasing_required?(user_operations)
       degrease_operation = OperationLibrary::DegreaseOperations.get_degrease_operation
       operations_with_auto_ops << {
@@ -366,20 +433,41 @@ class PartProcessingInstruction < ApplicationRecord
       }
     end
 
-    # 6. Add user operations and their rinses, handling ENP Strip Mask separately
+    # 6. User operations with interpolation for masking/stripping
     user_operations_without_enp_strip = user_operations.reject { |op| ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type) }
     enp_strip_operations = user_operations.select { |op| ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type) }
 
     user_operations_without_enp_strip.each do |operation|
-      # Add the user operation with interpolated text
-      operations_with_auto_ops << {
-        id: operation.id,
-        display_name: operation.display_name,
-        operation_text: operation.operation_text, # Now includes interpolated time for ENP
-        auto_inserted: false
-      }
+      # Handle special interpolation for masking and stripping
+      final_op_data = case operation.process_type
+      when 'masking'
+        masking_op = OperationLibrary::Masking.get_masking_operation(masking_methods)
+        {
+          id: masking_op.id,
+          display_name: masking_op.display_name,
+          operation_text: masking_op.operation_text,
+          auto_inserted: false
+        }
+      when 'stripping'
+        stripping_op = OperationLibrary::Stripping.get_stripping_operation(stripping_type, stripping_method)
+        {
+          id: stripping_op.id,
+          display_name: stripping_op.display_name,
+          operation_text: stripping_op.operation_text,
+          auto_inserted: false
+        }
+      else
+        {
+          id: operation.id,
+          display_name: operation.display_name,
+          operation_text: operation.operation_text,
+          auto_inserted: false
+        }
+      end
 
-      # Add rinse operations after chemical processes
+      operations_with_auto_ops << final_op_data
+
+      # Add rinse operations
       if OperationLibrary::RinseOperations.operation_requires_rinse?(operation)
         rinse_operation = OperationLibrary::RinseOperations.get_rinse_operation(
           operation,
@@ -396,7 +484,7 @@ class PartProcessingInstruction < ApplicationRecord
       end
     end
 
-    # 7. Auto-insert unjig before ENP Strip Mask operations
+    # 7. Unjig
     if OperationLibrary::JigUnjig.unjigging_required?(user_operations)
       unjig_operation = OperationLibrary::JigUnjig.get_unjig_operation
       operations_with_auto_ops << {
@@ -407,7 +495,7 @@ class PartProcessingInstruction < ApplicationRecord
       }
     end
 
-    # 7.5. Add ENP Strip Mask operations after unjig
+    # 7.5. ENP Strip Mask operations
     if has_enp_strip_mask
       enp_strip_operations.each do |enp_strip_op|
         operations_with_auto_ops << {
@@ -419,7 +507,7 @@ class PartProcessingInstruction < ApplicationRecord
       end
     end
 
-    # 8. Auto-insert final inspection before pack
+    # 8. Final inspection
     if OperationLibrary::InspectFinalInspectVatInspect.final_inspection_required?(user_operations)
       final_inspection_operation = OperationLibrary::InspectFinalInspectVatInspect.get_final_inspection_operation
       operations_with_auto_ops << {
@@ -430,7 +518,7 @@ class PartProcessingInstruction < ApplicationRecord
       }
     end
 
-    # 9. Auto-insert pack at the very end (always required)
+    # 9. Pack
     if OperationLibrary::PackOperations.pack_required?(operations_with_auto_ops.map { |op| OpenStruct.new(process_type: op[:id] == 'PACK' ? 'pack' : 'other') })
       pack_operation = OperationLibrary::PackOperations.get_pack_operation
       operations_with_auto_ops << {
@@ -444,9 +532,9 @@ class PartProcessingInstruction < ApplicationRecord
     operations_with_auto_ops
   end
 
-  # Update this method to accept thickness, jig type, and ENP strip type parameters
-  def self.simulate_operations_summary(operation_ids, target_thickness = nil, selected_jig_type = nil, enp_strip_type = 'nitric')
-    operations_with_auto_ops = simulate_operations_with_auto_ops(operation_ids, target_thickness, selected_jig_type, enp_strip_type)
+  # Update simulation summary to accept new parameters
+  def self.simulate_operations_summary(operation_ids, target_thickness = nil, selected_jig_type = nil, enp_strip_type = 'nitric', masking_methods = {}, stripping_type = nil, stripping_method = nil)
+    operations_with_auto_ops = simulate_operations_with_auto_ops(operation_ids, target_thickness, selected_jig_type, enp_strip_type, masking_methods, stripping_type, stripping_method)
     return "No operations selected" if operations_with_auto_ops.empty?
 
     operations_with_auto_ops.map { |op| op[:display_name] }.join(" → ")
@@ -521,7 +609,7 @@ class PartProcessingInstruction < ApplicationRecord
   def validate_selected_operations
     return unless selected_operations.present?
 
-    # Count non-ENP Strip Mask operations for the 3-operation limit
+    # Count non-ENP Strip Mask operations for the 5-operation limit
     enp_strip_mask_ids = [
       'ENP_MASK', 'ENP_MASKING_CHECK', 'ENP_STRIP_NITRIC',
       'ENP_STRIP_METEX', 'ENP_STRIP_MASKING', 'ENP_MASKING_CHECK_FINAL'
@@ -529,8 +617,8 @@ class PartProcessingInstruction < ApplicationRecord
 
     non_enp_strip_operations = selected_operations.reject { |op_id| enp_strip_mask_ids.include?(op_id) }
 
-    if non_enp_strip_operations.length > 3
-      errors.add(:base, "cannot select more than 3 main operations (ENP Strip Mask operations don't count toward this limit)")
+    if non_enp_strip_operations.length > 5
+      errors.add(:base, "cannot select more than 5 main operations (ENP Strip Mask operations don't count toward this limit)")
     end
 
     all_op_ids = Operation.all_operations.map(&:id)
@@ -539,6 +627,9 @@ class PartProcessingInstruction < ApplicationRecord
       all_op_ids += OperationLibrary::EnpStripMask.operations('nitric').map(&:id)
       all_op_ids += OperationLibrary::EnpStripMask.operations('metex_dekote').map(&:id)
     end
+
+    # Add masking and stripping operation IDs
+    all_op_ids += ['MASKING', 'STRIPPING']
 
     invalid_ids = selected_operations - all_op_ids
     if invalid_ids.any?

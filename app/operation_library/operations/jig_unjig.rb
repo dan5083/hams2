@@ -2,23 +2,35 @@
 module OperationLibrary
   class JigUnjig
     # Actual jig types used in the shop
-    JIG_TYPES = [
-      'a secure titanium-to-part assy',
-      'Expanding Jig',
-      'Rotor Jig',
-      'Vertical AllThread Jig',
-      'Twisted Double Strap Jig',
-      'Double Strap Jig',
-      '3 Prong Jig',
-      '4 Prong Jig',
-      'Flat 3 Prong Jig',
-      'Flat 4 Prong Jig',
-      'M6 Jig',
-      'Thin-stem M8 Jig',
-      'Thick-stem M8 Jig',
-      'Spring Jig',
-      'Circular Spring Jig'
-    ].freeze
+  JIG_TYPES = [
+    'a secure titanium-to-part assy',
+    'Expanding Jig',
+    'Large Aluminum Expanding Jig',
+    'Rotor Jig',
+    'Vertical AllThread Jig',
+    'Twisted Double Strap Jig',
+    'Long Twisted Double Strap Jig',
+    'Double Strap Jig',
+    '3 Prong Jig',
+    '4 Prong Jig',
+    'Flat 3 Prong Jig',
+    'Flat 4 Prong Jig',
+    'M6 Jig (Metric)',
+    'M6 Jig (UNC)',
+    'Thin-stem M8 Jig',
+    'Thick-stem M8 Jig',
+    'Spring Jig',
+    'Circular Spring Jig',
+    'Aluminum Clamp Jig',
+    'Wheel Nut Jig',
+    'Muller Jigs',
+    'Flat Piston Jig',
+    'Upright Piston Jig',
+    'Thick Wrap Around Jig',
+    'Thin Wrap Around Jig',
+    'Monobloc Jig',
+    'Hytorque Jig'
+  ].freeze
 
     def self.operations(jig_type = nil)
       # Use provided jig_type or placeholder for interpolation

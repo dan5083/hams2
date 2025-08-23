@@ -101,7 +101,7 @@ module OperationLibrary
       Operation.new(
         id: 'ENP_STRIP_METEX',
         process_type: 'strip',
-        operation_text: "Strip ENP from the ferrous substrate in Metex Dekote at 80 to 90C, " +
+        operation_text: "Strip ENP in Metex Dekote at 80 to 90C, " +
                        "for approximately 20 microns per hour strip rate."
       )
     end

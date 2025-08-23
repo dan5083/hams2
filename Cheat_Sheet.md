@@ -37,6 +37,26 @@ done
 # Routes & Schema
 echo "=== db/schema.rb ==="; cat db/schema.rb; echo; echo "=== config/routes.rb ==="; cat config/routes.rb; echo
 
+# Op files a-g
+for file in app/operation_library/operations/[a-g]*.rb; do
+  echo "=== $file ==="
+  cat "$file"
+  echo
+done
+
+# Show hard_anodising specifically
+echo "=== app/operation_library/operations/hard_anodising.rb ==="
+cat "app/operation_library/operations/hard_anodising.rb"
+echo
+
+
+# Show operations i-z
+for file in app/operation_library/operations/[i-z]*.rb; do
+  echo "=== $file ==="
+  cat "$file"
+  echo
+done
+
 # Views
 for f in app/views/artifacts/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
 for f in app/views/customer_orders/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done

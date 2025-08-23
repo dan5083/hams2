@@ -12,3 +12,5 @@ require Rails.root.join('app', 'operation_library', 'operations', 'pack_operatio
 require Rails.root.join('app', 'operation_library', 'operations', 'inspect_final_inspect_vat_inspect')
 require Rails.root.join('app', 'operation_library', 'operations', 'jig_unjig')
 require Rails.root.join('app', 'operation_library', 'operations', 'enp_strip_mask')
+require Rails.root.join('app', 'operation_library', 'operations', 'masking')
+require Rails.root.join('app', 'operation_library', 'operations', 'stripping')
