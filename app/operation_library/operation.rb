@@ -193,6 +193,8 @@ class Operation
         'Desmut'
       when /ALUMON/
         'Alumon Treatment'
+      when /ETCH_AWAY/
+        'Etch Away Zincate'
       when /ZINCATE/
         'Zincate'
       when /ETCH_AWAY/
