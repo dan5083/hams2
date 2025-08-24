@@ -119,19 +119,25 @@ class PartProcessingInstruction < ApplicationRecord
       operations_with_auto_ops << vat_inspection_operation
     end
 
-    # 4. MODIFIED: Check if masking is present - if so, handle masking first, then jig
+    # 4. MODIFIED: Check if masking is present - if so, handle masking first, then inspection, then jig
     if has_masking
       # 4a. Add masking operation first (for anodising treatments)
       masking_operation = build_final_operation(user_operations.find { |op| op.process_type == 'masking' })
       operations_with_auto_ops << masking_operation if masking_operation
 
-      # 4b. Then add jig operation after masking
+      # 4b. NEW: Add masking inspection after masking
+      if OperationLibrary::Masking.masking_inspection_required?(selected_operations)
+        masking_inspection_operation = OperationLibrary::Masking.get_masking_inspection_operation
+        operations_with_auto_ops << masking_inspection_operation
+      end
+
+      # 4c. Then add jig operation after masking inspection
       if OperationLibrary::JigUnjig.jigging_required?(user_operations)
         jig_operation = OperationLibrary::JigUnjig.get_jig_operation(selected_jig_type)
         operations_with_auto_ops << jig_operation
       end
     else
-      # 4c. Original logic: jig before degrease when no masking
+      # 4d. Original logic: jig before degrease when no masking
       if OperationLibrary::JigUnjig.jigging_required?(user_operations)
         jig_operation = OperationLibrary::JigUnjig.get_jig_operation(selected_jig_type)
         operations_with_auto_ops << jig_operation
@@ -431,7 +437,7 @@ class PartProcessingInstruction < ApplicationRecord
       }
     end
 
-    # 4. MODIFIED: Handle masking first, then jig if masking is present
+    # 4. MODIFIED: Handle masking first, then inspection, then jig if masking is present
     if has_masking
       # 4a. Add masking operation first
       masking_operation = user_operations.find { |op| op.process_type == 'masking' }
@@ -445,7 +451,18 @@ class PartProcessingInstruction < ApplicationRecord
         }
       end
 
-      # 4b. Then add jig operation after masking
+      # 4b. NEW: Add masking inspection after masking
+      if OperationLibrary::Masking.masking_inspection_required?(expanded_operation_ids)
+        masking_inspection_operation = OperationLibrary::Masking.get_masking_inspection_operation
+        operations_with_auto_ops << {
+          id: masking_inspection_operation.id,
+          display_name: masking_inspection_operation.display_name,
+          operation_text: masking_inspection_operation.operation_text,
+          auto_inserted: true
+        }
+      end
+
+      # 4c. Then add jig operation after masking inspection
       if OperationLibrary::JigUnjig.jigging_required?(user_operations)
         jig_operation = OperationLibrary::JigUnjig.get_jig_operation(selected_jig_type)
         operations_with_auto_ops << {
@@ -456,7 +473,7 @@ class PartProcessingInstruction < ApplicationRecord
         }
       end
     else
-      # 4c. Original logic: jig before degrease when no masking
+      # 4d. Original logic: jig before degrease when no masking
       if OperationLibrary::JigUnjig.jigging_required?(user_operations)
         jig_operation = OperationLibrary::JigUnjig.get_jig_operation(selected_jig_type)
         operations_with_auto_ops << {

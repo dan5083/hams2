@@ -65,7 +65,7 @@ class Operation
 
   # Filter operations by criteria (excluding auto-inserted operations from normal filtering)
   def self.find_matching(process_type: nil, alloy: nil, target_thickness: nil, anodic_class: nil, enp_type: nil)
-    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check']
+    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check', 'masking_inspection']
     matching = all_operations(target_thickness).reject { |op| auto_inserted_types.include?(op.process_type) }
 
     matching = matching.select { |op| op.process_type == process_type } if process_type.present?
@@ -104,22 +104,22 @@ class Operation
 
   # Get available options for dropdowns (excluding auto-inserted operations)
   def self.available_process_types
-    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check']
+    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check', 'masking_inspection']
     all_operations.reject { |op| auto_inserted_types.include?(op.process_type) }.map(&:process_type).uniq.sort
   end
 
   def self.available_alloys
-    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check']
+    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check', 'masking_inspection']
     all_operations.reject { |op| auto_inserted_types.include?(op.process_type) }.flat_map(&:alloys).uniq.sort
   end
 
   def self.available_anodic_classes
-    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check']
+    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check', 'masking_inspection']
     all_operations.reject { |op| auto_inserted_types.include?(op.process_type) }.flat_map(&:anodic_classes).uniq.sort
   end
 
   def self.available_thicknesses
-    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check']
+    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check', 'masking_inspection']
     all_operations.reject { |op| auto_inserted_types.include?(op.process_type) }.map(&:target_thickness).uniq.select { |t| t > 0 }.sort
   end
 
@@ -153,7 +153,7 @@ class Operation
   end
 
   def self.masking_operations
-    all_operations.select { |op| ['masking', 'masking_removal', 'masking_removal_check'].include?(op.process_type) }
+    all_operations.select { |op| ['masking', 'masking_removal', 'masking_removal_check', 'masking_inspection'].include?(op.process_type) }
   end
 
   # Instance methods
@@ -178,6 +178,8 @@ class Operation
       'Masking Removal'
     elsif process_type == 'masking_removal_check'
       'Masking Removal Check'
+    elsif process_type == 'masking_inspection'
+      'Masking Inspection'
     elsif process_type == 'mask'
       'ENP Mask'
     elsif process_type == 'masking_check'
@@ -301,13 +303,17 @@ class Operation
     ['masking_removal', 'masking_removal_check'].include?(process_type)
   end
 
+  def masking_inspection?
+    process_type == 'masking_inspection'
+  end
+
   def stripping?
     process_type == 'stripping'
   end
 
   # Check if this operation is auto-inserted
   def auto_inserted?
-    ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check'].include?(process_type)
+    ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check', 'masking_inspection'].include?(process_type)
   end
 
   # Calculate plating time for ENP operations

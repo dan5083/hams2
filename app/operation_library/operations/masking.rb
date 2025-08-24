@@ -16,6 +16,13 @@ module OperationLibrary
           operation_text: build_masking_text(selected_methods)
         ),
 
+        # NEW: Masking inspection operation - auto-inserted after masking
+        Operation.new(
+          id: 'MASKING_INSPECTION',
+          process_type: 'masking_inspection',
+          operation_text: '**Masking Inspection:** Independent operator must verify applied masking matches drawing requirements, then inspect each part for masking errors. Separate acceptable from rejected parts, return rejects to previous operator for rework, and only sign off once all parts meet standard.'
+        ),
+
         # Masking removal operation - auto-inserted after unjig
         Operation.new(
           id: 'MASKING_REMOVAL',
@@ -77,6 +84,16 @@ module OperationLibrary
       operations(selected_methods).first
     end
 
+    # NEW: Get the masking inspection operation
+    def self.get_masking_inspection_operation
+      operations.find { |op| op.id == 'MASKING_INSPECTION' }
+    end
+
+    # NEW: Check if masking inspection is required (always required when masking is present)
+    def self.masking_inspection_required?(selected_operations)
+      selected_operations.include?('MASKING')
+    end
+
     # Check if any masking methods are selected
     def self.masking_selected?(masking_data)
       masking_data.is_a?(Hash) && masking_data.any? { |method, location| method.present? }
@@ -94,7 +111,5 @@ module OperationLibrary
     def self.get_masking_removal_operations
       operations.select { |op| ['MASKING_REMOVAL', 'MASKING_REMOVAL_CHECK'].include?(op.id) }
     end
-
-
   end
 end
