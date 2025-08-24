@@ -194,11 +194,9 @@ class Operation
       when /ALUMON/
         'Alumon Treatment'
       when /ETCH_AWAY/
-        'Etch Away Zincate'
+        'Strip Zincate'
       when /ZINCATE/
         'Zincate'
-      when /ETCH_AWAY/
-        'Etch Away Zincate'
       when /PICKLING/
         'Pickling'
       when /ACID_DIP/
