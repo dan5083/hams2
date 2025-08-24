@@ -99,6 +99,7 @@ class PartProcessingInstruction < ApplicationRecord
 
     operations_with_auto_ops = []
     has_special_requirements = has_special_auto_op_requirements?
+    has_masking = selected_operations.include?('MASKING')
 
     # 1. Auto-insert contract review at the very beginning (always required)
     if OperationLibrary::ContractReviewOperations.contract_review_required?(user_operations)
@@ -118,10 +119,23 @@ class PartProcessingInstruction < ApplicationRecord
       operations_with_auto_ops << vat_inspection_operation
     end
 
-    # 4. Auto-insert jig operation before degrease
-    if OperationLibrary::JigUnjig.jigging_required?(user_operations)
-      jig_operation = OperationLibrary::JigUnjig.get_jig_operation(selected_jig_type)
-      operations_with_auto_ops << jig_operation
+    # 4. MODIFIED: Check if masking is present - if so, handle masking first, then jig
+    if has_masking
+      # 4a. Add masking operation first (for anodising treatments)
+      masking_operation = build_final_operation(user_operations.find { |op| op.process_type == 'masking' })
+      operations_with_auto_ops << masking_operation if masking_operation
+
+      # 4b. Then add jig operation after masking
+      if OperationLibrary::JigUnjig.jigging_required?(user_operations)
+        jig_operation = OperationLibrary::JigUnjig.get_jig_operation(selected_jig_type)
+        operations_with_auto_ops << jig_operation
+      end
+    else
+      # 4c. Original logic: jig before degrease when no masking
+      if OperationLibrary::JigUnjig.jigging_required?(user_operations)
+        jig_operation = OperationLibrary::JigUnjig.get_jig_operation(selected_jig_type)
+        operations_with_auto_ops << jig_operation
+      end
     end
 
     # 5. Auto-insert degrease after jig if needed for surface treatments
@@ -130,8 +144,10 @@ class PartProcessingInstruction < ApplicationRecord
       operations_with_auto_ops << degrease_operation
     end
 
-    # 6. Add user operations in the order selected, with auto-operations between them
-    user_operations.each_with_index do |operation, index|
+    # 6. Add remaining user operations (excluding masking which was handled above)
+    user_operations_without_masking = user_operations.reject { |op| op.process_type == 'masking' }
+
+    user_operations_without_masking.each_with_index do |operation, index|
       # Add the user operation with interpolated text
       final_operation = build_final_operation(operation)
       operations_with_auto_ops << final_operation
@@ -380,9 +396,7 @@ class PartProcessingInstruction < ApplicationRecord
     operations_with_auto_ops = []
     has_special_requirements = user_operations.any? { |op| op.process_type == 'electroless_nickel_plating' }
     has_enp_strip_mask = user_operations.any? { |op| ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type) }
-
-    # Follow same auto-insertion logic as instance method...
-    # [Same auto-insertion logic as get_operations_with_auto_ops but for simulation]
+    has_masking = operation_ids.include?('MASKING')
 
     # 1. Contract review
     if OperationLibrary::ContractReviewOperations.contract_review_required?(user_operations)
@@ -417,15 +431,41 @@ class PartProcessingInstruction < ApplicationRecord
       }
     end
 
-    # 4. Jig operation
-    if OperationLibrary::JigUnjig.jigging_required?(user_operations)
-      jig_operation = OperationLibrary::JigUnjig.get_jig_operation(selected_jig_type)
-      operations_with_auto_ops << {
-        id: jig_operation.id,
-        display_name: jig_operation.display_name,
-        operation_text: jig_operation.operation_text,
-        auto_inserted: true
-      }
+    # 4. MODIFIED: Handle masking first, then jig if masking is present
+    if has_masking
+      # 4a. Add masking operation first
+      masking_operation = user_operations.find { |op| op.process_type == 'masking' }
+      if masking_operation
+        masking_op = OperationLibrary::Masking.get_masking_operation(masking_methods)
+        operations_with_auto_ops << {
+          id: masking_op.id,
+          display_name: masking_op.display_name,
+          operation_text: masking_op.operation_text,
+          auto_inserted: false
+        }
+      end
+
+      # 4b. Then add jig operation after masking
+      if OperationLibrary::JigUnjig.jigging_required?(user_operations)
+        jig_operation = OperationLibrary::JigUnjig.get_jig_operation(selected_jig_type)
+        operations_with_auto_ops << {
+          id: jig_operation.id,
+          display_name: jig_operation.display_name,
+          operation_text: jig_operation.operation_text,
+          auto_inserted: true
+        }
+      end
+    else
+      # 4c. Original logic: jig before degrease when no masking
+      if OperationLibrary::JigUnjig.jigging_required?(user_operations)
+        jig_operation = OperationLibrary::JigUnjig.get_jig_operation(selected_jig_type)
+        operations_with_auto_ops << {
+          id: jig_operation.id,
+          display_name: jig_operation.display_name,
+          operation_text: jig_operation.operation_text,
+          auto_inserted: true
+        }
+      end
     end
 
     # 5. Degrease
@@ -439,21 +479,13 @@ class PartProcessingInstruction < ApplicationRecord
       }
     end
 
-    # 6. User operations with interpolation for masking/stripping
-    user_operations_without_enp_strip = user_operations.reject { |op| ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type) }
+    # 6. User operations (excluding masking which was handled above)
+    user_operations_without_enp_strip = user_operations.reject { |op| ['mask', 'masking_check', 'strip', 'strip_masking', 'masking'].include?(op.process_type) }
     enp_strip_operations = user_operations.select { |op| ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type) }
 
     user_operations_without_enp_strip.each do |operation|
-      # Handle special interpolation for masking and stripping
+      # Handle special interpolation for stripping (masking was handled above)
       final_op_data = case operation.process_type
-      when 'masking'
-        masking_op = OperationLibrary::Masking.get_masking_operation(masking_methods)
-        {
-          id: masking_op.id,
-          display_name: masking_op.display_name,
-          operation_text: masking_op.operation_text,
-          auto_inserted: false
-        }
       when 'stripping'
         stripping_op = OperationLibrary::Stripping.get_stripping_operation(stripping_type, stripping_method)
         {
