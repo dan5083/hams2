@@ -113,17 +113,10 @@ class PartProcessingInstruction < ApplicationRecord
       operations_with_auto_ops << incoming_inspection_operation
     end
 
-    # 3. Auto-insert VAT inspection before pretreatments
+    # 3. Auto-insert VAT inspection before jigging
     if OperationLibrary::InspectFinalInspectVatInspect.vat_inspection_required?(user_operations)
       vat_inspection_operation = OperationLibrary::InspectFinalInspectVatInspect.get_vat_inspection_operation
       operations_with_auto_ops << vat_inspection_operation
-    end
-
-    # 3.5. Auto-insert pretreatments after VAT inspection
-    if defined?(OperationLibrary::Pretreatments) && OperationLibrary::Pretreatments.pretreatment_required?(user_operations)
-      selected_alloy = get_selected_enp_alloy # Get the selected alloy for ENP
-      pretreatment_operations = OperationLibrary::Pretreatments.get_pretreatment_sequence(user_operations, selected_alloy)
-      operations_with_auto_ops += pretreatment_operations
     end
 
     # 4. MODIFIED: Check if masking is present - if so, handle masking first, then inspection, then jig
@@ -155,6 +148,13 @@ class PartProcessingInstruction < ApplicationRecord
     if OperationLibrary::DegreaseOperations.degreasing_required?(user_operations)
       degrease_operation = OperationLibrary::DegreaseOperations.get_degrease_operation
       operations_with_auto_ops << degrease_operation
+    end
+
+    # 5.5. Auto-insert pretreatments after degrease but before main user operations
+    if defined?(OperationLibrary::Pretreatments) && OperationLibrary::Pretreatments.pretreatment_required?(user_operations)
+      selected_alloy = get_selected_enp_alloy # Get the selected alloy for ENP
+      pretreatment_operations = OperationLibrary::Pretreatments.get_pretreatment_sequence(user_operations, selected_alloy)
+      operations_with_auto_ops += pretreatment_operations
     end
 
     # 6. Add remaining user operations (excluding masking which was handled above)
@@ -454,20 +454,6 @@ class PartProcessingInstruction < ApplicationRecord
       }
     end
 
-    # 3.5. Pretreatments (after VAT inspection, before jigging)
-    if defined?(OperationLibrary::Pretreatments) && OperationLibrary::Pretreatments.pretreatment_required?(user_operations)
-      pretreatment_operations = OperationLibrary::Pretreatments.get_pretreatment_sequence(user_operations, selected_alloy)
-
-      pretreatment_operations.each do |pretreat_op|
-        operations_with_auto_ops << {
-          id: pretreat_op.id,
-          display_name: pretreat_op.respond_to?(:display_name) ? pretreat_op.display_name : pretreat_op.id.humanize,
-          operation_text: pretreat_op.operation_text,
-          auto_inserted: true
-        }
-      end
-    end
-
     # 4. MODIFIED: Handle masking first, then inspection, then jig if masking is present
     if has_masking
       # 4a. Add masking operation first
@@ -525,6 +511,20 @@ class PartProcessingInstruction < ApplicationRecord
         operation_text: degrease_operation.operation_text,
         auto_inserted: true
       }
+    end
+
+    # 5.5. Pretreatments (after degrease, before main user operations)
+    if defined?(OperationLibrary::Pretreatments) && OperationLibrary::Pretreatments.pretreatment_required?(user_operations)
+      pretreatment_operations = OperationLibrary::Pretreatments.get_pretreatment_sequence(user_operations, selected_alloy)
+
+      pretreatment_operations.each do |pretreat_op|
+        operations_with_auto_ops << {
+          id: pretreat_op.id,
+          display_name: pretreat_op.respond_to?(:display_name) ? pretreat_op.display_name : pretreat_op.id.humanize,
+          operation_text: pretreat_op.operation_text,
+          auto_inserted: true
+        }
+      end
     end
 
     # 6. User operations (excluding masking which was handled above)
