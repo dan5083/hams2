@@ -3,6 +3,9 @@ module OperationLibrary
   class RinseOperations
     # Define which process types are non-water chemical processes that require rinses
     NON_WATER_CHEMICAL_PROCESSES = %w[
+      degrease
+      pretreatment
+      enp_pretreatment
       chemical_conversion
       standard_anodising
       hard_anodising
@@ -13,6 +16,7 @@ module OperationLibrary
 
     # Define which process types are extreme pH processes that require cascade rinse (dichromate coming soon!!)
     EXTREME_PH_PROCESSES = %w[
+      pretreatment
       etch
       standard_anodising
       hard_anodising
