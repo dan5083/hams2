@@ -6,11 +6,6 @@ for file in app/models/[f-j]*.rb; do echo "=== $file ==="; cat "$file"; echo; do
 for file in app/models/[k-p]*.rb; do echo "=== $file ==="; cat "$file"; echo; done
 for file in app/models/[q-z]*.rb; do echo "=== $file ==="; cat "$file"; echo; done
 
-# Show operation library base file
-echo "=== app/operation_library/operation.rb ==="
-cat "app/operation_library/operation.rb"
-echo
-
 # Show controllers.rb files starting with a-i
 for file in app/controllers/[a-i]*.rb; do
   echo "=== $file ==="
@@ -36,6 +31,11 @@ done
 
 # Routes & Schema
 echo "=== db/schema.rb ==="; cat db/schema.rb; echo; echo "=== config/routes.rb ==="; cat config/routes.rb; echo
+
+# Show operation library base file
+echo "=== app/operation_library/operation.rb ==="
+cat "app/operation_library/operation.rb"
+echo
 
 # Op files a-g
 for file in app/operation_library/operations/[a-g]*.rb; do

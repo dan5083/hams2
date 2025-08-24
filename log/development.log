@@ -14760,3 +14760,5 @@ Processing by PartProcessingInstructionsController#new as HTML
 Completed 200 OK in 79ms (Views: 50.7ms | ActiveRecord: 2.2ms (4 queries, 0 cached) | GC: 25.0ms)
 
 
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
