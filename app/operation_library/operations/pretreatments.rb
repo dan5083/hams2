@@ -204,28 +204,7 @@ module OperationLibrary
       end.compact
     end
 
-    # Insert pretreatments into operation sequence
-    def self.insert_pretreatments_if_required(operations_sequence, selected_alloy = nil)
-      return operations_sequence unless pretreatment_required?(operations_sequence)
-
-      pretreatment_ops = get_pretreatment_sequence(operations_sequence, selected_alloy)
-      return operations_sequence if pretreatment_ops.empty?
-
-      # Insert after VAT inspection but before jigging/degrease
-      insertion_index = operations_sequence.find_index { |op|
-        op.process_type == 'vat_inspect'
-      }
-
-      if insertion_index
-        # Insert after VAT inspection
-        operations_sequence.insert(insertion_index + 1, *pretreatment_ops)
-      else
-        # Fallback: insert at beginning
-        pretreatment_ops + operations_sequence
-      end
-    end
-  end
-end
+    # ENP pretreatment sequences by alloy
     def self.enp_sequences
       {
         STEEL: [
