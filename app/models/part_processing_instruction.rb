@@ -148,13 +148,34 @@ class PartProcessingInstruction < ApplicationRecord
     if OperationLibrary::DegreaseOperations.degreasing_required?(user_operations)
       degrease_operation = OperationLibrary::DegreaseOperations.get_degrease_operation
       operations_with_auto_ops << degrease_operation
+
+      # Add rinse after degrease
+      if OperationLibrary::RinseOperations.operation_requires_rinse?(degrease_operation)
+        rinse_operation = OperationLibrary::RinseOperations.get_rinse_operation(
+          degrease_operation,
+          ppi_contains_electroless_nickel: has_special_requirements
+        )
+        operations_with_auto_ops << rinse_operation if rinse_operation
+      end
     end
 
     # 5.5. Auto-insert pretreatments after degrease but before main user operations
     if defined?(OperationLibrary::Pretreatments) && OperationLibrary::Pretreatments.pretreatment_required?(user_operations)
       selected_alloy = get_selected_enp_alloy # Get the selected alloy for ENP
       pretreatment_operations = OperationLibrary::Pretreatments.get_pretreatment_sequence(user_operations, selected_alloy)
-      operations_with_auto_ops += pretreatment_operations
+
+      pretreatment_operations.each do |pretreat_op|
+        operations_with_auto_ops << pretreat_op
+
+        # Add rinse after each pretreatment operation (except RO rinses which are already included in ENP sequences)
+        if pretreat_op.process_type != 'rinse' && OperationLibrary::RinseOperations.operation_requires_rinse?(pretreat_op)
+          rinse_operation = OperationLibrary::RinseOperations.get_rinse_operation(
+            pretreat_op,
+            ppi_contains_electroless_nickel: has_special_requirements
+          )
+          operations_with_auto_ops << rinse_operation if rinse_operation
+        end
+      end
     end
 
     # 6. Add remaining user operations (excluding masking which was handled above)
@@ -511,6 +532,22 @@ class PartProcessingInstruction < ApplicationRecord
         operation_text: degrease_operation.operation_text,
         auto_inserted: true
       }
+
+      # Add rinse after degrease
+      if OperationLibrary::RinseOperations.operation_requires_rinse?(degrease_operation)
+        rinse_operation = OperationLibrary::RinseOperations.get_rinse_operation(
+          degrease_operation,
+          ppi_contains_electroless_nickel: has_special_requirements
+        )
+        if rinse_operation
+          operations_with_auto_ops << {
+            id: rinse_operation.id,
+            display_name: rinse_operation.display_name,
+            operation_text: rinse_operation.operation_text,
+            auto_inserted: true
+          }
+        end
+      end
     end
 
     # 5.5. Pretreatments (after degrease, before main user operations)
@@ -524,6 +561,22 @@ class PartProcessingInstruction < ApplicationRecord
           operation_text: pretreat_op.operation_text,
           auto_inserted: true
         }
+
+        # Add rinse after each pretreatment operation (except RO rinses which are already included in ENP sequences)
+        if pretreat_op.process_type != 'rinse' && OperationLibrary::RinseOperations.operation_requires_rinse?(pretreat_op)
+          rinse_operation = OperationLibrary::RinseOperations.get_rinse_operation(
+            pretreat_op,
+            ppi_contains_electroless_nickel: has_special_requirements
+          )
+          if rinse_operation
+            operations_with_auto_ops << {
+              id: rinse_operation.id,
+              display_name: rinse_operation.display_name,
+              operation_text: rinse_operation.operation_text,
+              auto_inserted: true
+            }
+          end
+        end
       end
     end
 
