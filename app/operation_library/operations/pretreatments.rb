@@ -281,7 +281,7 @@ module OperationLibrary
           'ACTIVATE_M629_30SEC_1MIN_18_52C_CELCIUS'
         ],
 
-        '2000_SERIES_ALLOYS' => [
+        TWO_THOUSAND_SERIES_ALLOYS: [
           'ALUMINIUM_CLEAN_KEYCOTE_245_30_60SEC',
           'DESMUT_MICROETCH_66_1_2_MIN_18_25C',
           'ALUMON_70_1_2_MIN_18_25C',
@@ -297,7 +297,7 @@ module OperationLibrary
           'DESMUT_MICROETCH_66_1_2_MIN_18_25C'
         ],
 
-        '316_STAINLESS_STEEL' => [
+        THREE_ONE_SIX_STAINLESS_STEEL: [
           'FERROUS_CLEANING_KEYCOTE_245_5_20_MIN',
           'PICKLING_ALUMON_70_9_11_MIN_18_25C',
           'SOAK_WOODS_NICKEL_STRIKE_15_16_MIN_18_43C',

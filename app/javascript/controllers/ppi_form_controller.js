@@ -1147,7 +1147,23 @@ export default class extends Controller {
         const isENPStripMask = ['ENP_MASK', 'ENP_MASKING_CHECK', 'ENP_STRIP_NITRIC', 'ENP_STRIP_METEX', 'ENP_STRIP_MASKING', 'ENP_MASKING_CHECK_FINAL'].includes(op.id)
         const isMasking = op.id === 'MASKING'
         const isStripping = op.id === 'STRIPPING'
-        const isPretreatment = op.id && (op.id.startsWith('DEOX_') || op.id.startsWith('FERROUS_') || op.id.startsWith('ELECTROCLEAN_') || op.id.startsWith('ACTIVATE_') || op.id.startsWith('WOODS_') || op.id.startsWith('ALUMINIUM_') || op.id.startsWith('DESMUT_') || op.id.startsWith('ALUMON_') || op.id.startsWith('ZINCATE_') || op.id.startsWith('ETCH_') || op.id.startsWith('PICKLING_') || op.id.startsWith('ACID_') || op.id.startsWith('MICROETCH_') || op.id === 'RO_RINSE_PRETREATMENT')
+        const isPretreatment = op.id && (
+          op.id.startsWith('DEOX_') ||
+          op.id.startsWith('FERROUS_') ||
+          op.id.startsWith('ELECTROCLEAN_') ||
+          op.id.startsWith('ACTIVATE_') ||
+          op.id.startsWith('WOODS_') ||
+          op.id.startsWith('SOAK_') ||
+          op.id.startsWith('ALUMINIUM_') ||
+          op.id.startsWith('DESMUT_') ||
+          op.id.startsWith('ALUMON_') ||
+          op.id.startsWith('ZINCATE_') ||
+          op.id.startsWith('ETCH_') ||
+          op.id.startsWith('PICKLING_') ||
+          op.id.startsWith('ACID_') ||
+          op.id.startsWith('MICROETCH_') ||
+          op.id === 'RO_RINSE_PRETREATMENT'
+        )
 
         let bgColor, textColor, removeButton
 
