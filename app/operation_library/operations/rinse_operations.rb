@@ -12,15 +12,18 @@ module OperationLibrary
       chromic_anodising
       etch
       electroless_nickel_plating
+      sealing
+      dichromate_sealing
     ].freeze
 
-    # Define which process types are extreme pH processes that require cascade rinse (dichromate coming soon!!)
+    # Define which process types are extreme pH processes that require cascade rinse
     EXTREME_PH_PROCESSES = %w[
       pretreatment
       etch
       standard_anodising
       hard_anodising
       chromic_anodising
+      dichromate_sealing
     ].freeze
 
     def self.operations

@@ -200,15 +200,21 @@
           <% operations_with_auto_ops.each_with_index do |operation, index| %>
             <% if operation %>
               <% is_auto_inserted = operation.respond_to?(:auto_inserted?) && operation.auto_inserted? %>
-              <div class="<%= is_auto_inserted ? 'bg-gray-100 border border-gray-300' : 'bg-blue-100 border border-blue-300' %> rounded px-3 py-2 flex justify-between items-center" data-operation-id="<%= operation.id %>">
-                <span class="text-sm <%= 'italic text-gray-600' if is_auto_inserted %>">
+              <% is_sealing = ['SODIUM_DICHROMATE_SEAL', 'OXIDITE_SECO_SEAL', 'HOT_WATER_DIP', 'HOT_SEAL', 'SURTEC_650V_SEAL', 'DEIONISED_WATER_SEAL'].include?(operation.id) %>
+              <% bg_color_class = is_sealing ? 'bg-purple-100 border border-purple-300' : (is_auto_inserted ? 'bg-gray-100 border border-gray-300' : 'bg-blue-100 border border-blue-300') %>
+              <% text_color_class = is_auto_inserted ? 'italic text-gray-600' : 'text-gray-900' %>
+
+              <div class="<%= bg_color_class %> rounded px-3 py-2 flex justify-between items-center" data-operation-id="<%= operation.id %>">
+                <span class="text-sm <%= text_color_class %>">
                   <strong><%= index + 1 %>.</strong>
                   <%= operation.display_name %>: <%= operation.operation_text %>
-                  <% if is_auto_inserted %>
+                  <% if is_sealing %>
+                    <span class="text-xs text-purple-600 ml-2">(sealing)</span>
+                  <% elsif is_auto_inserted %>
                     <span class="text-xs text-gray-500 ml-2">(auto-inserted)</span>
                   <% end %>
                 </span>
-                <% unless is_auto_inserted %>
+                <% unless is_auto_inserted || is_sealing %>
                   <button type="button" class="text-red-600 hover:text-red-800 ml-2" data-action="click->ppi-form#removeOperation" data-ppi-form-operation-id-param="<%= operation.id %>">×</button>
                 <% end %>
               </div>
@@ -229,6 +235,11 @@
     <%= hidden_field_tag "part_processing_instruction[customisation_data][operation_selection][enp_strip_type]",
         'nitric',
         data: { ppi_form_target: "enpStripTypeField" } %>
+
+    <!-- Hidden field for sealing type -->
+    <%= hidden_field_tag "part_processing_instruction[customisation_data][operation_selection][sealing_type]",
+        ppi.selected_sealing_type,
+        data: { ppi_form_target: "sealingTypeField" } %>
   </div>
 
   <!-- Specification (will be auto-generated from operations) -->
@@ -261,7 +272,7 @@
       <div class="ml-3">
         <h3 class="text-sm font-medium text-blue-800">Operation-Based PPI Creation</h3>
         <div class="mt-2 text-sm text-blue-700">
-          <p>Select your treatment criteria above and choose up to 5 operations in sequence. Auto-operations (inspections, jigging, rinses, etc.) are automatically inserted in the correct sequence. The selected jig type will be used for all jigging operations. Supports anodising, chemical conversion, ENP, masking, stripping, and ENP strip/mask operations. The specification will be automatically generated from your selections.</p>
+          <p>Select your treatment criteria above and choose up to 5 operations in sequence. Auto-operations (inspections, jigging, rinses, sealing, etc.) are automatically inserted in the correct sequence. The selected jig type will be used for all jigging operations. Supports anodising (with optional sealing), chemical conversion, ENP, masking, stripping, and ENP strip/mask operations. The specification will be automatically generated from your selections.</p>
         </div>
       </div>
     </div>

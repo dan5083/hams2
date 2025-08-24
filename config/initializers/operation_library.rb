@@ -15,3 +15,4 @@ require Rails.root.join('app', 'operation_library', 'operations', 'enp_strip_mas
 require Rails.root.join('app', 'operation_library', 'operations', 'masking')
 require Rails.root.join('app', 'operation_library', 'operations', 'stripping')
 require Rails.root.join('app', 'operation_library', 'operations', 'pretreatments')
+require Rails.root.join('app', 'operation_library', 'operations', 'sealing')

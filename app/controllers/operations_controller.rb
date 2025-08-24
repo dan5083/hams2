@@ -1,4 +1,4 @@
-# app/controllers/operations_controller.rb - Enhanced for masking and stripping operations
+# app/controllers/operations_controller.rb - Enhanced for masking, stripping, and sealing operations
 class OperationsController < ApplicationController
   skip_before_action :verify_authenticity_token, only: [:filter, :details, :summary, :preview_with_auto_ops]
 
@@ -15,43 +15,53 @@ class OperationsController < ApplicationController
     operations << OperationLibrary::Masking.get_masking_operation({})
     operations << OperationLibrary::Stripping.get_stripping_operation(nil, nil)
 
-    # Filter by anodising types (now includes ENP, ENP Strip Mask, masking, and stripping) - exclude auto-inserted operations
+    # Filter by anodising types (now includes ENP, ENP Strip Mask, masking, stripping, and sealing) - exclude auto-inserted operations
     if criteria[:anodising_types].present?
-      operations = operations.select { |op| criteria[:anodising_types].include?(op.process_type) }
+      # Handle sealing filtering - both 'sealing' and 'dichromate_sealing' process types
+      if criteria[:anodising_types].include?('sealing')
+        sealing_operations = operations.select { |op| ['sealing', 'dichromate_sealing'].include?(op.process_type) }
+        other_operations = operations.select { |op|
+          criteria[:anodising_types].include?(op.process_type) && !['sealing', 'dichromate_sealing'].include?(op.process_type)
+        }
+        operations = sealing_operations + other_operations
+      else
+        operations = operations.select { |op| criteria[:anodising_types].include?(op.process_type) }
+      end
     end
 
     # Exclude auto-inserted operations (degrease and rinse) from manual selection
     operations = operations.reject { |op| op.auto_inserted? }
 
-    # Filter by alloys (not applicable to masking/stripping)
+    # Filter by alloys (not applicable to masking/stripping/sealing)
     if criteria[:alloys].present?
       operations = operations.select { |op|
-        op.process_type.in?(['masking', 'stripping']) || (op.alloys & criteria[:alloys]).any?
+        op.process_type.in?(['masking', 'stripping', 'sealing', 'dichromate_sealing']) || (op.alloys & criteria[:alloys]).any?
       }
     end
 
-    # Filter by anodic classes (not applicable to masking/stripping)
+    # Filter by anodic classes (not applicable to masking/stripping/sealing)
     if criteria[:anodic_classes].present?
       operations = operations.select { |op|
-        op.process_type.in?(['masking', 'stripping']) || (op.anodic_classes & criteria[:anodic_classes]).any?
+        op.process_type.in?(['masking', 'stripping', 'sealing', 'dichromate_sealing']) || (op.anodic_classes & criteria[:anodic_classes]).any?
       }
     end
 
-    # Filter by ENP types (not applicable to masking/stripping)
+    # Filter by ENP types (not applicable to masking/stripping/sealing)
     if criteria[:enp_types].present?
       operations = operations.select { |op|
-        op.process_type.in?(['masking', 'stripping']) || (op.enp_type.present? && criteria[:enp_types].include?(op.enp_type))
+        op.process_type.in?(['masking', 'stripping', 'sealing', 'dichromate_sealing']) || (op.enp_type.present? && criteria[:enp_types].include?(op.enp_type))
       }
     end
 
-    # Filter by target thickness (with tolerance) - skip for chemical conversion, ENP, masking, and stripping
+    # Filter by target thickness (with tolerance) - skip for chemical conversion, ENP, masking, stripping, and sealing
     if criteria[:target_thicknesses].present?
       operations = operations.select do |op|
-        # Skip thickness filtering for chemical conversion, ENP, masking, stripping, and ENP Strip Mask
-        if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'masking', 'stripping']) ||
+        # Skip thickness filtering for chemical conversion, ENP, masking, stripping, sealing, dichromate_sealing, and ENP Strip Mask
+        if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'masking', 'stripping', 'sealing', 'dichromate_sealing']) ||
            ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type)
           true
         else
+          # Exact match or within reasonable tolerance (±2.5μm)
           criteria[:target_thicknesses].any? do |target|
             (op.target_thickness - target).abs <= 2.5
           end
@@ -62,7 +72,7 @@ class OperationsController < ApplicationController
       if criteria[:target_thicknesses].length == 1
         target = criteria[:target_thicknesses].first
         operations = operations.sort_by do |op|
-          if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'masking', 'stripping']) ||
+          if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'masking', 'stripping', 'sealing', 'dichromate_sealing']) ||
              ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type)
             0
           else
@@ -77,7 +87,7 @@ class OperationsController < ApplicationController
       {
         id: op.id,
         display_name: op.display_name,
-        operation_text: op.operation_text, # Now includes interpolated time for ENP and text for masking/stripping
+        operation_text: op.operation_text, # Now includes interpolated time for ENP and text for masking/stripping/sealing
         vat_options_text: op.vat_options_text,
         target_thickness: op.target_thickness,
         process_type: op.process_type,
@@ -110,6 +120,7 @@ class OperationsController < ApplicationController
     masking_methods = params[:masking_methods] || {}
     stripping_type = params[:stripping_type]
     stripping_method = params[:stripping_method]
+    selected_sealing_type = params[:selected_sealing_type]
 
     # Handle ENP Strip Mask operations with correct strip type
     expanded_operation_ids = expand_enp_strip_mask_operations(operation_ids, enp_strip_type)
@@ -125,13 +136,19 @@ class OperationsController < ApplicationController
     stripping_op = OperationLibrary::Stripping.get_stripping_operation(stripping_type, stripping_method)
     all_operations += [masking_op, stripping_op]
 
+    # Add sealing operation if selected
+    if selected_sealing_type.present?
+      sealing_op = OperationLibrary::Sealing.get_sealing_operation(selected_sealing_type)
+      all_operations << sealing_op if sealing_op
+    end
+
     results = expanded_operation_ids.map do |op_id|
       operation = all_operations.find { |op| op.id == op_id }
       if operation
         {
           id: operation.id,
           display_name: operation.display_name,
-          operation_text: operation.operation_text, # Includes interpolated time if ENP, or interpolated text for masking/stripping
+          operation_text: operation.operation_text, # Includes interpolated time if ENP, or interpolated text for masking/stripping/sealing
           vat_options_text: operation.vat_options_text,
           target_thickness: operation.target_thickness,
           process_type: operation.process_type,
@@ -154,11 +171,12 @@ class OperationsController < ApplicationController
     masking_methods = params[:masking_methods] || {}
     stripping_type = params[:stripping_type]
     stripping_method = params[:stripping_method]
+    selected_sealing_type = params[:selected_sealing_type]
 
     # Handle ENP Strip Mask operations
     expanded_operation_ids = expand_enp_strip_mask_operations(operation_ids, enp_strip_type)
 
-    # Pass all parameters for complete operation simulation
+    # Pass all parameters including sealing for complete operation simulation
     summary = PartProcessingInstruction.simulate_operations_summary(
       expanded_operation_ids,
       target_thickness,
@@ -166,7 +184,9 @@ class OperationsController < ApplicationController
       enp_strip_type,
       masking_methods,
       stripping_type,
-      stripping_method
+      stripping_method,
+      nil, # selected_alloy
+      selected_sealing_type
     )
     render json: { summary: summary }
   end
@@ -180,11 +200,12 @@ class OperationsController < ApplicationController
     stripping_type = params[:stripping_type]
     stripping_method = params[:stripping_method]
     selected_alloy = params[:selected_alloy]
+    selected_sealing_type = params[:selected_sealing_type]
 
     # Handle ENP Strip Mask operations
     expanded_operation_ids = expand_enp_strip_mask_operations(operation_ids, enp_strip_type)
 
-    # Pass all parameters including masking and stripping for complete operation simulation
+    # Pass all parameters including sealing for complete operation simulation
     operations_with_auto_ops = PartProcessingInstruction.simulate_operations_with_auto_ops(
       expanded_operation_ids,
       target_thickness,
@@ -193,7 +214,8 @@ class OperationsController < ApplicationController
       masking_methods,
       stripping_type,
       stripping_method,
-      selected_alloy
+      selected_alloy,
+      selected_sealing_type
     )
 
     render json: { operations: operations_with_auto_ops }
@@ -210,7 +232,8 @@ class OperationsController < ApplicationController
       enp_types: [],
       masking_methods: {},
       stripping_type: {},
-      stripping_method: {}
+      stripping_method: {},
+      selected_sealing_type: []
     )
   end
 

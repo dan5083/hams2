@@ -92,7 +92,7 @@ class PartProcessingInstruction < ApplicationRecord
     end.compact
   end
 
-  # Get operations with auto-inserted operations (inspections, pretreatments, jigs, rinses, etc.)
+  # Get operations with auto-inserted operations (inspections, pretreatments, jigs, rinses, sealing, etc.)
   def get_operations_with_auto_ops
     user_operations = get_operations
     return [] if user_operations.empty?
@@ -119,13 +119,13 @@ class PartProcessingInstruction < ApplicationRecord
       operations_with_auto_ops << vat_inspection_operation
     end
 
-    # 4. MODIFIED: Check if masking is present - if so, handle masking first, then inspection, then jig
+    # 4. Handle masking first, then inspection, then jig
     if has_masking
       # 4a. Add masking operation first (for anodising treatments)
       masking_operation = build_final_operation(user_operations.find { |op| op.process_type == 'masking' })
       operations_with_auto_ops << masking_operation if masking_operation
 
-      # 4b. NEW: Add masking inspection after masking
+      # 4b. Add masking inspection after masking
       if OperationLibrary::Masking.masking_inspection_required?(selected_operations)
         masking_inspection_operation = OperationLibrary::Masking.get_masking_inspection_operation
         operations_with_auto_ops << masking_inspection_operation
@@ -198,31 +198,48 @@ class PartProcessingInstruction < ApplicationRecord
       end
     end
 
-    # 7. Auto-insert unjig before ENP Strip Mask operations
+    # 7. Auto-insert sealing before unjig (if selected for anodising processes)
+    if has_anodising_operations? && selected_sealing_type.present?
+      sealing_operation = get_selected_sealing_operation
+      if sealing_operation
+        operations_with_auto_ops << sealing_operation
+
+        # Add rinse after sealing
+        if OperationLibrary::RinseOperations.operation_requires_rinse?(sealing_operation)
+          rinse_operation = OperationLibrary::RinseOperations.get_rinse_operation(
+            sealing_operation,
+            ppi_contains_electroless_nickel: has_special_requirements
+          )
+          operations_with_auto_ops << rinse_operation if rinse_operation
+        end
+      end
+    end
+
+    # 8. Auto-insert unjig before ENP Strip Mask operations
     if OperationLibrary::JigUnjig.unjigging_required?(user_operations)
       unjig_operation = OperationLibrary::JigUnjig.get_unjig_operation
       operations_with_auto_ops << unjig_operation
     end
 
-    # 7.5. Auto-insert masking removal operations before final inspection (tape/lacquer only)
+    # 8.5. Auto-insert masking removal operations before final inspection (tape/lacquer only)
     if OperationLibrary::Masking.masking_removal_required?(selected_operations, selected_masking_methods)
       masking_removal_ops = OperationLibrary::Masking.get_masking_removal_operations
       operations_with_auto_ops += masking_removal_ops
     end
 
-    # 7.75. Add ENP Strip Mask operations after unjig
+    # 8.75. Add ENP Strip Mask operations after unjig
     if has_enp_strip_mask_operations?
       enp_strip_operations = get_enp_strip_mask_operations_for_sequence
       operations_with_auto_ops += enp_strip_operations
     end
 
-    # 8. Auto-insert final inspection before pack
+    # 9. Auto-insert final inspection before pack
     if OperationLibrary::InspectFinalInspectVatInspect.final_inspection_required?(user_operations)
       final_inspection_operation = OperationLibrary::InspectFinalInspectVatInspect.get_final_inspection_operation
       operations_with_auto_ops << final_inspection_operation
     end
 
-    # 9. Auto-insert pack at the very end (always required)
+    # 10. Auto-insert pack at the very end (always required)
     if OperationLibrary::PackOperations.pack_required?(operations_with_auto_ops)
       pack_operation = OperationLibrary::PackOperations.get_pack_operation
       operations_with_auto_ops << pack_operation
@@ -254,6 +271,14 @@ class PartProcessingInstruction < ApplicationRecord
     selected_operations.any? do |op_id|
       operation = Operation.all_operations.find { |op| op.id == op_id }
       operation&.process_type == 'electroless_nickel_plating'
+    end
+  end
+
+  # Check if this PPI has anodising operations (for sealing)
+  def has_anodising_operations?
+    selected_operations.any? do |op_id|
+      operation = Operation.all_operations.find { |op| op.id == op_id }
+      operation&.process_type&.in?(['standard_anodising', 'hard_anodising', 'chromic_anodising'])
     end
   end
 
@@ -325,6 +350,21 @@ class PartProcessingInstruction < ApplicationRecord
 
   def selected_stripping_method=(method)
     operation_selection["stripping_method"] = method
+  end
+
+  # Sealing type selection for anodising processes
+  def selected_sealing_type
+    operation_selection["sealing_type"]
+  end
+
+  def selected_sealing_type=(sealing_type)
+    operation_selection["sealing_type"] = sealing_type
+  end
+
+  # Get the selected sealing operation
+  def get_selected_sealing_operation
+    return nil unless selected_sealing_type.present?
+    OperationLibrary::Sealing.get_sealing_operation(selected_sealing_type)
   end
 
   def operation_selection
@@ -400,7 +440,7 @@ class PartProcessingInstruction < ApplicationRecord
 
   # Class method for real-time simulation during PPI building
   # Returns detailed operation data for form preview (including auto-operations)
-  def self.simulate_operations_with_auto_ops(operation_ids, target_thickness = nil, selected_jig_type = nil, enp_strip_type = 'nitric', masking_methods = {}, stripping_type = nil, stripping_method = nil, selected_alloy = nil)
+  def self.simulate_operations_with_auto_ops(operation_ids, target_thickness = nil, selected_jig_type = nil, enp_strip_type = 'nitric', masking_methods = {}, stripping_type = nil, stripping_method = nil, selected_alloy = nil, selected_sealing_type = nil)
     return [] if operation_ids.blank?
 
     # Get operations with thickness for ENP interpolation
@@ -429,6 +469,12 @@ class PartProcessingInstruction < ApplicationRecord
       all_ops << OperationLibrary::Stripping.get_stripping_operation(nil, nil)
     end
 
+    # Add sealing operations if needed
+    if selected_sealing_type.present?
+      sealing_op = OperationLibrary::Sealing.get_sealing_operation(selected_sealing_type)
+      all_ops << sealing_op if sealing_op
+    end
+
     # Expand ENP Strip Mask operations and filter to selected ones
     expanded_operation_ids = expand_enp_strip_mask_operations(operation_ids, enp_strip_type)
     user_operations = expanded_operation_ids.map do |op_id|
@@ -441,6 +487,7 @@ class PartProcessingInstruction < ApplicationRecord
     has_special_requirements = user_operations.any? { |op| op.process_type == 'electroless_nickel_plating' }
     has_enp_strip_mask = user_operations.any? { |op| ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type) }
     has_masking = operation_ids.include?('MASKING')
+    has_anodising = user_operations.any? { |op| op.process_type.in?(['standard_anodising', 'hard_anodising', 'chromic_anodising']) }
 
     # 1. Contract review
     if OperationLibrary::ContractReviewOperations.contract_review_required?(user_operations)
@@ -475,7 +522,7 @@ class PartProcessingInstruction < ApplicationRecord
       }
     end
 
-    # 4. MODIFIED: Handle masking first, then inspection, then jig if masking is present
+    # 4. Handle masking first, then inspection, then jig if masking is present
     if has_masking
       # 4a. Add masking operation first
       masking_operation = user_operations.find { |op| op.process_type == 'masking' }
@@ -489,7 +536,7 @@ class PartProcessingInstruction < ApplicationRecord
         }
       end
 
-      # 4b. NEW: Add masking inspection after masking
+      # 4b. Add masking inspection after masking
       if OperationLibrary::Masking.masking_inspection_required?(expanded_operation_ids)
         masking_inspection_operation = OperationLibrary::Masking.get_masking_inspection_operation
         operations_with_auto_ops << {
@@ -623,7 +670,36 @@ class PartProcessingInstruction < ApplicationRecord
       end
     end
 
-    # 7. Unjig
+    # 7. Sealing (before unjig, only for anodising operations)
+    if has_anodising && selected_sealing_type.present?
+      sealing_operation = OperationLibrary::Sealing.get_sealing_operation(selected_sealing_type)
+      if sealing_operation
+        operations_with_auto_ops << {
+          id: sealing_operation.id,
+          display_name: sealing_operation.display_name,
+          operation_text: sealing_operation.operation_text,
+          auto_inserted: false
+        }
+
+        # Add rinse after sealing
+        if OperationLibrary::RinseOperations.operation_requires_rinse?(sealing_operation)
+          rinse_operation = OperationLibrary::RinseOperations.get_rinse_operation(
+            sealing_operation,
+            ppi_contains_electroless_nickel: has_special_requirements
+          )
+          if rinse_operation
+            operations_with_auto_ops << {
+              id: rinse_operation.id,
+              display_name: rinse_operation.display_name,
+              operation_text: rinse_operation.operation_text,
+              auto_inserted: true
+            }
+          end
+        end
+      end
+    end
+
+    # 8. Unjig
     if OperationLibrary::JigUnjig.unjigging_required?(user_operations)
       unjig_operation = OperationLibrary::JigUnjig.get_unjig_operation
       operations_with_auto_ops << {
@@ -634,7 +710,7 @@ class PartProcessingInstruction < ApplicationRecord
       }
     end
 
-    # 7.5. Masking removal operations (tape/lacquer only)
+    # 8.5. Masking removal operations (tape/lacquer only)
     if OperationLibrary::Masking.masking_removal_required?(expanded_operation_ids, masking_methods)
       masking_removal_ops = OperationLibrary::Masking.get_masking_removal_operations
       masking_removal_ops.each do |masking_removal_op|
@@ -647,7 +723,7 @@ class PartProcessingInstruction < ApplicationRecord
       end
     end
 
-    # 7.75. ENP Strip Mask operations
+    # 8.75. ENP Strip Mask operations
     if has_enp_strip_mask
       enp_strip_operations.each do |enp_strip_op|
         operations_with_auto_ops << {
@@ -659,7 +735,7 @@ class PartProcessingInstruction < ApplicationRecord
       end
     end
 
-    # 8. Final inspection
+    # 9. Final inspection
     if OperationLibrary::InspectFinalInspectVatInspect.final_inspection_required?(user_operations)
       final_inspection_operation = OperationLibrary::InspectFinalInspectVatInspect.get_final_inspection_operation
       operations_with_auto_ops << {
@@ -670,7 +746,7 @@ class PartProcessingInstruction < ApplicationRecord
       }
     end
 
-    # 9. Pack
+    # 10. Pack
     if OperationLibrary::PackOperations.pack_required?(operations_with_auto_ops.map { |op| OpenStruct.new(process_type: op[:id] == 'PACK' ? 'pack' : 'other') })
       pack_operation = OperationLibrary::PackOperations.get_pack_operation
       operations_with_auto_ops << {
@@ -684,9 +760,9 @@ class PartProcessingInstruction < ApplicationRecord
     operations_with_auto_ops
   end
 
-  # Update simulation summary to accept new parameters
-  def self.simulate_operations_summary(operation_ids, target_thickness = nil, selected_jig_type = nil, enp_strip_type = 'nitric', masking_methods = {}, stripping_type = nil, stripping_method = nil, selected_alloy = nil)
-    operations_with_auto_ops = simulate_operations_with_auto_ops(operation_ids, target_thickness, selected_jig_type, enp_strip_type, masking_methods, stripping_type, stripping_method, selected_alloy)
+  # Update simulation summary to accept sealing parameter
+  def self.simulate_operations_summary(operation_ids, target_thickness = nil, selected_jig_type = nil, enp_strip_type = 'nitric', masking_methods = {}, stripping_type = nil, stripping_method = nil, selected_alloy = nil, selected_sealing_type = nil)
+    operations_with_auto_ops = simulate_operations_with_auto_ops(operation_ids, target_thickness, selected_jig_type, enp_strip_type, masking_methods, stripping_type, stripping_method, selected_alloy, selected_sealing_type)
     return "No operations selected" if operations_with_auto_ops.empty?
 
     operations_with_auto_ops.map { |op| op[:display_name] }.join(" → ")
@@ -782,6 +858,11 @@ class PartProcessingInstruction < ApplicationRecord
 
     # Add masking and stripping operation IDs
     all_op_ids += ['MASKING', 'STRIPPING']
+
+    # Add sealing operation IDs
+    if defined?(OperationLibrary::Sealing)
+      all_op_ids += OperationLibrary::Sealing.operations.map(&:id)
+    end
 
     invalid_ids = selected_operations - all_op_ids
     if invalid_ids.any?

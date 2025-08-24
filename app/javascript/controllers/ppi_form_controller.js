@@ -41,6 +41,7 @@ export default class extends Controller {
     this.strippingType = null // Store selected stripping type
     this.strippingMethod = null // Store selected stripping method
     this.selectedENPAlloy = null // Store selected ENP alloy for pretreatments
+    this.selectedSealingType = null // Store selected sealing type for anodising processes
 
     this.initializeExistingData()
     this.setupTreatmentButtons()
@@ -571,6 +572,10 @@ export default class extends Controller {
             </select>
           </div>
         </div>
+
+        <!-- Sealing Selection for Anodising Processes -->
+        ${this.generateSealingSelectionHTML(treatment)}
+
         <div class="mt-4">
           <h5 class="text-sm font-medium text-gray-700 mb-2">Available Operations</h5>
           <div class="operations-list-${index} space-y-1 max-h-32 overflow-y-auto border border-gray-200 rounded p-2 bg-gray-50">
@@ -594,6 +599,13 @@ export default class extends Controller {
           this.selectedENPAlloy = e.target.value
           console.log('ENP Alloy selected:', this.selectedENPAlloy)
           // Update preview when alloy changes (affects pretreatments)
+          this.updateSelectedOperations()
+        }
+        // Special handling for sealing selection
+        else if (e.target.classList.contains('sealing-select')) {
+          this.selectedSealingType = e.target.value
+          console.log('Sealing type selected:', this.selectedSealingType)
+          // Update preview when sealing changes
           this.updateSelectedOperations()
         }
         this.filterOperationsForTreatment(e)
@@ -779,7 +791,30 @@ export default class extends Controller {
     }
   }
 
-  // Utility method to format treatment names
+  // Generate sealing selection HTML for anodising processes
+  generateSealingSelectionHTML(treatment) {
+    const anodisingProcesses = ['standard_anodising', 'hard_anodising', 'chromic_anodising']
+
+    if (!anodisingProcesses.includes(treatment)) {
+      return '' // No sealing for non-anodising processes
+    }
+
+    return `
+      <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+        <h5 class="text-sm font-medium text-blue-800 mb-2">Sealing Selection (Optional)</h5>
+        <select class="sealing-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" data-treatment="${treatment}">
+          <option value="">No sealing</option>
+          <option value="HOT_SEAL">Hot Seal</option>
+          <option value="SODIUM_DICHROMATE_SEAL">Sodium Dichromate Seal</option>
+          <option value="OXIDITE_SECO_SEAL">Oxidite SE-CO Seal</option>
+          <option value="HOT_WATER_DIP">Hot Water Dip</option>
+          <option value="SURTEC_650V_SEAL">SurTec 650V Seal</option>
+          <option value="DEIONISED_WATER_SEAL">Deionised Water Seal</option>
+        </select>
+        <p class="text-xs text-blue-600 mt-1">Sealing will be auto-inserted before unjig operation</p>
+      </div>
+    `
+  }
   formatTreatmentName(treatment) {
     return treatment
       .replace('_anodising', '')
@@ -1130,6 +1165,11 @@ export default class extends Controller {
         requestData.selected_alloy = this.selectedENPAlloy
       }
 
+      // Add selected sealing type for anodising operations
+      if (this.selectedSealingType) {
+        requestData.selected_sealing_type = this.selectedSealingType
+      }
+
       const response = await fetch(this.previewPathValue, {
         method: 'POST',
         headers: {
@@ -1147,6 +1187,7 @@ export default class extends Controller {
         const isENPStripMask = ['ENP_MASK', 'ENP_MASKING_CHECK', 'ENP_STRIP_NITRIC', 'ENP_STRIP_METEX', 'ENP_STRIP_MASKING', 'ENP_MASKING_CHECK_FINAL'].includes(op.id)
         const isMasking = op.id === 'MASKING'
         const isStripping = op.id === 'STRIPPING'
+        const isSealing = ['SODIUM_DICHROMATE_SEAL', 'OXIDITE_SECO_SEAL', 'HOT_WATER_DIP', 'HOT_SEAL', 'SURTEC_650V_SEAL', 'DEIONISED_WATER_SEAL'].includes(op.id)
         const isPretreatment = op.id && (
           op.id.startsWith('DEOX_') ||
           op.id.startsWith('FERROUS_') ||
@@ -1188,6 +1229,10 @@ export default class extends Controller {
           bgColor = 'bg-red-100 border border-red-300'
           textColor = 'text-gray-900'
           removeButton = `<button type="button" class="text-red-600 hover:text-red-800 ml-2" data-action="click->ppi-form#removeOperation" data-ppi-form-operation-id-param="${op.id}">×</button>`
+        } else if (isSealing) {
+          bgColor = 'bg-purple-100 border border-purple-300'
+          textColor = 'text-gray-900'
+          removeButton = '' // Sealing is managed through dropdown, not removable directly
         } else {
           bgColor = 'bg-blue-100 border border-blue-300'
           textColor = 'text-gray-900'
@@ -1198,7 +1243,8 @@ export default class extends Controller {
           (isPretreatment ? '<span class="text-xs text-yellow-600 ml-2">(pretreatment)</span>' : '<span class="text-xs text-gray-500 ml-2">(auto-inserted)</span>') :
           isENPStripMask ? '<span class="text-xs text-pink-600 ml-2">(ENP strip/mask)</span>' :
           isMasking ? '<span class="text-xs text-teal-600 ml-2">(masking)</span>' :
-          isStripping ? '<span class="text-xs text-red-600 ml-2">(stripping)</span>' : ''
+          isStripping ? '<span class="text-xs text-red-600 ml-2">(stripping)</span>' :
+          isSealing ? '<span class="text-xs text-purple-600 ml-2">(sealing)</span>' : ''
 
         return `
           <div class="${bgColor} rounded px-3 py-2 flex justify-between items-center" data-operation-id="${op.id}">
