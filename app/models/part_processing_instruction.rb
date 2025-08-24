@@ -92,7 +92,7 @@ class PartProcessingInstruction < ApplicationRecord
     end.compact
   end
 
-  # Get operations with auto-inserted operations (inspections, jigs, rinses, etc.)
+  # Get operations with auto-inserted operations (inspections, pretreatments, jigs, rinses, etc.)
   def get_operations_with_auto_ops
     user_operations = get_operations
     return [] if user_operations.empty?
@@ -113,10 +113,17 @@ class PartProcessingInstruction < ApplicationRecord
       operations_with_auto_ops << incoming_inspection_operation
     end
 
-    # 3. Auto-insert VAT inspection before degrease
+    # 3. Auto-insert VAT inspection before pretreatments
     if OperationLibrary::InspectFinalInspectVatInspect.vat_inspection_required?(user_operations)
       vat_inspection_operation = OperationLibrary::InspectFinalInspectVatInspect.get_vat_inspection_operation
       operations_with_auto_ops << vat_inspection_operation
+    end
+
+    # 3.5. Auto-insert pretreatments after VAT inspection
+    if defined?(OperationLibrary::Pretreatments) && OperationLibrary::Pretreatments.pretreatment_required?(user_operations)
+      selected_alloy = get_selected_enp_alloy # Get the selected alloy for ENP
+      pretreatment_operations = OperationLibrary::Pretreatments.get_pretreatment_sequence(user_operations, selected_alloy)
+      operations_with_auto_ops += pretreatment_operations
     end
 
     # 4. MODIFIED: Check if masking is present - if so, handle masking first, then inspection, then jig
@@ -251,6 +258,16 @@ class PartProcessingInstruction < ApplicationRecord
     operation_selection["selected_jig_type"]
   end
 
+  # Get the selected ENP alloy for pretreatments
+  def get_selected_enp_alloy
+    operation_selection["selected_enp_alloy"]
+  end
+
+  # Set the selected ENP alloy
+  def selected_enp_alloy=(alloy)
+    operation_selection["selected_enp_alloy"] = alloy
+  end
+
   # Get the selected ENP strip type
   def selected_enp_strip_type
     operation_selection["enp_strip_type"] || 'nitric'
@@ -362,7 +379,7 @@ class PartProcessingInstruction < ApplicationRecord
 
   # Class method for real-time simulation during PPI building
   # Returns detailed operation data for form preview (including auto-operations)
-  def self.simulate_operations_with_auto_ops(operation_ids, target_thickness = nil, selected_jig_type = nil, enp_strip_type = 'nitric', masking_methods = {}, stripping_type = nil, stripping_method = nil)
+  def self.simulate_operations_with_auto_ops(operation_ids, target_thickness = nil, selected_jig_type = nil, enp_strip_type = 'nitric', masking_methods = {}, stripping_type = nil, stripping_method = nil, selected_alloy = nil)
     return [] if operation_ids.blank?
 
     # Get operations with thickness for ENP interpolation
@@ -435,6 +452,20 @@ class PartProcessingInstruction < ApplicationRecord
         operation_text: vat_inspection_operation.operation_text,
         auto_inserted: true
       }
+    end
+
+    # 3.5. Pretreatments (after VAT inspection, before jigging)
+    if defined?(OperationLibrary::Pretreatments) && OperationLibrary::Pretreatments.pretreatment_required?(user_operations)
+      pretreatment_operations = OperationLibrary::Pretreatments.get_pretreatment_sequence(user_operations, selected_alloy)
+
+      pretreatment_operations.each do |pretreat_op|
+        operations_with_auto_ops << {
+          id: pretreat_op.id,
+          display_name: pretreat_op.respond_to?(:display_name) ? pretreat_op.display_name : pretreat_op.id.humanize,
+          operation_text: pretreat_op.operation_text,
+          auto_inserted: true
+        }
+      end
     end
 
     # 4. MODIFIED: Handle masking first, then inspection, then jig if masking is present
@@ -601,8 +632,8 @@ class PartProcessingInstruction < ApplicationRecord
   end
 
   # Update simulation summary to accept new parameters
-  def self.simulate_operations_summary(operation_ids, target_thickness = nil, selected_jig_type = nil, enp_strip_type = 'nitric', masking_methods = {}, stripping_type = nil, stripping_method = nil)
-    operations_with_auto_ops = simulate_operations_with_auto_ops(operation_ids, target_thickness, selected_jig_type, enp_strip_type, masking_methods, stripping_type, stripping_method)
+  def self.simulate_operations_summary(operation_ids, target_thickness = nil, selected_jig_type = nil, enp_strip_type = 'nitric', masking_methods = {}, stripping_type = nil, stripping_method = nil, selected_alloy = nil)
+    operations_with_auto_ops = simulate_operations_with_auto_ops(operation_ids, target_thickness, selected_jig_type, enp_strip_type, masking_methods, stripping_type, stripping_method, selected_alloy)
     return "No operations selected" if operations_with_auto_ops.empty?
 
     operations_with_auto_ops.map { |op| op[:display_name] }.join(" → ")

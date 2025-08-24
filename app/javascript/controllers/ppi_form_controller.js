@@ -40,6 +40,7 @@ export default class extends Controller {
     this.maskingMethods = {} // Store masking method => location pairs
     this.strippingType = null // Store selected stripping type
     this.strippingMethod = null // Store selected stripping method
+    this.selectedENPAlloy = null // Store selected ENP alloy for pretreatments
 
     this.initializeExistingData()
     this.setupTreatmentButtons()
@@ -490,9 +491,12 @@ export default class extends Controller {
               <option value="copper">Copper</option>
               <option value="brass">Brass</option>
               <option value="2000_series_alloys">2000 Series Alloys</option>
+              <option value="stainless_steel_with_oxides">Stainless Steel with Oxides</option>
+              <option value="copper_sans_electrical_contact">Copper (Sans Electrical Contact)</option>
               <option value="cast_aluminium_william_cope">Cast Aluminium (William Cope)</option>
               <option value="mclaren_sta142_procedure_d">McLaren STA142 Procedure D</option>
             </select>
+            <p class="text-xs text-gray-500 mt-1">Required for pretreatment selection</p>
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">ENP Type</label>
@@ -584,7 +588,16 @@ export default class extends Controller {
     const allCheckboxes = this.treatmentCriteriaContainerTarget.querySelectorAll('.masking-method-checkbox')
 
     allSelects.forEach(select => {
-      select.addEventListener('change', (e) => this.filterOperationsForTreatment(e))
+      select.addEventListener('change', (e) => {
+        // Special handling for ENP alloy selection
+        if (e.target.classList.contains('alloy-select') && e.target.dataset.treatment === 'electroless_nickel_plating') {
+          this.selectedENPAlloy = e.target.value
+          console.log('ENP Alloy selected:', this.selectedENPAlloy)
+          // Update preview when alloy changes (affects pretreatments)
+          this.updateSelectedOperations()
+        }
+        this.filterOperationsForTreatment(e)
+      })
     })
 
     allInputs.forEach(input => {
@@ -1112,6 +1125,11 @@ export default class extends Controller {
         requestData.stripping_method = this.strippingMethod
       }
 
+      // Add selected ENP alloy for pretreatments
+      if (this.selectedENPAlloy) {
+        requestData.selected_alloy = this.selectedENPAlloy
+      }
+
       const response = await fetch(this.previewPathValue, {
         method: 'POST',
         headers: {
@@ -1129,12 +1147,18 @@ export default class extends Controller {
         const isENPStripMask = ['ENP_MASK', 'ENP_MASKING_CHECK', 'ENP_STRIP_NITRIC', 'ENP_STRIP_METEX', 'ENP_STRIP_MASKING', 'ENP_MASKING_CHECK_FINAL'].includes(op.id)
         const isMasking = op.id === 'MASKING'
         const isStripping = op.id === 'STRIPPING'
+        const isPretreatment = op.id && (op.id.startsWith('DEOX_') || op.id.startsWith('FERROUS_') || op.id.startsWith('ELECTROCLEAN_') || op.id.startsWith('ACTIVATE_') || op.id.startsWith('WOODS_') || op.id.startsWith('ALUMINIUM_') || op.id.startsWith('DESMUT_') || op.id.startsWith('ALUMON_') || op.id.startsWith('ZINCATE_') || op.id.startsWith('ETCH_') || op.id.startsWith('PICKLING_') || op.id.startsWith('ACID_') || op.id.startsWith('MICROETCH_') || op.id === 'RO_RINSE_PRETREATMENT')
 
         let bgColor, textColor, removeButton
 
         if (isAutoInserted) {
-          bgColor = 'bg-gray-100 border border-gray-300'
-          textColor = 'italic text-gray-600'
+          if (isPretreatment) {
+            bgColor = 'bg-yellow-100 border border-yellow-300'
+            textColor = 'italic text-gray-700'
+          } else {
+            bgColor = 'bg-gray-100 border border-gray-300'
+            textColor = 'italic text-gray-600'
+          }
           removeButton = ''
         } else if (isENPStripMask) {
           bgColor = 'bg-pink-100 border border-pink-300'
@@ -1154,10 +1178,11 @@ export default class extends Controller {
           removeButton = `<button type="button" class="text-red-600 hover:text-red-800 ml-2" data-action="click->ppi-form#removeOperation" data-ppi-form-operation-id-param="${op.id}">×</button>`
         }
 
-        const autoLabel = isAutoInserted ? '<span class="text-xs text-gray-500 ml-2">(auto-inserted)</span>' :
-                          isENPStripMask ? '<span class="text-xs text-pink-600 ml-2">(ENP strip/mask)</span>' :
-                          isMasking ? '<span class="text-xs text-teal-600 ml-2">(masking)</span>' :
-                          isStripping ? '<span class="text-xs text-red-600 ml-2">(stripping)</span>' : ''
+        const autoLabel = isAutoInserted ?
+          (isPretreatment ? '<span class="text-xs text-yellow-600 ml-2">(pretreatment)</span>' : '<span class="text-xs text-gray-500 ml-2">(auto-inserted)</span>') :
+          isENPStripMask ? '<span class="text-xs text-pink-600 ml-2">(ENP strip/mask)</span>' :
+          isMasking ? '<span class="text-xs text-teal-600 ml-2">(masking)</span>' :
+          isStripping ? '<span class="text-xs text-red-600 ml-2">(stripping)</span>' : ''
 
         return `
           <div class="${bgColor} rounded px-3 py-2 flex justify-between items-center" data-operation-id="${op.id}">

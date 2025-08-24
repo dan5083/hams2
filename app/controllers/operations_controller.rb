@@ -179,6 +179,7 @@ class OperationsController < ApplicationController
     masking_methods = params[:masking_methods] || {}
     stripping_type = params[:stripping_type]
     stripping_method = params[:stripping_method]
+    selected_alloy = params[:selected_alloy]
 
     # Handle ENP Strip Mask operations
     expanded_operation_ids = expand_enp_strip_mask_operations(operation_ids, enp_strip_type)
@@ -191,7 +192,8 @@ class OperationsController < ApplicationController
       enp_strip_type,
       masking_methods,
       stripping_type,
-      stripping_method
+      stripping_method,
+      selected_alloy
     )
 
     render json: { operations: operations_with_auto_ops }
