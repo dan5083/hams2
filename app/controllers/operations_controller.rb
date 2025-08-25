@@ -113,20 +113,17 @@ class OperationsController < ApplicationController
     treatments_data = params[:treatments_data] || []
     selected_jig_type = params[:selected_jig_type]
     selected_alloy = params[:selected_alloy]
+    selected_operations = params[:selected_operations] || []
+    enp_strip_type = params[:enp_strip_type] || 'nitric'
 
-    # Get operations using the treatment cycle system
+    # Get operations using the treatment cycle system with ENP Strip/Mask data
     operations_with_auto_ops = PartProcessingInstruction.simulate_operations_with_auto_ops(
       treatments_data,
       selected_jig_type,
-      selected_alloy
+      selected_alloy,
+      selected_operations,
+      enp_strip_type
     )
-
-    # Add ENP Strip Mask operations if selected
-    if params[:selected_operations].present?
-      enp_strip_operations = handle_enp_strip_mask_operations(params[:selected_operations], params[:enp_strip_type])
-      # ENP Strip Mask should be inserted BEFORE final ops, not after
-      # We'll handle this in the PPI model instead
-    end
 
     render json: { operations: operations_with_auto_ops }
   end

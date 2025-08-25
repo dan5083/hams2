@@ -119,14 +119,16 @@ class PartProcessingInstruction < ApplicationRecord
   end
 
   # FIXED: Class method for frontend preview with correct ordering
-  def self.simulate_operations_with_auto_ops(treatments_data, selected_jig_type = nil, selected_alloy = nil)
+  def self.simulate_operations_with_auto_ops(treatments_data, selected_jig_type = nil, selected_alloy = nil, selected_operations = nil, enp_strip_type = 'nitric')
     return [] if treatments_data.blank?
 
     mock_ppi = new
     mock_ppi.customisation_data = {
       "operation_selection" => {
         "treatments" => treatments_data,
-        "selected_jig_type" => selected_jig_type
+        "selected_jig_type" => selected_jig_type,
+        "selected_operations" => selected_operations || [],
+        "enp_strip_type" => enp_strip_type
       }
     }
 
@@ -141,7 +143,7 @@ class PartProcessingInstruction < ApplicationRecord
     end
   end
 
-  # ENP Strip Mask (unchanged)
+  # ENP Strip Mask - check if selected operations include ENP strip/mask ops
   def has_enp_strip_mask_operations?
     enp_ids = ['ENP_MASK', 'ENP_MASKING_CHECK', 'ENP_STRIP_NITRIC', 'ENP_STRIP_METEX', 'ENP_STRIP_MASKING', 'ENP_MASKING_CHECK_FINAL']
     (operation_selection["selected_operations"] || []).any? { |id| enp_ids.include?(id) }
