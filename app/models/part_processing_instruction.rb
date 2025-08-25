@@ -73,7 +73,10 @@ class PartProcessingInstruction < ApplicationRecord
   # Get treatments from nested structure
   def get_treatments
     treatments_data = operation_selection["treatments"] || []
-    all_operations = Operation.all_operations
+
+    # Get operations with target thickness for ENP time interpolation
+    target_thickness = get_enp_target_thickness_from_treatments(treatments_data)
+    all_operations = Operation.all_operations(target_thickness)
 
     treatments_data.map do |data|
       operation = all_operations.find { |op| op.id == data["operation_id"] }
@@ -326,5 +329,13 @@ class PartProcessingInstruction < ApplicationRecord
 
   def disable_replaced_ppi
     replaces&.disable! if replaces_id.present?
+  end
+
+  private
+
+  # Helper method to extract ENP target thickness from treatments data for operation interpolation
+  def get_enp_target_thickness_from_treatments(treatments_data)
+    enp_treatment = treatments_data.find { |t| t["type"] == "electroless_nickel_plating" && t["target_thickness"] }
+    enp_treatment&.dig("target_thickness")&.to_f
   end
 end

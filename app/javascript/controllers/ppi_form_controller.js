@@ -119,6 +119,7 @@ export default class extends Controller {
       type: treatmentType,
       operation_id: null,
       selected_alloy: null, // For ENP treatments
+      target_thickness: null, // For ENP treatments
       masking: {
         enabled: false,
         methods: {}
@@ -281,14 +282,7 @@ export default class extends Controller {
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Target Thickness (μm)</label>
-          <input type="number" class="thickness-input mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" data-treatment-id="${treatment.id}" placeholder="e.g., 25" min="1" max="100">
-        </div>
-      </div>
-
-      <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
-        <h6 class="text-sm font-medium text-blue-800 mb-1">Plating Time Estimate</h6>
-        <div class="plating-time-estimate text-sm text-blue-700" data-treatment-id="${treatment.id}">
-          Enter thickness and select ENP type above to see time estimate
+          <input type="number" class="thickness-input mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" data-treatment-id="${treatment.id}" placeholder="e.g., 25" min="1" max="100" value="${treatment.target_thickness || ''}">
         </div>
       </div>
     `
@@ -465,17 +459,18 @@ export default class extends Controller {
       console.log(`Updated ENP alloy for treatment ${treatmentId}:`, treatment.selected_alloy)
     }
 
+    // Store thickness for ENP treatments
+    if (event.target.classList.contains('thickness-input') && treatment.type === 'electroless_nickel_plating') {
+      treatment.target_thickness = parseFloat(event.target.value) || null
+      console.log(`Updated ENP thickness for treatment ${treatmentId}:`, treatment.target_thickness)
+    }
+
     // Update treatment data based on the changed element
     if (event.target.classList.contains('alloy-select') ||
         event.target.classList.contains('thickness-select') ||
         event.target.classList.contains('thickness-input') ||
         event.target.classList.contains('anodic-select') ||
         event.target.classList.contains('enp-type-select')) {
-
-      // For ENP, also update time calculation
-      if (treatment.type === 'electroless_nickel_plating') {
-        this.calculateENPPlatingTime(treatmentId)
-      }
 
       this.loadOperationsForTreatment(treatmentId)
     }
@@ -691,7 +686,12 @@ export default class extends Controller {
 
       if (alloySelect?.value) criteria.alloys = [alloySelect.value]
       if (enpTypeSelect?.value) criteria.enp_types = [enpTypeSelect.value]
-      if (thicknessInput?.value) criteria.target_thicknesses = [parseFloat(thicknessInput.value)]
+      if (thicknessInput?.value) {
+        const thickness = parseFloat(thicknessInput.value)
+        criteria.target_thicknesses = [thickness]
+        // Store thickness in treatment for server-side time calculation
+        treatment.target_thickness = thickness
+      }
     } else if (treatment.type !== 'chemical_conversion') {
       const alloySelect = card.querySelector('.alloy-select')
       const thicknessSelect = card.querySelector('.thickness-select')
@@ -743,13 +743,21 @@ export default class extends Controller {
     console.log(`Selecting operation ${operationId} for treatment ${treatmentId}`)
     treatment.operation_id = operationId
 
-    // For ENP treatments, also store the selected alloy if not already stored
+    // For ENP treatments, also store the selected alloy and thickness if not already stored
     if (treatment.type === 'electroless_nickel_plating') {
       const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
       const alloySelect = card.querySelector('.alloy-select')
+      const thicknessInput = card.querySelector('.thickness-input')
+
       if (alloySelect && alloySelect.value && !treatment.selected_alloy) {
         treatment.selected_alloy = alloySelect.value
         console.log(`Stored ENP alloy for treatment ${treatmentId}:`, treatment.selected_alloy)
+      }
+
+      // Store thickness for server-side time calculation
+      if (thicknessInput && thicknessInput.value) {
+        treatment.target_thickness = parseFloat(thicknessInput.value)
+        console.log(`Stored ENP thickness for treatment ${treatmentId}:`, treatment.target_thickness)
       }
     }
 
@@ -971,70 +979,5 @@ export default class extends Controller {
       .split('_')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ')
-  }
-
-  // Calculate ENP plating time
-  calculateENPPlatingTime(treatmentId) {
-    const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
-    if (!card) return
-
-    const thicknessInput = card.querySelector('.thickness-input')
-    const enpTypeSelect = card.querySelector('.enp-type-select')
-    const timeEstimateDiv = card.querySelector('.plating-time-estimate')
-
-    if (!thicknessInput || !timeEstimateDiv || !enpTypeSelect) return
-
-    const thickness = parseFloat(thicknessInput.value)
-    const enpType = enpTypeSelect.value
-
-    if (thickness && thickness > 0 && enpType) {
-      const timeData = this.getENPTimeData(enpType)
-      const { minTimeHours, maxTimeHours, avgTimeHours } = this.calculateTimeRange(thickness, timeData)
-
-      timeEstimateDiv.innerHTML = `
-        <div class="space-y-1">
-          <div><strong>${timeData.typeName}</strong></div>
-          <div>Time range: <strong>${this.formatTime(minTimeHours)} - ${this.formatTime(maxTimeHours)}</strong></div>
-          <div>Average: <strong>${this.formatTime(avgTimeHours)}</strong></div>
-          <div class="text-xs text-blue-600">Rate: ${timeData.minRate}-${timeData.maxRate} μm/hour at 82-91°C</div>
-        </div>
-      `
-    } else if (thickness && thickness > 0) {
-      timeEstimateDiv.innerHTML = 'Select ENP type above for accurate time estimate'
-    } else {
-      timeEstimateDiv.innerHTML = 'Enter thickness and select ENP type for time estimate'
-    }
-  }
-
-  // Get ENP deposition rates by type
-  getENPTimeData(enpType) {
-    const rates = {
-      'high_phosphorous': { minRate: 12.0, maxRate: 14.1, typeName: 'High Phos (Vandalloy 4100)' },
-      'medium_phosphorous': { minRate: 13.3, maxRate: 17.1, typeName: 'Medium Phos (Nicklad 767)' },
-      'low_phosphorous': { minRate: 6.8, maxRate: 18.2, typeName: 'Low Phos (Nicklad ELV 824)' },
-      'ptfe_composite': { minRate: 5.0, maxRate: 11.0, typeName: 'PTFE Composite (Nicklad Ice)' }
-    }
-    return rates[enpType] || { minRate: 12.0, maxRate: 15.0, typeName: 'General ENP' }
-  }
-
-  // Calculate time range from thickness and rates
-  calculateTimeRange(thickness, timeData) {
-    const minTimeHours = thickness / timeData.maxRate
-    const maxTimeHours = thickness / timeData.minRate
-    const avgTimeHours = (minTimeHours + maxTimeHours) / 2
-    return { minTimeHours, maxTimeHours, avgTimeHours }
-  }
-
-  // Format time display
-  formatTime(hours) {
-    if (hours < 1) {
-      return `${Math.round(hours * 60)} min`
-    } else if (hours < 2) {
-      const h = Math.floor(hours)
-      const m = Math.round((hours - h) * 60)
-      return `${h}h ${m}m`
-    } else {
-      return `${hours.toFixed(1)}h`
-    }
   }
 }
