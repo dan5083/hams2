@@ -14762,3 +14762,72 @@ Completed 200 OK in 79ms (Views: 50.7ms | ActiveRecord: 2.2ms (4 queries, 0 cach
 
 [dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
 [dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+Started GET "/release_notes" for 127.0.0.1 at 2025-08-25 10:22:06 +0100
+  [1m[36mActiveRecord::SchemaMigration Load (4.2ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+Processing by ReleaseNotesController#index as HTML
+Started GET "/service-worker" for 127.0.0.1 at 2025-08-25 10:22:06 +0100
+Processing by Rails::PwaController#service_worker as */*
+  Rendering pwa/service-worker.js
+  Rendered pwa/service-worker.js (Duration: 6.5ms | GC: 0.0ms)
+Completed 200 OK in 52ms (Views: 36.8ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+  [1m[36mSession Load (6.3ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '6ec4d8a1-a4b9-4a6a-acc5-3b330f8088c4' LIMIT 1 /*action='index',application='Hams2',controller='release_notes'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+  Rendering layout layouts/application.html.erb
+  Rendering release_notes/index.html.erb within layouts/application
+  [1m[36mOrganization Load (11.5ms)[0m  [1m[34mSELECT "organizations".* FROM "organizations" WHERE "organizations"."is_customer" = TRUE AND "organizations"."enabled" = TRUE ORDER BY "organizations"."name" ASC /*action='index',application='Hams2',controller='release_notes'*/[0m
+  ↳ app/views/release_notes/index.html.erb:24:in `map'
+  [1m[36mReleaseNote Load (33.2ms)[0m  [1m[34mSELECT "release_notes".* FROM "release_notes" ORDER BY "release_notes"."number" DESC /*action='index',application='Hams2',controller='release_notes'*/[0m
+  ↳ app/views/release_notes/index.html.erb:82
+  [1m[36mReleaseNote Count (2.9ms)[0m  [1m[34mSELECT COUNT(*) FROM "release_notes" /*action='index',application='Hams2',controller='release_notes'*/[0m
+  ↳ app/views/release_notes/index.html.erb:154
+  [1m[36mReleaseNote Count (4.0ms)[0m  [1m[34mSELECT COUNT(*) FROM "release_notes" LEFT OUTER JOIN "invoice_items" ON "invoice_items"."release_note_id" = "release_notes"."id" WHERE "invoice_items"."id" IS NULL AND "release_notes"."voided" = FALSE AND (quantity_accepted > 0) AND "release_notes"."no_invoice" != TRUE /*action='index',application='Hams2',controller='release_notes'*/[0m
+  ↳ app/views/release_notes/index.html.erb:159
+  [1m[36mReleaseNote Count (0.8ms)[0m  [1m[34mSELECT COUNT(*) FROM "release_notes" INNER JOIN "invoice_items" ON "invoice_items"."release_note_id" = "release_notes"."id" /*action='index',application='Hams2',controller='release_notes'*/[0m
+  ↳ app/views/release_notes/index.html.erb:165
+  [1m[36mReleaseNote Count (0.6ms)[0m  [1m[34mSELECT COUNT(*) FROM "release_notes" WHERE "release_notes"."voided" = TRUE /*action='index',application='Hams2',controller='release_notes'*/[0m
+  ↳ app/views/release_notes/index.html.erb:171
+  Rendered release_notes/index.html.erb within layouts/application (Duration: 232.2ms | GC: 0.0ms)
+  [1m[36mUser Load (5.6ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."id" = '52d38d4d-3b20-4e3c-a6e7-b579d9dc53e5' LIMIT 1 /*action='index',application='Hams2',controller='release_notes'*/[0m
+  ↳ app/models/current.rb:3:in `user'
+  Rendered shared/_navbar.html.erb (Duration: 34.7ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 303.3ms | GC: 0.0ms)
+Completed 200 OK in 705ms (Views: 235.5ms | ActiveRecord: 177.9ms (8 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/release_notes" for 127.0.0.1 at 2025-08-25 10:22:06 +0100
+Processing by ReleaseNotesController#index as HTML
+  [1m[36mSession Load (0.4ms)[0m  [1m[34mSELECT "sessions".* FROM "sessions" WHERE "sessions"."id" = '6ec4d8a1-a4b9-4a6a-acc5-3b330f8088c4' LIMIT 1 /*action='index',application='Hams2',controller='release_notes'*/[0m
+  ↳ app/controllers/concerns/authentication.rb:29:in `find_session_by_cookie'
+  Rendering layout layouts/application.html.erb
+  Rendering release_notes/index.html.erb within layouts/application
+  [1m[36mOrganization Load (0.3ms)[0m  [1m[34mSELECT "organizations".* FROM "organizations" WHERE "organizations"."is_customer" = TRUE AND "organizations"."enabled" = TRUE ORDER BY "organizations"."name" ASC /*action='index',application='Hams2',controller='release_notes'*/[0m
+  ↳ app/views/release_notes/index.html.erb:24:in `map'
+  [1m[36mReleaseNote Load (0.5ms)[0m  [1m[34mSELECT "release_notes".* FROM "release_notes" ORDER BY "release_notes"."number" DESC /*action='index',application='Hams2',controller='release_notes'*/[0m
+  ↳ app/views/release_notes/index.html.erb:82
+  [1m[36mReleaseNote Count (0.4ms)[0m  [1m[34mSELECT COUNT(*) FROM "release_notes" /*action='index',application='Hams2',controller='release_notes'*/[0m
+  ↳ app/views/release_notes/index.html.erb:154
+  [1m[36mReleaseNote Count (0.6ms)[0m  [1m[34mSELECT COUNT(*) FROM "release_notes" LEFT OUTER JOIN "invoice_items" ON "invoice_items"."release_note_id" = "release_notes"."id" WHERE "invoice_items"."id" IS NULL AND "release_notes"."voided" = FALSE AND (quantity_accepted > 0) AND "release_notes"."no_invoice" != TRUE /*action='index',application='Hams2',controller='release_notes'*/[0m
+  ↳ app/views/release_notes/index.html.erb:159
+  [1m[36mReleaseNote Count (0.5ms)[0m  [1m[34mSELECT COUNT(*) FROM "release_notes" INNER JOIN "invoice_items" ON "invoice_items"."release_note_id" = "release_notes"."id" /*action='index',application='Hams2',controller='release_notes'*/[0m
+  ↳ app/views/release_notes/index.html.erb:165
+  [1m[36mReleaseNote Count (0.3ms)[0m  [1m[34mSELECT COUNT(*) FROM "release_notes" WHERE "release_notes"."voided" = TRUE /*action='index',application='Hams2',controller='release_notes'*/[0m
+  ↳ app/views/release_notes/index.html.erb:171
+  Rendered release_notes/index.html.erb within layouts/application (Duration: 41.0ms | GC: 25.1ms)
+  [1m[36mUser Load (0.5ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."id" = '52d38d4d-3b20-4e3c-a6e7-b579d9dc53e5' LIMIT 1 /*action='index',application='Hams2',controller='release_notes'*/[0m
+  ↳ app/models/current.rb:3:in `user'
+  Rendered shared/_navbar.html.erb (Duration: 3.7ms | GC: 0.7ms)
+  Rendered layout layouts/application.html.erb (Duration: 47.9ms | GC: 26.6ms)
+Completed 200 OK in 65ms (Views: 45.3ms | ActiveRecord: 3.4ms (8 queries, 0 cached) | GC: 26.6ms)
+
+
+Started GET "/service-worker" for 127.0.0.1 at 2025-08-25 10:22:39 +0100
+Processing by Rails::PwaController#service_worker as */*
+  Rendering pwa/service-worker.js
+  Rendered pwa/service-worker.js (Duration: 0.3ms | GC: 0.0ms)
+Completed 200 OK in 30ms (Views: 1.3ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+

@@ -716,8 +716,12 @@ export default class extends Controller {
   // Select operation for treatment
   selectOperationForTreatment(operationId, treatmentId) {
     const treatment = this.treatments.find(t => t.id === treatmentId)
-    if (!treatment) return
+    if (!treatment) {
+      console.error(`Treatment not found: ${treatmentId}`)
+      return
+    }
 
+    console.log(`Selecting operation ${operationId} for treatment ${treatmentId}`)
     treatment.operation_id = operationId
 
     // Update visual feedback
@@ -726,15 +730,18 @@ export default class extends Controller {
 
     operationsList.querySelectorAll('[data-operation-id]').forEach(div => {
       div.classList.remove('bg-blue-100')
-      div.querySelector('.select-operation-btn').textContent = 'Select'
+      const btn = div.querySelector('.select-operation-btn')
+      if (btn) btn.textContent = 'Select'
     })
 
     const selectedDiv = operationsList.querySelector(`[data-operation-id="${operationId}"]`)
     if (selectedDiv) {
       selectedDiv.classList.add('bg-blue-100')
-      selectedDiv.querySelector('.select-operation-btn').textContent = 'Selected'
+      const btn = selectedDiv.querySelector('.select-operation-btn')
+      if (btn) btn.textContent = 'Selected'
     }
 
+    console.log(`Treatment after selection:`, treatment)
     this.updateTreatmentsField()
     this.updatePreview()
   }
@@ -821,15 +828,27 @@ export default class extends Controller {
 
   // Update preview
   async updatePreview() {
+    console.log('Updating preview with treatments:', this.treatments)
+
     if (this.treatments.length === 0) {
       this.selectedContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">No treatments selected</p>'
       this.specificationFieldTarget.value = ''
       return
     }
 
+    // Filter treatments that have operations selected
+    const treatmentsWithOperations = this.treatments.filter(t => t.operation_id)
+    console.log('Treatments with operations:', treatmentsWithOperations)
+
+    if (treatmentsWithOperations.length === 0) {
+      this.selectedContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">Select operations for treatments to see preview</p>'
+      this.specificationFieldTarget.value = ''
+      return
+    }
+
     try {
       const requestData = {
-        treatments_data: this.treatments.filter(t => t.operation_id) // Only include treatments with selected operations
+        treatments_data: treatmentsWithOperations
       }
 
       // Add jig type
@@ -844,6 +863,8 @@ export default class extends Controller {
         requestData.selected_operations = this.getENPStripMaskOperationIds(this.enpStripType)
       }
 
+      console.log('Sending preview request:', requestData)
+
       const response = await fetch(this.previewPathValue, {
         method: 'POST',
         headers: {
@@ -853,8 +874,19 @@ export default class extends Controller {
         body: JSON.stringify(requestData)
       })
 
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
       const data = await response.json()
+      console.log('Preview response:', data)
       const operations = data.operations || []
+
+      if (operations.length === 0) {
+        this.selectedContainerTarget.innerHTML = '<p class="text-yellow-600 text-sm">No operations generated - check treatment configuration</p>'
+        this.specificationFieldTarget.value = ''
+        return
+      }
 
       this.selectedContainerTarget.innerHTML = operations.map((op, index) => {
         const isAutoInserted = op.auto_inserted
