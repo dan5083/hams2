@@ -283,6 +283,13 @@ export default class extends Controller {
           <input type="number" class="thickness-input mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" data-treatment-id="${treatment.id}" placeholder="e.g., 25" min="1" max="100">
         </div>
       </div>
+
+      <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+        <h6 class="text-sm font-medium text-blue-800 mb-1">Plating Time Estimate</h6>
+        <div class="plating-time-estimate text-sm text-blue-700" data-treatment-id="${treatment.id}">
+          Enter thickness and select ENP type above to see time estimate
+        </div>
+      </div>
     `
   }
 
@@ -457,6 +464,11 @@ export default class extends Controller {
         event.target.classList.contains('thickness-input') ||
         event.target.classList.contains('anodic-select') ||
         event.target.classList.contains('enp-type-select')) {
+
+      // For ENP, also update time calculation
+      if (treatment.type === 'electroless_nickel_plating') {
+        this.calculateENPPlatingTime(treatmentId)
+      }
 
       this.loadOperationsForTreatment(treatmentId)
     }
@@ -942,5 +954,70 @@ export default class extends Controller {
       .split('_')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ')
+  }
+
+  // Calculate ENP plating time
+  calculateENPPlatingTime(treatmentId) {
+    const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
+    if (!card) return
+
+    const thicknessInput = card.querySelector('.thickness-input')
+    const enpTypeSelect = card.querySelector('.enp-type-select')
+    const timeEstimateDiv = card.querySelector('.plating-time-estimate')
+
+    if (!thicknessInput || !timeEstimateDiv || !enpTypeSelect) return
+
+    const thickness = parseFloat(thicknessInput.value)
+    const enpType = enpTypeSelect.value
+
+    if (thickness && thickness > 0 && enpType) {
+      const timeData = this.getENPTimeData(enpType)
+      const { minTimeHours, maxTimeHours, avgTimeHours } = this.calculateTimeRange(thickness, timeData)
+
+      timeEstimateDiv.innerHTML = `
+        <div class="space-y-1">
+          <div><strong>${timeData.typeName}</strong></div>
+          <div>Time range: <strong>${this.formatTime(minTimeHours)} - ${this.formatTime(maxTimeHours)}</strong></div>
+          <div>Average: <strong>${this.formatTime(avgTimeHours)}</strong></div>
+          <div class="text-xs text-blue-600">Rate: ${timeData.minRate}-${timeData.maxRate} μm/hour at 82-91°C</div>
+        </div>
+      `
+    } else if (thickness && thickness > 0) {
+      timeEstimateDiv.innerHTML = 'Select ENP type above for accurate time estimate'
+    } else {
+      timeEstimateDiv.innerHTML = 'Enter thickness and select ENP type for time estimate'
+    }
+  }
+
+  // Get ENP deposition rates by type
+  getENPTimeData(enpType) {
+    const rates = {
+      'high_phosphorous': { minRate: 12.0, maxRate: 14.1, typeName: 'High Phos (Vandalloy 4100)' },
+      'medium_phosphorous': { minRate: 13.3, maxRate: 17.1, typeName: 'Medium Phos (Nicklad 767)' },
+      'low_phosphorous': { minRate: 6.8, maxRate: 18.2, typeName: 'Low Phos (Nicklad ELV 824)' },
+      'ptfe_composite': { minRate: 5.0, maxRate: 11.0, typeName: 'PTFE Composite (Nicklad Ice)' }
+    }
+    return rates[enpType] || { minRate: 12.0, maxRate: 15.0, typeName: 'General ENP' }
+  }
+
+  // Calculate time range from thickness and rates
+  calculateTimeRange(thickness, timeData) {
+    const minTimeHours = thickness / timeData.maxRate
+    const maxTimeHours = thickness / timeData.minRate
+    const avgTimeHours = (minTimeHours + maxTimeHours) / 2
+    return { minTimeHours, maxTimeHours, avgTimeHours }
+  }
+
+  // Format time display
+  formatTime(hours) {
+    if (hours < 1) {
+      return `${Math.round(hours * 60)} min`
+    } else if (hours < 2) {
+      const h = Math.floor(hours)
+      const m = Math.round((hours - h) * 60)
+      return `${h}h ${m}m`
+    } else {
+      return `${hours.toFixed(1)}h`
+    }
   }
 }
