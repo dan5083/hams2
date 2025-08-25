@@ -50,8 +50,15 @@ cat "app/operation_library/operations/hard_anodising.rb"
 echo
 
 
-# Show operations i-z
-for file in app/operation_library/operations/[i-z]*.rb; do
+# Show operations i-p
+for file in app/operation_library/operations/[i-p]*.rb; do
+  echo "=== $file ==="
+  cat "$file"
+  echo
+done
+
+# Show operations q-z
+for file in app/operation_library/operations/[q-z]*.rb; do
   echo "=== $file ==="
   cat "$file"
   echo

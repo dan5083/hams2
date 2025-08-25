@@ -118,6 +118,7 @@ export default class extends Controller {
       id: `treatment_${this.treatmentIdCounter}`,
       type: treatmentType,
       operation_id: null,
+      selected_alloy: null, // For ENP treatments
       masking: {
         enabled: false,
         methods: {}
@@ -255,17 +256,17 @@ export default class extends Controller {
           <label class="block text-sm font-medium text-gray-700 mb-1">Alloy/Material</label>
           <select class="alloy-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" data-treatment-id="${treatment.id}">
             <option value="">Select material...</option>
-            <option value="steel">Steel</option>
-            <option value="stainless_steel">Stainless Steel</option>
-            <option value="316_stainless_steel">316 Stainless Steel</option>
-            <option value="aluminium">Aluminium</option>
-            <option value="copper">Copper</option>
-            <option value="brass">Brass</option>
-            <option value="2000_series_alloys">2000 Series Alloys</option>
-            <option value="stainless_steel_with_oxides">Stainless Steel with Oxides</option>
-            <option value="copper_sans_electrical_contact">Copper (Sans Electrical Contact)</option>
-            <option value="cast_aluminium_william_cope">Cast Aluminium (William Cope)</option>
-            <option value="mclaren_sta142_procedure_d">McLaren STA142 Procedure D</option>
+            <option value="steel" ${treatment.selected_alloy === 'steel' ? 'selected' : ''}>Steel</option>
+            <option value="stainless_steel" ${treatment.selected_alloy === 'stainless_steel' ? 'selected' : ''}>Stainless Steel</option>
+            <option value="316_stainless_steel" ${treatment.selected_alloy === '316_stainless_steel' ? 'selected' : ''}>316 Stainless Steel</option>
+            <option value="aluminium" ${treatment.selected_alloy === 'aluminium' ? 'selected' : ''}>Aluminium</option>
+            <option value="copper" ${treatment.selected_alloy === 'copper' ? 'selected' : ''}>Copper</option>
+            <option value="brass" ${treatment.selected_alloy === 'brass' ? 'selected' : ''}>Brass</option>
+            <option value="2000_series_alloys" ${treatment.selected_alloy === '2000_series_alloys' ? 'selected' : ''}>2000 Series Alloys</option>
+            <option value="stainless_steel_with_oxides" ${treatment.selected_alloy === 'stainless_steel_with_oxides' ? 'selected' : ''}>Stainless Steel with Oxides</option>
+            <option value="copper_sans_electrical_contact" ${treatment.selected_alloy === 'copper_sans_electrical_contact' ? 'selected' : ''}>Copper (Sans Electrical Contact)</option>
+            <option value="cast_aluminium_william_cope" ${treatment.selected_alloy === 'cast_aluminium_william_cope' ? 'selected' : ''}>Cast Aluminium (William Cope)</option>
+            <option value="mclaren_sta142_procedure_d" ${treatment.selected_alloy === 'mclaren_sta142_procedure_d' ? 'selected' : ''}>McLaren STA142 Procedure D</option>
           </select>
         </div>
         <div>
@@ -457,6 +458,12 @@ export default class extends Controller {
 
     const treatment = this.treatments.find(t => t.id === treatmentId)
     if (!treatment) return
+
+    // Store alloy selection for ENP treatments
+    if (event.target.classList.contains('alloy-select') && treatment.type === 'electroless_nickel_plating') {
+      treatment.selected_alloy = event.target.value
+      console.log(`Updated ENP alloy for treatment ${treatmentId}:`, treatment.selected_alloy)
+    }
 
     // Update treatment data based on the changed element
     if (event.target.classList.contains('alloy-select') ||
@@ -735,6 +742,16 @@ export default class extends Controller {
 
     console.log(`Selecting operation ${operationId} for treatment ${treatmentId}`)
     treatment.operation_id = operationId
+
+    // For ENP treatments, also store the selected alloy if not already stored
+    if (treatment.type === 'electroless_nickel_plating') {
+      const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
+      const alloySelect = card.querySelector('.alloy-select')
+      if (alloySelect && alloySelect.value && !treatment.selected_alloy) {
+        treatment.selected_alloy = alloySelect.value
+        console.log(`Stored ENP alloy for treatment ${treatmentId}:`, treatment.selected_alloy)
+      }
+    }
 
     // Update visual feedback
     const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)

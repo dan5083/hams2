@@ -81,6 +81,7 @@ class PartProcessingInstruction < ApplicationRecord
 
       {
         operation: operation,
+        treatment_data: data,
         masking: data["masking"] || {},
         stripping: data["stripping"] || {},
         sealing: data["sealing"] || {}
@@ -141,13 +142,14 @@ class PartProcessingInstruction < ApplicationRecord
   # Add single treatment cycle operations
   def add_treatment_cycle(sequence, treatment, has_enp)
     op = treatment[:operation]
+    treatment_data = treatment[:treatment_data]
     masking = treatment[:masking]
     stripping = treatment[:stripping]
     sealing = treatment[:sealing]
 
     # ENP has special workflow - no masking/stripping modifiers
     if op.process_type == 'electroless_nickel_plating'
-      add_enp_cycle(sequence, op)
+      add_enp_cycle(sequence, op, treatment_data)
       return
     end
 
@@ -209,7 +211,7 @@ class PartProcessingInstruction < ApplicationRecord
   end
 
   # ENP special cycle - jig, degrease, pretreat, plate, unjig (masking happens later via ENP Strip Mask)
-  def add_enp_cycle(sequence, enp_op)
+  def add_enp_cycle(sequence, enp_op, treatment_data)
     # 1. Jig
     sequence << OperationLibrary::JigUnjig.get_jig_operation(selected_jig_type)
 
@@ -220,11 +222,14 @@ class PartProcessingInstruction < ApplicationRecord
 
     # 3. ENP pretreatments + rinses
     if defined?(OperationLibrary::Pretreatments)
-      selected_alloy = operation_selection["selected_enp_alloy"]
-      pretreatments = OperationLibrary::Pretreatments.get_pretreatment_sequence([enp_op], selected_alloy)
-      pretreatments.each do |pretreat|
-        sequence << pretreat
-        sequence << get_rinse(pretreat, true) unless pretreat.process_type == 'rinse'
+      # Get the selected alloy for the ENP treatment from the treatment data
+      selected_alloy = get_selected_enp_alloy_for_treatment_data(treatment_data)
+      if selected_alloy
+        pretreatments = OperationLibrary::Pretreatments.get_pretreatment_sequence([enp_op], selected_alloy)
+        pretreatments.each do |pretreat|
+          sequence << pretreat
+          sequence << get_rinse(pretreat, true) unless pretreat.process_type == 'rinse'
+        end
       end
     end
 
@@ -260,6 +265,33 @@ class PartProcessingInstruction < ApplicationRecord
     return unless defined?(OperationLibrary::EnpStripMask)
     strip_type = operation_selection["enp_strip_type"] || 'nitric'
     sequence.concat(OperationLibrary::EnpStripMask.operations(strip_type))
+  end
+
+  # Helper method to get ENP alloy from treatment data
+  def get_selected_enp_alloy_for_treatment_data(treatment_data)
+    return nil unless treatment_data && treatment_data["selected_alloy"]
+
+    # Convert from form format to pretreatment format
+    convert_alloy_to_pretreatment_format(treatment_data["selected_alloy"])
+  end
+
+  # Convert form alloy values to pretreatment sequence keys
+  def convert_alloy_to_pretreatment_format(form_alloy)
+    mapping = {
+      'steel' => 'STEEL',
+      'stainless_steel' => 'STAINLESS_STEEL',
+      '316_stainless_steel' => 'THREE_ONE_SIX_STAINLESS_STEEL',
+      'aluminium' => 'ALUMINIUM',
+      'copper' => 'COPPER',
+      'brass' => 'BRASS',
+      '2000_series_alloys' => 'TWO_THOUSAND_SERIES_ALLOYS',
+      'stainless_steel_with_oxides' => 'STAINLESS_STEEL_WITH_OXIDES',
+      'copper_sans_electrical_contact' => 'COPPER_SANS_ELECTRICAL_CONTACT',
+      'cast_aluminium_william_cope' => 'CAST_ALUMINIUM_WILLIAM_COPE',
+      'mclaren_sta142_procedure_d' => 'MCLAREN_STA142_PROCEDURE_D'
+    }
+
+    mapping[form_alloy]
   end
 
   # Validation and setup
