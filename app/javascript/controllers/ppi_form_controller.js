@@ -257,11 +257,11 @@ export default class extends Controller {
             <option value="">Select material...</option>
             <option value="steel">Steel</option>
             <option value="stainless_steel">Stainless Steel</option>
-            <option value="three_one_six_stainless_steel">316 Stainless Steel</option>
+            <option value="316_stainless_steel">316 Stainless Steel</option>
             <option value="aluminium">Aluminium</option>
             <option value="copper">Copper</option>
             <option value="brass">Brass</option>
-            <option value="two_thousand_series_alloys">2000 Series Alloys</option>
+            <option value="2000_series_alloys">2000 Series Alloys</option>
             <option value="stainless_steel_with_oxides">Stainless Steel with Oxides</option>
             <option value="copper_sans_electrical_contact">Copper (Sans Electrical Contact)</option>
             <option value="cast_aluminium_william_cope">Cast Aluminium (William Cope)</option>
