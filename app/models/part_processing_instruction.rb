@@ -62,8 +62,10 @@ class PartProcessingInstruction < ApplicationRecord
     # Treatment cycles
     treatments.each { |treatment| add_treatment_cycle(sequence, treatment, has_enp) }
 
-    # Ending ops
+    # ENP Strip/Mask operations (before ending ops)
     add_enp_strip_mask_ops(sequence) if has_enp_strip_mask_operations?
+
+    # Ending ops (always last)
     sequence << OperationLibrary::InspectFinalInspectVatInspect.get_final_inspection_operation
     sequence << OperationLibrary::PackOperations.get_pack_operation
 
