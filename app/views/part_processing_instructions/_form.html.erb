@@ -114,13 +114,13 @@
     </div>
   </div>
 
-  <!-- Main Treatment Selection -->
+  <!-- Treatment Selection -->
   <div class="bg-white shadow rounded-lg p-6">
     <h3 class="text-lg font-medium text-gray-900 mb-4">Treatment Selection</h3>
-    <p class="text-sm text-gray-600 mb-4">Select up to 5 treatments (in the order you wish them to appear in the operations)</p>
+    <p class="text-sm text-gray-600 mb-4">Select up to 5 treatments. Each treatment can have masking, stripping, and sealing options.</p>
 
     <!-- Treatment Type Buttons -->
-    <div class="grid grid-cols-2 gap-3 mb-6 sm:grid-cols-4 lg:grid-cols-8">
+    <div class="grid grid-cols-2 gap-3 mb-6 sm:grid-cols-5">
       <button type="button" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-blue-500 transition-colors text-sm" data-treatment="standard_anodising">
         <span>Standard</span>
         <span class="count-badge ml-2 min-w-[20px] h-5 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">0</span>
@@ -145,52 +145,35 @@
         <span>ENP</span>
         <span class="count-badge ml-2 min-w-[20px] h-5 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">0</span>
       </button>
-
-      <button type="button" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-teal-500 transition-colors text-sm" data-treatment="masking">
-        <span>Masking</span>
-        <span class="count-badge ml-2 min-w-[20px] h-5 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">0</span>
-      </button>
-
-      <button type="button" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-red-500 transition-colors text-sm" data-treatment="stripping">
-        <span>Stripping</span>
-        <span class="count-badge ml-2 min-w-[20px] h-5 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">0</span>
-      </button>
-
-      <button type="button" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-pink-500 transition-colors text-sm" data-treatment="enp_strip_mask" data-ppi-form-target="enpStripMaskBtn" style="display: none;">
-        <span>ENP Strip</span>
-        <span class="count-badge ml-2 min-w-[20px] h-5 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">0</span>
-      </button>
     </div>
 
-    <!-- ENP Strip Type Selection (shown when ENP Strip Mask is selected) -->
+    <!-- ENP Strip Type Selection (shown when ENP is selected) -->
     <div data-ppi-form-target="enpStripTypeContainer" class="mb-6" style="display: none;">
       <h4 class="text-md font-medium text-gray-900 mb-3">ENP Strip Type</h4>
       <div class="flex space-x-4">
         <label class="flex items-center">
-          <input type="radio" name="enp_strip_type" value="nitric" checked class="form-radio text-pink-600" data-ppi-form-target="enpStripTypeRadio">
+          <input type="radio" name="enp_strip_type" value="nitric" checked class="form-radio text-indigo-600" data-ppi-form-target="enpStripTypeRadio">
           <span class="ml-2 text-sm text-gray-700">Nitric Acid (Standard)</span>
         </label>
         <label class="flex items-center">
-          <input type="radio" name="enp_strip_type" value="metex_dekote" class="form-radio text-pink-600" data-ppi-form-target="enpStripTypeRadio">
+          <input type="radio" name="enp_strip_type" value="metex_dekote" class="form-radio text-indigo-600" data-ppi-form-target="enpStripTypeRadio">
           <span class="ml-2 text-sm text-gray-700">Metex Dekote (Ferrous)</span>
+        </label>
+      </div>
+      <div class="mt-3">
+        <label class="flex items-center">
+          <input type="checkbox" data-ppi-form-target="enpStripMaskCheckbox" class="form-checkbox text-indigo-600">
+          <span class="ml-2 text-sm text-gray-700">Add ENP Strip/Mask Operations</span>
         </label>
       </div>
     </div>
 
-    <!-- Dynamic Treatment Criteria -->
-    <div data-ppi-form-target="treatmentCriteriaContainer" class="space-y-6">
-      <p class="text-gray-500 text-sm">Select treatment types above to configure criteria</p>
+    <!-- Treatment Cards Container -->
+    <div data-ppi-form-target="treatmentsContainer" class="space-y-4 mb-6">
+      <p class="text-gray-500 text-sm">Select treatments above to configure them</p>
     </div>
 
-    <!-- Available Operations -->
-    <div class="mt-6">
-      <h4 class="text-md font-medium text-gray-900 mb-3">Available Operations</h4>
-      <div data-ppi-form-target="operationsContainer" class="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded p-3">
-        <p class="text-gray-500 text-sm">Select criteria above to see matching operations</p>
-      </div>
-    </div>
-
-    <!-- Selected Treatments -->
+    <!-- Operations Preview -->
     <div class="mt-6">
       <h4 class="text-md font-medium text-gray-900 mb-3">Operations Preview</h4>
 
@@ -200,23 +183,17 @@
           <% operations_with_auto_ops.each_with_index do |operation, index| %>
             <% if operation %>
               <% is_auto_inserted = operation.respond_to?(:auto_inserted?) && operation.auto_inserted? %>
-              <% is_sealing = ['SODIUM_DICHROMATE_SEAL', 'OXIDITE_SECO_SEAL', 'HOT_WATER_DIP', 'HOT_SEAL', 'SURTEC_650V_SEAL', 'DEIONISED_WATER_SEAL'].include?(operation.id) %>
-              <% bg_color_class = is_sealing ? 'bg-purple-100 border border-purple-300' : (is_auto_inserted ? 'bg-gray-100 border border-gray-300' : 'bg-blue-100 border border-blue-300') %>
+              <% bg_color_class = is_auto_inserted ? 'bg-gray-100 border border-gray-300' : 'bg-blue-100 border border-blue-300' %>
               <% text_color_class = is_auto_inserted ? 'italic text-gray-600' : 'text-gray-900' %>
 
-              <div class="<%= bg_color_class %> rounded px-3 py-2 flex justify-between items-center" data-operation-id="<%= operation.id %>">
+              <div class="<%= bg_color_class %> rounded px-3 py-2 flex justify-between items-center">
                 <span class="text-sm <%= text_color_class %>">
                   <strong><%= index + 1 %>.</strong>
                   <%= operation.display_name %>: <%= operation.operation_text %>
-                  <% if is_sealing %>
-                    <span class="text-xs text-purple-600 ml-2">(sealing)</span>
-                  <% elsif is_auto_inserted %>
+                  <% if is_auto_inserted %>
                     <span class="text-xs text-gray-500 ml-2">(auto-inserted)</span>
                   <% end %>
                 </span>
-                <% unless is_auto_inserted || is_sealing %>
-                  <button type="button" class="text-red-600 hover:text-red-800 ml-2" data-action="click->ppi-form#removeOperation" data-ppi-form-operation-id-param="<%= operation.id %>">×</button>
-                <% end %>
               </div>
             <% end %>
           <% end %>
@@ -226,20 +203,20 @@
       </div>
     </div>
 
-    <!-- Hidden field for selected operations -->
-    <%= hidden_field_tag "part_processing_instruction[customisation_data][operation_selection][selected_operations]",
-        ppi.selected_operations.to_json,
-        data: { ppi_form_target: "selectedOperationsField" } %>
+    <!-- Hidden field for treatments data -->
+    <%= hidden_field_tag "part_processing_instruction[customisation_data][operation_selection][treatments]",
+        ppi.operation_selection["treatments"]&.to_json || '[]',
+        data: { ppi_form_target: "treatmentsField" } %>
 
     <!-- Hidden field for ENP strip type -->
     <%= hidden_field_tag "part_processing_instruction[customisation_data][operation_selection][enp_strip_type]",
         'nitric',
         data: { ppi_form_target: "enpStripTypeField" } %>
 
-    <!-- Hidden field for sealing type -->
-    <%= hidden_field_tag "part_processing_instruction[customisation_data][operation_selection][sealing_type]",
-        ppi.selected_sealing_type,
-        data: { ppi_form_target: "sealingTypeField" } %>
+    <!-- Hidden field for ENP strip mask selection -->
+    <%= hidden_field_tag "part_processing_instruction[customisation_data][operation_selection][selected_operations]",
+        '[]',
+        data: { ppi_form_target: "enpStripMaskField" } %>
   </div>
 
   <!-- Specification (will be auto-generated from operations) -->
@@ -247,12 +224,12 @@
     <h3 class="text-lg font-medium text-gray-900 mb-4">Specification</h3>
 
     <%= form.text_area :specification,
-        placeholder: "Will be automatically generated from selected operations...",
+        placeholder: "Will be automatically generated from selected treatments...",
         rows: 4,
         class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-gray-50",
         readonly: true,
         data: { ppi_form_target: "specificationField" } %>
-    <p class="mt-1 text-xs text-gray-500">Auto-generated from selected operations</p>
+    <p class="mt-1 text-xs text-gray-500">Auto-generated from selected treatments</p>
   </div>
 
   <!-- Special Instructions (manual) -->
@@ -270,9 +247,9 @@
   <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
     <div class="flex">
       <div class="ml-3">
-        <h3 class="text-sm font-medium text-blue-800">Operation-Based PPI Creation</h3>
+        <h3 class="text-sm font-medium text-blue-800">Treatment Cycle System</h3>
         <div class="mt-2 text-sm text-blue-700">
-          <p>Select your treatment criteria above and choose up to 5 operations in sequence. Auto-operations (inspections, jigging, rinses, sealing, etc.) are automatically inserted in the correct sequence. The selected jig type will be used for all jigging operations. Supports anodising (with optional sealing), chemical conversion, ENP, masking, stripping, and ENP strip/mask operations. The specification will be automatically generated from your selections.</p>
+          <p>Select up to 5 treatments in the order you want them processed. Each anodising or chemical conversion treatment can have masking, stripping, and sealing options. ENP treatments use a separate ENP Strip/Mask system. Auto-operations (inspections, jigging, rinses, etc.) are automatically inserted in the correct sequence.</p>
         </div>
       </div>
     </div>

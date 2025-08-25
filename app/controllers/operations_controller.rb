@@ -1,4 +1,4 @@
-# app/controllers/operations_controller.rb - Enhanced for masking, stripping, and sealing operations
+# app/controllers/operations_controller.rb - Enhanced for treatment cycles
 class OperationsController < ApplicationController
   skip_before_action :verify_authenticity_token, only: [:filter, :details, :summary, :preview_with_auto_ops]
 
@@ -11,54 +11,34 @@ class OperationsController < ApplicationController
     # Start with all operations - pass thickness to ENP operations
     operations = Operation.all_operations(target_thickness)
 
-    # Add masking and stripping operations
-    operations << OperationLibrary::Masking.get_masking_operation({})
-    operations << OperationLibrary::Stripping.get_stripping_operation(nil, nil)
-
-    # Filter by anodising types (now includes ENP, ENP Strip Mask, masking, stripping, and sealing) - exclude auto-inserted operations
+    # Filter by anodising types - exclude auto-inserted operations
     if criteria[:anodising_types].present?
-      # Handle sealing filtering - both 'sealing' and 'dichromate_sealing' process types
-      if criteria[:anodising_types].include?('sealing')
-        sealing_operations = operations.select { |op| ['sealing', 'dichromate_sealing'].include?(op.process_type) }
-        other_operations = operations.select { |op|
-          criteria[:anodising_types].include?(op.process_type) && !['sealing', 'dichromate_sealing'].include?(op.process_type)
-        }
-        operations = sealing_operations + other_operations
-      else
-        operations = operations.select { |op| criteria[:anodising_types].include?(op.process_type) }
-      end
+      operations = operations.select { |op| criteria[:anodising_types].include?(op.process_type) }
     end
 
-    # Exclude auto-inserted operations (degrease and rinse) from manual selection
+    # Exclude auto-inserted operations from manual selection
     operations = operations.reject { |op| op.auto_inserted? }
 
-    # Filter by alloys (not applicable to masking/stripping/sealing)
+    # Filter by alloys
     if criteria[:alloys].present?
-      operations = operations.select { |op|
-        op.process_type.in?(['masking', 'stripping', 'sealing', 'dichromate_sealing']) || (op.alloys & criteria[:alloys]).any?
-      }
+      operations = operations.select { |op| (op.alloys & criteria[:alloys]).any? }
     end
 
-    # Filter by anodic classes (not applicable to masking/stripping/sealing)
+    # Filter by anodic classes
     if criteria[:anodic_classes].present?
-      operations = operations.select { |op|
-        op.process_type.in?(['masking', 'stripping', 'sealing', 'dichromate_sealing']) || (op.anodic_classes & criteria[:anodic_classes]).any?
-      }
+      operations = operations.select { |op| (op.anodic_classes & criteria[:anodic_classes]).any? }
     end
 
-    # Filter by ENP types (not applicable to masking/stripping/sealing)
+    # Filter by ENP types
     if criteria[:enp_types].present?
-      operations = operations.select { |op|
-        op.process_type.in?(['masking', 'stripping', 'sealing', 'dichromate_sealing']) || (op.enp_type.present? && criteria[:enp_types].include?(op.enp_type))
-      }
+      operations = operations.select { |op| op.enp_type.present? && criteria[:enp_types].include?(op.enp_type) }
     end
 
-    # Filter by target thickness (with tolerance) - skip for chemical conversion, ENP, masking, stripping, and sealing
+    # Filter by target thickness (with tolerance)
     if criteria[:target_thicknesses].present?
       operations = operations.select do |op|
-        # Skip thickness filtering for chemical conversion, ENP, masking, stripping, sealing, dichromate_sealing, and ENP Strip Mask
-        if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'masking', 'stripping', 'sealing', 'dichromate_sealing']) ||
-           ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type)
+        # Skip thickness filtering for chemical conversion, ENP
+        if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating'])
           true
         else
           # Exact match or within reasonable tolerance (±2.5μm)
@@ -72,8 +52,7 @@ class OperationsController < ApplicationController
       if criteria[:target_thicknesses].length == 1
         target = criteria[:target_thicknesses].first
         operations = operations.sort_by do |op|
-          if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'masking', 'stripping', 'sealing', 'dichromate_sealing']) ||
-             ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type)
+          if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating'])
             0
           else
             (op.target_thickness - target).abs
@@ -87,7 +66,7 @@ class OperationsController < ApplicationController
       {
         id: op.id,
         display_name: op.display_name,
-        operation_text: op.operation_text, # Now includes interpolated time for ENP and text for masking/stripping/sealing
+        operation_text: op.operation_text,
         vat_options_text: op.vat_options_text,
         target_thickness: op.target_thickness,
         process_type: op.process_type,
@@ -100,55 +79,22 @@ class OperationsController < ApplicationController
       }
     end
 
-    # DEBUG: Log operations with interpolated text
-    if criteria[:anodising_types]&.include?('electroless_nickel_plating')
-      Rails.logger.info "🔍 ENP FILTER DEBUG:"
-      Rails.logger.info "  - Thickness: #{target_thickness}μm"
-      Rails.logger.info "  - Found #{results.length} operations"
-      results.each do |result|
-        Rails.logger.info "  - #{result[:id]}: #{result[:operation_text][0..80]}..."
-      end
-    end
-
     render json: results
   end
 
   def details
     operation_ids = params[:operation_ids] || []
     target_thickness = params[:target_thickness]&.to_f
-    enp_strip_type = params[:enp_strip_type] || 'nitric'
-    masking_methods = params[:masking_methods] || {}
-    stripping_type = params[:stripping_type]
-    stripping_method = params[:stripping_method]
-    selected_sealing_type = params[:selected_sealing_type]
-
-    # Handle ENP Strip Mask operations with correct strip type
-    expanded_operation_ids = expand_enp_strip_mask_operations(operation_ids, enp_strip_type)
 
     all_operations = Operation.all_operations(target_thickness)
 
-    # Add ENP Strip Mask operations with correct strip type
-    enp_strip_operations = get_enp_strip_mask_operations(enp_strip_type)
-    all_operations += enp_strip_operations
-
-    # Add masking and stripping operations with interpolation
-    masking_op = OperationLibrary::Masking.get_masking_operation(masking_methods)
-    stripping_op = OperationLibrary::Stripping.get_stripping_operation(stripping_type, stripping_method)
-    all_operations += [masking_op, stripping_op]
-
-    # Add sealing operation if selected
-    if selected_sealing_type.present?
-      sealing_op = OperationLibrary::Sealing.get_sealing_operation(selected_sealing_type)
-      all_operations << sealing_op if sealing_op
-    end
-
-    results = expanded_operation_ids.map do |op_id|
+    results = operation_ids.map do |op_id|
       operation = all_operations.find { |op| op.id == op_id }
       if operation
         {
           id: operation.id,
           display_name: operation.display_name,
-          operation_text: operation.operation_text, # Includes interpolated time if ENP, or interpolated text for masking/stripping/sealing
+          operation_text: operation.operation_text,
           vat_options_text: operation.vat_options_text,
           target_thickness: operation.target_thickness,
           process_type: operation.process_type,
@@ -164,59 +110,34 @@ class OperationsController < ApplicationController
   end
 
   def summary
-    operation_ids = params[:operation_ids] || []
-    target_thickness = params[:target_thickness]&.to_f
-    selected_jig_type = params[:selected_jig_type]
-    enp_strip_type = params[:enp_strip_type] || 'nitric'
-    masking_methods = params[:masking_methods] || {}
-    stripping_type = params[:stripping_type]
-    stripping_method = params[:stripping_method]
-    selected_sealing_type = params[:selected_sealing_type]
-
-    # Handle ENP Strip Mask operations
-    expanded_operation_ids = expand_enp_strip_mask_operations(operation_ids, enp_strip_type)
-
-    # Pass all parameters including sealing for complete operation simulation
-    summary = PartProcessingInstruction.simulate_operations_summary(
-      expanded_operation_ids,
-      target_thickness,
-      selected_jig_type,
-      enp_strip_type,
-      masking_methods,
-      stripping_type,
-      stripping_method,
-      nil, # selected_alloy
-      selected_sealing_type
-    )
-    render json: { summary: summary }
+    # Legacy endpoint - redirect to preview_with_auto_ops for compatibility
+    preview_with_auto_ops
   end
 
   def preview_with_auto_ops
-    operation_ids = params[:operation_ids] || []
-    target_thickness = params[:target_thickness]&.to_f
+    treatments_data = params[:treatments_data] || []
     selected_jig_type = params[:selected_jig_type]
-    enp_strip_type = params[:enp_strip_type] || 'nitric'
-    masking_methods = params[:masking_methods] || {}
-    stripping_type = params[:stripping_type]
-    stripping_method = params[:stripping_method]
     selected_alloy = params[:selected_alloy]
-    selected_sealing_type = params[:selected_sealing_type]
 
-    # Handle ENP Strip Mask operations
-    expanded_operation_ids = expand_enp_strip_mask_operations(operation_ids, enp_strip_type)
+    # Handle legacy format if needed
+    if treatments_data.blank? && params[:operation_ids].present?
+      # Convert legacy operation_ids to treatments format for compatibility
+      operation_ids = params[:operation_ids]
+      treatments_data = convert_legacy_operations_to_treatments(operation_ids)
+    end
 
-    # Pass all parameters including sealing for complete operation simulation
+    # Get operations using the new treatment cycle system
     operations_with_auto_ops = PartProcessingInstruction.simulate_operations_with_auto_ops(
-      expanded_operation_ids,
-      target_thickness,
+      treatments_data,
       selected_jig_type,
-      enp_strip_type,
-      masking_methods,
-      stripping_type,
-      stripping_method,
-      selected_alloy,
-      selected_sealing_type
+      selected_alloy
     )
+
+    # Add ENP Strip Mask operations if selected
+    if params[:selected_operations].present?
+      enp_strip_operations = handle_enp_strip_mask_operations(params[:selected_operations], params[:enp_strip_type])
+      operations_with_auto_ops.concat(enp_strip_operations)
+    end
 
     render json: { operations: operations_with_auto_ops }
   end
@@ -229,60 +150,61 @@ class OperationsController < ApplicationController
       alloys: [],
       target_thicknesses: [],
       anodic_classes: [],
-      enp_types: [],
-      masking_methods: {},
-      stripping_type: {},
-      stripping_method: {},
-      selected_sealing_type: []
+      enp_types: []
     )
   end
 
-  # Expand ENP Strip Mask operation IDs to include all 5 operations
-  def expand_enp_strip_mask_operations(operation_ids, enp_strip_type)
-    expanded_ids = []
+  # Convert legacy operation_ids to treatments format for backward compatibility
+  def convert_legacy_operations_to_treatments(operation_ids)
+    return [] if operation_ids.blank?
+
+    all_operations = Operation.all_operations
+    treatments = []
 
     operation_ids.each do |op_id|
-      if enp_strip_mask_operation?(op_id)
-        # Replace any ENP Strip Mask operation with the complete sequence
-        unless expanded_ids.any? { |id| enp_strip_mask_operation?(id) }
-          expanded_ids += get_enp_strip_mask_operation_ids(enp_strip_type)
-        end
-      else
-        expanded_ids << op_id
+      operation = all_operations.find { |op| op.id == op_id }
+      next unless operation
+
+      # Skip auto-inserted operations
+      next if operation.auto_inserted?
+
+      # Create treatment for main operations
+      if ['standard_anodising', 'hard_anodising', 'chromic_anodising', 'chemical_conversion', 'electroless_nickel_plating'].include?(operation.process_type)
+        treatments << {
+          "id" => "legacy_treatment_#{treatments.length + 1}",
+          "type" => operation.process_type,
+          "operation_id" => operation.id,
+          "masking" => { "enabled" => false, "methods" => {} },
+          "stripping" => { "enabled" => false, "type" => nil, "method" => nil },
+          "sealing" => { "enabled" => false, "type" => nil }
+        }
       end
     end
 
-    expanded_ids
+    treatments
   end
 
-  # Check if operation ID is part of ENP Strip Mask sequence
-  def enp_strip_mask_operation?(operation_id)
+  # Handle ENP Strip Mask operations
+  def handle_enp_strip_mask_operations(selected_operations, enp_strip_type = 'nitric')
     enp_strip_mask_ids = [
-      'ENP_MASK',
-      'ENP_MASKING_CHECK',
-      'ENP_STRIP_NITRIC',
-      'ENP_STRIP_METEX',
-      'ENP_STRIP_MASKING',
-      'ENP_MASKING_CHECK_FINAL'
+      'ENP_MASK', 'ENP_MASKING_CHECK', 'ENP_STRIP_NITRIC',
+      'ENP_STRIP_METEX', 'ENP_STRIP_MASKING', 'ENP_MASKING_CHECK_FINAL'
     ]
-    enp_strip_mask_ids.include?(operation_id)
-  end
 
-  # Get ENP Strip Mask operation IDs for given strip type
-  def get_enp_strip_mask_operation_ids(strip_type)
-    if defined?(OperationLibrary::EnpStripMask)
-      OperationLibrary::EnpStripMask.get_operation_ids(strip_type)
-    else
-      []
-    end
-  end
+    # Check if any ENP Strip Mask operations are selected
+    has_enp_strip_mask = selected_operations.any? { |op_id| enp_strip_mask_ids.include?(op_id) }
+    return [] unless has_enp_strip_mask && defined?(OperationLibrary::EnpStripMask)
 
-  # Get ENP Strip Mask operations for given strip type
-  def get_enp_strip_mask_operations(strip_type)
-    if defined?(OperationLibrary::EnpStripMask)
-      OperationLibrary::EnpStripMask.operations(strip_type)
-    else
-      []
+    # Get the appropriate ENP Strip Mask operations
+    enp_operations = OperationLibrary::EnpStripMask.operations(enp_strip_type || 'nitric')
+
+    enp_operations.map do |operation|
+      {
+        id: operation.id,
+        display_name: operation.display_name,
+        operation_text: operation.operation_text,
+        auto_inserted: false # ENP Strip Mask are user-selected, not auto-inserted
+      }
     end
   end
 end
