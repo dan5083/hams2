@@ -122,7 +122,7 @@ export default class extends Controller {
       target_thickness: null, // For ENP treatments
       masking: {
         enabled: false,
-        methods: {}
+        methods: {} // Will store {method: location} pairs
       },
       stripping: {
         enabled: false,
@@ -216,7 +216,7 @@ export default class extends Controller {
       <div class="border border-gray-200 rounded-lg p-4 bg-gray-50" data-treatment-id="${treatment.id}">
         <div class="flex justify-between items-center mb-4">
           <h4 class="font-medium text-gray-900">${treatmentName} Treatment ${index + 1}</h4>
-          <button type="button" class="text-red-600 hover:text-red-800" data-action="click->ppi-form#removeTreatment" data-ppi-form-treatment-id-param="${treatment.id}">×</button>
+          <button type="button" class="text-red-600 hover:text-red-800 text-xl font-bold" data-action="click->ppi-form#removeTreatment" data-ppi-form-treatment-id-param="${treatment.id}">×</button>
         </div>
 
         <!-- Operation Selection -->
@@ -331,37 +331,36 @@ export default class extends Controller {
     `
   }
 
-  // Generate sub-selections HTML (masking, stripping, sealing)
+  // Generate sub-selections HTML (masking, stripping, sealing) - UPDATED
   generateSubSelectionsHTML(treatment) {
     const anodisingTypes = ['standard_anodising', 'hard_anodising', 'chromic_anodising']
     const showSealing = anodisingTypes.includes(treatment.type)
+
+    // Get currently selected masking methods
+    const selectedMaskingMethods = Object.keys(treatment.masking.methods || {})
 
     return `
       <div class="border-t border-gray-200 pt-4 mt-4">
         <h5 class="text-sm font-medium text-gray-700 mb-3">Treatment Modifiers</h5>
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-${showSealing ? '3' : '2'}">
-          <!-- Masking -->
+          <!-- Masking - UPDATED TO MULTI-SELECT DROPDOWN -->
           <div>
             <label class="flex items-center mb-2">
               <input type="checkbox" class="masking-checkbox form-checkbox text-teal-600" data-treatment-id="${treatment.id}" ${treatment.masking.enabled ? 'checked' : ''}>
               <span class="ml-2 text-sm font-medium text-gray-700">Masking</span>
             </label>
             <div class="masking-methods space-y-2" style="display: ${treatment.masking.enabled ? 'block' : 'none'}">
-              <div class="flex items-center space-x-2">
-                <input type="checkbox" class="masking-method-checkbox" data-method="bungs" data-treatment-id="${treatment.id}">
-                <span class="text-xs text-gray-600">Bungs</span>
-                <input type="text" class="masking-location-input flex-1 text-xs border border-gray-300 rounded px-1 py-1" data-method="bungs" placeholder="Location" disabled>
+              <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Select Methods (hold Ctrl for multiple)</label>
+                <select multiple class="masking-methods-select w-full text-xs border border-gray-300 rounded px-2 py-2 bg-white" data-treatment-id="${treatment.id}" size="3">
+                  <option value="bungs" ${selectedMaskingMethods.includes('bungs') ? 'selected' : ''}>Bungs</option>
+                  <option value="pc21_polyester_tape" ${selectedMaskingMethods.includes('pc21_polyester_tape') ? 'selected' : ''}>PC21 - Polyester tape</option>
+                  <option value="45_stopping_off_lacquer" ${selectedMaskingMethods.includes('45_stopping_off_lacquer') ? 'selected' : ''}>45 Stopping off lacquer</option>
+                </select>
               </div>
-              <div class="flex items-center space-x-2">
-                <input type="checkbox" class="masking-method-checkbox" data-method="pc21_polyester_tape" data-treatment-id="${treatment.id}">
-                <span class="text-xs text-gray-600">PC21 Tape</span>
-                <input type="text" class="masking-location-input flex-1 text-xs border border-gray-300 rounded px-1 py-1" data-method="pc21_polyester_tape" placeholder="Location" disabled>
-              </div>
-              <div class="flex items-center space-x-2">
-                <input type="checkbox" class="masking-method-checkbox" data-method="45_stopping_off_lacquer" data-treatment-id="${treatment.id}">
-                <span class="text-xs text-gray-600">45 Lacquer</span>
-                <input type="text" class="masking-location-input flex-1 text-xs border border-gray-300 rounded px-1 py-1" data-method="45_stopping_off_lacquer" placeholder="Location" disabled>
+              <div class="masking-locations space-y-1">
+                ${this.generateMaskingLocationInputs(treatment)}
               </div>
             </div>
           </div>
@@ -375,16 +374,17 @@ export default class extends Controller {
             <div class="stripping-options space-y-2" style="display: ${treatment.stripping.enabled ? 'block' : 'none'}">
               <select class="stripping-type-select w-full text-xs border border-gray-300 rounded px-2 py-1" data-treatment-id="${treatment.id}">
                 <option value="">Select type...</option>
-                <option value="anodising_stripping">Anodising Stripping</option>
-                <option value="enp_stripping">ENP Stripping</option>
+                <option value="anodising_stripping" ${treatment.stripping.type === 'anodising_stripping' ? 'selected' : ''}>Anodising Stripping</option>
+                <option value="enp_stripping" ${treatment.stripping.type === 'enp_stripping' ? 'selected' : ''}>ENP Stripping</option>
               </select>
-              <select class="stripping-method-select w-full text-xs border border-gray-300 rounded px-2 py-1" data-treatment-id="${treatment.id}" disabled>
+              <select class="stripping-method-select w-full text-xs border border-gray-300 rounded px-2 py-1" data-treatment-id="${treatment.id}" ${!treatment.stripping.type ? 'disabled' : ''}>
                 <option value="">Select method...</option>
+                ${this.generateStrippingMethodOptions(treatment.stripping.type, treatment.stripping.method)}
               </select>
             </div>
           </div>
 
-          <!-- Sealing (only for anodising) -->
+          <!-- Sealing (only for anodising) - FIXED VISIBILITY -->
           ${showSealing ? `
           <div>
             <label class="flex items-center mb-2">
@@ -394,12 +394,12 @@ export default class extends Controller {
             <div class="sealing-options" style="display: ${treatment.sealing.enabled ? 'block' : 'none'}">
               <select class="sealing-type-select w-full text-xs border border-gray-300 rounded px-2 py-1" data-treatment-id="${treatment.id}">
                 <option value="">Select sealing...</option>
-                <option value="HOT_SEAL">Hot Seal</option>
-                <option value="SODIUM_DICHROMATE_SEAL">Sodium Dichromate Seal</option>
-                <option value="OXIDITE_SECO_SEAL">Oxidite SE-CO Seal</option>
-                <option value="HOT_WATER_DIP">Hot Water Dip</option>
-                <option value="SURTEC_650V_SEAL">SurTec 650V Seal</option>
-                <option value="DEIONISED_WATER_SEAL">Deionised Water Seal</option>
+                <option value="SODIUM_DICHROMATE_SEAL" ${treatment.sealing.type === 'SODIUM_DICHROMATE_SEAL' ? 'selected' : ''}>Sodium Dichromate Seal</option>
+                <option value="OXIDITE_SECO_SEAL" ${treatment.sealing.type === 'OXIDITE_SECO_SEAL' ? 'selected' : ''}>Oxidite SE-CO Seal</option>
+                <option value="HOT_WATER_DIP" ${treatment.sealing.type === 'HOT_WATER_DIP' ? 'selected' : ''}>Hot Water Dip</option>
+                <option value="HOT_SEAL" ${treatment.sealing.type === 'HOT_SEAL' ? 'selected' : ''}>Hot Seal</option>
+                <option value="SURTEC_650V_SEAL" ${treatment.sealing.type === 'SURTEC_650V_SEAL' ? 'selected' : ''}>SurTec 650V Seal</option>
+                <option value="DEIONISED_WATER_SEAL" ${treatment.sealing.type === 'DEIONISED_WATER_SEAL' ? 'selected' : ''}>Deionised Water Seal</option>
               </select>
             </div>
           </div>
@@ -409,7 +409,49 @@ export default class extends Controller {
     `
   }
 
-  // Add event listeners to treatment cards
+  // Generate masking location inputs for selected methods - NEW METHOD
+  generateMaskingLocationInputs(treatment) {
+    const methods = treatment.masking.methods || {}
+    return Object.keys(methods).map(method => {
+      const methodLabel = this.getMaskingMethodLabel(method)
+      return `
+        <div class="flex items-center space-x-2">
+          <label class="text-xs text-gray-600 w-20 flex-shrink-0">${methodLabel}:</label>
+          <input type="text" class="masking-location-input flex-1 text-xs border border-gray-300 rounded px-2 py-1" data-method="${method}" data-treatment-id="${treatment.id}" placeholder="Location" value="${methods[method] || ''}">
+        </div>
+      `
+    }).join('')
+  }
+
+  // Get readable label for masking method - NEW METHOD
+  getMaskingMethodLabel(method) {
+    const labels = {
+      'bungs': 'Bungs',
+      'pc21_polyester_tape': 'PC21 Tape',
+      '45_stopping_off_lacquer': '45 Lacquer'
+    }
+    return labels[method] || method
+  }
+
+  // Generate stripping method options based on type - NEW METHOD
+  generateStrippingMethodOptions(strippingType, selectedMethod) {
+    if (!strippingType) return ''
+
+    if (strippingType === 'anodising_stripping') {
+      return `
+        <option value="chromic_phosphoric" ${selectedMethod === 'chromic_phosphoric' ? 'selected' : ''}>Chromic-Phosphoric Acid</option>
+        <option value="sulphuric_sodium_hydroxide" ${selectedMethod === 'sulphuric_sodium_hydroxide' ? 'selected' : ''}>Sulphuric Acid + Sodium Hydroxide</option>
+      `
+    } else if (strippingType === 'enp_stripping') {
+      return `
+        <option value="nitric" ${selectedMethod === 'nitric' ? 'selected' : ''}>Nitric Acid</option>
+        <option value="metex_dekote" ${selectedMethod === 'metex_dekote' ? 'selected' : ''}>Metex Dekote</option>
+      `
+    }
+    return ''
+  }
+
+  // Add event listeners to treatment cards - UPDATED
   addTreatmentCardListeners() {
     this.treatmentsContainerTarget.querySelectorAll('select, input').forEach(element => {
       element.addEventListener('change', (e) => this.handleTreatmentChange(e))
@@ -431,8 +473,9 @@ export default class extends Controller {
       checkbox.addEventListener('change', (e) => this.toggleSealingOptions(e))
     })
 
-    this.treatmentsContainerTarget.querySelectorAll('.masking-method-checkbox').forEach(checkbox => {
-      checkbox.addEventListener('change', (e) => this.toggleMaskingMethodInput(e))
+    // NEW: Multi-select masking methods listener
+    this.treatmentsContainerTarget.querySelectorAll('.masking-methods-select').forEach(select => {
+      select.addEventListener('change', (e) => this.updateMaskingMethodSelection(e))
     })
 
     this.treatmentsContainerTarget.querySelectorAll('.stripping-type-select').forEach(select => {
@@ -475,7 +518,7 @@ export default class extends Controller {
       this.loadOperationsForTreatment(treatmentId)
     }
 
-    // Update masking methods
+    // Update masking location inputs
     if (event.target.classList.contains('masking-location-input')) {
       this.updateTreatmentMaskingMethods(treatmentId)
     }
@@ -494,7 +537,7 @@ export default class extends Controller {
     this.updatePreview()
   }
 
-  // Toggle masking options visibility
+  // Toggle masking options visibility - UPDATED
   toggleMaskingOptions(event) {
     const treatmentId = event.target.dataset.treatmentId
     const treatment = this.treatments.find(t => t.id === treatmentId)
@@ -508,17 +551,14 @@ export default class extends Controller {
 
     if (!event.target.checked) {
       treatment.masking.methods = {}
-      // Uncheck all method checkboxes
-      card.querySelectorAll('.masking-method-checkbox').forEach(cb => {
-        cb.checked = false
-        const input = card.querySelector(`input[data-method="${cb.dataset.method}"]`)
-        if (input) {
-          input.disabled = true
-          input.value = ''
-        }
-      })
+      // Reset multi-select dropdown
+      const maskingSelect = card.querySelector('.masking-methods-select')
+      if (maskingSelect) {
+        Array.from(maskingSelect.options).forEach(option => option.selected = false)
+      }
     }
 
+    this.updateMaskingLocationInputs(treatmentId)
     this.updateTreatmentsField()
     this.updatePreview()
   }
@@ -540,6 +580,9 @@ export default class extends Controller {
       treatment.stripping.method = null
       card.querySelectorAll('.stripping-type-select, .stripping-method-select').forEach(select => {
         select.value = ''
+        if (select.classList.contains('stripping-method-select')) {
+          select.disabled = true
+        }
       })
     }
 
@@ -547,7 +590,7 @@ export default class extends Controller {
     this.updatePreview()
   }
 
-  // Toggle sealing options visibility
+  // Toggle sealing options visibility - FIXED
   toggleSealingOptions(event) {
     const treatmentId = event.target.dataset.treatmentId
     const treatment = this.treatments.find(t => t.id === treatmentId)
@@ -557,31 +600,65 @@ export default class extends Controller {
     const sealingOptions = card.querySelector('.sealing-options')
 
     treatment.sealing.enabled = event.target.checked
-    sealingOptions.style.display = event.target.checked ? 'block' : 'none'
+
+    // FIXED: Ensure proper visibility toggling
+    if (sealingOptions) {
+      sealingOptions.style.display = event.target.checked ? 'block' : 'none'
+    }
 
     if (!event.target.checked) {
       treatment.sealing.type = null
-      card.querySelector('.sealing-type-select').value = ''
+      const sealingSelect = card.querySelector('.sealing-type-select')
+      if (sealingSelect) {
+        sealingSelect.value = ''
+      }
     }
 
     this.updateTreatmentsField()
     this.updatePreview()
   }
 
-  // Toggle individual masking method input
-  toggleMaskingMethodInput(event) {
-    const method = event.target.dataset.method
-    const card = event.target.closest('[data-treatment-id]')
-    const input = card.querySelector(`input.masking-location-input[data-method="${method}"]`)
+  // NEW: Update masking method selection from multi-select dropdown
+  updateMaskingMethodSelection(event) {
+    const treatmentId = event.target.dataset.treatmentId
+    const treatment = this.treatments.find(t => t.id === treatmentId)
+    if (!treatment) return
 
-    if (input) {
-      input.disabled = !event.target.checked
-      if (!event.target.checked) {
-        input.value = ''
-      }
+    const selectedOptions = Array.from(event.target.selectedOptions).map(option => option.value)
+
+    // Update treatment masking methods, preserving existing locations where possible
+    const oldMethods = treatment.masking.methods || {}
+    const newMethods = {}
+
+    selectedOptions.forEach(method => {
+      newMethods[method] = oldMethods[method] || '' // Preserve existing location or set to empty
+    })
+
+    treatment.masking.methods = newMethods
+
+    // Re-render the location inputs
+    this.updateMaskingLocationInputs(treatmentId)
+
+    this.updateTreatmentsField()
+    this.updatePreview()
+  }
+
+  // NEW: Update masking location inputs display
+  updateMaskingLocationInputs(treatmentId) {
+    const treatment = this.treatments.find(t => t.id === treatmentId)
+    if (!treatment) return
+
+    const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
+    const locationsContainer = card.querySelector('.masking-locations')
+
+    if (locationsContainer) {
+      locationsContainer.innerHTML = this.generateMaskingLocationInputs(treatment)
+
+      // Re-add event listeners for the new location inputs
+      locationsContainer.querySelectorAll('.masking-location-input').forEach(input => {
+        input.addEventListener('input', (e) => this.handleTreatmentChange(e))
+      })
     }
-
-    this.updateTreatmentMaskingMethods(event.target.dataset.treatmentId)
   }
 
   // Update stripping methods based on type
@@ -593,36 +670,28 @@ export default class extends Controller {
     methodSelect.innerHTML = '<option value="">Select method...</option>'
     methodSelect.disabled = !strippingType
 
-    if (strippingType === 'anodising_stripping') {
-      methodSelect.innerHTML += `
-        <option value="chromic_phosphoric">Chromic-Phosphoric Acid</option>
-        <option value="sulphuric_sodium_hydroxide">Sulphuric Acid + Sodium Hydroxide</option>
-      `
-    } else if (strippingType === 'enp_stripping') {
-      methodSelect.innerHTML += `
-        <option value="nitric">Nitric Acid</option>
-        <option value="metex_dekote">Metex Dekote</option>
-      `
+    if (strippingType) {
+      methodSelect.innerHTML += this.generateStrippingMethodOptions(strippingType, '')
     }
 
     this.updateTreatmentStrippingConfig(event.target.dataset.treatmentId)
   }
 
-  // Update treatment masking methods
+  // Update treatment masking methods - UPDATED
   updateTreatmentMaskingMethods(treatmentId) {
     const treatment = this.treatments.find(t => t.id === treatmentId)
     if (!treatment) return
 
     const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
-    const methods = {}
 
-    card.querySelectorAll('.masking-method-checkbox:checked').forEach(checkbox => {
-      const method = checkbox.dataset.method
-      const locationInput = card.querySelector(`input.masking-location-input[data-method="${method}"]`)
-      methods[method] = locationInput ? locationInput.value : ''
+    // Update locations from input fields
+    card.querySelectorAll('.masking-location-input').forEach(input => {
+      const method = input.dataset.method
+      if (treatment.masking.methods.hasOwnProperty(method)) {
+        treatment.masking.methods[method] = input.value
+      }
     })
 
-    treatment.masking.methods = methods
     this.updateTreatmentsField()
     this.updatePreview()
   }
