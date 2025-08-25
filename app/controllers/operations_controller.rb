@@ -117,7 +117,8 @@ class OperationsController < ApplicationController
   def preview_with_auto_ops
     treatments_data = params[:treatments_data] || []
     selected_jig_type = params[:selected_jig_type]
-    selected_alloy = params[:selected_alloy]
+    enp_strip_type = params[:enp_strip_type] || 'nitric'
+    selected_operations = params[:selected_operations] || []
 
     # Handle legacy format if needed
     if treatments_data.blank? && params[:operation_ids].present?
@@ -126,18 +127,13 @@ class OperationsController < ApplicationController
       treatments_data = convert_legacy_operations_to_treatments(operation_ids)
     end
 
-    # Get operations using the new treatment cycle system
-    operations_with_auto_ops = PartProcessingInstruction.simulate_operations_with_auto_ops(
+    # Use the enhanced simulation method that handles ENP Strip/Mask properly within the sequence
+    operations_with_auto_ops = PartProcessingInstruction.simulate_operations_with_enp_strip_mask(
       treatments_data,
       selected_jig_type,
-      selected_alloy
+      enp_strip_type,
+      selected_operations
     )
-
-    # Add ENP Strip Mask operations if selected
-    if params[:selected_operations].present?
-      enp_strip_operations = handle_enp_strip_mask_operations(params[:selected_operations], params[:enp_strip_type])
-      operations_with_auto_ops.concat(enp_strip_operations)
-    end
 
     render json: { operations: operations_with_auto_ops }
   end
@@ -182,29 +178,5 @@ class OperationsController < ApplicationController
     end
 
     treatments
-  end
-
-  # Handle ENP Strip Mask operations
-  def handle_enp_strip_mask_operations(selected_operations, enp_strip_type = 'nitric')
-    enp_strip_mask_ids = [
-      'ENP_MASK', 'ENP_MASKING_CHECK', 'ENP_STRIP_NITRIC',
-      'ENP_STRIP_METEX', 'ENP_STRIP_MASKING', 'ENP_MASKING_CHECK_FINAL'
-    ]
-
-    # Check if any ENP Strip Mask operations are selected
-    has_enp_strip_mask = selected_operations.any? { |op_id| enp_strip_mask_ids.include?(op_id) }
-    return [] unless has_enp_strip_mask && defined?(OperationLibrary::EnpStripMask)
-
-    # Get the appropriate ENP Strip Mask operations
-    enp_operations = OperationLibrary::EnpStripMask.operations(enp_strip_type || 'nitric')
-
-    enp_operations.map do |operation|
-      {
-        id: operation.id,
-        display_name: operation.display_name,
-        operation_text: operation.operation_text,
-        auto_inserted: false # ENP Strip Mask are user-selected, not auto-inserted
-      }
-    end
   end
 end
