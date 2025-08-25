@@ -46,7 +46,7 @@ class PartProcessingInstruction < ApplicationRecord
     enabled && part&.enabled && customer&.active?
   end
 
-  # Main method - get operations with treatment cycles
+  # FIXED: Main method - get operations with correct ordering
   def get_operations_with_auto_ops
     treatments = get_treatments
     return [] if treatments.empty?
@@ -54,19 +54,23 @@ class PartProcessingInstruction < ApplicationRecord
     sequence = []
     has_enp = treatments.any? { |t| t[:operation].process_type == 'electroless_nickel_plating' }
 
-    # Beginning ops
+    # Beginning ops (always first)
     sequence << OperationLibrary::ContractReviewOperations.get_contract_review_operation
     sequence << OperationLibrary::InspectFinalInspectVatInspect.get_incoming_inspection_operation
     sequence << OperationLibrary::InspectFinalInspectVatInspect.get_vat_inspection_operation
 
-    # Treatment cycles
+    # Treatment cycles (main processing)
     treatments.each { |treatment| add_treatment_cycle(sequence, treatment, has_enp) }
 
-    # ENP Strip/Mask operations (before ending ops)
+    # FIXED: Post-treatment operations in correct order
+
+    # 1. ENP Strip/Mask operations (before final inspection!)
     add_enp_strip_mask_ops(sequence) if has_enp_strip_mask_operations?
 
-    # Ending ops (always last)
+    # 2. Final inspection (after all processing including masking removal)
     sequence << OperationLibrary::InspectFinalInspectVatInspect.get_final_inspection_operation
+
+    # 3. Pack (always last)
     sequence << OperationLibrary::PackOperations.get_pack_operation
 
     sequence
@@ -114,7 +118,7 @@ class PartProcessingInstruction < ApplicationRecord
     ops.map(&:display_name).join(" → ")
   end
 
-  # Class method for frontend preview
+  # FIXED: Class method for frontend preview with correct ordering
   def self.simulate_operations_with_auto_ops(treatments_data, selected_jig_type = nil, selected_alloy = nil)
     return [] if treatments_data.blank?
 
@@ -126,6 +130,7 @@ class PartProcessingInstruction < ApplicationRecord
       }
     }
 
+    # Use the fixed ordering from the instance method
     mock_ppi.get_operations_with_auto_ops.map do |operation|
       {
         id: operation.id,
@@ -144,7 +149,7 @@ class PartProcessingInstruction < ApplicationRecord
 
   private
 
-  # Add single treatment cycle operations
+  # FIXED: Standard treatment cycle with masking removal BEFORE final ops
   def add_treatment_cycle(sequence, treatment, has_enp)
     op = treatment[:operation]
     treatment_data = treatment[:treatment_data]
@@ -207,15 +212,18 @@ class PartProcessingInstruction < ApplicationRecord
     # 8. Unjig
     sequence << OperationLibrary::JigUnjig.get_unjig_operation
 
-    # 9. Masking removal
+    # 9. FIXED: Masking removal (but NOT final inspection/pack - those come later!)
     if masking["enabled"] && masking["methods"].present?
       if OperationLibrary::Masking.masking_removal_required?([], masking["methods"])
         sequence.concat(OperationLibrary::Masking.get_masking_removal_operations)
       end
     end
+
+    # NOTE: Final inspection and pack are now added in get_operations_with_auto_ops
+    # AFTER all treatment cycles and ENP Strip/Mask operations are complete
   end
 
-  # ENP special cycle - jig, degrease, pretreat, plate, unjig (masking happens later via ENP Strip Mask)
+  # ENP cycle - no masking in cycle, handled by ENP Strip/Mask later
   def add_enp_cycle(sequence, enp_op, treatment_data)
     # 1. Jig
     sequence << OperationLibrary::JigUnjig.get_jig_operation(selected_jig_type)
@@ -244,6 +252,9 @@ class PartProcessingInstruction < ApplicationRecord
 
     # 5. Unjig
     sequence << OperationLibrary::JigUnjig.get_unjig_operation
+
+    # NOTE: ENP Strip/Mask operations are handled separately in get_operations_with_auto_ops
+    # They occur AFTER all treatment cycles but BEFORE final inspection
   end
 
   def needs_degrease?(op)
@@ -332,8 +343,6 @@ class PartProcessingInstruction < ApplicationRecord
   def disable_replaced_ppi
     replaces&.disable! if replaces_id.present?
   end
-
-  private
 
   # Helper method to extract ENP target thickness from treatments data for operation interpolation
   def get_enp_target_thickness_from_treatments(treatments_data)

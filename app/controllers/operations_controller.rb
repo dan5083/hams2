@@ -1,6 +1,6 @@
-# app/controllers/operations_controller.rb - Enhanced for treatment cycles
+# app/controllers/operations_controller.rb - Cleaned version
 class OperationsController < ApplicationController
-  skip_before_action :verify_authenticity_token, only: [:filter, :details, :summary, :preview_with_auto_ops]
+  skip_before_action :verify_authenticity_token, only: [:filter, :details, :preview_with_auto_ops]
 
   def filter
     criteria = filter_params
@@ -109,24 +109,12 @@ class OperationsController < ApplicationController
     render json: results
   end
 
-  def summary
-    # Legacy endpoint - redirect to preview_with_auto_ops for compatibility
-    preview_with_auto_ops
-  end
-
   def preview_with_auto_ops
     treatments_data = params[:treatments_data] || []
     selected_jig_type = params[:selected_jig_type]
     selected_alloy = params[:selected_alloy]
 
-    # Handle legacy format if needed
-    if treatments_data.blank? && params[:operation_ids].present?
-      # Convert legacy operation_ids to treatments format for compatibility
-      operation_ids = params[:operation_ids]
-      treatments_data = convert_legacy_operations_to_treatments(operation_ids)
-    end
-
-    # Get operations using the new treatment cycle system
+    # Get operations using the treatment cycle system
     operations_with_auto_ops = PartProcessingInstruction.simulate_operations_with_auto_ops(
       treatments_data,
       selected_jig_type,
@@ -136,7 +124,8 @@ class OperationsController < ApplicationController
     # Add ENP Strip Mask operations if selected
     if params[:selected_operations].present?
       enp_strip_operations = handle_enp_strip_mask_operations(params[:selected_operations], params[:enp_strip_type])
-      operations_with_auto_ops.concat(enp_strip_operations)
+      # ENP Strip Mask should be inserted BEFORE final ops, not after
+      # We'll handle this in the PPI model instead
     end
 
     render json: { operations: operations_with_auto_ops }
@@ -152,36 +141,6 @@ class OperationsController < ApplicationController
       anodic_classes: [],
       enp_types: []
     )
-  end
-
-  # Convert legacy operation_ids to treatments format for backward compatibility
-  def convert_legacy_operations_to_treatments(operation_ids)
-    return [] if operation_ids.blank?
-
-    all_operations = Operation.all_operations
-    treatments = []
-
-    operation_ids.each do |op_id|
-      operation = all_operations.find { |op| op.id == op_id }
-      next unless operation
-
-      # Skip auto-inserted operations
-      next if operation.auto_inserted?
-
-      # Create treatment for main operations
-      if ['standard_anodising', 'hard_anodising', 'chromic_anodising', 'chemical_conversion', 'electroless_nickel_plating'].include?(operation.process_type)
-        treatments << {
-          "id" => "legacy_treatment_#{treatments.length + 1}",
-          "type" => operation.process_type,
-          "operation_id" => operation.id,
-          "masking" => { "enabled" => false, "methods" => {} },
-          "stripping" => { "enabled" => false, "type" => nil, "method" => nil },
-          "sealing" => { "enabled" => false, "type" => nil }
-        }
-      end
-    end
-
-    treatments
   end
 
   # Handle ENP Strip Mask operations
