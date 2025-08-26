@@ -14,6 +14,7 @@ module OperationLibrary
       electroless_nickel_plating
       sealing
       dichromate_sealing
+      stripping
     ].freeze
 
     # Define which process types are extreme pH processes that require cascade rinse
