@@ -265,6 +265,8 @@ class Operation
       case id
       when 'CASCADE_RINSE'
         'Cascade Rinse'
+      when 'CASCADE_RINSE_BUNGS'
+        'Cascade Rinse (Bungs)'
       when 'RO_RINSE'
         'RO Rinse'
       when 'RO_RINSE_PRETREATMENT'

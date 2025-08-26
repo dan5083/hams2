@@ -99,17 +99,38 @@ module OperationLibrary
       masking_data.is_a?(Hash) && masking_data.any? { |method, location| method.present? }
     end
 
-    # Check if masking removal is required (tape/lacquer only, not bungs)
-    def self.masking_removal_required?(selected_operations, masking_methods)
-      return false unless selected_operations.include?('MASKING')
+    # FIXED: Check if masking removal is required (simplified logic - just check methods directly)
+    def self.masking_removal_required?(masking_methods)
+      return false unless masking_methods.present?
 
       removable_methods = ['pc21_polyester_tape', '45_stopping_off_lacquer']
-      masking_methods.keys.any? { |method| removable_methods.include?(method) }
+
+      # Handle both hash with method keys and simple method array
+      methods_to_check = if masking_methods.is_a?(Hash)
+        masking_methods.keys
+      else
+        masking_methods
+      end
+
+      methods_to_check.any? { |method| removable_methods.include?(method.to_s) }
     end
 
     # Get the operations for masking removal
     def self.get_masking_removal_operations
       operations.select { |op| ['MASKING_REMOVAL', 'MASKING_REMOVAL_CHECK'].include?(op.id) }
+    end
+
+    # Check if bungs are present in masking methods
+    def self.bungs_present?(masking_methods)
+      return false unless masking_methods.present?
+
+      methods_to_check = if masking_methods.is_a?(Hash)
+        masking_methods.keys
+      else
+        masking_methods
+      end
+
+      methods_to_check.any? { |method| method.to_s == 'bungs' }
     end
   end
 end

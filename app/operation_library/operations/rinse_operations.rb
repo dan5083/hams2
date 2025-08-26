@@ -42,6 +42,13 @@ module OperationLibrary
           operation_text: 'Cascade rinse - neutralizing swill then clean swill'
         ),
 
+        # Cascade rinse with bung removal - for extreme pH processes with bungs
+        Operation.new(
+          id: 'CASCADE_RINSE_BUNGS',
+          process_type: 'rinse',
+          operation_text: 'Cascade rinse - neutralizing swill then clean swill, remove bungs and spray out holes with water'
+        ),
+
         # RO rinse - for electroless nickel plating processes
         Operation.new(
           id: 'RO_RINSE',
@@ -52,7 +59,7 @@ module OperationLibrary
     end
 
     # Get the appropriate rinse operation based on the previous operation and PPI context
-    def self.get_rinse_operation(previous_operation = nil, ppi_contains_electroless_nickel: false)
+    def self.get_rinse_operation(previous_operation = nil, ppi_contains_electroless_nickel: false, masking: {})
       return nil unless previous_operation
       return nil if previous_operation.process_type == 'rinse' # Don't rinse after rinse
       return nil unless operation_requires_rinse?(previous_operation)
@@ -62,9 +69,13 @@ module OperationLibrary
         return operations.find { |op| op.id == 'RO_RINSE' }
       end
 
-      # If extreme pH process, use cascade rinse
+      # If extreme pH process, use cascade rinse (with bung variant if bungs present)
       if EXTREME_PH_PROCESSES.include?(previous_operation.process_type)
-        return operations.find { |op| op.id == 'CASCADE_RINSE' }
+        if bungs_present_in_masking?(masking)
+          return operations.find { |op| op.id == 'CASCADE_RINSE_BUNGS' }
+        else
+          return operations.find { |op| op.id == 'CASCADE_RINSE' }
+        end
       end
 
       # Default to basic rinse
@@ -78,6 +89,26 @@ module OperationLibrary
 
       # Only non-water chemical processes require rinses
       NON_WATER_CHEMICAL_PROCESSES.include?(operation.process_type)
+    end
+
+    # Check if bungs are present in masking data
+    def self.bungs_present_in_masking?(masking)
+      return false unless masking.present? && masking.is_a?(Hash)
+
+      # Check if masking is enabled and methods contain bungs
+      return false unless masking["enabled"] == true || masking["enabled"] == "true"
+
+      methods = masking["methods"] || {}
+      return false unless methods.present?
+
+      # Handle different masking data structures
+      if methods.is_a?(Hash)
+        methods.keys.any? { |method| method.to_s == 'bungs' }
+      elsif methods.is_a?(Array)
+        methods.any? { |method| method.to_s == 'bungs' }
+      else
+        false
+      end
     end
 
     # Get list of non-water chemical process types (for extending as new operations are added)

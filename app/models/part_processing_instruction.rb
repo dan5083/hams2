@@ -179,7 +179,7 @@ class PartProcessingInstruction < ApplicationRecord
     if needs_degrease?(op)
       degrease = OperationLibrary::DegreaseOperations.get_degrease_operation
       sequence << degrease
-      sequence << get_rinse(degrease, has_enp)
+      sequence << get_rinse(degrease, has_enp, masking)
     end
 
     # 4. Pretreatments + rinses
@@ -187,7 +187,7 @@ class PartProcessingInstruction < ApplicationRecord
       pretreatments = OperationLibrary::Pretreatments.get_pretreatment_sequence([op], nil)
       pretreatments.each do |pretreat|
         sequence << pretreat
-        sequence << get_rinse(pretreat, has_enp) unless pretreat.process_type == 'rinse'
+        sequence << get_rinse(pretreat, has_enp, masking) unless pretreat.process_type == 'rinse'
       end
     end
 
@@ -195,28 +195,28 @@ class PartProcessingInstruction < ApplicationRecord
     if stripping["enabled"] && stripping["type"].present? && stripping["method"].present?
       strip_op = OperationLibrary::Stripping.get_stripping_operation(stripping["type"], stripping["method"])
       sequence << strip_op
-      sequence << get_rinse(strip_op, has_enp)
+      sequence << get_rinse(strip_op, has_enp, masking)
     end
 
     # 6. Main operation + rinse
     sequence << op
-    sequence << get_rinse(op, has_enp)
+    sequence << get_rinse(op, has_enp, masking)
 
     # 7. Sealing + rinse
     if sealing["enabled"] && sealing["type"].present? && is_anodising?(op)
       seal_op = OperationLibrary::Sealing.get_sealing_operation(sealing["type"])
       if seal_op
         sequence << seal_op
-        sequence << get_rinse(seal_op, has_enp)
+        sequence << get_rinse(seal_op, has_enp, masking)
       end
     end
 
     # 8. Unjig
     sequence << OperationLibrary::JigUnjig.get_unjig_operation
 
-    # 9. FIXED: Masking removal (but NOT final inspection/pack - those come later!)
+    # 9. FIXED: Masking removal - simplified logic
     if masking["enabled"] && masking["methods"].present?
-      if OperationLibrary::Masking.masking_removal_required?([], masking["methods"])
+      if OperationLibrary::Masking.masking_removal_required?(masking["methods"])
         sequence.concat(OperationLibrary::Masking.get_masking_removal_operations)
       end
     end
@@ -233,7 +233,7 @@ class PartProcessingInstruction < ApplicationRecord
     # 2. Degrease + rinse
     degrease = OperationLibrary::DegreaseOperations.get_degrease_operation
     sequence << degrease
-    sequence << get_rinse(degrease, true)
+    sequence << get_rinse(degrease, true, {})
 
     # 3. ENP pretreatments + rinses
     if defined?(OperationLibrary::Pretreatments)
@@ -243,14 +243,14 @@ class PartProcessingInstruction < ApplicationRecord
         pretreatments = OperationLibrary::Pretreatments.get_pretreatment_sequence([enp_op], selected_alloy)
         pretreatments.each do |pretreat|
           sequence << pretreat
-          sequence << get_rinse(pretreat, true) unless pretreat.process_type == 'rinse'
+          sequence << get_rinse(pretreat, true, {}) unless pretreat.process_type == 'rinse'
         end
       end
     end
 
     # 4. ENP operation + rinse
     sequence << enp_op
-    sequence << get_rinse(enp_op, true)
+    sequence << get_rinse(enp_op, true, {})
 
     # 5. Unjig
     sequence << OperationLibrary::JigUnjig.get_unjig_operation
@@ -271,8 +271,8 @@ class PartProcessingInstruction < ApplicationRecord
     ['standard_anodising', 'hard_anodising', 'chromic_anodising'].include?(op.process_type)
   end
 
-  def get_rinse(op, has_enp)
-    OperationLibrary::RinseOperations.get_rinse_operation(op, ppi_contains_electroless_nickel: has_enp)
+  def get_rinse(op, has_enp, masking = {})
+    OperationLibrary::RinseOperations.get_rinse_operation(op, ppi_contains_electroless_nickel: has_enp, masking: masking)
   end
 
   def get_selected_alloy(op)
