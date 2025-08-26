@@ -124,7 +124,7 @@ class OperationsController < ApplicationController
       selected_jig_type,
       selected_alloy,
       selected_operations,
-      enp_strip_type
+      enp_strip_type,
       aerospace_defense
     )
 
