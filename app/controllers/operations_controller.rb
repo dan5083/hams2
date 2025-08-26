@@ -115,6 +115,8 @@ class OperationsController < ApplicationController
     selected_alloy = params[:selected_alloy]
     selected_operations = params[:selected_operations] || []
     enp_strip_type = params[:enp_strip_type] || 'nitric'
+    aerospace_defense = params[:aerospace_defense] || false
+
 
     # Get operations using the treatment cycle system with ENP Strip/Mask data
     operations_with_auto_ops = PartProcessingInstruction.simulate_operations_with_auto_ops(
@@ -123,6 +125,7 @@ class OperationsController < ApplicationController
       selected_alloy,
       selected_operations,
       enp_strip_type
+      aerospace_defense
     )
 
     render json: { operations: operations_with_auto_ops }
