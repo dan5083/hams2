@@ -60,9 +60,9 @@ class PartProcessingInstruction < ApplicationRecord
     has_enp = treatments.any? { |t| t[:operation].process_type == 'electroless_nickel_plating' }
 
     # Beginning ops (always first)
-    sequence << OperationLibrary::ContractReviewOperations.get_contract_review_operation
-    sequence << OperationLibrary::InspectFinalInspectVatInspect.get_incoming_inspection_operation
-    sequence << OperationLibrary::InspectFinalInspectVatInspect.get_vat_inspection_operation
+    safe_add_to_sequence(sequence, OperationLibrary::ContractReviewOperations.get_contract_review_operation, "Contract Review")
+    safe_add_to_sequence(sequence, OperationLibrary::InspectFinalInspectVatInspect.get_incoming_inspection_operation, "Incoming Inspection")
+    safe_add_to_sequence(sequence, OperationLibrary::InspectFinalInspectVatInspect.get_vat_inspection_operation, "VAT Inspection")
 
     # Treatment cycles (main processing)
     treatments.each { |treatment| add_treatment_cycle(sequence, treatment, has_enp) }
@@ -73,10 +73,10 @@ class PartProcessingInstruction < ApplicationRecord
     add_enp_strip_mask_ops(sequence) if has_enp_strip_mask_operations?
 
     # 2. Final inspection (after all processing including masking removal)
-    sequence << OperationLibrary::InspectFinalInspectVatInspect.get_final_inspection_operation
+    safe_add_to_sequence(sequence, OperationLibrary::InspectFinalInspectVatInspect.get_final_inspection_operation, "Final Inspection")
 
     # 3. Pack (always last)
-    sequence << OperationLibrary::PackOperations.get_pack_operation
+    safe_add_to_sequence(sequence, OperationLibrary::PackOperations.get_pack_operation, "Pack")
 
     # 4. Insert water break test if required (after degrease operations)
     if defined?(OperationLibrary::WaterBreakOperations)
@@ -86,7 +86,8 @@ class PartProcessingInstruction < ApplicationRecord
       )
     end
 
-    sequence
+    # Remove any nil entries that might have been added
+    sequence.compact
   end
 
   # Get treatments from nested structure
@@ -165,6 +166,15 @@ class PartProcessingInstruction < ApplicationRecord
 
   private
 
+  # Helper method to safely add operations to sequence with nil checking
+  def safe_add_to_sequence(sequence, operation, description)
+    if operation.nil?
+      Rails.logger.error "NIL OPERATION: #{description}"
+    else
+      sequence << operation
+    end
+  end
+
   # FIXED: Standard treatment cycle with masking removal BEFORE final ops
   def add_treatment_cycle(sequence, treatment, has_enp)
     op = treatment[:operation]
@@ -182,56 +192,58 @@ class PartProcessingInstruction < ApplicationRecord
     # Standard anodising/chemical conversion cycle
     # 1. Masking
     if masking["enabled"] && masking["methods"].present?
-      sequence << OperationLibrary::Masking.get_masking_operation(masking["methods"])
-      sequence << OperationLibrary::Masking.get_masking_inspection_operation
+      safe_add_to_sequence(sequence, OperationLibrary::Masking.get_masking_operation(masking["methods"]), "Masking")
+      safe_add_to_sequence(sequence, OperationLibrary::Masking.get_masking_inspection_operation, "Masking Inspection")
     end
 
     # 2. Jig
-    sequence << OperationLibrary::JigUnjig.get_jig_operation(selected_jig_type)
+    safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_jig_operation(selected_jig_type), "Jig")
 
     # 3. Degrease + rinse
     if needs_degrease?(op)
       degrease = OperationLibrary::DegreaseOperations.get_degrease_operation
-      sequence << degrease
-      sequence << get_rinse(degrease, has_enp, masking)
+      safe_add_to_sequence(sequence, degrease, "Degrease")
+      safe_add_to_sequence(sequence, get_rinse(degrease, has_enp, masking), "Rinse after Degrease")
     end
 
     # 4. Pretreatments + rinses
     if needs_pretreatment?(op)
       pretreatments = OperationLibrary::Pretreatments.get_pretreatment_sequence([op], nil)
       pretreatments.each do |pretreat|
-        sequence << pretreat
-        sequence << get_rinse(pretreat, has_enp, masking) unless pretreat.process_type == 'rinse'
+        safe_add_to_sequence(sequence, pretreat, "Pretreatment")
+        safe_add_to_sequence(sequence, get_rinse(pretreat, has_enp, masking), "Rinse after Pretreatment") unless pretreat.process_type == 'rinse'
       end
     end
 
     # 5. Stripping + rinse
     if stripping["enabled"] && stripping["type"].present? && stripping["method"].present?
       strip_op = OperationLibrary::Stripping.get_stripping_operation(stripping["type"], stripping["method"])
-      sequence << strip_op
-      sequence << get_rinse(strip_op, has_enp, masking)
+      safe_add_to_sequence(sequence, strip_op, "Stripping")
+      safe_add_to_sequence(sequence, get_rinse(strip_op, has_enp, masking), "Rinse after Stripping")
     end
 
     # 6. Main operation + rinse
-    sequence << op
-    sequence << get_rinse(op, has_enp, masking)
+    safe_add_to_sequence(sequence, op, "Main Operation")
+    safe_add_to_sequence(sequence, get_rinse(op, has_enp, masking), "Rinse after Main Operation")
 
     # 7. Sealing + rinse
     if sealing["enabled"] && sealing["type"].present? && is_anodising?(op)
       seal_op = OperationLibrary::Sealing.get_sealing_operation(sealing["type"])
       if seal_op
-        sequence << seal_op
-        sequence << get_rinse(seal_op, has_enp, masking)
+        safe_add_to_sequence(sequence, seal_op, "Sealing")
+        safe_add_to_sequence(sequence, get_rinse(seal_op, has_enp, masking), "Rinse after Sealing")
       end
     end
 
     # 8. Unjig
-    sequence << OperationLibrary::JigUnjig.get_unjig_operation
+    safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_unjig_operation, "Unjig")
 
     # 9. FIXED: Masking removal - simplified logic
     if masking["enabled"] && masking["methods"].present?
       if OperationLibrary::Masking.masking_removal_required?(masking["methods"])
-        sequence.concat(OperationLibrary::Masking.get_masking_removal_operations)
+        OperationLibrary::Masking.get_masking_removal_operations.each do |removal_op|
+          safe_add_to_sequence(sequence, removal_op, "Masking Removal")
+        end
       end
     end
 
@@ -242,12 +254,12 @@ class PartProcessingInstruction < ApplicationRecord
   # ENP cycle - no masking in cycle, handled by ENP Strip/Mask later
   def add_enp_cycle(sequence, enp_op, treatment_data)
     # 1. Jig
-    sequence << OperationLibrary::JigUnjig.get_jig_operation(selected_jig_type)
+    safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_jig_operation(selected_jig_type), "ENP Jig")
 
     # 2. Degrease + rinse
     degrease = OperationLibrary::DegreaseOperations.get_degrease_operation
-    sequence << degrease
-    sequence << get_rinse(degrease, true, {})
+    safe_add_to_sequence(sequence, degrease, "ENP Degrease")
+    safe_add_to_sequence(sequence, get_rinse(degrease, true, {}), "ENP Rinse after Degrease")
 
     # 3. ENP pretreatments + rinses
     if defined?(OperationLibrary::Pretreatments)
@@ -256,18 +268,18 @@ class PartProcessingInstruction < ApplicationRecord
       if selected_alloy
         pretreatments = OperationLibrary::Pretreatments.get_pretreatment_sequence([enp_op], selected_alloy)
         pretreatments.each do |pretreat|
-          sequence << pretreat
-          sequence << get_rinse(pretreat, true, {}) unless pretreat.process_type == 'rinse'
+          safe_add_to_sequence(sequence, pretreat, "ENP Pretreatment")
+          safe_add_to_sequence(sequence, get_rinse(pretreat, true, {}), "ENP Rinse after Pretreatment") unless pretreat.process_type == 'rinse'
         end
       end
     end
 
     # 4. ENP operation + rinse
-    sequence << enp_op
-    sequence << get_rinse(enp_op, true, {})
+    safe_add_to_sequence(sequence, enp_op, "ENP Operation")
+    safe_add_to_sequence(sequence, get_rinse(enp_op, true, {}), "ENP Rinse after Operation")
 
     # 5. Unjig
-    sequence << OperationLibrary::JigUnjig.get_unjig_operation
+    safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_unjig_operation, "ENP Unjig")
 
     # NOTE: ENP Strip/Mask operations are handled separately in get_operations_with_auto_ops
     # They occur AFTER all treatment cycles but BEFORE final inspection
