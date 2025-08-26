@@ -736,7 +736,7 @@ export default class extends Controller {
     }
 
     try {
-      // Convert data structure for server - UPDATED FOR NEW MASKING FORMAT
+      // Convert data structure for server - UPDATED FOR NEW MASKING FORMAT AND FIXED STRIPPING
       const treatmentsData = treatmentsWithOperations.map(treatment => ({
         id: treatment.id,
         type: treatment.type,
@@ -750,7 +750,7 @@ export default class extends Controller {
         stripping: {
           enabled: treatment.stripping_method !== 'none',
           type: treatment.stripping_method !== 'none' ?
-            (treatment.stripping_method.includes('nitric') || treatment.stripping_method.includes('metex') ? 'enp_stripping' : 'anodising_stripping') : null,
+            (treatment.stripping_method === 'nitric' || treatment.stripping_method === 'metex_dekote' ? 'enp_stripping' : 'anodising_stripping') : null,
           method: treatment.stripping_method !== 'none' ? treatment.stripping_method : null
         },
         sealing: {
