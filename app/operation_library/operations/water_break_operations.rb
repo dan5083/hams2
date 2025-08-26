@@ -42,7 +42,8 @@ module OperationLibrary
       # Find the rinse operation that follows degrease
       rinse_after_degrease_index = nil
       (degrease_index + 1).upto(operations_sequence.length - 1) do |i|
-        if operations_sequence[i].process_type == 'rinse'
+        operation = operations_sequence[i]
+        if operation && operation.process_type == 'rinse'
           rinse_after_degrease_index = i
           break
         end
