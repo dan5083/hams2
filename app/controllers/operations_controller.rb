@@ -117,8 +117,8 @@ class OperationsController < ApplicationController
     enp_strip_type = params[:enp_strip_type] || 'nitric'
     aerospace_defense = params[:aerospace_defense] || false
 
-    Rails.logger.info "🔍 Preview request: treatments=#{treatments_data.length}, aerospace_defense=#{aerospace_defense}"
 
+    # Get operations using the treatment cycle system with ENP Strip/Mask data
     operations_with_auto_ops = PartProcessingInstruction.simulate_operations_with_auto_ops(
       treatments_data,
       selected_jig_type,
@@ -128,13 +128,19 @@ class OperationsController < ApplicationController
       aerospace_defense
     )
 
-    Rails.logger.info "🔍 Generated operations: #{operations_with_auto_ops.length}"
-
     render json: { operations: operations_with_auto_ops }
-  rescue => e
-    Rails.logger.error "🚨 Preview error: #{e.message}"
-    Rails.logger.error e.backtrace.join("\n")
-    render json: { error: e.message }, status: 500
+  end
+
+  private
+
+  def filter_params
+    params.permit(
+      anodising_types: [],
+      alloys: [],
+      target_thicknesses: [],
+      anodic_classes: [],
+      enp_types: []
+    )
   end
 
   # Handle ENP Strip Mask operations
