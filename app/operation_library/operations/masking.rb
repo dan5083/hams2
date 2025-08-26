@@ -44,14 +44,16 @@ module OperationLibrary
       MASKING_METHODS
     end
 
-    # Build the operation text based on selected methods and locations
+    # UPDATED: Build the operation text based on multiple selected methods and their individual locations
     def self.build_masking_text(selected_methods = {})
-      return 'Mask as specified' if selected_methods.empty?
+      return 'Mask as specified' if selected_methods.blank?
 
       masking_instructions = []
 
       selected_methods.each do |method, location|
-        method_name = case method
+        next if method.blank? || location.nil? # Skip methods that aren't actually selected
+
+        method_name = case method.to_s
         when 'bungs'
           'bungs'
         when 'pc21_polyester_tape'
@@ -59,7 +61,7 @@ module OperationLibrary
         when '45_stopping_off_lacquer'
           '45 Stopping off lacquer'
         else
-          method.humanize.downcase
+          method.to_s.humanize.downcase
         end
 
         if location.present?
@@ -68,6 +70,8 @@ module OperationLibrary
           masking_instructions << "mask with #{method_name}"
         end
       end
+
+      return 'Mask as specified' if masking_instructions.empty?
 
       # Capitalize first instruction and join with 'and'
       if masking_instructions.length == 1
@@ -84,35 +88,44 @@ module OperationLibrary
       operations(selected_methods).first
     end
 
-    # NEW: Get the masking inspection operation
+    # Get the masking inspection operation
     def self.get_masking_inspection_operation
       operations.find { |op| op.id == 'MASKING_INSPECTION' }
     end
 
-    # NEW: Check if masking inspection is required (always required when masking is present)
+    # Check if masking inspection is required (always required when masking is present)
     def self.masking_inspection_required?(selected_operations)
       selected_operations.include?('MASKING')
     end
 
-    # Check if any masking methods are selected
+    # UPDATED: Check if any masking methods are selected (works with new multiple methods format)
     def self.masking_selected?(masking_data)
-      masking_data.is_a?(Hash) && masking_data.any? { |method, location| method.present? }
+      return false unless masking_data.present?
+
+      if masking_data.is_a?(Hash)
+        # Check if enabled flag is set and methods are present
+        return false unless masking_data["enabled"] == true || masking_data["enabled"] == "true"
+        methods = masking_data["methods"] || {}
+        methods.any? { |method, location| method.present? && !location.nil? }
+      else
+        false
+      end
     end
 
-    # FIXED: Check if masking removal is required (simplified logic - just check methods directly)
+    # UPDATED: Check if masking removal is required (simplified logic - works with new format)
     def self.masking_removal_required?(masking_methods)
       return false unless masking_methods.present?
 
       removable_methods = ['pc21_polyester_tape', '45_stopping_off_lacquer']
 
-      # Handle both hash with method keys and simple method array
-      methods_to_check = if masking_methods.is_a?(Hash)
-        masking_methods.keys
+      # Handle the new multiple methods format: {"method" => "location", ...}
+      if masking_methods.is_a?(Hash)
+        masking_methods.keys.any? { |method| removable_methods.include?(method.to_s) }
+      elsif masking_methods.is_a?(Array)
+        masking_methods.any? { |method| removable_methods.include?(method.to_s) }
       else
-        masking_methods
+        false
       end
-
-      methods_to_check.any? { |method| removable_methods.include?(method.to_s) }
     end
 
     # Get the operations for masking removal
@@ -120,17 +133,17 @@ module OperationLibrary
       operations.select { |op| ['MASKING_REMOVAL', 'MASKING_REMOVAL_CHECK'].include?(op.id) }
     end
 
-    # Check if bungs are present in masking methods
+    # UPDATED: Check if bungs are present in masking methods (works with new format)
     def self.bungs_present?(masking_methods)
       return false unless masking_methods.present?
 
-      methods_to_check = if masking_methods.is_a?(Hash)
-        masking_methods.keys
+      if masking_methods.is_a?(Hash)
+        masking_methods.keys.any? { |method| method.to_s == 'bungs' }
+      elsif masking_methods.is_a?(Array)
+        masking_methods.any? { |method| method.to_s == 'bungs' }
       else
-        masking_methods
+        false
       end
-
-      methods_to_check.any? { |method| method.to_s == 'bungs' }
     end
   end
 end
