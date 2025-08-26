@@ -24,6 +24,7 @@ module OperationLibrary
       hard_anodising
       chromic_anodising
       dichromate_sealing
+      stripping
     ].freeze
 
     def self.operations
