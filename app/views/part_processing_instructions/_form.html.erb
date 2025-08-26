@@ -135,7 +135,7 @@
   <!-- Treatment Selection -->
   <div class="bg-white shadow rounded-lg p-6">
     <h3 class="text-lg font-medium text-gray-900 mb-4">Treatment Selection</h3>
-    <p class="text-sm text-gray-600 mb-4">Select up to 5 treatments. Each treatment can have masking, stripping, and sealing options.</p>
+    <p class="text-sm text-gray-600 mb-4">Select up to 5 treatments. Each treatment can have masking, stripping, dye, and sealing options.</p>
 
     <!-- Treatment Type Buttons -->
     <div class="grid grid-cols-2 gap-3 mb-6 sm:grid-cols-5">
@@ -202,10 +202,13 @@
             <% if operation %>
               <% is_auto_inserted = operation.respond_to?(:auto_inserted?) && operation.auto_inserted? %>
               <% is_water_break_test = operation.respond_to?(:water_break_test?) && operation.water_break_test? %>
+              <% is_dye = operation.respond_to?(:dye?) && operation.dye? %>
               <% bg_color_class = is_auto_inserted ? 'bg-gray-100 border border-gray-300' : 'bg-blue-100 border border-blue-300' %>
               <% bg_color_class = 'bg-red-50 border border-red-200' if is_water_break_test %>
+              <% bg_color_class = 'bg-purple-50 border border-purple-200' if is_dye %>
               <% text_color_class = is_auto_inserted ? 'italic text-gray-600' : 'text-gray-900' %>
               <% text_color_class = 'text-red-800' if is_water_break_test %>
+              <% text_color_class = 'text-purple-800' if is_dye %>
 
               <div class="<%= bg_color_class %> rounded px-3 py-2 flex justify-between items-center">
                 <span class="text-sm <%= text_color_class %>">
@@ -216,6 +219,9 @@
                   <% end %>
                   <% if is_water_break_test %>
                     <span class="text-xs text-red-600 ml-2">(requires manual recording)</span>
+                  <% end %>
+                  <% if is_dye %>
+                    <span class="text-xs text-purple-600 ml-2">(dye operation)</span>
                   <% end %>
                 </span>
               </div>
@@ -278,7 +284,7 @@
       <div class="ml-3">
         <h3 class="text-sm font-medium text-blue-800">Treatment Cycle System</h3>
         <div class="mt-2 text-sm text-blue-700">
-          <p>Select up to 5 treatments in the order you want them processed. Each anodising or chemical conversion treatment can have masking, stripping, and sealing options. ENP treatments use a separate ENP Strip/Mask system. Auto-operations (inspections, jigging, rinses, etc.) are automatically inserted in the correct sequence. Aerospace/Defense applications automatically include water break tests after degreasing operations.</p>
+          <p>Select up to 5 treatments in the order you want them processed. Each anodising or chemical conversion treatment can have masking, stripping, dye, and sealing options. ENP treatments use a separate ENP Strip/Mask system. Auto-operations (inspections, jigging, rinses, etc.) are automatically inserted in the correct sequence. Aerospace/Defense applications automatically include water break tests after degreasing operations.</p>
         </div>
       </div>
     </div>

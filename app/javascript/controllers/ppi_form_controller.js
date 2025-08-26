@@ -147,10 +147,11 @@ export default class extends Controller {
       operation_id: null,
       selected_alloy: null, // For ENP treatments
       target_thickness: null, // For ENP treatments
-      // NEW: Multiple masking methods with individual locations
+      // Multiple masking methods with individual locations
       masking_methods: {}, // e.g., {"bungs": "threads", "pc21_polyester_tape": "external surface"}
       stripping_method: 'none',
-      sealing_method: 'none'
+      sealing_method: 'none',
+      dye_color: 'none' // NEW: dye color selection
     }
 
     this.treatments.push(treatment)
@@ -248,7 +249,7 @@ export default class extends Controller {
         <!-- Criteria Selection -->
         ${this.generateCriteriaHTML(treatment)}
 
-        <!-- Treatment Modifiers - UPDATED WITH NEW MASKING CHECKBOXES -->
+        <!-- Treatment Modifiers - UPDATED WITH DYE SUPPORT -->
         ${isENP ? '' : this.generateTreatmentModifiersHTML(treatment)}
       </div>
     `
@@ -271,7 +272,7 @@ export default class extends Controller {
     return this.generateAnodisingCriteriaHTML(treatment)
   }
 
-  // NEW: Generate chromic criteria HTML (only alloy selection, no thickness or class)
+  // Generate chromic criteria HTML (only alloy selection, no thickness or class)
   generateChromicCriteriaHTML(treatment) {
     return `
       <div class="grid grid-cols-1 gap-4 mb-4">
@@ -373,17 +374,18 @@ export default class extends Controller {
     `
   }
 
-  // Generate treatment modifiers HTML - UPDATED WITH NEW MASKING CHECKBOXES
+  // Generate treatment modifiers HTML - UPDATED WITH DYE SUPPORT
   generateTreatmentModifiersHTML(treatment) {
     const anodisingTypes = ['standard_anodising', 'hard_anodising', 'chromic_anodising']
     const showSealing = anodisingTypes.includes(treatment.type)
+    const showDye = anodisingTypes.includes(treatment.type)
 
     return `
       <div class="border-t border-gray-200 pt-4 mt-4">
         <h5 class="text-sm font-medium text-gray-700 mb-3">Treatment Modifiers</h5>
 
         <div class="space-y-4">
-          <!-- NEW: Multiple Masking Methods with Individual Locations -->
+          <!-- Multiple Masking Methods with Individual Locations -->
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">Masking Methods</label>
             <div class="space-y-2">
@@ -413,7 +415,7 @@ export default class extends Controller {
             </div>
           </div>
 
-          <div class="grid grid-cols-1 gap-4 ${showSealing ? 'sm:grid-cols-2' : 'sm:grid-cols-1'}">
+          <div class="grid grid-cols-1 gap-4 ${showSealing && showDye ? 'sm:grid-cols-3' : (showSealing || showDye ? 'sm:grid-cols-2' : 'sm:grid-cols-1')}">
             <!-- Stripping Method -->
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Stripping</label>
@@ -425,6 +427,21 @@ export default class extends Controller {
                 <option value="metex_dekote" ${treatment.stripping_method === 'metex_dekote' ? 'selected' : ''}>Metex Dekote</option>
               </select>
             </div>
+
+            <!-- NEW: Dye Selection (for anodising only) -->
+            ${showDye ? `
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Dye Color</label>
+              <select class="dye-color-select w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm" data-treatment-id="${treatment.id}">
+                <option value="none" ${treatment.dye_color === 'none' ? 'selected' : ''}>No Dye</option>
+                <option value="BLACK_DYE" ${treatment.dye_color === 'BLACK_DYE' ? 'selected' : ''}>Black</option>
+                <option value="RED_DYE" ${treatment.dye_color === 'RED_DYE' ? 'selected' : ''}>Red</option>
+                <option value="BLUE_DYE" ${treatment.dye_color === 'BLUE_DYE' ? 'selected' : ''}>Blue</option>
+                <option value="GOLD_DYE" ${treatment.dye_color === 'GOLD_DYE' ? 'selected' : ''}>Gold</option>
+                <option value="GREEN_DYE" ${treatment.dye_color === 'GREEN_DYE' ? 'selected' : ''}>Green</option>
+              </select>
+            </div>
+            ` : ''}
 
             <!-- Sealing Method (for anodising only) -->
             ${showSealing ? `
@@ -447,7 +464,7 @@ export default class extends Controller {
     `
   }
 
-  // Add event listeners to treatment cards - UPDATED FOR NEW MASKING CHECKBOXES
+  // Add event listeners to treatment cards - UPDATED FOR DYE SUPPORT
   addTreatmentCardListeners() {
     this.treatmentsContainerTarget.querySelectorAll('select, input').forEach(element => {
       element.addEventListener('change', (e) => this.handleTreatmentChange(e))
@@ -462,7 +479,7 @@ export default class extends Controller {
     })
   }
 
-  // Handle changes in treatment configuration - UPDATED FOR NEW MASKING CHECKBOXES
+  // Handle changes in treatment configuration - UPDATED FOR DYE SUPPORT
   handleTreatmentChange(event) {
     const treatmentId = event.target.dataset.treatmentId
     if (!treatmentId) return
@@ -485,7 +502,7 @@ export default class extends Controller {
       treatment.target_thickness = parseFloat(event.target.value) || null
     }
 
-    // Handle NEW masking checkbox changes
+    // Handle masking checkbox changes
     if (event.target.classList.contains('masking-checkbox')) {
       const method = event.target.dataset.method
       const isChecked = event.target.checked
@@ -526,6 +543,11 @@ export default class extends Controller {
       treatment.sealing_method = event.target.value
     }
 
+    // NEW: Handle dye color selection
+    if (event.target.classList.contains('dye-color-select')) {
+      treatment.dye_color = event.target.value
+    }
+
     // Update treatment data based on the changed element
     if (event.target.classList.contains('alloy-select') ||
         event.target.classList.contains('thickness-select') ||
@@ -558,7 +580,7 @@ export default class extends Controller {
     }
   }
 
-  // Build criteria for operation filtering - UPDATED FOR CHROMIC
+  // Build criteria for operation filtering
   buildCriteriaForTreatment(treatment, card) {
     const criteria = { anodising_types: [treatment.type] }
 
@@ -757,13 +779,12 @@ export default class extends Controller {
     this.treatmentsFieldTarget.value = JSON.stringify(this.treatments)
   }
 
-  // Update preview - UPDATED TO NOT SHOW OPERATIONS IN SPECIFICATION FIELD + AEROSPACE/DEFENSE SUPPORT
+  // Update preview - UPDATED FOR DYE SUPPORT
   async updatePreview() {
     console.log('Updating preview with treatments:', this.treatments, 'Aerospace/Defense:', this.aerospaceDefense)
 
     if (this.treatments.length === 0) {
       this.selectedContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">No treatments selected</p>'
-      // CLEAR specification field instead of populating it
       this.specificationFieldTarget.value = ''
       return
     }
@@ -773,13 +794,12 @@ export default class extends Controller {
 
     if (treatmentsWithOperations.length === 0) {
       this.selectedContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">Select operations for treatments to see preview</p>'
-      // CLEAR specification field instead of populating it
       this.specificationFieldTarget.value = ''
       return
     }
 
     try {
-      // Convert data structure for server - UPDATED FOR NEW MASKING FORMAT AND FIXED STRIPPING
+      // Convert data structure for server - UPDATED FOR DYE SUPPORT
       const treatmentsData = treatmentsWithOperations.map(treatment => ({
         id: treatment.id,
         type: treatment.type,
@@ -799,6 +819,11 @@ export default class extends Controller {
         sealing: {
           enabled: treatment.sealing_method !== 'none',
           type: treatment.sealing_method !== 'none' ? treatment.sealing_method : null
+        },
+        // NEW: dye data structure
+        dye: {
+          enabled: treatment.dye_color !== 'none',
+          color: treatment.dye_color !== 'none' ? treatment.dye_color : null
         }
       }))
 
@@ -837,7 +862,6 @@ export default class extends Controller {
 
       if (operations.length === 0) {
         this.selectedContainerTarget.innerHTML = '<p class="text-yellow-600 text-sm">No operations generated - check treatment configuration</p>'
-        // CLEAR specification field instead of populating it
         this.specificationFieldTarget.value = ''
         return
       }
@@ -845,6 +869,7 @@ export default class extends Controller {
       this.selectedContainerTarget.innerHTML = operations.map((op, index) => {
         const isAutoInserted = op.auto_inserted
         const isWaterBreakTest = op.id === 'WATER_BREAK_TEST'
+        const isDye = op.id && (op.id.includes('_DYE') || op.display_name?.includes('Dye'))
 
         let bgColor = 'bg-blue-100 border border-blue-300'
         let textColor = 'text-gray-900'
@@ -862,6 +887,12 @@ export default class extends Controller {
           autoLabel = '<span class="text-xs text-red-600 ml-2">(requires manual recording)</span>'
         }
 
+        if (isDye) {
+          bgColor = 'bg-purple-50 border border-purple-200'
+          textColor = 'text-purple-800'
+          autoLabel = '<span class="text-xs text-purple-600 ml-2">(dye operation)</span>'
+        }
+
         return `
           <div class="${bgColor} rounded px-3 py-2">
             <span class="text-sm ${textColor}">
@@ -872,9 +903,6 @@ export default class extends Controller {
           </div>
         `
       }).join('')
-
-      // REMOVED: No longer update specification field with operations
-      // The specification field remains empty for manual entry
 
     } catch (error) {
       console.error('Error updating preview:', error)

@@ -107,7 +107,8 @@ class PartProcessingInstruction < ApplicationRecord
         treatment_data: data,
         masking: data["masking"] || {},
         stripping: data["stripping"] || {},
-        sealing: data["sealing"] || {}
+        sealing: data["sealing"] || {},
+        dye: data["dye"] || {}
       }
     end.compact
   end
@@ -175,15 +176,16 @@ class PartProcessingInstruction < ApplicationRecord
     end
   end
 
-  # FIXED: Standard treatment cycle with masking removal BEFORE final ops
+  # FIXED: Standard treatment cycle with dye and masking removal BEFORE final ops
   def add_treatment_cycle(sequence, treatment, has_enp)
     op = treatment[:operation]
     treatment_data = treatment[:treatment_data]
     masking = treatment[:masking]
     stripping = treatment[:stripping]
     sealing = treatment[:sealing]
+    dye = treatment[:dye]
 
-    # ENP has special workflow - no masking/stripping modifiers
+    # ENP has special workflow - no masking/stripping/dye modifiers
     if op.process_type == 'electroless_nickel_plating'
       add_enp_cycle(sequence, op, treatment_data)
       return
@@ -226,7 +228,16 @@ class PartProcessingInstruction < ApplicationRecord
     safe_add_to_sequence(sequence, op, "Main Operation")
     safe_add_to_sequence(sequence, get_rinse(op, has_enp, masking), "Rinse after Main Operation")
 
-    # 7. Sealing + rinse
+    # 7. Dye + rinse (NEW: for anodising operations only)
+    if dye["enabled"] && dye["color"].present? && is_anodising?(op)
+      dye_op = OperationLibrary::Dye.get_dye_operation(dye["color"])
+      if dye_op
+        safe_add_to_sequence(sequence, dye_op, "Dye")
+        safe_add_to_sequence(sequence, get_rinse(dye_op, has_enp, masking), "Rinse after Dye")
+      end
+    end
+
+    # 8. Sealing + rinse
     if sealing["enabled"] && sealing["type"].present? && is_anodising?(op)
       seal_op = OperationLibrary::Sealing.get_sealing_operation(sealing["type"])
       if seal_op
@@ -235,10 +246,10 @@ class PartProcessingInstruction < ApplicationRecord
       end
     end
 
-    # 8. Unjig
+    # 9. Unjig
     safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_unjig_operation, "Unjig")
 
-    # 9. FIXED: Masking removal - simplified logic
+    # 10. FIXED: Masking removal - simplified logic
     if masking["enabled"] && masking["methods"].present?
       if OperationLibrary::Masking.masking_removal_required?(masking["methods"])
         OperationLibrary::Masking.get_masking_removal_operations.each do |removal_op|
@@ -251,7 +262,7 @@ class PartProcessingInstruction < ApplicationRecord
     # AFTER all treatment cycles and ENP Strip/Mask operations are complete
   end
 
-  # ENP cycle - no masking in cycle, handled by ENP Strip/Mask later
+  # ENP cycle - no masking/dye in cycle, handled by ENP Strip/Mask later
   def add_enp_cycle(sequence, enp_op, treatment_data)
     # 1. Jig
     safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_jig_operation(selected_jig_type), "ENP Jig")
