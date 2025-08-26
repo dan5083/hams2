@@ -46,7 +46,12 @@ class PartProcessingInstruction < ApplicationRecord
     enabled && part&.enabled && customer&.active?
   end
 
-  # FIXED: Main method - get operations with correct ordering
+  # Get aerospace/defense flag from customisation data
+  def aerospace_defense?
+    operation_selection["aerospace_defense"] == true || operation_selection["aerospace_defense"] == "true"
+  end
+
+  # FIXED: Main method - get operations with correct ordering including water break test
   def get_operations_with_auto_ops
     treatments = get_treatments
     return [] if treatments.empty?
@@ -72,6 +77,14 @@ class PartProcessingInstruction < ApplicationRecord
 
     # 3. Pack (always last)
     sequence << OperationLibrary::PackOperations.get_pack_operation
+
+    # 4. Insert water break test if required (after degrease operations)
+    if defined?(OperationLibrary::WaterBreakOperations)
+      sequence = OperationLibrary::WaterBreakOperations.insert_water_break_test_if_required(
+        sequence,
+        aerospace_defense: aerospace_defense?
+      )
+    end
 
     sequence
   end
@@ -118,8 +131,8 @@ class PartProcessingInstruction < ApplicationRecord
     ops.map(&:display_name).join(" → ")
   end
 
-  # FIXED: Class method for frontend preview with correct ordering
-  def self.simulate_operations_with_auto_ops(treatments_data, selected_jig_type = nil, selected_alloy = nil, selected_operations = nil, enp_strip_type = 'nitric')
+  # FIXED: Class method for frontend preview with correct ordering including water break test
+  def self.simulate_operations_with_auto_ops(treatments_data, selected_jig_type = nil, selected_alloy = nil, selected_operations = nil, enp_strip_type = 'nitric', aerospace_defense = false)
     return [] if treatments_data.blank?
 
     mock_ppi = new
@@ -128,7 +141,8 @@ class PartProcessingInstruction < ApplicationRecord
         "treatments" => treatments_data,
         "selected_jig_type" => selected_jig_type,
         "selected_operations" => selected_operations || [],
-        "enp_strip_type" => enp_strip_type
+        "enp_strip_type" => enp_strip_type,
+        "aerospace_defense" => aerospace_defense
       }
     }
 

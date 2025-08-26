@@ -11,7 +11,9 @@ export default class extends Controller {
     "enpStripTypeRadio",
     "enpStripTypeField",
     "enpStripMaskCheckbox",
-    "enpStripMaskField"
+    "enpStripMaskField",
+    "aerospaceDefenseCheckbox",
+    "aerospaceDefenseField"
   ]
 
   static values = {
@@ -34,6 +36,7 @@ export default class extends Controller {
     this.maxTreatments = 5
     this.enpStripType = 'nitric'
     this.enpStripMaskEnabled = false
+    this.aerospaceDefense = false
     this.treatmentIdCounter = 0
 
     this.initializeExistingData()
@@ -41,6 +44,7 @@ export default class extends Controller {
     this.setupJigDropdownListener()
     this.setupENPStripTypeListener()
     this.setupENPStripMaskListener()
+    this.setupAerospaceDefenseListener()
   }
 
   // Initialize with existing treatment data
@@ -50,6 +54,13 @@ export default class extends Controller {
       this.treatments = existingData
       this.updateTreatmentCounts()
       this.renderTreatmentCards()
+
+      // Initialize aerospace/defense flag
+      if (this.hasAerospaceDefenseCheckboxTarget) {
+        this.aerospaceDefense = this.aerospaceDefenseCheckboxTarget.checked
+        this.aerospaceDefenseFieldTarget.value = this.aerospaceDefense
+      }
+
       this.updatePreview()
     } catch(e) {
       console.error("Error parsing existing treatments:", e)
@@ -92,6 +103,22 @@ export default class extends Controller {
         this.enpStripMaskEnabled = e.target.checked
         this.updateENPStripMaskField()
         this.updatePreview()
+      })
+    }
+  }
+
+  // Set up aerospace/defense checkbox listener
+  setupAerospaceDefenseListener() {
+    if (this.hasAerospaceDefenseCheckboxTarget) {
+      this.aerospaceDefenseCheckboxTarget.addEventListener('change', (e) => {
+        this.aerospaceDefense = e.target.checked
+        this.aerospaceDefenseFieldTarget.value = this.aerospaceDefense
+        this.updatePreview()
+
+        // Provide visual feedback when enabled
+        if (this.aerospaceDefense) {
+          console.log("Aerospace/Defense mode enabled - water break tests will be included")
+        }
       })
     }
   }
@@ -687,9 +714,9 @@ export default class extends Controller {
     this.treatmentsFieldTarget.value = JSON.stringify(this.treatments)
   }
 
-  // Update preview - UPDATED TO NOT SHOW OPERATIONS IN SPECIFICATION FIELD
+  // Update preview - UPDATED TO NOT SHOW OPERATIONS IN SPECIFICATION FIELD + AEROSPACE/DEFENSE SUPPORT
   async updatePreview() {
-    console.log('Updating preview with treatments:', this.treatments)
+    console.log('Updating preview with treatments:', this.treatments, 'Aerospace/Defense:', this.aerospaceDefense)
 
     if (this.treatments.length === 0) {
       this.selectedContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">No treatments selected</p>'
@@ -733,7 +760,8 @@ export default class extends Controller {
       }))
 
       const requestData = {
-        treatments_data: treatmentsData
+        treatments_data: treatmentsData,
+        aerospace_defense: this.aerospaceDefense
       }
 
       // Add jig type
@@ -773,9 +801,23 @@ export default class extends Controller {
 
       this.selectedContainerTarget.innerHTML = operations.map((op, index) => {
         const isAutoInserted = op.auto_inserted
-        const bgColor = isAutoInserted ? 'bg-gray-100 border border-gray-300' : 'bg-blue-100 border border-blue-300'
-        const textColor = isAutoInserted ? 'italic text-gray-600' : 'text-gray-900'
-        const autoLabel = isAutoInserted ? '<span class="text-xs text-gray-500 ml-2">(auto-inserted)</span>' : ''
+        const isWaterBreakTest = op.id === 'WATER_BREAK_TEST'
+
+        let bgColor = 'bg-blue-100 border border-blue-300'
+        let textColor = 'text-gray-900'
+        let autoLabel = ''
+
+        if (isAutoInserted) {
+          bgColor = 'bg-gray-100 border border-gray-300'
+          textColor = 'italic text-gray-600'
+          autoLabel = '<span class="text-xs text-gray-500 ml-2">(auto-inserted)</span>'
+        }
+
+        if (isWaterBreakTest) {
+          bgColor = 'bg-red-50 border border-red-200'
+          textColor = 'text-red-800'
+          autoLabel = '<span class="text-xs text-red-600 ml-2">(requires manual recording)</span>'
+        }
 
         return `
           <div class="${bgColor} rounded px-3 py-2">
