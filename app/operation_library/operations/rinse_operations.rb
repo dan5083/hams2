@@ -16,7 +16,6 @@ module OperationLibrary
       dichromate_sealing
       stripping
       dye
-      ptfe
     ].freeze
 
     # Define which process types are extreme pH processes WITHOUT sulphates
