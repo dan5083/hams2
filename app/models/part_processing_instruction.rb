@@ -108,7 +108,8 @@ class PartProcessingInstruction < ApplicationRecord
         masking: data["masking"] || {},
         stripping: data["stripping"] || {},
         sealing: data["sealing"] || {},
-        dye: data["dye"] || {}
+        dye: data["dye"] || {},
+        ptfe: data["ptfe"] || {}
       }
     end.compact
   end
@@ -176,7 +177,7 @@ class PartProcessingInstruction < ApplicationRecord
     end
   end
 
-  # FIXED: Standard treatment cycle with dye and masking removal BEFORE final ops
+  # FIXED: Standard treatment cycle with dye, PTFE and masking removal BEFORE final ops
   def add_treatment_cycle(sequence, treatment, has_enp)
     op = treatment[:operation]
     treatment_data = treatment[:treatment_data]
@@ -184,8 +185,9 @@ class PartProcessingInstruction < ApplicationRecord
     stripping = treatment[:stripping]
     sealing = treatment[:sealing]
     dye = treatment[:dye]
+    ptfe = treatment[:ptfe]
 
-    # ENP has special workflow - no masking/stripping/dye modifiers
+    # ENP has special workflow - no masking/stripping/dye/PTFE modifiers
     if op.process_type == 'electroless_nickel_plating'
       add_enp_cycle(sequence, op, treatment_data)
       return
@@ -228,7 +230,7 @@ class PartProcessingInstruction < ApplicationRecord
     safe_add_to_sequence(sequence, op, "Main Operation")
     safe_add_to_sequence(sequence, get_rinse(op, has_enp, masking), "Rinse after Main Operation")
 
-    # 7. Dye + rinse (NEW: for anodising operations only)
+    # 7. Dye + rinse (for anodising operations only)
     if dye["enabled"] && dye["color"].present? && is_anodising?(op)
       dye_op = OperationLibrary::Dye.get_dye_operation(dye["color"])
       if dye_op
@@ -246,10 +248,19 @@ class PartProcessingInstruction < ApplicationRecord
       end
     end
 
-    # 9. Unjig
+    # 9. PTFE + rinse (NEW: for anodising operations only, after sealing)
+    if ptfe["enabled"] && is_anodising?(op)
+      ptfe_op = OperationLibrary::Ptfe.get_ptfe_operation
+      if ptfe_op
+        safe_add_to_sequence(sequence, ptfe_op, "PTFE")
+        safe_add_to_sequence(sequence, get_rinse(ptfe_op, has_enp, masking), "Rinse after PTFE")
+      end
+    end
+
+    # 10. Unjig
     safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_unjig_operation, "Unjig")
 
-    # 10. FIXED: Masking removal - simplified logic
+    # 11. FIXED: Masking removal - simplified logic
     if masking["enabled"] && masking["methods"].present?
       if OperationLibrary::Masking.masking_removal_required?(masking["methods"])
         OperationLibrary::Masking.get_masking_removal_operations.each do |removal_op|

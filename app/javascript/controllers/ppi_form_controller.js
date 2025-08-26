@@ -151,7 +151,8 @@ export default class extends Controller {
       masking_methods: {}, // e.g., {"bungs": "threads", "pc21_polyester_tape": "external surface"}
       stripping_method: 'none',
       sealing_method: 'none',
-      dye_color: 'none' // NEW: dye color selection
+      dye_color: 'none', // NEW: dye color selection
+      ptfe_enabled: false // NEW: PTFE toggle
     }
 
     this.treatments.push(treatment)
@@ -459,6 +460,17 @@ export default class extends Controller {
             </div>
             ` : ''}
           </div>
+
+          <!-- NEW: PTFE Toggle (for anodising only, after sealing) -->
+          ${showDye ? `
+          <div class="mt-4 pt-4 border-t border-gray-200">
+            <label class="flex items-center">
+              <input type="checkbox" class="ptfe-checkbox rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-offset-0 focus:ring-blue-200 focus:ring-opacity-50" data-treatment-id="${treatment.id}" ${treatment.ptfe_enabled ? 'checked' : ''}>
+              <span class="ml-2 text-sm font-medium text-gray-700">Apply PTFE Treatment</span>
+            </label>
+            <p class="mt-1 text-xs text-gray-500">Anolube treatment applied after sealing</p>
+          </div>
+          ` : ''}
         </div>
       </div>
     `
@@ -546,6 +558,11 @@ export default class extends Controller {
     // NEW: Handle dye color selection
     if (event.target.classList.contains('dye-color-select')) {
       treatment.dye_color = event.target.value
+    }
+
+    // NEW: Handle PTFE checkbox changes
+    if (event.target.classList.contains('ptfe-checkbox')) {
+      treatment.ptfe_enabled = event.target.checked
     }
 
     // Update treatment data based on the changed element
@@ -824,6 +841,10 @@ export default class extends Controller {
         dye: {
           enabled: treatment.dye_color !== 'none',
           color: treatment.dye_color !== 'none' ? treatment.dye_color : null
+        },
+        // NEW: PTFE data structure
+        ptfe: {
+          enabled: treatment.ptfe_enabled
         }
       }))
 

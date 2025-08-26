@@ -62,6 +62,9 @@ class Operation
     # Add dye operations
     operations += OperationLibrary::Dye.operations if defined?(OperationLibrary::Dye)
 
+    # Add PTFE operations
+    operations += OperationLibrary::Ptfe.operations if defined?(OperationLibrary::Ptfe)
+
     # Add sealing operations
     operations += OperationLibrary::Sealing.operations if defined?(OperationLibrary::Sealing)
 
@@ -79,7 +82,7 @@ class Operation
 
   # Filter operations by criteria (excluding auto-inserted operations from normal filtering)
   def self.find_matching(process_type: nil, alloy: nil, target_thickness: nil, anodic_class: nil, enp_type: nil)
-    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check', 'masking_inspection', 'pretreatment', 'enp_pretreatment', 'water_break_test', 'dye']
+    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check', 'masking_inspection', 'pretreatment', 'enp_pretreatment', 'water_break_test', 'dye', 'ptfe']
     matching = all_operations(target_thickness).reject { |op| auto_inserted_types.include?(op.process_type) }
 
     matching = matching.select { |op| op.process_type == process_type } if process_type.present?
@@ -102,8 +105,8 @@ class Operation
     if target_thickness.present?
       target = target_thickness.to_f
       matching = matching.select do |op|
-        # Skip thickness filtering for chemical conversion, ENP, chromic anodising, masking, stripping, sealing, dichromate_sealing, water_break_test, dye, and ENP Strip Mask
-        if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'chromic_anodising', 'masking', 'stripping', 'sealing', 'dichromate_sealing', 'water_break_test', 'dye']) ||
+        # Skip thickness filtering for chemical conversion, ENP, chromic anodising, masking, stripping, sealing, dichromate_sealing, water_break_test, dye, ptfe, and ENP Strip Mask
+        if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'chromic_anodising', 'masking', 'stripping', 'sealing', 'dichromate_sealing', 'water_break_test', 'dye', 'ptfe']) ||
            ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type)
           true
         else
@@ -130,25 +133,25 @@ class Operation
 
   # Get available options for dropdowns (excluding auto-inserted operations)
   def self.available_process_types
-    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check', 'masking_inspection', 'pretreatment', 'enp_pretreatment', 'water_break_test', 'dye']
+    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check', 'masking_inspection', 'pretreatment', 'enp_pretreatment', 'water_break_test', 'dye', 'ptfe']
     all_operations.reject { |op| auto_inserted_types.include?(op.process_type) }.map(&:process_type).uniq.sort
   end
 
   def self.available_alloys
-    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check', 'masking_inspection', 'pretreatment', 'enp_pretreatment', 'water_break_test', 'dye']
+    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check', 'masking_inspection', 'pretreatment', 'enp_pretreatment', 'water_break_test', 'dye', 'ptfe']
     all_operations.reject { |op| auto_inserted_types.include?(op.process_type) }.flat_map(&:alloys).uniq.sort
   end
 
   def self.available_anodic_classes
-    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check', 'masking_inspection', 'pretreatment', 'enp_pretreatment', 'water_break_test', 'dye']
+    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check', 'masking_inspection', 'pretreatment', 'enp_pretreatment', 'water_break_test', 'dye', 'ptfe']
     # Exclude chromic anodising from anodic class availability since it doesn't use classes
     all_operations.reject { |op| auto_inserted_types.include?(op.process_type) || op.process_type == 'chromic_anodising' }.flat_map(&:anodic_classes).uniq.sort
   end
 
   def self.available_thicknesses
-    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check', 'masking_inspection', 'pretreatment', 'enp_pretreatment', 'water_break_test', 'dye']
-    # Exclude chromic anodising and dye from thickness availability since they use fixed thickness or no thickness
-    all_operations.reject { |op| auto_inserted_types.include?(op.process_type) || op.process_type == 'chromic_anodising' || op.process_type == 'dye' }.map(&:target_thickness).uniq.select { |t| t > 0 }.sort
+    auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check', 'masking_inspection', 'pretreatment', 'enp_pretreatment', 'water_break_test', 'dye', 'ptfe']
+    # Exclude chromic anodising, dye, and PTFE from thickness availability since they use fixed thickness or no thickness
+    all_operations.reject { |op| auto_inserted_types.include?(op.process_type) || op.process_type == 'chromic_anodising' || op.process_type == 'dye' || op.process_type == 'ptfe' }.map(&:target_thickness).uniq.select { |t| t > 0 }.sort
   end
 
   def self.available_enp_types
@@ -198,6 +201,10 @@ class Operation
 
   def self.dye_operations
     all_operations.select { |op| op.process_type == 'dye' }
+  end
+
+  def self.ptfe_operations
+    all_operations.select { |op| op.process_type == 'ptfe' }
   end
 
   # Instance methods
@@ -294,6 +301,8 @@ class Operation
       end
     when 'dye'
       id.sub('_DYE', '').capitalize
+    when 'ptfe'
+      'PTFE'
     when 'rinse'
       case id
       when 'CASCADE_RINSE'
@@ -363,10 +372,10 @@ class Operation
 
     return false if enp_type.present? && self.enp_type != enp_type
 
-    # Skip thickness check for chromic anodising and dye
+    # Skip thickness check for chromic anodising, dye, and PTFE
     if target_thickness.present? && self.process_type != 'electroless_nickel_plating' &&
        self.process_type != 'chemical_conversion' && self.process_type != 'chromic_anodising' &&
-       self.process_type != 'dye' &&
+       self.process_type != 'dye' && self.process_type != 'ptfe' &&
        !['mask', 'masking_check', 'strip', 'strip_masking', 'masking', 'stripping', 'sealing', 'dichromate_sealing', 'pretreatment', 'enp_pretreatment', 'water_break_test'].include?(self.process_type)
       target = target_thickness.to_f
       return false if (self.target_thickness - target).abs > 2.5
@@ -456,9 +465,13 @@ class Operation
     process_type == 'dye'
   end
 
+  def ptfe?
+    process_type == 'ptfe'
+  end
+
   # Check if this operation is auto-inserted
   def auto_inserted?
-    ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check', 'masking_inspection', 'pretreatment', 'enp_pretreatment', 'water_break_test', 'dye'].include?(process_type)
+    ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check', 'masking_inspection', 'pretreatment', 'enp_pretreatment', 'water_break_test', 'dye', 'ptfe'].include?(process_type)
   end
 
   # Calculate plating time for ENP operations
