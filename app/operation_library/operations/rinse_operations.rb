@@ -78,38 +78,39 @@ module OperationLibrary
       ]
     end
 
-    # Get the appropriate rinse operation based on the previous operation and PPI context
-    def self.get_rinse_operation(previous_operation = nil, ppi_contains_electroless_nickel: false, masking: {})
-      return nil unless previous_operation
-      return nil if previous_operation.process_type == 'rinse' # Don't rinse after rinse
-      return nil unless operation_requires_rinse?(previous_operation)
+  # Get the appropriate rinse operation based on the previous operation and PPI context
+  def self.get_rinse_operation(previous_operation = nil, ppi_contains_electroless_nickel: false, masking: {})
+    return nil unless previous_operation
+    return nil if previous_operation.process_type == 'rinse'
+    return nil unless operation_requires_rinse?(previous_operation)
 
-      # If PPI contains electroless nickel plating, always use RO rinse
-      if ppi_contains_electroless_nickel
-        return operations.find { |op| op.id == 'RO_RINSE' }
-      end
-
-      # If extreme pH process with sulphates, use cascade rinse with 5-minute wait
-      if EXTREME_PH_WITH_SULPHATES_PROCESSES.include?(previous_operation.process_type)
-        if bungs_present_in_masking?(masking)
-          return operations.find { |op| op.id == 'CASCADE_RINSE_5MIN_WAIT_BUNGS' }
-        else
-          return operations.find { |op| op.id == 'CASCADE_RINSE_5MIN_WAIT' }
-        end
-      end
-
-      # If extreme pH process without sulphates, use standard cascade rinse
-      if EXTREME_PH_SANS_SULPHATES_PROCESSES.include?(previous_operation.process_type)
-        if bungs_present_in_masking?(masking)
-          return operations.find { |op| op.id == 'CASCADE_RINSE_BUNGS' }
-        else
-          return operations.find { |op| op.id == 'CASCADE_RINSE' }
-        end
-      end
-
-      # Default to basic rinse
-      operations.find { |op| op.id == 'RINSE' }
+    # If PPI contains electroless nickel plating, always use RO rinse
+    if ppi_contains_electroless_nickel
+      return operations.find { |op| op.id == 'RO_RINSE' }
     end
+
+    # If extreme pH process with sulphates, use cascade rinse with 5-minute wait
+    if EXTREME_PH_WITH_SULPHATES_PROCESSES.include?(previous_operation.process_type)
+      if bungs_present_in_masking?(masking)
+        return operations.find { |op| op.id == 'CASCADE_RINSE_5MIN_WAIT_BUNGS' }
+      else
+        return operations.find { |op| op.id == 'CASCADE_RINSE_5MIN_WAIT' }
+      end
+    end
+
+    # If extreme pH process without sulphates, use standard cascade rinse
+    # BUT skip bung removal for stripping operations - only do it for main treatments
+    if EXTREME_PH_SANS_SULPHATES_PROCESSES.include?(previous_operation.process_type)
+      if bungs_present_in_masking?(masking) && previous_operation.process_type != 'stripping'
+        return operations.find { |op| op.id == 'CASCADE_RINSE_BUNGS' }
+      else
+        return operations.find { |op| op.id == 'CASCADE_RINSE' }
+      end
+    end
+
+    # Default to basic rinse
+    operations.find { |op| op.id == 'RINSE' }
+  end
 
     # Check if an operation requires a rinse after it
     def self.operation_requires_rinse?(operation)
