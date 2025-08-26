@@ -60,7 +60,10 @@ module OperationLibrary
 
     # Get the stripping operation with interpolated text
     def self.get_stripping_operation(stripping_type = nil, stripping_method = nil)
-      operations(stripping_type, stripping_method).first
+      Rails.logger.info "🔍 Stripping called with type=#{stripping_type}, method=#{stripping_method}"
+      result = operations(stripping_type, stripping_method).first
+      Rails.logger.info "🔍 Stripping result: #{result.inspect}"
+      result
     end
 
     # Check if stripping is configured
