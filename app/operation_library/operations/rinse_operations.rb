@@ -17,15 +17,19 @@ module OperationLibrary
       stripping
     ].freeze
 
-    # Define which process types are extreme pH processes that require cascade rinse
-    EXTREME_PH_PROCESSES = %w[
+    # Define which process types are extreme pH processes WITHOUT sulphates
+    EXTREME_PH_SANS_SULPHATES_PROCESSES = %w[
       pretreatment
       etch
-      standard_anodising
-      hard_anodising
       chromic_anodising
       dichromate_sealing
       stripping
+    ].freeze
+
+    # Define which process types are extreme pH processes WITH sulphates (requiring 5-minute wait)
+    EXTREME_PH_WITH_SULPHATES_PROCESSES = %w[
+      standard_anodising
+      hard_anodising
     ].freeze
 
     def self.operations
@@ -37,18 +41,32 @@ module OperationLibrary
           operation_text: 'Rinse in clean swill'
         ),
 
-        # Cascade rinse - for extreme pH processes (neutralizing + clean swill)
+        # Cascade rinse - for extreme pH processes without sulphates (neutralizing + clean swill)
         Operation.new(
           id: 'CASCADE_RINSE',
           process_type: 'rinse',
           operation_text: 'Cascade rinse - neutralizing swill then clean swill'
         ),
 
-        # Cascade rinse with bung removal - for extreme pH processes with bungs
+        # Cascade rinse with bung removal - for extreme pH processes without sulphates with bungs
         Operation.new(
           id: 'CASCADE_RINSE_BUNGS',
           process_type: 'rinse',
           operation_text: 'Cascade rinse - neutralizing swill then clean swill, remove bungs and spray out holes with water'
+        ),
+
+        # NEW: Cascade rinse with 5-minute wait - for sulphate-containing processes
+        Operation.new(
+          id: 'CASCADE_RINSE_5MIN_WAIT',
+          process_type: 'rinse',
+          operation_text: 'Cascade rinse - neutralizing swill then clean swill with 5 minute immersion'
+        ),
+
+        # NEW: Cascade rinse with 5-minute wait and bung removal - for sulphate-containing processes with bungs
+        Operation.new(
+          id: 'CASCADE_RINSE_5MIN_WAIT_BUNGS',
+          process_type: 'rinse',
+          operation_text: 'Cascade rinse - neutralizing swill then clean swill with 5 minute immersion, remove bungs and spray out holes with water'
         ),
 
         # RO rinse - for electroless nickel plating processes
@@ -71,8 +89,17 @@ module OperationLibrary
         return operations.find { |op| op.id == 'RO_RINSE' }
       end
 
-      # If extreme pH process, use cascade rinse (with bung variant if bungs present)
-      if EXTREME_PH_PROCESSES.include?(previous_operation.process_type)
+      # If extreme pH process with sulphates, use cascade rinse with 5-minute wait
+      if EXTREME_PH_WITH_SULPHATES_PROCESSES.include?(previous_operation.process_type)
+        if bungs_present_in_masking?(masking)
+          return operations.find { |op| op.id == 'CASCADE_RINSE_5MIN_WAIT_BUNGS' }
+        else
+          return operations.find { |op| op.id == 'CASCADE_RINSE_5MIN_WAIT' }
+        end
+      end
+
+      # If extreme pH process without sulphates, use standard cascade rinse
+      if EXTREME_PH_SANS_SULPHATES_PROCESSES.include?(previous_operation.process_type)
         if bungs_present_in_masking?(masking)
           return operations.find { |op| op.id == 'CASCADE_RINSE_BUNGS' }
         else
@@ -121,6 +148,16 @@ module OperationLibrary
     # Add a new non-water chemical process type (for future extension)
     def self.add_non_water_chemical_process(process_type)
       NON_WATER_CHEMICAL_PROCESSES << process_type unless NON_WATER_CHEMICAL_PROCESSES.include?(process_type)
+    end
+
+    # Get list of extreme pH processes with sulphates (for reference)
+    def self.extreme_ph_with_sulphates_processes
+      EXTREME_PH_WITH_SULPHATES_PROCESSES
+    end
+
+    # Get list of extreme pH processes without sulphates (for reference)
+    def self.extreme_ph_sans_sulphates_processes
+      EXTREME_PH_SANS_SULPHATES_PROCESSES
     end
   end
 end
