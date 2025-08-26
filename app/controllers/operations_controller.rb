@@ -1,4 +1,4 @@
-# app/controllers/operations_controller.rb - Cleaned version
+# app/controllers/operations_controller.rb - Updated for chromic anodising changes
 class OperationsController < ApplicationController
   skip_before_action :verify_authenticity_token, only: [:filter, :details, :preview_with_auto_ops]
 
@@ -24,9 +24,16 @@ class OperationsController < ApplicationController
       operations = operations.select { |op| (op.alloys & criteria[:alloys]).any? }
     end
 
-    # Filter by anodic classes
+    # Filter by anodic classes (skip for chromic anodising)
     if criteria[:anodic_classes].present?
-      operations = operations.select { |op| (op.anodic_classes & criteria[:anodic_classes]).any? }
+      operations = operations.select { |op|
+        # Skip anodic class filtering for chromic anodising
+        if op.process_type == 'chromic_anodising'
+          true
+        else
+          (op.anodic_classes & criteria[:anodic_classes]).any?
+        end
+      }
     end
 
     # Filter by ENP types
@@ -34,11 +41,11 @@ class OperationsController < ApplicationController
       operations = operations.select { |op| op.enp_type.present? && criteria[:enp_types].include?(op.enp_type) }
     end
 
-    # Filter by target thickness (with tolerance)
+    # Filter by target thickness (with tolerance) - skip for chromic anodising
     if criteria[:target_thicknesses].present?
       operations = operations.select do |op|
-        # Skip thickness filtering for chemical conversion, ENP
-        if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating'])
+        # Skip thickness filtering for chemical conversion, ENP, and chromic anodising
+        if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'chromic_anodising'])
           true
         else
           # Exact match or within reasonable tolerance (±2.5μm)
@@ -48,11 +55,11 @@ class OperationsController < ApplicationController
         end
       end
 
-      # Sort by closest thickness match (but only for anodising operations)
+      # Sort by closest thickness match (but only for standard/hard anodising operations)
       if criteria[:target_thicknesses].length == 1
         target = criteria[:target_thicknesses].first
         operations = operations.sort_by do |op|
-          if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating'])
+          if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'chromic_anodising'])
             0
           else
             (op.target_thickness - target).abs

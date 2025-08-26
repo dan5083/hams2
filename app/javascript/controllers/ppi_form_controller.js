@@ -254,7 +254,7 @@ export default class extends Controller {
     `
   }
 
-  // Generate criteria selection HTML
+  // Generate criteria selection HTML - UPDATED TO HANDLE CHROMIC DIFFERENTLY
   generateCriteriaHTML(treatment) {
     if (treatment.type === 'chemical_conversion') {
       return '' // Chemical conversion needs no criteria
@@ -264,7 +264,31 @@ export default class extends Controller {
       return this.generateENPCriteriaHTML(treatment)
     }
 
+    if (treatment.type === 'chromic_anodising') {
+      return this.generateChromicCriteriaHTML(treatment)
+    }
+
     return this.generateAnodisingCriteriaHTML(treatment)
+  }
+
+  // NEW: Generate chromic criteria HTML (only alloy selection, no thickness or class)
+  generateChromicCriteriaHTML(treatment) {
+    return `
+      <div class="grid grid-cols-1 gap-4 mb-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Alloy</label>
+          <select class="alloy-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm" data-treatment-id="${treatment.id}">
+            <option value="">Select alloy...</option>
+            <option value="general" ${treatment.selected_alloy === 'general' ? 'selected' : ''}>General</option>
+            <option value="aluminium" ${treatment.selected_alloy === 'aluminium' ? 'selected' : ''}>Aluminium</option>
+            <option value="6000_series" ${treatment.selected_alloy === '6000_series' ? 'selected' : ''}>6000 Series</option>
+            <option value="7075" ${treatment.selected_alloy === '7075' ? 'selected' : ''}>7075 (High Voltage Only)</option>
+            <option value="2024" ${treatment.selected_alloy === '2024' ? 'selected' : ''}>2024</option>
+          </select>
+          <p class="mt-1 text-xs text-gray-500">Chromic anodising - no class selection needed</p>
+        </div>
+      </div>
+    `
   }
 
   // Generate ENP criteria HTML
@@ -306,7 +330,7 @@ export default class extends Controller {
     `
   }
 
-  // Generate anodising criteria HTML
+  // Generate anodising criteria HTML (for standard and hard anodising)
   generateAnodisingCriteriaHTML(treatment) {
     return `
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-4">
@@ -451,6 +475,11 @@ export default class extends Controller {
       treatment.selected_alloy = event.target.value
     }
 
+    // Store alloy selection for chromic treatments
+    if (event.target.classList.contains('alloy-select') && treatment.type === 'chromic_anodising') {
+      treatment.selected_alloy = event.target.value
+    }
+
     // Store thickness for ENP treatments
     if (event.target.classList.contains('thickness-input') && treatment.type === 'electroless_nickel_plating') {
       treatment.target_thickness = parseFloat(event.target.value) || null
@@ -529,7 +558,7 @@ export default class extends Controller {
     }
   }
 
-  // Build criteria for operation filtering
+  // Build criteria for operation filtering - UPDATED FOR CHROMIC
   buildCriteriaForTreatment(treatment, card) {
     const criteria = { anodising_types: [treatment.type] }
 
@@ -546,6 +575,10 @@ export default class extends Controller {
         // Store thickness in treatment for server-side time calculation
         treatment.target_thickness = thickness
       }
+    } else if (treatment.type === 'chromic_anodising') {
+      // Chromic only needs alloy selection - no thickness or class
+      const alloySelect = card.querySelector('.alloy-select')
+      if (alloySelect?.value) criteria.alloys = [alloySelect.value]
     } else if (treatment.type !== 'chemical_conversion') {
       const alloySelect = card.querySelector('.alloy-select')
       const thicknessSelect = card.querySelector('.thickness-select')
@@ -610,6 +643,16 @@ export default class extends Controller {
       // Store thickness for server-side time calculation
       if (thicknessInput && thicknessInput.value) {
         treatment.target_thickness = parseFloat(thicknessInput.value)
+      }
+    }
+
+    // For chromic treatments, store the selected alloy
+    if (treatment.type === 'chromic_anodising') {
+      const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
+      const alloySelect = card.querySelector('.alloy-select')
+
+      if (alloySelect && alloySelect.value && !treatment.selected_alloy) {
+        treatment.selected_alloy = alloySelect.value
       }
     }
 

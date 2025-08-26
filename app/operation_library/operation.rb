@@ -1,4 +1,4 @@
-# app/operation_library/operation.rb - Updated to handle pretreatments, ENP Strip Mask operations, masking removal, sealing, and water break test
+# app/operation_library/operation.rb - Updated to handle chromic anodising without thickness/class filtering
 class Operation
   attr_accessor :id, :alloys, :process_type, :anodic_classes, :target_thickness, :vat_numbers,
                 :operation_text, :specifications, :enp_type, :deposition_rate_range, :time
@@ -81,15 +81,26 @@ class Operation
 
     matching = matching.select { |op| op.process_type == process_type } if process_type.present?
     matching = matching.select { |op| op.alloys.include?(alloy) } if alloy.present?
-    matching = matching.select { |op| op.anodic_classes.include?(anodic_class) } if anodic_class.present?
+
+    # Skip anodic class filtering for chromic anodising
+    if anodic_class.present?
+      matching = matching.select { |op|
+        if op.process_type == 'chromic_anodising'
+          true
+        else
+          op.anodic_classes.include?(anodic_class)
+        end
+      }
+    end
+
     matching = matching.select { |op| op.enp_type == enp_type } if enp_type.present?
 
-    # For thickness, find operations that match exactly or are close (skip for ENP, chemical conversion, masking, stripping, sealing, dichromate_sealing, and water_break_test)
+    # For thickness, find operations that match exactly or are close (skip for ENP, chemical conversion, chromic anodising, masking, stripping, sealing, dichromate_sealing, and water_break_test)
     if target_thickness.present?
       target = target_thickness.to_f
       matching = matching.select do |op|
-        # Skip thickness filtering for chemical conversion, ENP, masking, stripping, sealing, dichromate_sealing, water_break_test, and ENP Strip Mask
-        if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'masking', 'stripping', 'sealing', 'dichromate_sealing', 'water_break_test']) ||
+        # Skip thickness filtering for chemical conversion, ENP, chromic anodising, masking, stripping, sealing, dichromate_sealing, water_break_test, and ENP Strip Mask
+        if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'chromic_anodising', 'masking', 'stripping', 'sealing', 'dichromate_sealing', 'water_break_test']) ||
            ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type)
           true
         else
@@ -97,11 +108,11 @@ class Operation
           (op.target_thickness - target).abs <= 2.5
         end
       end
-      # Sort by closest thickness match (but only for anodising operations)
+      # Sort by closest thickness match (but only for standard/hard anodising operations)
       if criteria[:target_thicknesses].length == 1
         target = criteria[:target_thicknesses].first
         matching = matching.sort_by do |op|
-          if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'masking', 'stripping', 'sealing', 'dichromate_sealing', 'water_break_test']) ||
+          if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'chromic_anodising', 'masking', 'stripping', 'sealing', 'dichromate_sealing', 'water_break_test']) ||
              ['mask', 'masking_check', 'strip', 'strip_masking'].include?(op.process_type)
             0
           else
@@ -127,12 +138,14 @@ class Operation
 
   def self.available_anodic_classes
     auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check', 'masking_inspection', 'pretreatment', 'enp_pretreatment', 'water_break_test']
-    all_operations.reject { |op| auto_inserted_types.include?(op.process_type) }.flat_map(&:anodic_classes).uniq.sort
+    # Exclude chromic anodising from anodic class availability since it doesn't use classes
+    all_operations.reject { |op| auto_inserted_types.include?(op.process_type) || op.process_type == 'chromic_anodising' }.flat_map(&:anodic_classes).uniq.sort
   end
 
   def self.available_thicknesses
     auto_inserted_types = ['rinse', 'degrease', 'contract_review', 'pack', 'inspect', 'vat_inspect', 'final_inspect', 'jig', 'unjig', 'masking_removal', 'masking_removal_check', 'masking_inspection', 'pretreatment', 'enp_pretreatment', 'water_break_test']
-    all_operations.reject { |op| auto_inserted_types.include?(op.process_type) }.map(&:target_thickness).uniq.select { |t| t > 0 }.sort
+    # Exclude chromic anodising from thickness availability since it uses fixed thickness
+    all_operations.reject { |op| auto_inserted_types.include?(op.process_type) || op.process_type == 'chromic_anodising' }.map(&:target_thickness).uniq.select { |t| t > 0 }.sort
   end
 
   def self.available_enp_types
@@ -277,6 +290,10 @@ class Operation
         'Cascade Rinse'
       when 'CASCADE_RINSE_BUNGS'
         'Cascade Rinse (Bungs)'
+      when 'CASCADE_RINSE_5MIN_WAIT'
+        'Cascade Rinse (5min wait)'
+      when 'CASCADE_RINSE_5MIN_WAIT_BUNGS'
+        'Cascade Rinse (5min wait, Bungs)'
       when 'RO_RINSE'
         'RO Rinse'
       when 'RO_RINSE_PRETREATMENT'
@@ -296,6 +313,16 @@ class Operation
         'PTFE Composite ENP'
       else
         'Electroless Nickel'
+      end
+    elsif process_type == 'chromic_anodising'
+      # Don't show thickness for chromic anodising display names
+      case id
+      when 'CAA_40_50V_40MIN'
+        'Chromic Anodise (High Voltage)'
+      when 'CAA_22V_37MIN'
+        'Chromic Anodise (Standard Voltage)'
+      else
+        'Chromic Anodise'
       end
     elsif target_thickness > 0
       "#{id} (#{target_thickness}μm)"
@@ -317,11 +344,17 @@ class Operation
   def matches_criteria?(process_type: nil, alloy: nil, target_thickness: nil, anodic_class: nil, enp_type: nil)
     return false if process_type.present? && self.process_type != process_type
     return false if alloy.present? && !alloys.include?(alloy)
-    return false if anodic_class.present? && !anodic_classes.include?(anodic_class)
+
+    # Skip anodic class check for chromic anodising
+    if anodic_class.present? && self.process_type != 'chromic_anodising'
+      return false unless anodic_classes.include?(anodic_class)
+    end
+
     return false if enp_type.present? && self.enp_type != enp_type
 
+    # Skip thickness check for chromic anodising
     if target_thickness.present? && self.process_type != 'electroless_nickel_plating' &&
-       self.process_type != 'chemical_conversion' &&
+       self.process_type != 'chemical_conversion' && self.process_type != 'chromic_anodising' &&
        !['mask', 'masking_check', 'strip', 'strip_masking', 'masking', 'stripping', 'sealing', 'dichromate_sealing', 'pretreatment', 'enp_pretreatment', 'water_break_test'].include?(self.process_type)
       target = target_thickness.to_f
       return false if (self.target_thickness - target).abs > 2.5
@@ -377,6 +410,10 @@ class Operation
 
   def electroless_nickel_plating?
     process_type == 'electroless_nickel_plating'
+  end
+
+  def chromic_anodising?
+    process_type == 'chromic_anodising'
   end
 
   def enp_strip_mask?
