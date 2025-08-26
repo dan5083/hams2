@@ -282,7 +282,7 @@ export default class extends Controller {
             <option value="general" ${treatment.selected_alloy === 'general' ? 'selected' : ''}>General</option>
             <option value="aluminium" ${treatment.selected_alloy === 'aluminium' ? 'selected' : ''}>Aluminium</option>
             <option value="6000_series" ${treatment.selected_alloy === '6000_series' ? 'selected' : ''}>6000 Series</option>
-            <option value="7075" ${treatment.selected_alloy === '7075' ? 'selected' : ''}>7075 (High Voltage Only)</option>
+            <option value="7075" ${treatment.selected_alloy === '7075' ? 'selected' : ''}>7075 (Standard Voltage Only)</option>
             <option value="2024" ${treatment.selected_alloy === '2024' ? 'selected' : ''}>2024</option>
           </select>
           <p class="mt-1 text-xs text-gray-500">Chromic anodising - no class selection needed</p>
