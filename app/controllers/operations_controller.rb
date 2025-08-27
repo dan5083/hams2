@@ -123,11 +123,12 @@ class OperationsController < ApplicationController
     selected_operations = params[:selected_operations] || []
     enp_strip_type = params[:enp_strip_type] || 'nitric'
     aerospace_defense = params[:aerospace_defense] || false
+    selected_enp_pre_heat_treatment = params[:selected_enp_pre_heat_treatment] # NEW
     selected_enp_heat_treatment = params[:selected_enp_heat_treatment]
 
-    Rails.logger.info "🔍 Preview params: treatments=#{treatments_data.length}, heat_treatment=#{selected_enp_heat_treatment}, aerospace=#{aerospace_defense}"
+    Rails.logger.info "Preview params: treatments=#{treatments_data.length}, pre_heat_treatment=#{selected_enp_pre_heat_treatment}, post_heat_treatment=#{selected_enp_heat_treatment}, aerospace=#{aerospace_defense}"
 
-    # Get operations using the treatment cycle system with ENP Strip/Mask data and ENP heat treatment
+    # Get operations using the treatment cycle system with ENP Strip/Mask data and both ENP heat treatments
     operations_with_auto_ops = PartProcessingInstruction.simulate_operations_with_auto_ops(
       treatments_data,
       selected_jig_type,
@@ -135,10 +136,11 @@ class OperationsController < ApplicationController
       selected_operations,
       enp_strip_type,
       aerospace_defense,
-      selected_enp_heat_treatment
+      selected_enp_heat_treatment,
+      selected_enp_pre_heat_treatment # NEW
     )
 
-    Rails.logger.info "🔍 Generated operations: #{operations_with_auto_ops.length} operations"
+    Rails.logger.info "Generated operations: #{operations_with_auto_ops.length} operations"
 
     render json: { operations: operations_with_auto_ops }
   end

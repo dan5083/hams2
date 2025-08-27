@@ -8,6 +8,8 @@ export default class extends Controller {
     "selectedContainer",
     "specificationField",
     "enpOptionsContainer",
+    "enpPreHeatTreatmentSelect",
+    "enpPreHeatTreatmentField",
     "enpHeatTreatmentSelect",
     "enpHeatTreatmentField",
     "enpStripTypeRadio",
@@ -38,6 +40,7 @@ export default class extends Controller {
     this.maxTreatments = 5
     this.enpStripType = 'nitric'
     this.enpStripMaskEnabled = false
+    this.selectedEnpPreHeatTreatment = 'none' // NEW
     this.selectedEnpHeatTreatment = 'none'
     this.aerospaceDefense = false
     this.treatmentIdCounter = 0
@@ -45,6 +48,7 @@ export default class extends Controller {
     this.initializeExistingData()
     this.setupTreatmentButtons()
     this.setupJigDropdownListener()
+    this.setupENPPreHeatTreatmentListener() // NEW
     this.setupENPHeatTreatmentListener()
     this.setupENPStripTypeListener()
     this.setupENPStripMaskListener()
@@ -59,7 +63,15 @@ export default class extends Controller {
       this.updateTreatmentCounts()
       this.renderTreatmentCards()
 
-      // Initialize ENP heat treatment selection
+      // Initialize ENP pre-heat treatment selection (NEW)
+      if (this.hasEnpPreHeatTreatmentFieldTarget) {
+        this.selectedEnpPreHeatTreatment = this.enpPreHeatTreatmentFieldTarget.value || 'none'
+        if (this.hasEnpPreHeatTreatmentSelectTarget) {
+          this.enpPreHeatTreatmentSelectTarget.value = this.selectedEnpPreHeatTreatment
+        }
+      }
+
+      // Initialize ENP post-heat treatment selection
       if (this.hasEnpHeatTreatmentFieldTarget) {
         this.selectedEnpHeatTreatment = this.enpHeatTreatmentFieldTarget.value || 'none'
         if (this.hasEnpHeatTreatmentSelectTarget) {
@@ -97,13 +109,25 @@ export default class extends Controller {
     }
   }
 
-  // Set up ENP heat treatment dropdown listener
+  // Set up ENP pre-heat treatment dropdown listener (NEW)
+  setupENPPreHeatTreatmentListener() {
+    if (this.hasEnpPreHeatTreatmentSelectTarget) {
+      this.enpPreHeatTreatmentSelectTarget.addEventListener('change', (e) => {
+        this.selectedEnpPreHeatTreatment = e.target.value
+        this.enpPreHeatTreatmentFieldTarget.value = this.selectedEnpPreHeatTreatment
+        console.log("ENP Pre-Heat Treatment changed to:", this.selectedEnpPreHeatTreatment)
+        this.updatePreview()
+      })
+    }
+  }
+
+  // Set up ENP post-heat treatment dropdown listener (UPDATED COMMENT)
   setupENPHeatTreatmentListener() {
     if (this.hasEnpHeatTreatmentSelectTarget) {
       this.enpHeatTreatmentSelectTarget.addEventListener('change', (e) => {
         this.selectedEnpHeatTreatment = e.target.value
         this.enpHeatTreatmentFieldTarget.value = this.selectedEnpHeatTreatment
-        console.log("ENP Heat Treatment changed to:", this.selectedEnpHeatTreatment)
+        console.log("ENP Post-Heat Treatment changed to:", this.selectedEnpHeatTreatment)
         this.updatePreview()
       })
     }
@@ -823,9 +847,9 @@ export default class extends Controller {
     this.treatmentsFieldTarget.value = JSON.stringify(this.treatments)
   }
 
-  // Update preview - UPDATED FOR DYE SUPPORT AND ENP HEAT TREATMENT
+  // Update preview - UPDATED FOR DYE SUPPORT AND ENP HEAT TREATMENTS
   async updatePreview() {
-    console.log('Updating preview with treatments:', this.treatments, 'ENP Heat Treatment:', this.selectedEnpHeatTreatment, 'Aerospace/Defense:', this.aerospaceDefense)
+    console.log('Updating preview with treatments:', this.treatments, 'ENP Pre-Heat Treatment:', this.selectedEnpPreHeatTreatment, 'ENP Post-Heat Treatment:', this.selectedEnpHeatTreatment, 'Aerospace/Defense:', this.aerospaceDefense)
 
     if (this.treatments.length === 0) {
       this.selectedContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">No treatments selected</p>'
@@ -843,7 +867,7 @@ export default class extends Controller {
     }
 
     try {
-      // Convert data structure for server - UPDATED FOR DYE SUPPORT
+      // Convert data structure for server - UPDATED FOR DYE SUPPORT AND PRE-HEAT TREATMENT
       const treatmentsData = treatmentsWithOperations.map(treatment => ({
         id: treatment.id,
         type: treatment.type,
@@ -878,6 +902,7 @@ export default class extends Controller {
       const requestData = {
         treatments_data: treatmentsData,
         aerospace_defense: this.aerospaceDefense,
+        selected_enp_pre_heat_treatment: this.selectedEnpPreHeatTreatment, // NEW
         selected_enp_heat_treatment: this.selectedEnpHeatTreatment
       }
 
@@ -919,7 +944,8 @@ export default class extends Controller {
         const isAutoInserted = op.auto_inserted
         const isWaterBreakTest = op.id === 'WATER_BREAK_TEST'
         const isDye = op.id && (op.id.includes('_DYE') || op.display_name?.includes('Dye'))
-        const isHeatTreatment = op.id && (op.id.includes('ENP_HEAT_TREAT') || op.id.includes('ENP_POST_HEAT_TREAT') || op.id.includes('ENP_BAKE'))
+        const isPreHeatTreatment = op.id && op.id.startsWith('PRE_ENP_HEAT_TREAT')
+        const isPostHeatTreatment = op.id && (op.id.startsWith('POST_ENP_HEAT_TREAT') || op.id.includes('ENP_POST_HEAT_TREAT') || op.id.includes('ENP_BAKE'))
 
         let bgColor = 'bg-blue-100 border border-blue-300'
         let textColor = 'text-gray-900'
@@ -943,10 +969,16 @@ export default class extends Controller {
           autoLabel = '<span class="text-xs text-purple-600 ml-2">(dye operation)</span>'
         }
 
-        if (isHeatTreatment) {
+        if (isPreHeatTreatment) {
+          bgColor = 'bg-amber-50 border border-amber-200'
+          textColor = 'text-amber-800'
+          autoLabel = '<span class="text-xs text-amber-600 ml-2">(ENP pre-heat treatment)</span>'
+        }
+
+        if (isPostHeatTreatment) {
           bgColor = 'bg-orange-50 border border-orange-200'
           textColor = 'text-orange-800'
-          autoLabel = '<span class="text-xs text-orange-600 ml-2">(ENP heat treatment)</span>'
+          autoLabel = '<span class="text-xs text-orange-600 ml-2">(ENP post-heat treatment)</span>'
         }
 
         return `

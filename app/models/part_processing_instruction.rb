@@ -51,14 +51,24 @@ class PartProcessingInstruction < ApplicationRecord
     operation_selection["aerospace_defense"] == true || operation_selection["aerospace_defense"] == "true"
   end
 
-  # Get selected ENP heat treatment
+  # Get selected ENP post-heat treatment
   def selected_enp_heat_treatment
     operation_selection["selected_enp_heat_treatment"]
   end
 
-  # Check if ENP heat treatment is selected
+  # Get selected ENP pre-heat treatment (NEW)
+  def selected_enp_pre_heat_treatment
+    operation_selection["selected_enp_pre_heat_treatment"]
+  end
+
+  # Check if ENP post-heat treatment is selected
   def enp_heat_treatment_selected?
     selected_enp_heat_treatment.present? && selected_enp_heat_treatment != 'none'
+  end
+
+  # Check if ENP pre-heat treatment is selected (NEW)
+  def enp_pre_heat_treatment_selected?
+    selected_enp_pre_heat_treatment.present? && selected_enp_pre_heat_treatment != 'none'
   end
 
   # FIXED: Main method - get operations with correct ordering including water break test and ENP heat treatments
@@ -74,12 +84,15 @@ class PartProcessingInstruction < ApplicationRecord
     safe_add_to_sequence(sequence, OperationLibrary::InspectFinalInspectVatInspect.get_incoming_inspection_operation, "Incoming Inspection")
     safe_add_to_sequence(sequence, OperationLibrary::InspectFinalInspectVatInspect.get_vat_inspection_operation, "VAT Inspection")
 
+    # NEW: ENP Pre-Heat Treatment (before any treatment cycles)
+    add_enp_pre_heat_treatment_if_selected(sequence) if has_enp
+
     # Treatment cycles (main processing)
     treatments.each { |treatment| add_treatment_cycle(sequence, treatment, has_enp) }
 
     # FIXED: Post-treatment operations in correct order
 
-    # 1. ENP Heat Treatment (after all treatment cycles but before ENP Strip/Mask)
+    # 1. ENP Post-Heat Treatment (after all treatment cycles but before ENP Strip/Mask)
     add_enp_heat_treatment_if_selected(sequence) if has_enp
 
     # 2. ENP Strip/Mask operations (before final inspection!)
@@ -148,7 +161,7 @@ class PartProcessingInstruction < ApplicationRecord
   end
 
   # FIXED: Class method for frontend preview with correct ordering including water break test and ENP heat treatments
-  def self.simulate_operations_with_auto_ops(treatments_data, selected_jig_type = nil, selected_alloy = nil, selected_operations = nil, enp_strip_type = 'nitric', aerospace_defense = false, selected_enp_heat_treatment = nil)
+  def self.simulate_operations_with_auto_ops(treatments_data, selected_jig_type = nil, selected_alloy = nil, selected_operations = nil, enp_strip_type = 'nitric', aerospace_defense = false, selected_enp_heat_treatment = nil, selected_enp_pre_heat_treatment = nil)
     return [] if treatments_data.blank?
 
     mock_ppi = new
@@ -159,7 +172,8 @@ class PartProcessingInstruction < ApplicationRecord
         "selected_operations" => selected_operations || [],
         "enp_strip_type" => enp_strip_type,
         "aerospace_defense" => aerospace_defense,
-        "selected_enp_heat_treatment" => selected_enp_heat_treatment
+        "selected_enp_heat_treatment" => selected_enp_heat_treatment,
+        "selected_enp_pre_heat_treatment" => selected_enp_pre_heat_treatment # NEW
       }
     }
 
@@ -191,16 +205,43 @@ class PartProcessingInstruction < ApplicationRecord
     end
   end
 
-  # NEW: Add ENP heat treatment if selected
+  # NEW: Add ENP pre-heat treatment if selected (before jigging)
+  def add_enp_pre_heat_treatment_if_selected(sequence)
+    return unless enp_pre_heat_treatment_selected?
+    return unless defined?(OperationLibrary::EnpHeatTreatments)
+
+    pre_heat_treatment = OperationLibrary::EnpHeatTreatments.get_heat_treatment_operation(selected_enp_pre_heat_treatment)
+    if pre_heat_treatment
+      # Create a duplicate with modified text to indicate it's pre-heat
+      pre_heat_op = Operation.new(
+        id: "PRE_#{pre_heat_treatment.id}",
+        process_type: 'enp_pre_heat_treatment',
+        operation_text: "**Pre-Heat:** #{pre_heat_treatment.operation_text}",
+        specifications: pre_heat_treatment.specifications
+      )
+      safe_add_to_sequence(sequence, pre_heat_op, "ENP Pre-Heat Treatment")
+    else
+      Rails.logger.warn "ENP Pre-Heat Treatment not found: #{selected_enp_pre_heat_treatment}"
+    end
+  end
+
+  # UPDATED: Add ENP post-heat treatment if selected (after unjig)
   def add_enp_heat_treatment_if_selected(sequence)
     return unless enp_heat_treatment_selected?
     return unless defined?(OperationLibrary::EnpHeatTreatments)
 
     heat_treatment = OperationLibrary::EnpHeatTreatments.get_heat_treatment_operation(selected_enp_heat_treatment)
     if heat_treatment
-      safe_add_to_sequence(sequence, heat_treatment, "ENP Heat Treatment")
+      # Create a duplicate with modified text to indicate it's post-heat
+      post_heat_op = Operation.new(
+        id: "POST_#{heat_treatment.id}",
+        process_type: 'enp_post_heat_treatment',
+        operation_text: "**Post-Heat:** #{heat_treatment.operation_text}",
+        specifications: heat_treatment.specifications
+      )
+      safe_add_to_sequence(sequence, post_heat_op, "ENP Post-Heat Treatment")
     else
-      Rails.logger.warn "ENP Heat Treatment not found: #{selected_enp_heat_treatment}"
+      Rails.logger.warn "ENP Post-Heat Treatment not found: #{selected_enp_heat_treatment}"
     end
   end
 
@@ -297,7 +338,7 @@ class PartProcessingInstruction < ApplicationRecord
     end
 
     # NOTE: Final inspection and pack are now added in get_operations_with_auto_ops
-    # AFTER all treatment cycles, ENP heat treatment, and ENP Strip/Mask operations are complete
+    # AFTER all treatment cycles, ENP heat treatments, and ENP Strip/Mask operations are complete
   end
 
   # ENP cycle - no masking/dye in cycle, handled by ENP Strip/Mask later
@@ -330,10 +371,10 @@ class PartProcessingInstruction < ApplicationRecord
     # 5. Unjig
     safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_unjig_operation, "ENP Unjig")
 
-    # NOTE: ENP Heat Treatment and ENP Strip/Mask operations are handled separately in get_operations_with_auto_ops
+    # NOTE: ENP Heat Treatments and ENP Strip/Mask operations are handled separately in get_operations_with_auto_ops
     # They occur AFTER all treatment cycles in the correct order:
     # 1. All treatment cycles complete
-    # 2. ENP Heat Treatment (if selected)
+    # 2. ENP Post-Heat Treatment (if selected)
     # 3. ENP Strip/Mask operations (if selected)
     # 4. Final inspection
     # 5. Pack
