@@ -7,7 +7,9 @@ export default class extends Controller {
     "treatmentsContainer",
     "selectedContainer",
     "specificationField",
-    "enpStripTypeContainer",
+    "enpOptionsContainer",
+    "enpHeatTreatmentSelect",
+    "enpHeatTreatmentField",
     "enpStripTypeRadio",
     "enpStripTypeField",
     "enpStripMaskCheckbox",
@@ -36,12 +38,14 @@ export default class extends Controller {
     this.maxTreatments = 5
     this.enpStripType = 'nitric'
     this.enpStripMaskEnabled = false
+    this.selectedEnpHeatTreatment = 'none'
     this.aerospaceDefense = false
     this.treatmentIdCounter = 0
 
     this.initializeExistingData()
     this.setupTreatmentButtons()
     this.setupJigDropdownListener()
+    this.setupENPHeatTreatmentListener()
     this.setupENPStripTypeListener()
     this.setupENPStripMaskListener()
     this.setupAerospaceDefenseListener()
@@ -55,12 +59,22 @@ export default class extends Controller {
       this.updateTreatmentCounts()
       this.renderTreatmentCards()
 
+      // Initialize ENP heat treatment selection
+      if (this.hasEnpHeatTreatmentFieldTarget) {
+        this.selectedEnpHeatTreatment = this.enpHeatTreatmentFieldTarget.value || 'none'
+        if (this.hasEnpHeatTreatmentSelectTarget) {
+          this.enpHeatTreatmentSelectTarget.value = this.selectedEnpHeatTreatment
+        }
+      }
+
       // Initialize aerospace/defense flag
       if (this.hasAerospaceDefenseCheckboxTarget) {
         this.aerospaceDefense = this.aerospaceDefenseCheckboxTarget.checked
         this.aerospaceDefenseFieldTarget.value = this.aerospaceDefense
       }
 
+      // Show ENP options if ENP treatments are present
+      this.updateENPOptionsVisibility()
       this.updatePreview()
     } catch(e) {
       console.error("Error parsing existing treatments:", e)
@@ -80,6 +94,18 @@ export default class extends Controller {
     const jigSelect = this.element.querySelector('select[name*="selected_jig_type"]')
     if (jigSelect) {
       jigSelect.addEventListener('change', () => this.updatePreview())
+    }
+  }
+
+  // Set up ENP heat treatment dropdown listener
+  setupENPHeatTreatmentListener() {
+    if (this.hasEnpHeatTreatmentSelectTarget) {
+      this.enpHeatTreatmentSelectTarget.addEventListener('change', (e) => {
+        this.selectedEnpHeatTreatment = e.target.value
+        this.enpHeatTreatmentFieldTarget.value = this.selectedEnpHeatTreatment
+        console.log("ENP Heat Treatment changed to:", this.selectedEnpHeatTreatment)
+        this.updatePreview()
+      })
     }
   }
 
@@ -160,6 +186,16 @@ export default class extends Controller {
     this.updateButtonAppearance(button, treatmentType)
     this.renderTreatmentCards()
     this.updateTreatmentsField()
+    this.updateENPOptionsVisibility()
+  }
+
+  // Update ENP options visibility based on treatment selection
+  updateENPOptionsVisibility() {
+    const hasENPTreatment = this.treatments.some(t => t.type === 'electroless_nickel_plating')
+
+    if (this.hasEnpOptionsContainerTarget) {
+      this.enpOptionsContainerTarget.style.display = hasENPTreatment ? 'block' : 'none'
+    }
   }
 
   // Update button appearance
@@ -180,11 +216,6 @@ export default class extends Controller {
     countBadge.classList.remove('bg-gray-100')
     countBadge.classList.add(badgeColor, 'text-white')
     countBadge.textContent = this.treatmentCounts[treatmentType]
-
-    // Show ENP options if ENP selected
-    if (treatmentType === 'electroless_nickel_plating' && this.hasEnpStripTypeContainerTarget) {
-      this.enpStripTypeContainerTarget.style.display = 'block'
-    }
   }
 
   // Update treatment counts from current treatments array
@@ -733,11 +764,6 @@ export default class extends Controller {
       if (button) {
         this.resetButtonAppearance(button)
       }
-
-      // Hide ENP options if no more ENP treatments
-      if (treatment.type === 'electroless_nickel_plating' && this.hasEnpStripTypeContainerTarget) {
-        this.enpStripTypeContainerTarget.style.display = 'none'
-      }
     } else {
       // Update count badge
       const button = this.element.querySelector(`[data-treatment="${treatment.type}"]`)
@@ -749,6 +775,7 @@ export default class extends Controller {
 
     this.renderTreatmentCards()
     this.updateTreatmentsField()
+    this.updateENPOptionsVisibility()
     this.updatePreview()
   }
 
@@ -796,9 +823,9 @@ export default class extends Controller {
     this.treatmentsFieldTarget.value = JSON.stringify(this.treatments)
   }
 
-  // Update preview - UPDATED FOR DYE SUPPORT
+  // Update preview - UPDATED FOR DYE SUPPORT AND ENP HEAT TREATMENT
   async updatePreview() {
-    console.log('Updating preview with treatments:', this.treatments, 'Aerospace/Defense:', this.aerospaceDefense)
+    console.log('Updating preview with treatments:', this.treatments, 'ENP Heat Treatment:', this.selectedEnpHeatTreatment, 'Aerospace/Defense:', this.aerospaceDefense)
 
     if (this.treatments.length === 0) {
       this.selectedContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">No treatments selected</p>'
@@ -850,7 +877,8 @@ export default class extends Controller {
 
       const requestData = {
         treatments_data: treatmentsData,
-        aerospace_defense: this.aerospaceDefense
+        aerospace_defense: this.aerospaceDefense,
+        selected_enp_heat_treatment: this.selectedEnpHeatTreatment
       }
 
       // Add jig type
@@ -891,6 +919,7 @@ export default class extends Controller {
         const isAutoInserted = op.auto_inserted
         const isWaterBreakTest = op.id === 'WATER_BREAK_TEST'
         const isDye = op.id && (op.id.includes('_DYE') || op.display_name?.includes('Dye'))
+        const isHeatTreatment = op.id && (op.id.includes('ENP_HEAT_TREAT') || op.id.includes('ENP_POST_HEAT_TREAT') || op.id.includes('ENP_BAKE'))
 
         let bgColor = 'bg-blue-100 border border-blue-300'
         let textColor = 'text-gray-900'
@@ -912,6 +941,12 @@ export default class extends Controller {
           bgColor = 'bg-purple-50 border border-purple-200'
           textColor = 'text-purple-800'
           autoLabel = '<span class="text-xs text-purple-600 ml-2">(dye operation)</span>'
+        }
+
+        if (isHeatTreatment) {
+          bgColor = 'bg-orange-50 border border-orange-200'
+          textColor = 'text-orange-800'
+          autoLabel = '<span class="text-xs text-orange-600 ml-2">(ENP heat treatment)</span>'
         }
 
         return `

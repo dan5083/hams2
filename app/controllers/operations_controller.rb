@@ -1,4 +1,4 @@
-# app/controllers/operations_controller.rb - Updated for chromic anodising changes
+# app/controllers/operations_controller.rb - Updated for chromic anodising changes and ENP heat treatments
 class OperationsController < ApplicationController
   skip_before_action :verify_authenticity_token, only: [:filter, :details, :preview_with_auto_ops]
 
@@ -44,8 +44,8 @@ class OperationsController < ApplicationController
     # Filter by target thickness (with tolerance) - skip for chromic anodising
     if criteria[:target_thicknesses].present?
       operations = operations.select do |op|
-        # Skip thickness filtering for chemical conversion, ENP, and chromic anodising
-        if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'chromic_anodising'])
+        # Skip thickness filtering for chemical conversion, ENP, chromic anodising, and ENP heat treatments
+        if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'chromic_anodising', 'enp_heat_treatment', 'enp_post_heat_treatment', 'enp_baking'])
           true
         else
           # Exact match or within reasonable tolerance (±2.5μm)
@@ -59,7 +59,7 @@ class OperationsController < ApplicationController
       if criteria[:target_thicknesses].length == 1
         target = criteria[:target_thicknesses].first
         operations = operations.sort_by do |op|
-          if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'chromic_anodising'])
+          if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'chromic_anodising', 'enp_heat_treatment', 'enp_post_heat_treatment', 'enp_baking'])
             0
           else
             (op.target_thickness - target).abs
@@ -123,17 +123,22 @@ class OperationsController < ApplicationController
     selected_operations = params[:selected_operations] || []
     enp_strip_type = params[:enp_strip_type] || 'nitric'
     aerospace_defense = params[:aerospace_defense] || false
+    selected_enp_heat_treatment = params[:selected_enp_heat_treatment]
 
+    Rails.logger.info "🔍 Preview params: treatments=#{treatments_data.length}, heat_treatment=#{selected_enp_heat_treatment}, aerospace=#{aerospace_defense}"
 
-    # Get operations using the treatment cycle system with ENP Strip/Mask data
+    # Get operations using the treatment cycle system with ENP Strip/Mask data and ENP heat treatment
     operations_with_auto_ops = PartProcessingInstruction.simulate_operations_with_auto_ops(
       treatments_data,
       selected_jig_type,
       selected_alloy,
       selected_operations,
       enp_strip_type,
-      aerospace_defense
+      aerospace_defense,
+      selected_enp_heat_treatment
     )
+
+    Rails.logger.info "🔍 Generated operations: #{operations_with_auto_ops.length} operations"
 
     render json: { operations: operations_with_auto_ops }
   end
