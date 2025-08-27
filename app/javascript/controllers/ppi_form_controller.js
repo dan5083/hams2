@@ -40,15 +40,45 @@ export default class extends Controller {
     this.maxTreatments = 5
     this.enpStripType = 'nitric'
     this.enpStripMaskEnabled = false
-    this.selectedEnpPreHeatTreatment = 'none' // NEW
+    this.selectedEnpPreHeatTreatment = 'none'
     this.selectedEnpHeatTreatment = 'none'
     this.aerospaceDefense = false
     this.treatmentIdCounter = 0
 
+    // Available jig types
+    this.availableJigTypes = [
+      'a secure titanium-to-part assy',
+      'Expanding Jig',
+      'Large Aluminum Expanding Jig',
+      'Rotor Jig',
+      'Vertical AllThread Jig',
+      'Twisted Double Strap Jig',
+      'Long Twisted Double Strap Jig',
+      'Double Strap Jig',
+      '3 Prong Jig',
+      '4 Prong Jig',
+      'Flat 3 Prong Jig',
+      'Flat 4 Prong Jig',
+      'M6 Jig (Metric)',
+      'M6 Jig (UNC)',
+      'Thin-stem M8 Jig',
+      'Thick-stem M8 Jig',
+      'Spring Jig',
+      'Circular Spring Jig',
+      'Aluminum Clamp Jig',
+      'Wheel Nut Jig',
+      'Muller Jigs',
+      'Flat Piston Jig',
+      'Upright Piston Jig',
+      'Thick Wrap Around Jig',
+      'Thin Wrap Around Jig',
+      'Monobloc Jig',
+      'Hytorque Jig'
+    ]
+
     this.initializeExistingData()
     this.setupTreatmentButtons()
-    this.setupJigDropdownListener()
-    this.setupENPPreHeatTreatmentListener() // NEW
+    this.setupENPPreHeatTreatmentListener()
     this.setupENPHeatTreatmentListener()
     this.setupENPStripTypeListener()
     this.setupENPStripMaskListener()
@@ -63,7 +93,7 @@ export default class extends Controller {
       this.updateTreatmentCounts()
       this.renderTreatmentCards()
 
-      // Initialize ENP pre-heat treatment selection (NEW)
+      // Initialize ENP pre-heat treatment selection
       if (this.hasEnpPreHeatTreatmentFieldTarget) {
         this.selectedEnpPreHeatTreatment = this.enpPreHeatTreatmentFieldTarget.value || 'none'
         if (this.hasEnpPreHeatTreatmentSelectTarget) {
@@ -101,15 +131,7 @@ export default class extends Controller {
     })
   }
 
-  // Set up jig dropdown change listener
-  setupJigDropdownListener() {
-    const jigSelect = this.element.querySelector('select[name*="selected_jig_type"]')
-    if (jigSelect) {
-      jigSelect.addEventListener('change', () => this.updatePreview())
-    }
-  }
-
-  // Set up ENP pre-heat treatment dropdown listener (NEW)
+  // Set up ENP pre-heat treatment dropdown listener
   setupENPPreHeatTreatmentListener() {
     if (this.hasEnpPreHeatTreatmentSelectTarget) {
       this.enpPreHeatTreatmentSelectTarget.addEventListener('change', (e) => {
@@ -121,7 +143,7 @@ export default class extends Controller {
     }
   }
 
-  // Set up ENP post-heat treatment dropdown listener (UPDATED COMMENT)
+  // Set up ENP post-heat treatment dropdown listener
   setupENPHeatTreatmentListener() {
     if (this.hasEnpHeatTreatmentSelectTarget) {
       this.enpHeatTreatmentSelectTarget.addEventListener('change', (e) => {
@@ -197,12 +219,13 @@ export default class extends Controller {
       operation_id: null,
       selected_alloy: null, // For ENP treatments
       target_thickness: null, // For ENP treatments
+      selected_jig_type: null, // NEW: Per-treatment jig selection
       // Multiple masking methods with individual locations
       masking_methods: {}, // e.g., {"bungs": "threads", "pc21_polyester_tape": "external surface"}
       stripping_method: 'none',
       sealing_method: 'none',
-      dye_color: 'none', // NEW: dye color selection
-      ptfe_enabled: false // NEW: PTFE toggle
+      dye_color: 'none',
+      ptfe_enabled: false
     }
 
     this.treatments.push(treatment)
@@ -294,6 +317,18 @@ export default class extends Controller {
           <button type="button" class="text-red-600 hover:text-red-800 text-xl font-bold" data-action="click->ppi-form#removeTreatment" data-ppi-form-treatment-id-param="${treatment.id}">×</button>
         </div>
 
+        <!-- Jig Selection (NEW: Per-treatment) -->
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Jig Type</label>
+          <select class="jig-type-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" data-treatment-id="${treatment.id}" required>
+            <option value="">Select jig type...</option>
+            ${this.availableJigTypes.map(jig =>
+              `<option value="${jig}" ${treatment.selected_jig_type === jig ? 'selected' : ''}>${jig}</option>`
+            ).join('')}
+          </select>
+          <p class="mt-1 text-xs text-gray-500">Required for jigging operations in this treatment</p>
+        </div>
+
         <!-- Operation Selection -->
         <div class="mb-4">
           <label class="block text-sm font-medium text-gray-700 mb-2">Select Operation</label>
@@ -305,13 +340,13 @@ export default class extends Controller {
         <!-- Criteria Selection -->
         ${this.generateCriteriaHTML(treatment)}
 
-        <!-- Treatment Modifiers - UPDATED WITH DYE SUPPORT -->
+        <!-- Treatment Modifiers -->
         ${isENP ? '' : this.generateTreatmentModifiersHTML(treatment)}
       </div>
     `
   }
 
-  // Generate criteria selection HTML - UPDATED TO HANDLE CHROMIC DIFFERENTLY
+  // Generate criteria selection HTML
   generateCriteriaHTML(treatment) {
     if (treatment.type === 'chemical_conversion') {
       return '' // Chemical conversion needs no criteria
@@ -430,7 +465,7 @@ export default class extends Controller {
     `
   }
 
-  // Generate treatment modifiers HTML - UPDATED WITH DYE SUPPORT
+  // Generate treatment modifiers HTML
   generateTreatmentModifiersHTML(treatment) {
     const anodisingTypes = ['standard_anodising', 'hard_anodising', 'chromic_anodising']
     const showSealing = anodisingTypes.includes(treatment.type)
@@ -484,7 +519,7 @@ export default class extends Controller {
               </select>
             </div>
 
-            <!-- NEW: Dye Selection (for anodising only) -->
+            <!-- Dye Selection (for anodising only) -->
             ${showDye ? `
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Dye Color</label>
@@ -516,7 +551,7 @@ export default class extends Controller {
             ` : ''}
           </div>
 
-          <!-- NEW: PTFE Toggle (for anodising only, after sealing) -->
+          <!-- PTFE Toggle (for anodising only, after sealing) -->
           ${showDye ? `
           <div class="mt-4 pt-4 border-t border-gray-200">
             <label class="flex items-center">
@@ -531,7 +566,7 @@ export default class extends Controller {
     `
   }
 
-  // Add event listeners to treatment cards - UPDATED FOR DYE SUPPORT
+  // Add event listeners to treatment cards
   addTreatmentCardListeners() {
     this.treatmentsContainerTarget.querySelectorAll('select, input').forEach(element => {
       element.addEventListener('change', (e) => this.handleTreatmentChange(e))
@@ -546,13 +581,18 @@ export default class extends Controller {
     })
   }
 
-  // Handle changes in treatment configuration - UPDATED FOR DYE SUPPORT
+  // Handle changes in treatment configuration
   handleTreatmentChange(event) {
     const treatmentId = event.target.dataset.treatmentId
     if (!treatmentId) return
 
     const treatment = this.treatments.find(t => t.id === treatmentId)
     if (!treatment) return
+
+    // Handle jig selection changes (NEW)
+    if (event.target.classList.contains('jig-type-select')) {
+      treatment.selected_jig_type = event.target.value
+    }
 
     // Store alloy selection for ENP treatments
     if (event.target.classList.contains('alloy-select') && treatment.type === 'electroless_nickel_plating') {
@@ -610,12 +650,10 @@ export default class extends Controller {
       treatment.sealing_method = event.target.value
     }
 
-    // NEW: Handle dye color selection
     if (event.target.classList.contains('dye-color-select')) {
       treatment.dye_color = event.target.value
     }
 
-    // NEW: Handle PTFE checkbox changes
     if (event.target.classList.contains('ptfe-checkbox')) {
       treatment.ptfe_enabled = event.target.checked
     }
@@ -666,11 +704,9 @@ export default class extends Controller {
       if (thicknessInput?.value) {
         const thickness = parseFloat(thicknessInput.value)
         criteria.target_thicknesses = [thickness]
-        // Store thickness in treatment for server-side time calculation
         treatment.target_thickness = thickness
       }
     } else if (treatment.type === 'chromic_anodising') {
-      // Chromic only needs alloy selection - no thickness or class
       const alloySelect = card.querySelector('.alloy-select')
       if (alloySelect?.value) criteria.alloys = [alloySelect.value]
     } else if (treatment.type !== 'chemical_conversion') {
@@ -724,7 +760,7 @@ export default class extends Controller {
     console.log(`Selecting operation ${operationId} for treatment ${treatmentId}`)
     treatment.operation_id = operationId
 
-    // For ENP treatments, also store the selected alloy and thickness if not already stored
+    // For ENP treatments, store alloy and thickness
     if (treatment.type === 'electroless_nickel_plating') {
       const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
       const alloySelect = card.querySelector('.alloy-select')
@@ -734,13 +770,12 @@ export default class extends Controller {
         treatment.selected_alloy = alloySelect.value
       }
 
-      // Store thickness for server-side time calculation
       if (thicknessInput && thicknessInput.value) {
         treatment.target_thickness = parseFloat(thicknessInput.value)
       }
     }
 
-    // For chromic treatments, store the selected alloy
+    // For chromic treatments, store alloy
     if (treatment.type === 'chromic_anodising') {
       const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
       const alloySelect = card.querySelector('.alloy-select')
@@ -847,9 +882,9 @@ export default class extends Controller {
     this.treatmentsFieldTarget.value = JSON.stringify(this.treatments)
   }
 
-  // Update preview - UPDATED FOR DYE SUPPORT AND ENP HEAT TREATMENTS
+  // Update preview
   async updatePreview() {
-    console.log('Updating preview with treatments:', this.treatments, 'ENP Pre-Heat Treatment:', this.selectedEnpPreHeatTreatment, 'ENP Post-Heat Treatment:', this.selectedEnpHeatTreatment, 'Aerospace/Defense:', this.aerospaceDefense)
+    console.log('Updating preview with treatments:', this.treatments, 'ENP Pre-Heat:', this.selectedEnpPreHeatTreatment, 'ENP Post-Heat:', this.selectedEnpHeatTreatment, 'Aerospace/Defense:', this.aerospaceDefense)
 
     if (this.treatments.length === 0) {
       this.selectedContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">No treatments selected</p>'
@@ -866,14 +901,23 @@ export default class extends Controller {
       return
     }
 
+    // Check if all treatments have jig types selected
+    const treatmentsWithoutJigs = treatmentsWithOperations.filter(t => !t.selected_jig_type)
+    if (treatmentsWithoutJigs.length > 0) {
+      this.selectedContainerTarget.innerHTML = '<p class="text-yellow-600 text-sm">Select jig types for all treatments to see preview</p>'
+      this.specificationFieldTarget.value = ''
+      return
+    }
+
     try {
-      // Convert data structure for server - UPDATED FOR DYE SUPPORT AND PRE-HEAT TREATMENT
+      // Convert data structure for server
       const treatmentsData = treatmentsWithOperations.map(treatment => ({
         id: treatment.id,
         type: treatment.type,
         operation_id: treatment.operation_id,
         selected_alloy: treatment.selected_alloy,
         target_thickness: treatment.target_thickness,
+        selected_jig_type: treatment.selected_jig_type, // NEW: Per-treatment jig
         masking: {
           enabled: Object.keys(treatment.masking_methods || {}).length > 0,
           methods: treatment.masking_methods || {}
@@ -888,12 +932,10 @@ export default class extends Controller {
           enabled: treatment.sealing_method !== 'none',
           type: treatment.sealing_method !== 'none' ? treatment.sealing_method : null
         },
-        // NEW: dye data structure
         dye: {
           enabled: treatment.dye_color !== 'none',
           color: treatment.dye_color !== 'none' ? treatment.dye_color : null
         },
-        // NEW: PTFE data structure
         ptfe: {
           enabled: treatment.ptfe_enabled
         }
@@ -902,14 +944,8 @@ export default class extends Controller {
       const requestData = {
         treatments_data: treatmentsData,
         aerospace_defense: this.aerospaceDefense,
-        selected_enp_pre_heat_treatment: this.selectedEnpPreHeatTreatment, // NEW
+        selected_enp_pre_heat_treatment: this.selectedEnpPreHeatTreatment,
         selected_enp_heat_treatment: this.selectedEnpHeatTreatment
-      }
-
-      // Add jig type
-      const jigSelect = this.element.querySelector('select[name*="selected_jig_type"]')
-      if (jigSelect?.value) {
-        requestData.selected_jig_type = jigSelect.value
       }
 
       // Add ENP strip mask if enabled

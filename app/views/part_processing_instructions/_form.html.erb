@@ -89,18 +89,6 @@
             class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
       </div>
 
-      <!-- Jig Selection -->
-      <div>
-        <%= label_tag "part_processing_instruction[customisation_data][operation_selection][selected_jig_type]", "Jig Type", class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= select_tag "part_processing_instruction[customisation_data][operation_selection][selected_jig_type]",
-            options_for_select([['Select jig type...', '']] + OperationLibrary::JigUnjig.available_jig_types.map { |jig| [jig, jig] }, ppi.selected_jig_type),
-            {
-              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
-              required: true
-            } %>
-        <p class="mt-1 text-xs text-gray-500">Required for jigging operations (auto-inserted in process sequence)</p>
-      </div>
-
       <!-- Aerospace/Defense Application -->
       <div>
         <%= label_tag "part_processing_instruction[customisation_data][operation_selection][aerospace_defense]", "Application Type", class: "block text-sm font-medium text-gray-700 mb-1" %>
@@ -135,7 +123,7 @@
   <!-- Treatment Selection -->
   <div class="bg-white shadow rounded-lg p-6">
     <h3 class="text-lg font-medium text-gray-900 mb-4">Treatment Selection</h3>
-    <p class="text-sm text-gray-600 mb-4">Select up to 5 treatments. Each treatment can have masking, stripping, dye, and sealing options.</p>
+    <p class="text-sm text-gray-600 mb-4">Select up to 5 treatments. Each treatment can have its own jig type, masking, stripping, dye, and sealing options.</p>
 
     <!-- Treatment Type Buttons -->
     <div class="grid grid-cols-2 gap-3 mb-6 sm:grid-cols-5">
@@ -169,7 +157,7 @@
     <div data-ppi-form-target="enpOptionsContainer" class="mb-6" style="display: none;">
       <h4 class="text-md font-medium text-gray-900 mb-4">ENP Options</h4>
 
-      <!-- ENP Pre-Heat Treatment Selection (NEW) -->
+      <!-- ENP Pre-Heat Treatment Selection -->
       <div class="mb-4">
         <label for="enp_pre_heat_treatment_select" class="block text-sm font-medium text-gray-700 mb-2">Pre-Heat Treatment (Optional)</label>
         <select id="enp_pre_heat_treatment_select" data-ppi-form-target="enpPreHeatTreatmentSelect" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
@@ -195,7 +183,7 @@
         <p class="mt-1 text-xs text-gray-500">Pre-heat treatment occurs before jigging operations</p>
       </div>
 
-      <!-- ENP Post-Heat Treatment Selection (UPDATED LABEL) -->
+      <!-- ENP Post-Heat Treatment Selection -->
       <div class="mb-4">
         <label for="enp_heat_treatment_select" class="block text-sm font-medium text-gray-700 mb-2">Post-Heat Treatment (Optional)</label>
         <select id="enp_heat_treatment_select" data-ppi-form-target="enpHeatTreatmentSelect" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
@@ -304,12 +292,12 @@
         ppi.operation_selection["treatments"]&.to_json || '[]',
         data: { ppi_form_target: "treatmentsField" } %>
 
-    <!-- Hidden field for ENP pre-heat treatment (NEW) -->
+    <!-- Hidden field for ENP pre-heat treatment -->
     <%= hidden_field_tag "part_processing_instruction[customisation_data][operation_selection][selected_enp_pre_heat_treatment]",
         ppi.selected_enp_pre_heat_treatment || 'none',
         data: { ppi_form_target: "enpPreHeatTreatmentField" } %>
 
-    <!-- Hidden field for ENP post-heat treatment (UPDATED NAME) -->
+    <!-- Hidden field for ENP post-heat treatment -->
     <%= hidden_field_tag "part_processing_instruction[customisation_data][operation_selection][selected_enp_heat_treatment]",
         ppi.selected_enp_heat_treatment || 'none',
         data: { ppi_form_target: "enpHeatTreatmentField" } %>
@@ -360,7 +348,7 @@
       <div class="ml-3">
         <h3 class="text-sm font-medium text-blue-800">Treatment Cycle System</h3>
         <div class="mt-2 text-sm text-blue-700">
-          <p>Select up to 5 treatments in the order you want them processed. Each anodising or chemical conversion treatment can have masking, stripping, dye, and sealing options. ENP treatments include optional pre-heat treatment (before jigging), post-heat treatment (after unjig), and ENP Strip/Mask systems. Auto-operations (inspections, jigging, rinses, etc.) are automatically inserted in the correct sequence. Aerospace/Defense applications automatically include water break tests after degreasing operations.</p>
+          <p>Select up to 5 treatments in the order you want them processed. Each treatment can have its own jig type, masking, stripping, dye, and sealing options. ENP treatments include optional pre-heat treatment (before jigging), post-heat treatment (after unjig), and ENP Strip/Mask systems. Auto-operations (inspections, rinses, etc.) are automatically inserted in the correct sequence. Aerospace/Defense applications automatically include water break tests after degreasing operations.</p>
         </div>
       </div>
     </div>

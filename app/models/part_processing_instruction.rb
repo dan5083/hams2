@@ -56,7 +56,7 @@ class PartProcessingInstruction < ApplicationRecord
     operation_selection["selected_enp_heat_treatment"]
   end
 
-  # Get selected ENP pre-heat treatment (NEW)
+  # Get selected ENP pre-heat treatment
   def selected_enp_pre_heat_treatment
     operation_selection["selected_enp_pre_heat_treatment"]
   end
@@ -66,12 +66,12 @@ class PartProcessingInstruction < ApplicationRecord
     selected_enp_heat_treatment.present? && selected_enp_heat_treatment != 'none'
   end
 
-  # Check if ENP pre-heat treatment is selected (NEW)
+  # Check if ENP pre-heat treatment is selected
   def enp_pre_heat_treatment_selected?
     selected_enp_pre_heat_treatment.present? && selected_enp_pre_heat_treatment != 'none'
   end
 
-  # FIXED: Main method - get operations with correct ordering including water break test and ENP heat treatments
+  # UPDATED: Main method - get operations with correct ordering including water break test and ENP heat treatments
   def get_operations_with_auto_ops
     treatments = get_treatments
     return [] if treatments.empty?
@@ -84,13 +84,13 @@ class PartProcessingInstruction < ApplicationRecord
     safe_add_to_sequence(sequence, OperationLibrary::InspectFinalInspectVatInspect.get_incoming_inspection_operation, "Incoming Inspection")
     safe_add_to_sequence(sequence, OperationLibrary::InspectFinalInspectVatInspect.get_vat_inspection_operation, "VAT Inspection")
 
-    # NEW: ENP Pre-Heat Treatment (before any treatment cycles)
+    # ENP Pre-Heat Treatment (before any treatment cycles)
     add_enp_pre_heat_treatment_if_selected(sequence) if has_enp
 
-    # Treatment cycles (main processing)
+    # Treatment cycles (main processing) - each with their own jig
     treatments.each { |treatment| add_treatment_cycle(sequence, treatment, has_enp) }
 
-    # FIXED: Post-treatment operations in correct order
+    # Post-treatment operations in correct order
 
     # 1. ENP Post-Heat Treatment (after all treatment cycles but before ENP Strip/Mask)
     add_enp_heat_treatment_if_selected(sequence) if has_enp
@@ -144,9 +144,10 @@ class PartProcessingInstruction < ApplicationRecord
     customisation_data["operation_selection"] || {}
   end
 
-  def selected_jig_type
-    operation_selection["selected_jig_type"]
-  end
+  # REMOVED: selected_jig_type method - no longer used as jigs are per-treatment
+  # def selected_jig_type
+  #   operation_selection["selected_jig_type"]
+  # end
 
   def operations_text
     get_operations_with_auto_ops.map.with_index(1) do |operation, index|
@@ -160,7 +161,7 @@ class PartProcessingInstruction < ApplicationRecord
     ops.map(&:display_name).join(" → ")
   end
 
-  # FIXED: Class method for frontend preview with correct ordering including water break test and ENP heat treatments
+  # UPDATED: Class method for frontend preview with per-treatment jig support
   def self.simulate_operations_with_auto_ops(treatments_data, selected_jig_type = nil, selected_alloy = nil, selected_operations = nil, enp_strip_type = 'nitric', aerospace_defense = false, selected_enp_heat_treatment = nil, selected_enp_pre_heat_treatment = nil)
     return [] if treatments_data.blank?
 
@@ -168,16 +169,15 @@ class PartProcessingInstruction < ApplicationRecord
     mock_ppi.customisation_data = {
       "operation_selection" => {
         "treatments" => treatments_data,
-        "selected_jig_type" => selected_jig_type,
         "selected_operations" => selected_operations || [],
         "enp_strip_type" => enp_strip_type,
         "aerospace_defense" => aerospace_defense,
         "selected_enp_heat_treatment" => selected_enp_heat_treatment,
-        "selected_enp_pre_heat_treatment" => selected_enp_pre_heat_treatment # NEW
+        "selected_enp_pre_heat_treatment" => selected_enp_pre_heat_treatment
       }
     }
 
-    # Use the fixed ordering from the instance method
+    # Use the ordering from the instance method
     mock_ppi.get_operations_with_auto_ops.map do |operation|
       {
         id: operation.id,
@@ -205,7 +205,7 @@ class PartProcessingInstruction < ApplicationRecord
     end
   end
 
-  # NEW: Add ENP pre-heat treatment if selected (before jigging)
+  # Add ENP pre-heat treatment if selected (before jigging)
   def add_enp_pre_heat_treatment_if_selected(sequence)
     return unless enp_pre_heat_treatment_selected?
     return unless defined?(OperationLibrary::EnpHeatTreatments)
@@ -225,7 +225,7 @@ class PartProcessingInstruction < ApplicationRecord
     end
   end
 
-  # UPDATED: Add ENP post-heat treatment if selected (after unjig)
+  # Add ENP post-heat treatment if selected (after unjig)
   def add_enp_heat_treatment_if_selected(sequence)
     return unless enp_heat_treatment_selected?
     return unless defined?(OperationLibrary::EnpHeatTreatments)
@@ -245,7 +245,7 @@ class PartProcessingInstruction < ApplicationRecord
     end
   end
 
-  # FIXED: Standard treatment cycle with dye, PTFE and masking removal BEFORE final ops
+  # UPDATED: Standard treatment cycle with per-treatment jig support
   def add_treatment_cycle(sequence, treatment, has_enp)
     op = treatment[:operation]
     treatment_data = treatment[:treatment_data]
@@ -255,9 +255,12 @@ class PartProcessingInstruction < ApplicationRecord
     dye = treatment[:dye]
     ptfe = treatment[:ptfe]
 
+    # Get jig type for this specific treatment
+    treatment_jig_type = treatment_data["selected_jig_type"]
+
     # ENP has special workflow - no masking/stripping/dye/PTFE modifiers
     if op.process_type == 'electroless_nickel_plating'
-      add_enp_cycle(sequence, op, treatment_data)
+      add_enp_cycle(sequence, op, treatment_data, treatment_jig_type)
       return
     end
 
@@ -268,8 +271,8 @@ class PartProcessingInstruction < ApplicationRecord
       safe_add_to_sequence(sequence, OperationLibrary::Masking.get_masking_inspection_operation, "Masking Inspection")
     end
 
-    # 2. Jig
-    safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_jig_operation(selected_jig_type), "Jig")
+    # 2. Jig - USE TREATMENT-SPECIFIC JIG TYPE
+    safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_jig_operation(treatment_jig_type), "Jig")
 
     # 3. Degrease + rinse
     if needs_degrease?(op)
@@ -316,7 +319,7 @@ class PartProcessingInstruction < ApplicationRecord
       end
     end
 
-    # 9. PTFE + rinse (NEW: for anodising operations only, after sealing)
+    # 9. PTFE + rinse (for anodising operations only, after sealing)
     if ptfe["enabled"] && is_anodising?(op)
       ptfe_op = OperationLibrary::Ptfe.get_ptfe_operation
       if ptfe_op
@@ -328,7 +331,7 @@ class PartProcessingInstruction < ApplicationRecord
     # 10. Unjig
     safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_unjig_operation, "Unjig")
 
-    # 11. FIXED: Masking removal - simplified logic
+    # 11. Masking removal - simplified logic
     if masking["enabled"] && masking["methods"].present?
       if OperationLibrary::Masking.masking_removal_required?(masking["methods"])
         OperationLibrary::Masking.get_masking_removal_operations.each do |removal_op|
@@ -336,15 +339,12 @@ class PartProcessingInstruction < ApplicationRecord
         end
       end
     end
-
-    # NOTE: Final inspection and pack are now added in get_operations_with_auto_ops
-    # AFTER all treatment cycles, ENP heat treatments, and ENP Strip/Mask operations are complete
   end
 
-  # ENP cycle - no masking/dye in cycle, handled by ENP Strip/Mask later
-  def add_enp_cycle(sequence, enp_op, treatment_data)
-    # 1. Jig
-    safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_jig_operation(selected_jig_type), "ENP Jig")
+  # UPDATED: ENP cycle - USE TREATMENT-SPECIFIC JIG TYPE
+  def add_enp_cycle(sequence, enp_op, treatment_data, treatment_jig_type)
+    # 1. Jig - USE TREATMENT-SPECIFIC JIG TYPE
+    safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_jig_operation(treatment_jig_type), "ENP Jig")
 
     # 2. Degrease + rinse
     degrease = OperationLibrary::DegreaseOperations.get_degrease_operation
@@ -370,14 +370,6 @@ class PartProcessingInstruction < ApplicationRecord
 
     # 5. Unjig
     safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_unjig_operation, "ENP Unjig")
-
-    # NOTE: ENP Heat Treatments and ENP Strip/Mask operations are handled separately in get_operations_with_auto_ops
-    # They occur AFTER all treatment cycles in the correct order:
-    # 1. All treatment cycles complete
-    # 2. ENP Post-Heat Treatment (if selected)
-    # 3. ENP Strip/Mask operations (if selected)
-    # 4. Final inspection
-    # 5. Pack
   end
 
   def needs_degrease?(op)
@@ -437,6 +429,13 @@ class PartProcessingInstruction < ApplicationRecord
   def validate_treatments
     treatments_data = operation_selection["treatments"] || []
     errors.add(:base, "cannot select more than 5 treatments") if treatments_data.length > 5
+
+    # NEW: Validate that each treatment has a jig type selected
+    treatments_data.each_with_index do |treatment, index|
+      if treatment["selected_jig_type"].blank?
+        errors.add(:base, "treatment #{index + 1} must have a jig type selected")
+      end
+    end
   end
 
   def treatments_changed?
