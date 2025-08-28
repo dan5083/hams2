@@ -146,7 +146,8 @@ class Part < ApplicationRecord
 
   # Get treatments from nested structure
   def get_treatments
-    treatments_data = operation_selection["treatments"] || []
+    treatments_data = parse_treatments_data
+    return [] if treatments_data.empty?
 
     # Get operations with target thickness for ENP time interpolation
     target_thickness = get_enp_target_thickness_from_treatments(treatments_data)
@@ -191,7 +192,7 @@ class Part < ApplicationRecord
     mock_part = new
     mock_part.customisation_data = {
       "operation_selection" => {
-        "treatments" => treatments_data,
+        "treatments" => treatments_data.is_a?(String) ? treatments_data : treatments_data.to_json,
         "selected_operations" => selected_operations || [],
         "enp_strip_type" => enp_strip_type,
         "aerospace_defense" => aerospace_defense,
@@ -214,7 +215,8 @@ class Part < ApplicationRecord
   # ENP Strip Mask - check if selected operations include ENP strip/mask ops
   def has_enp_strip_mask_operations?
     enp_ids = ['ENP_MASK', 'ENP_MASKING_CHECK', 'ENP_STRIP_NITRIC', 'ENP_STRIP_METEX', 'ENP_STRIP_MASKING', 'ENP_MASKING_CHECK_FINAL']
-    (operation_selection["selected_operations"] || []).any? { |id| enp_ids.include?(id) }
+    selected_ops = parse_selected_operations
+    selected_ops.any? { |id| enp_ids.include?(id) }
   end
 
   # Helper methods for operation selection criteria (for views/forms)
@@ -239,10 +241,44 @@ class Part < ApplicationRecord
   end
 
   def selected_operations
-    operation_selection["selected_operations"] || []
+    parse_selected_operations
   end
 
   private
+
+  # Parse treatments data safely
+  def parse_treatments_data
+    treatments_raw = operation_selection["treatments"]
+    return [] if treatments_raw.blank?
+
+    if treatments_raw.is_a?(String)
+      JSON.parse(treatments_raw)
+    elsif treatments_raw.is_a?(Array)
+      treatments_raw
+    else
+      []
+    end
+  rescue JSON::ParserError => e
+    Rails.logger.error "Failed to parse treatments data: #{e.message}"
+    []
+  end
+
+  # Parse selected operations safely
+  def parse_selected_operations
+    selected_ops_raw = operation_selection["selected_operations"]
+    return [] if selected_ops_raw.blank?
+
+    if selected_ops_raw.is_a?(String)
+      JSON.parse(selected_ops_raw)
+    elsif selected_ops_raw.is_a?(Array)
+      selected_ops_raw
+    else
+      []
+    end
+  rescue JSON::ParserError => e
+    Rails.logger.error "Failed to parse selected operations: #{e.message}"
+    []
+  end
 
   # Helper method to safely add operations to sequence with nil checking
   def safe_add_to_sequence(sequence, operation, description)
@@ -475,7 +511,7 @@ class Part < ApplicationRecord
 
   # Validation and setup
   def validate_treatments
-    treatments_data = operation_selection["treatments"] || []
+    treatments_data = parse_treatments_data
     errors.add(:base, "cannot select more than 5 treatments") if treatments_data.length > 5
 
     # Validate that each treatment has a jig type selected
@@ -488,8 +524,19 @@ class Part < ApplicationRecord
 
   def treatments_changed?
     customisation_data_changed? && customisation_data_change&.any? { |before, after|
-      (before&.dig("operation_selection", "treatments") || []) != (after&.dig("operation_selection", "treatments") || [])
+      parse_treatments_from_data(before) != parse_treatments_from_data(after)
     }
+  end
+
+  def parse_treatments_from_data(data)
+    return [] unless data&.dig("operation_selection", "treatments")
+
+    treatments = data.dig("operation_selection", "treatments")
+    if treatments.is_a?(String)
+      JSON.parse(treatments) rescue []
+    else
+      treatments || []
+    end
   end
 
   def build_specification_from_operations

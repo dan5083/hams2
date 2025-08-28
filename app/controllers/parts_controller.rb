@@ -269,9 +269,9 @@ class PartsController < ApplicationController
   end
 
   def preview_operations
-    treatments_data = params[:treatments_data] || []
+    treatments_data = parse_treatments_param(params[:treatments_data])
     selected_alloy = params[:selected_alloy]
-    selected_operations = params[:selected_operations] || []
+    selected_operations = parse_json_param(params[:selected_operations]) || []
     enp_strip_type = params[:enp_strip_type] || 'nitric'
     aerospace_defense = params[:aerospace_defense] || false
     selected_enp_pre_heat_treatment = params[:selected_enp_pre_heat_treatment]
@@ -333,11 +333,35 @@ class PartsController < ApplicationController
   end
 
   def determine_process_type
-    treatments = part_params.dig(:customisation_data, "operation_selection", "treatments") || []
+    treatments_json = part_params.dig(:customisation_data, "operation_selection", "treatments")
+    return 'anodising' if treatments_json.blank?
+
+    treatments = parse_json_param(treatments_json)
     return 'anodising' if treatments.empty?
 
-    # Use the first treatment type as the primary process type
     first_treatment = treatments.first
     first_treatment&.dig("type") || 'anodising'
+  end
+
+  # Helper method to parse JSON parameters safely
+  def parse_json_param(param)
+    return [] if param.blank?
+    return param if param.is_a?(Array) # Already parsed
+
+    JSON.parse(param)
+  rescue JSON::ParserError => e
+    Rails.logger.error "JSON Parse Error: #{e.message} for param: #{param}"
+    []
+  end
+
+  # Helper method specifically for treatments data
+  def parse_treatments_param(param)
+    return [] if param.blank?
+    return param if param.is_a?(Array) # Already parsed
+
+    JSON.parse(param)
+  rescue JSON::ParserError => e
+    Rails.logger.error "Treatments JSON Parse Error: #{e.message} for param: #{param}"
+    []
   end
 end
