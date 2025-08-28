@@ -1,5 +1,13 @@
-<%# _form.html.erb %>
-<%= form_with model: part, local: true, class: "space-y-6" do |form| %>
+<%# app/views/parts/_form.html.erb - Consolidated Parts/PPI Form %>
+<%= form_with model: part, local: true, class: "space-y-6",
+    data: {
+      controller: "parts-form",
+      parts_form_filter_path_value: filter_operations_parts_path,
+      parts_form_details_path_value: operation_details_parts_path,
+      parts_form_preview_path_value: preview_operations_parts_path,
+      parts_form_csrf_token_value: form_authenticity_token
+    } do |form| %>
+
   <% if part.errors.any? %>
     <div class="bg-red-50 border border-red-200 rounded-md p-4">
       <div class="flex">
@@ -19,6 +27,7 @@
     </div>
   <% end %>
 
+  <!-- Part Details Section -->
   <div class="bg-white shadow rounded-lg p-6">
     <h3 class="text-lg font-medium text-gray-900 mb-4">Part Details</h3>
 
@@ -53,13 +62,32 @@
       <div>
         <%= form.label :uniform_part_issue, "Part Issue", class: "block text-sm font-medium text-gray-700 mb-1" %>
         <%= form.text_field :uniform_part_issue,
+            value: part.uniform_part_issue.presence || 'A',
             placeholder: "A",
             class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm font-mono",
             required: true %>
         <p class="mt-1 text-xs text-gray-500">Defaults to 'A' if not specified</p>
       </div>
 
-      <!-- Enabled Status -->
+      <!-- Aerospace/Defense Application -->
+      <div>
+        <%= label_tag "part[customisation_data][operation_selection][aerospace_defense]", "Application Type", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <div class="mt-1">
+          <%= check_box_tag "part[customisation_data][operation_selection][aerospace_defense]",
+              true,
+              part.aerospace_defense?,
+              {
+                class: "rounded border-gray-300 text-red-600 shadow-sm focus:border-red-300 focus:ring focus:ring-offset-0 focus:ring-red-200 focus:ring-opacity-50",
+                data: { parts_form_target: "aerospaceDefenseCheckbox" }
+              } %>
+          <%= label_tag "part[customisation_data][operation_selection][aerospace_defense]",
+              "Aerospace/Defense (requires water break test and OCV)",
+              class: "ml-2 text-sm text-gray-900" %>
+        </div>
+        <p class="mt-1 text-xs text-gray-500">Auto-inserts water break test after degreasing operations</p>
+      </div>
+
+      <!-- Enabled Status (for editing) -->
       <% if part.persisted? %>
         <div>
           <%= form.label :enabled, class: "block text-sm font-medium text-gray-700 mb-1" %>
@@ -72,20 +100,230 @@
     </div>
   </div>
 
+  <!-- Treatment Selection Section -->
+  <div class="bg-white shadow rounded-lg p-6">
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Processing Instructions</h3>
+    <p class="text-sm text-gray-600 mb-4">Configure the manufacturing processes for this part. Select up to 5 treatments, each with its own jig type and modifiers.</p>
+
+    <!-- Treatment Type Buttons -->
+    <div class="grid grid-cols-2 gap-3 mb-6 sm:grid-cols-5">
+      <button type="button" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-blue-500 transition-colors text-sm" data-treatment="standard_anodising">
+        <span>Standard</span>
+        <span class="count-badge ml-2 min-w-[20px] h-5 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">0</span>
+      </button>
+
+      <button type="button" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-purple-500 transition-colors text-sm" data-treatment="hard_anodising">
+        <span>Hard</span>
+        <span class="count-badge ml-2 min-w-[20px] h-5 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">0</span>
+      </button>
+
+      <button type="button" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-green-500 transition-colors text-sm" data-treatment="chromic_anodising">
+        <span>Chromic</span>
+        <span class="count-badge ml-2 min-w-[20px] h-5 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">0</span>
+      </button>
+
+      <button type="button" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-orange-500 transition-colors text-sm" data-treatment="chemical_conversion">
+        <span>Chemical Conv.</span>
+        <span class="count-badge ml-2 min-w-[20px] h-5 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">0</span>
+      </button>
+
+      <button type="button" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-indigo-500 transition-colors text-sm" data-treatment="electroless_nickel_plating">
+        <span>ENP</span>
+        <span class="count-badge ml-2 min-w-[20px] h-5 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">0</span>
+      </button>
+    </div>
+
+    <!-- ENP Options Container -->
+    <div data-parts-form-target="enpOptionsContainer" class="mb-6" style="display: none;">
+      <h4 class="text-md font-medium text-gray-900 mb-4">ENP Options</h4>
+
+      <!-- ENP Pre-Heat Treatment Selection -->
+      <div class="mb-4">
+        <label for="enp_pre_heat_treatment_select" class="block text-sm font-medium text-gray-700 mb-2">Pre-Heat Treatment (Optional)</label>
+        <select id="enp_pre_heat_treatment_select" data-parts-form-target="enpPreHeatTreatmentSelect" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+          <option value="none">No Pre-Heat Treatment</option>
+          <option value="ENP_HEAT_TREAT_120_130C_1_3H">120-130°C for 1-3 hours</option>
+          <option value="ENP_HEAT_TREAT_120_130C_1_6H">120-130°C for 1-6 hours</option>
+          <option value="ENP_HEAT_TREAT_120_130C_2_3H">120-130°C for 2-3 hours</option>
+          <option value="ENP_HEAT_TREAT_125C_5C_2H">125±5°C for 2 hours</option>
+          <option value="ENP_HEAT_TREAT_140C_10C_8H_MIN">140±10°C for 8h minimum</option>
+          <option value="ENP_HEAT_TREAT_140_150C_1_2H">140-150°C for 1-2 hours</option>
+          <option value="ENP_HEAT_TREAT_180C_1H">180°C for 1 hour</option>
+          <option value="ENP_HEAT_TREAT_190C_6H">190±4°C for 6 hours</option>
+          <option value="ENP_HEAT_TREAT_190C_14_8H">190±14°C for 8 hours</option>
+          <option value="ENP_HEAT_TREAT_200C_8H_MIN">200±10°C for 8h minimum</option>
+          <option value="ENP_HEAT_TREAT_232C_1H">232°C for 1 hour</option>
+          <option value="ENP_HEAT_TREAT_343C_1_5H_AIR_CIRCULATING">343±10°C for 1.5h minimum (Air Circulating)</option>
+          <option value="ENP_HEAT_TREAT_350C_1H">350°C for 1 hour</option>
+          <option value="ENP_HEAT_TREAT_395_405C_1H">395-405°C for 1 hour</option>
+          <option value="ENP_HEAT_TREAT_550C_1H">550°C for 1 hour</option>
+          <option value="ENP_POST_HEAT_TREAT_140C_24H">Post: 140±10°C for 24 hours</option>
+          <option value="ENP_BAKE_177_204C_6H">Bake: 177-204°C for 6h</option>
+        </select>
+        <p class="mt-1 text-xs text-gray-500">Pre-heat treatment occurs before jigging operations</p>
+      </div>
+
+      <!-- ENP Post-Heat Treatment Selection -->
+      <div class="mb-4">
+        <label for="enp_heat_treatment_select" class="block text-sm font-medium text-gray-700 mb-2">Post-Heat Treatment (Optional)</label>
+        <select id="enp_heat_treatment_select" data-parts-form-target="enpHeatTreatmentSelect" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+          <option value="none">No Post-Heat Treatment</option>
+          <option value="ENP_HEAT_TREAT_120_130C_1_3H">120-130°C for 1-3 hours</option>
+          <option value="ENP_HEAT_TREAT_120_130C_1_6H">120-130°C for 1-6 hours</option>
+          <option value="ENP_HEAT_TREAT_120_130C_2_3H">120-130°C for 2-3 hours</option>
+          <option value="ENP_HEAT_TREAT_125C_5C_2H">125±5°C for 2 hours</option>
+          <option value="ENP_HEAT_TREAT_140C_10C_8H_MIN">140±10°C for 8h minimum</option>
+          <option value="ENP_HEAT_TREAT_140_150C_1_2H">140-150°C for 1-2 hours</option>
+          <option value="ENP_HEAT_TREAT_180C_1H">180°C for 1 hour</option>
+          <option value="ENP_HEAT_TREAT_190C_6H">190±4°C for 6 hours</option>
+          <option value="ENP_HEAT_TREAT_190C_14_8H">190±14°C for 8 hours</option>
+          <option value="ENP_HEAT_TREAT_200C_8H_MIN">200±10°C for 8h minimum</option>
+          <option value="ENP_HEAT_TREAT_232C_1H">232°C for 1 hour</option>
+          <option value="ENP_HEAT_TREAT_343C_1_5H_AIR_CIRCULATING">343±10°C for 1.5h minimum (Air Circulating)</option>
+          <option value="ENP_HEAT_TREAT_350C_1H">350°C for 1 hour</option>
+          <option value="ENP_HEAT_TREAT_395_405C_1H">395-405°C for 1 hour</option>
+          <option value="ENP_HEAT_TREAT_550C_1H">550°C for 1 hour</option>
+          <option value="ENP_POST_HEAT_TREAT_140C_24H">Post: 140±10°C for 24 hours</option>
+          <option value="ENP_BAKE_177_204C_6H">Bake: 177-204°C for 6h</option>
+        </select>
+        <p class="mt-1 text-xs text-gray-500">Post-heat treatment occurs after unjig but before ENP Strip/Mask operations</p>
+      </div>
+
+      <!-- ENP Strip Type Selection -->
+      <div class="mb-4">
+        <h5 class="text-sm font-medium text-gray-700 mb-2">Strip Type</h5>
+        <div class="flex space-x-4">
+          <label class="flex items-center">
+            <input type="radio" name="enp_strip_type" value="nitric" checked class="form-radio text-indigo-600" data-parts-form-target="enpStripTypeRadio">
+            <span class="ml-2 text-sm text-gray-700">Nitric Acid (Standard)</span>
+          </label>
+          <label class="flex items-center">
+            <input type="radio" name="enp_strip_type" value="metex_dekote" class="form-radio text-indigo-600" data-parts-form-target="enpStripTypeRadio">
+            <span class="ml-2 text-sm text-gray-700">Metex Dekote (Ferrous)</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- ENP Strip/Mask Operations -->
+      <div>
+        <label class="flex items-center">
+          <input type="checkbox" data-parts-form-target="enpStripMaskCheckbox" class="form-checkbox text-indigo-600">
+          <span class="ml-2 text-sm text-gray-700">Add ENP Strip/Mask Operations</span>
+        </label>
+        <p class="mt-1 text-xs text-gray-500">Independent from heat treatments - can be selected separately</p>
+      </div>
+    </div>
+
+    <!-- Treatment Cards Container -->
+    <div data-parts-form-target="treatmentsContainer" class="space-y-4 mb-6">
+      <p class="text-gray-500 text-sm">Select treatments above to configure them</p>
+    </div>
+
+    <!-- Operations Preview -->
+    <div class="mt-6">
+      <h4 class="text-md font-medium text-gray-900 mb-3">Operations Preview</h4>
+
+      <div data-parts-form-target="selectedContainer" class="space-y-2 min-h-[60px] border border-gray-200 rounded p-3 bg-gray-50">
+        <% operations_with_auto_ops = part.respond_to?(:get_operations_with_auto_ops) ? part.get_operations_with_auto_ops : [] %>
+        <% if operations_with_auto_ops.any? %>
+          <% operations_with_auto_ops.each_with_index do |operation, index| %>
+            <% if operation %>
+              <% is_auto_inserted = operation.respond_to?(:auto_inserted?) && operation.auto_inserted? %>
+              <% is_water_break_test = operation.respond_to?(:water_break_test?) && operation.water_break_test? %>
+              <% is_dye = operation.respond_to?(:dye?) && operation.dye? %>
+              <% is_heat_treatment = operation.respond_to?(:enp_heat_treatment?) && operation.enp_heat_treatment? %>
+              <% bg_color_class = is_auto_inserted ? 'bg-gray-100 border border-gray-300' : 'bg-blue-100 border border-blue-300' %>
+              <% bg_color_class = 'bg-red-50 border border-red-200' if is_water_break_test %>
+              <% bg_color_class = 'bg-purple-50 border border-purple-200' if is_dye %>
+              <% bg_color_class = 'bg-orange-50 border border-orange-200' if is_heat_treatment %>
+              <% text_color_class = is_auto_inserted ? 'italic text-gray-600' : 'text-gray-900' %>
+              <% text_color_class = 'text-red-800' if is_water_break_test %>
+              <% text_color_class = 'text-purple-800' if is_dye %>
+              <% text_color_class = 'text-orange-800' if is_heat_treatment %>
+
+              <div class="<%= bg_color_class %> rounded px-3 py-2 flex justify-between items-center">
+                <span class="text-sm <%= text_color_class %>">
+                  <strong><%= index + 1 %>.</strong>
+                  <%= operation.display_name %>: <%= operation.operation_text %>
+                  <% if is_auto_inserted %>
+                    <span class="text-xs text-gray-500 ml-2">(auto-inserted)</span>
+                  <% end %>
+                  <% if is_water_break_test %>
+                    <span class="text-xs text-red-600 ml-2">(requires manual recording)</span>
+                  <% end %>
+                  <% if is_dye %>
+                    <span class="text-xs text-purple-600 ml-2">(dye operation)</span>
+                  <% end %>
+                  <% if is_heat_treatment %>
+                    <span class="text-xs text-orange-600 ml-2">(ENP heat treatment)</span>
+                  <% end %>
+                </span>
+              </div>
+            <% end %>
+          <% end %>
+        <% else %>
+          <p class="text-gray-500 text-sm">No treatments selected</p>
+        <% end %>
+      </div>
+    </div>
+
+    <!-- Hidden fields for form data -->
+    <%= hidden_field_tag "part[customisation_data][operation_selection][treatments]",
+        part.operation_selection["treatments"]&.to_json || '[]',
+        data: { parts_form_target: "treatmentsField" } %>
+
+    <%= hidden_field_tag "part[customisation_data][operation_selection][selected_enp_pre_heat_treatment]",
+        part.selected_enp_pre_heat_treatment || 'none',
+        data: { parts_form_target: "enpPreHeatTreatmentField" } %>
+
+    <%= hidden_field_tag "part[customisation_data][operation_selection][selected_enp_heat_treatment]",
+        part.selected_enp_heat_treatment || 'none',
+        data: { parts_form_target: "enpHeatTreatmentField" } %>
+
+    <%= hidden_field_tag "part[customisation_data][operation_selection][enp_strip_type]",
+        'nitric',
+        data: { parts_form_target: "enpStripTypeField" } %>
+
+    <%= hidden_field_tag "part[customisation_data][operation_selection][selected_operations]",
+        '[]',
+        data: { parts_form_target: "enpStripMaskField" } %>
+
+    <%= hidden_field_tag "part[customisation_data][operation_selection][aerospace_defense]",
+        part.aerospace_defense? || false,
+        data: { parts_form_target: "aerospaceDefenseField" } %>
+  </div>
+
+  <!-- Specification Section -->
+  <div class="bg-white shadow rounded-lg p-6">
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Specification</h3>
+
+    <%= form.text_area :specification,
+        placeholder: "Will be automatically generated from selected treatments...",
+        rows: 4,
+        class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-gray-50",
+        readonly: true,
+        data: { parts_form_target: "specificationField" } %>
+    <p class="mt-1 text-xs text-gray-500">Auto-generated from selected treatments</p>
+  </div>
+
+  <!-- Special Instructions Section -->
+  <div class="bg-white shadow rounded-lg p-6">
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Special Instructions</h3>
+
+    <%= form.text_area :special_instructions,
+        placeholder: "Any special handling or processing instructions...",
+        rows: 3,
+        class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
+    <p class="mt-1 text-xs text-gray-500">Optional special instructions or notes</p>
+  </div>
+
   <!-- Information Box -->
   <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
     <div class="flex">
       <div class="ml-3">
-        <h3 class="text-sm font-medium text-blue-800">Part Management Notes</h3>
+        <h3 class="text-sm font-medium text-blue-800">Manufacturing Process Configuration</h3>
         <div class="mt-2 text-sm text-blue-700">
-          <% if part.persisted? %>
-            <p>Changing the part number, issue, or customer will redirect you to the correct part record
-            (creating a new one if necessary). Use Part Processing Instructions to manage different
-            specifications for the same part.</p>
-          <% else %>
-            <p>Parts are automatically created when needed through Part Processing Instructions.
-            Each unique combination of customer, part number, and issue creates a distinct part record.</p>
-          <% end %>
+          <p>This integrated form creates a part with complete processing instructions. Select treatments in the order you want them processed. Each treatment can have its own jig type, masking, stripping, dye, and sealing options. ENP treatments include optional pre-heat treatment (before jigging), post-heat treatment (after unjig), and ENP Strip/Mask systems. Auto-operations (inspections, rinses, etc.) are automatically inserted in the correct sequence.</p>
         </div>
       </div>
     </div>

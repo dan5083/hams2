@@ -2,7 +2,7 @@ class PartsController < ApplicationController
   before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled]
 
   def index
-    @parts = Part.includes(:customer, :part_processing_instructions, :works_orders)
+    @parts = Part.includes(:customer, :works_orders)
                  .order(:uniform_part_number, :uniform_part_issue)
 
     # Filter by customer if provided
@@ -32,9 +32,6 @@ class PartsController < ApplicationController
   end
 
   def show
-    @part_processing_instructions = @part.part_processing_instructions
-                                         .includes(:customer)
-                                         .order(created_at: :desc)
     @works_orders = @part.works_orders
                          .includes(:customer_order, :release_level, :transport_method)
                          .order(created_at: :desc)
@@ -44,54 +41,65 @@ class PartsController < ApplicationController
   def new
     @part = Part.new
     @customers = Organization.enabled.order(:name)
+
+    # Set up for complex form (formerly PPI form)
+    @part.customisation_data = { "operation_selection" => {} }
   end
 
   def create
-    # Use Part.ensure to find or create the part
-    @part = Part.ensure(
-      customer_id: part_params[:customer_id],
-      part_number: part_params[:uniform_part_number],
-      part_issue: part_params[:uniform_part_issue]
-    )
+    Rails.logger.info "🔍 Raw Params: #{params.inspect}"
+    Rails.logger.info "🔍 Part Params: #{part_params.inspect}"
 
-    if @part.persisted?
-      if @part.enabled?
-        redirect_to @part, notice: 'Part already exists and is enabled.'
-      else
-        @part.update!(enabled: true)
-        redirect_to @part, notice: 'Part was re-enabled successfully.'
-      end
-    else
+    @part = Part.new(part_params)
+
+    Rails.logger.info "🔍 Part before save: customer_id=#{@part.customer_id}, part_number=#{@part.uniform_part_number}, part_issue=#{@part.uniform_part_issue}"
+
+    # Set defaults for new parts with processing instructions
+    @part.process_type = determine_process_type if @part.process_type.blank?
+
+    if @part.save
       redirect_to @part, notice: 'Part was successfully created.'
+    else
+      Rails.logger.error "🚨 Part Save Errors: #{@part.errors.full_messages}"
+      load_form_data_for_errors
+      render :new, status: :unprocessable_entity
     end
-  rescue ActiveRecord::RecordInvalid
-    @customers = Organization.enabled.order(:name)
-    render :new, status: :unprocessable_entity
   end
 
   def edit
-    @customers = Organization.enabled.order(:name)
+    @customers = [@part.customer] # Don't allow changing customer on existing part
+
+    # Ensure customisation_data structure exists
+    @part.customisation_data = { "operation_selection" => {} } if @part.customisation_data.blank?
   end
 
   def update
-    # For parts, we mainly just update the enabled status
-    # Part number and issue changes would create a new part via Part.ensure
-    if params[:part][:uniform_part_number] != @part.uniform_part_number ||
-       params[:part][:uniform_part_issue] != @part.uniform_part_issue ||
-       params[:part][:customer_id] != @part.customer_id.to_s
-
-      # This is effectively creating a new part
+    # For parts, changing customer/part_number/issue creates a new part
+    if part_details_changed?
       new_part = Part.ensure(
         customer_id: part_params[:customer_id],
         part_number: part_params[:uniform_part_number],
         part_issue: part_params[:uniform_part_issue]
       )
 
-      redirect_to new_part, notice: 'Part details updated - redirected to the correct part record.'
-    elsif @part.update(enabled: part_params[:enabled])
+      # Copy over the processing data to new part
+      if new_part != @part
+        new_part.update!(
+          specification: part_params[:specification],
+          special_instructions: part_params[:special_instructions],
+          process_type: part_params[:process_type],
+          customisation_data: part_params[:customisation_data] || {},
+          enabled: part_params[:enabled]
+        )
+        redirect_to new_part, notice: 'Part details updated - redirected to the correct part record.'
+        return
+      end
+    end
+
+    if @part.update(part_params)
       redirect_to @part, notice: 'Part was successfully updated.'
     else
-      @customers = Organization.enabled.order(:name)
+      @customers = [@part.customer]
       render :edit, status: :unprocessable_entity
     end
   end
@@ -101,7 +109,7 @@ class PartsController < ApplicationController
       @part.destroy
       redirect_to parts_url, notice: 'Part was successfully deleted.'
     else
-      redirect_to @part, alert: 'Cannot delete part with associated processing instructions or works orders.'
+      redirect_to @part, alert: 'Cannot delete part with associated works orders.'
     end
   end
 
@@ -138,12 +146,154 @@ class PartsController < ApplicationController
             id: part.id,
             display_name: part.display_name,
             customer_name: part.customer.name,
-            customer_id: part.customer_id
+            customer_id: part.customer_id,
+            specification: part.specification,
+            operations_summary: part.operations_summary
           }
         }
       end
       format.html { render :index }
     end
+  end
+
+  # Operations endpoints for the complex treatment form (formerly PPI endpoints)
+  def filter_operations
+    criteria = filter_params
+
+    # Extract thickness for ENP operations
+    target_thickness = criteria[:target_thicknesses]&.first
+
+    # Start with all operations - pass thickness to ENP operations
+    operations = Operation.all_operations(target_thickness)
+
+    # Filter by anodising types - exclude auto-inserted operations
+    if criteria[:anodising_types].present?
+      operations = operations.select { |op| criteria[:anodising_types].include?(op.process_type) }
+    end
+
+    # Exclude auto-inserted operations from manual selection
+    operations = operations.reject { |op| op.auto_inserted? }
+
+    # Filter by alloys
+    if criteria[:alloys].present?
+      operations = operations.select { |op| (op.alloys & criteria[:alloys]).any? }
+    end
+
+    # Filter by anodic classes (skip for chromic anodising)
+    if criteria[:anodic_classes].present?
+      operations = operations.select { |op|
+        if op.process_type == 'chromic_anodising'
+          true
+        else
+          (op.anodic_classes & criteria[:anodic_classes]).any?
+        end
+      }
+    end
+
+    # Filter by ENP types
+    if criteria[:enp_types].present?
+      operations = operations.select { |op| op.enp_type.present? && criteria[:enp_types].include?(op.enp_type) }
+    end
+
+    # Filter by target thickness (with tolerance) - skip for chromic anodising
+    if criteria[:target_thicknesses].present?
+      operations = operations.select do |op|
+        if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'chromic_anodising', 'enp_heat_treatment', 'enp_post_heat_treatment', 'enp_baking'])
+          true
+        else
+          criteria[:target_thicknesses].any? do |target|
+            (op.target_thickness - target).abs <= 2.5
+          end
+        end
+      end
+
+      # Sort by closest thickness match
+      if criteria[:target_thicknesses].length == 1
+        target = criteria[:target_thicknesses].first
+        operations = operations.sort_by do |op|
+          if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'chromic_anodising', 'enp_heat_treatment', 'enp_post_heat_treatment', 'enp_baking'])
+            0
+          else
+            (op.target_thickness - target).abs
+          end
+        end
+      end
+    end
+
+    # Convert to JSON format
+    results = operations.map do |op|
+      {
+        id: op.id,
+        display_name: op.display_name,
+        operation_text: op.operation_text,
+        vat_options_text: op.vat_options_text,
+        target_thickness: op.target_thickness,
+        process_type: op.process_type,
+        alloys: op.alloys,
+        anodic_classes: op.anodic_classes,
+        specifications: op.specifications,
+        enp_type: op.enp_type,
+        deposition_rate_range: op.deposition_rate_range,
+        time: op.time
+      }
+    end
+
+    render json: results
+  end
+
+  def operation_details
+    operation_ids = params[:operation_ids] || []
+    target_thickness = params[:target_thickness]&.to_f
+
+    all_operations = Operation.all_operations(target_thickness)
+
+    results = operation_ids.map do |op_id|
+      operation = all_operations.find { |op| op.id == op_id }
+      if operation
+        {
+          id: operation.id,
+          display_name: operation.display_name,
+          operation_text: operation.operation_text,
+          vat_options_text: operation.vat_options_text,
+          target_thickness: operation.target_thickness,
+          process_type: operation.process_type,
+          specifications: operation.specifications,
+          enp_type: operation.enp_type,
+          deposition_rate_range: operation.deposition_rate_range,
+          time: operation.time
+        }
+      end
+    end.compact
+
+    render json: results
+  end
+
+  def preview_operations
+    treatments_data = params[:treatments_data] || []
+    selected_alloy = params[:selected_alloy]
+    selected_operations = params[:selected_operations] || []
+    enp_strip_type = params[:enp_strip_type] || 'nitric'
+    aerospace_defense = params[:aerospace_defense] || false
+    selected_enp_pre_heat_treatment = params[:selected_enp_pre_heat_treatment]
+    selected_enp_heat_treatment = params[:selected_enp_heat_treatment]
+
+    Rails.logger.info "Preview params: treatments=#{treatments_data.length}, pre_heat_treatment=#{selected_enp_pre_heat_treatment}, post_heat_treatment=#{selected_enp_heat_treatment}, aerospace=#{aerospace_defense}"
+
+    # Get operations using the treatment cycle system
+    operations_with_auto_ops = Part.simulate_operations_with_auto_ops(
+      treatments_data,
+      nil,  # selected_jig_type no longer used globally
+      selected_alloy,
+      selected_operations,
+      enp_strip_type,
+      aerospace_defense,
+      selected_enp_heat_treatment,
+      selected_enp_pre_heat_treatment
+    )
+
+    Rails.logger.info "Generated operations: #{operations_with_auto_ops.length} operations"
+
+    render json: { operations: operations_with_auto_ops }
   end
 
   private
@@ -153,6 +303,41 @@ class PartsController < ApplicationController
   end
 
   def part_params
-    params.require(:part).permit(:customer_id, :uniform_part_number, :uniform_part_issue, :enabled)
+    params.require(:part).permit(
+      :customer_id, :uniform_part_number, :uniform_part_issue, :enabled,
+      :specification, :special_instructions, :process_type,
+      customisation_data: {}
+    )
+  end
+
+  def filter_params
+    params.permit(
+      anodising_types: [],
+      alloys: [],
+      target_thicknesses: [],
+      anodic_classes: [],
+      enp_types: []
+    )
+  end
+
+  def load_form_data_for_errors
+    @customers = Organization.enabled.order(:name)
+  end
+
+  def part_details_changed?
+    return false unless @part.persisted?
+
+    params[:part][:uniform_part_number] != @part.uniform_part_number ||
+    params[:part][:uniform_part_issue] != @part.uniform_part_issue ||
+    params[:part][:customer_id] != @part.customer_id.to_s
+  end
+
+  def determine_process_type
+    treatments = part_params.dig(:customisation_data, "operation_selection", "treatments") || []
+    return 'anodising' if treatments.empty?
+
+    # Use the first treatment type as the primary process type
+    first_treatment = treatments.first
+    first_treatment&.dig("type") || 'anodising'
   end
 end

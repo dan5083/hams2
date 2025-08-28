@@ -1,4 +1,4 @@
-// app/javascript/controllers/ppi_form_controller.js
+// app/javascript/controllers/parts_form_controller.js
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
@@ -28,7 +28,7 @@ export default class extends Controller {
   }
 
   connect() {
-    console.log("PPI Form controller connected")
+    console.log("Parts Form controller connected")
     this.treatments = []
     this.treatmentCounts = {
       standard_anodising: 0,
@@ -219,7 +219,7 @@ export default class extends Controller {
       operation_id: null,
       selected_alloy: null, // For ENP treatments
       target_thickness: null, // For ENP treatments
-      selected_jig_type: null, // NEW: Per-treatment jig selection
+      selected_jig_type: null, // Per-treatment jig selection
       // Multiple masking methods with individual locations
       masking_methods: {}, // e.g., {"bungs": "threads", "pc21_polyester_tape": "external surface"}
       stripping_method: 'none',
@@ -314,10 +314,10 @@ export default class extends Controller {
       <div class="border border-gray-200 rounded-lg p-4 bg-gray-50" data-treatment-id="${treatment.id}">
         <div class="flex justify-between items-center mb-4">
           <h4 class="font-medium text-gray-900">${treatmentName} Treatment ${index + 1}</h4>
-          <button type="button" class="text-red-600 hover:text-red-800 text-xl font-bold" data-action="click->ppi-form#removeTreatment" data-ppi-form-treatment-id-param="${treatment.id}">×</button>
+          <button type="button" class="text-red-600 hover:text-red-800 text-xl font-bold" data-action="click->parts-form#removeTreatment" data-parts-form-treatment-id-param="${treatment.id}">×</button>
         </div>
 
-        <!-- Jig Selection (NEW: Per-treatment) -->
+        <!-- Jig Selection (Per-treatment) -->
         <div class="mb-4">
           <label class="block text-sm font-medium text-gray-700 mb-2">Jig Type</label>
           <select class="jig-type-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" data-treatment-id="${treatment.id}" required>
@@ -589,7 +589,7 @@ export default class extends Controller {
     const treatment = this.treatments.find(t => t.id === treatmentId)
     if (!treatment) return
 
-    // Handle jig selection changes (NEW)
+    // Handle jig selection changes
     if (event.target.classList.contains('jig-type-select')) {
       treatment.selected_jig_type = event.target.value
     }
@@ -917,7 +917,7 @@ export default class extends Controller {
         operation_id: treatment.operation_id,
         selected_alloy: treatment.selected_alloy,
         target_thickness: treatment.target_thickness,
-        selected_jig_type: treatment.selected_jig_type, // NEW: Per-treatment jig
+        selected_jig_type: treatment.selected_jig_type, // Per-treatment jig
         masking: {
           enabled: Object.keys(treatment.masking_methods || {}).length > 0,
           methods: treatment.masking_methods || {}

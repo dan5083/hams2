@@ -1,3 +1,4 @@
+<%# app/views/parts/show.html.erb - Consolidated Part/Processing View %>
 <div class="container mx-auto px-4 py-6">
   <div class="flex justify-between items-center mb-6">
     <h1 class="text-3xl font-bold text-gray-900">Part: <%= @part.display_name %></h1>
@@ -46,8 +47,8 @@
         </div>
 
         <div>
-          <dt class="text-sm font-medium text-gray-500">Display Name</dt>
-          <dd class="text-sm text-gray-900 font-semibold"><%= @part.display_name %></dd>
+          <dt class="text-sm font-medium text-gray-500">Process Type</dt>
+          <dd class="text-sm text-gray-900"><%= @part.process_type&.humanize %></dd>
         </div>
 
         <div>
@@ -62,6 +63,11 @@
                 Disabled
               </span>
             <% end %>
+            <% if @part.aerospace_defense? %>
+              <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 ml-2">
+                Aerospace/Defense
+              </span>
+            <% end %>
           </dd>
         </div>
 
@@ -72,21 +78,11 @@
       </dl>
     </div>
 
-    <!-- Summary Statistics -->
+    <!-- Usage Summary -->
     <div class="bg-white shadow rounded-lg p-6">
       <h2 class="text-xl font-semibold text-gray-900 mb-4">Usage Summary</h2>
 
       <dl class="space-y-3">
-        <div>
-          <dt class="text-sm font-medium text-gray-500">Total PPIs</dt>
-          <dd class="text-sm text-gray-900 font-semibold"><%= @part.part_processing_instructions.count %></dd>
-        </div>
-
-        <div>
-          <dt class="text-sm font-medium text-gray-500">Active PPIs</dt>
-          <dd class="text-sm text-gray-900 font-semibold"><%= @part.part_processing_instructions.enabled.count %></dd>
-        </div>
-
         <div>
           <dt class="text-sm font-medium text-gray-500">Total Works Orders</dt>
           <dd class="text-sm text-gray-900 font-semibold"><%= @part.works_orders.count %></dd>
@@ -101,86 +97,235 @@
           <dt class="text-sm font-medium text-gray-500">Open Works Orders</dt>
           <dd class="text-sm text-gray-900 font-semibold"><%= @part.works_orders.open.count %></dd>
         </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Can be deleted?</dt>
+          <dd class="text-sm">
+            <% if @part.can_be_deleted? %>
+              <span class="text-green-600">✓ Yes</span>
+            <% else %>
+              <span class="text-red-600">✗ No (has works orders)</span>
+            <% end %>
+          </dd>
+        </div>
       </dl>
+
+      <% if @part.can_be_deleted? %>
+        <div class="mt-4 pt-4 border-t border-gray-200">
+          <%= button_to "Delete Part", part_path(@part),
+              method: :delete,
+              class: "bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded text-sm",
+              form: { data: { confirm: "Are you sure you want to delete this part? This cannot be undone." } } %>
+        </div>
+      <% end %>
     </div>
   </div>
 
-  <!-- Part Processing Instructions -->
-  <div class="bg-white shadow rounded-lg p-6 mb-6">
-    <div class="flex justify-between items-center mb-4">
-      <h2 class="text-xl font-semibold text-gray-900">Part Processing Instructions</h2>
-      <%= link_to "New PPI", new_part_processing_instruction_path(part_id: @part.id),
-          class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm" %>
-    </div>
+  <!-- Processing Instructions -->
+  <% operations_with_auto_ops = @part.get_operations_with_auto_ops %>
+  <% if operations_with_auto_ops.any? %>
+    <div class="bg-white shadow rounded-lg p-6 mb-6">
+      <h2 class="text-xl font-semibold text-gray-900 mb-4">Manufacturing Operations</h2>
 
-    <% if @part_processing_instructions.any? %>
-      <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50">
-            <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Customer
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Specification
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Process Type
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody class="bg-white divide-y divide-gray-200">
-            <% @part_processing_instructions.each do |ppi| %>
-              <tr class="hover:bg-gray-50">
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <%= ppi.customer.name %>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <%= truncate(ppi.specification, length: 50) %>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <%= ppi.process_type.humanize if ppi.process_type %>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <% if ppi.enabled %>
-                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                      Enabled
-                    </span>
-                  <% else %>
-                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                      Disabled
-                    </span>
+      <div class="space-y-4">
+        <% operations_with_auto_ops.each_with_index do |operation, index| %>
+          <% if operation %>
+            <% is_auto_inserted = operation.respond_to?(:auto_inserted?) && operation.auto_inserted? %>
+            <% is_water_break_test = operation.respond_to?(:water_break_test?) && operation.water_break_test? %>
+            <% is_dye = operation.respond_to?(:dye?) && operation.dye? %>
+            <% is_heat_treatment = operation.respond_to?(:enp_heat_treatment?) && operation.enp_heat_treatment? %>
+
+            <%
+              card_class = if is_water_break_test
+                'border-red-200 bg-red-50'
+              elsif is_heat_treatment
+                'border-orange-200 bg-orange-50'
+              elsif is_dye
+                'border-purple-200 bg-purple-50'
+              elsif is_auto_inserted
+                'border-gray-200 bg-gray-50'
+              else
+                'border-blue-200 bg-blue-50'
+              end
+            %>
+
+            <div class="border rounded-lg p-4 <%= card_class %>">
+              <div class="flex justify-between items-start mb-2">
+                <h3 class="font-medium text-gray-900">
+                  Operation <%= index + 1 %>: <%= operation.display_name %>
+                  <% if is_auto_inserted %>
+                    <span class="text-xs text-gray-500 ml-2 font-normal italic">(auto-inserted)</span>
+                  <% elsif is_water_break_test %>
+                    <span class="text-xs text-red-600 ml-2 font-normal">(requires manual recording)</span>
+                  <% elsif is_heat_treatment %>
+                    <span class="text-xs text-orange-600 ml-2 font-normal">(ENP heat treatment)</span>
+                  <% elsif is_dye %>
+                    <span class="text-xs text-purple-600 ml-2 font-normal">(dye operation)</span>
                   <% end %>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <%= link_to "View", ppi, class: "text-blue-600 hover:text-blue-900" %>
-                </td>
-              </tr>
-            <% end %>
-          </tbody>
-        </table>
+                </h3>
+                <% if operation.vat_numbers.any? %>
+                  <span class="text-xs text-gray-500"><%= operation.vat_options_text %></span>
+                <% end %>
+              </div>
+
+              <p class="text-sm text-gray-700 mb-2"><%= simple_format(operation.operation_text) %></p>
+
+              <% if operation.specifications.present? %>
+                <div class="mb-2">
+                  <span class="text-xs font-medium text-purple-600">Specifications:</span>
+                  <span class="text-xs text-purple-700"><%= operation.specifications %></span>
+                </div>
+              <% end %>
+
+              <div class="flex flex-wrap gap-2 text-xs text-gray-500">
+                <% if operation.target_thickness > 0 %>
+                  <span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Target: <%= operation.target_thickness %>μm</span>
+                <% end %>
+                <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded">Type: <%= operation.process_type.humanize %></span>
+                <% if operation.alloys.any? %>
+                  <span class="bg-green-100 text-green-800 px-2 py-1 rounded">Alloys: <%= operation.alloys.join(', ') %></span>
+                <% end %>
+                <% if operation.anodic_classes.any? %>
+                  <span class="bg-purple-100 text-purple-800 px-2 py-1 rounded">Classes: <%= operation.anodic_classes.join(', ') %></span>
+                <% end %>
+                <% if operation.enp_type.present? %>
+                  <span class="bg-indigo-100 text-indigo-800 px-2 py-1 rounded">ENP: <%= operation.enp_type.humanize %></span>
+                <% end %>
+              </div>
+            </div>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <!-- Processing Criteria -->
+  <% if @part.operation_selection.any? %>
+    <div class="bg-white shadow rounded-lg p-6 mb-6">
+      <h2 class="text-xl font-semibold text-gray-900 mb-4">Processing Configuration</h2>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <% if @part.anodising_types.any? %>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Treatment Types</dt>
+            <dd class="text-sm text-gray-900">
+              <% @part.anodising_types.each do |type| %>
+                <%
+                  badge_color = case type
+                  when 'chemical_conversion'
+                    'bg-orange-100 text-orange-800'
+                  when 'hard_anodising'
+                    'bg-purple-100 text-purple-800'
+                  when 'chromic_anodising'
+                    'bg-green-100 text-green-800'
+                  when 'electroless_nickel_plating'
+                    'bg-indigo-100 text-indigo-800'
+                  else
+                    'bg-blue-100 text-blue-800'
+                  end
+                %>
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <%= badge_color %> mr-1 mb-1">
+                  <%= type.gsub('_anodising', '').gsub('_', ' ').titleize %>
+                </span>
+              <% end %>
+            </dd>
+          </div>
+        <% end %>
+
+        <% if @part.alloys.any? %>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Alloys</dt>
+            <dd class="text-sm text-gray-900">
+              <% @part.alloys.each do |alloy| %>
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 mr-1 mb-1">
+                  <%= alloy.humanize %>
+                </span>
+              <% end %>
+            </dd>
+          </div>
+        <% end %>
+
+        <% if @part.target_thicknesses.any? %>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Target Thicknesses</dt>
+            <dd class="text-sm text-gray-900">
+              <% @part.target_thicknesses.each do |thickness| %>
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800 mr-1 mb-1">
+                  <%= thickness %>μm
+                </span>
+              <% end %>
+            </dd>
+          </div>
+        <% end %>
+
+        <% if @part.anodic_classes.any? %>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Anodic Classes</dt>
+            <dd class="text-sm text-gray-900">
+              <% @part.anodic_classes.each do |anodic_class| %>
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 mr-1 mb-1">
+                  <%= anodic_class == 'class_1' ? 'Class 1 (Undyed)' : 'Class 2 (Dyed)' %>
+                </span>
+              <% end %>
+            </dd>
+          </div>
+        <% end %>
+
+        <% if @part.selected_enp_heat_treatment.present? && @part.selected_enp_heat_treatment != 'none' %>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">ENP Post-Heat Treatment</dt>
+            <dd class="text-sm text-gray-900">
+              <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+                <%= @part.selected_enp_heat_treatment.humanize %>
+              </span>
+            </dd>
+          </div>
+        <% end %>
+
+        <% if @part.selected_enp_pre_heat_treatment.present? && @part.selected_enp_pre_heat_treatment != 'none' %>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">ENP Pre-Heat Treatment</dt>
+            <dd class="text-sm text-gray-900">
+              <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">
+                <%= @part.selected_enp_pre_heat_treatment.humanize %>
+              </span>
+            </dd>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <!-- Specification -->
+  <div class="bg-white shadow rounded-lg p-6 mb-6">
+    <h2 class="text-xl font-semibold text-gray-900 mb-4">Specification</h2>
+    <% if @part.specification.present? %>
+      <div class="prose max-w-none">
+        <%= simple_format(@part.specification) %>
       </div>
     <% else %>
-      <div class="text-center py-8">
-        <p class="text-gray-500">No part processing instructions yet.</p>
-        <%= link_to "Create the first PPI", new_part_processing_instruction_path(part_id: @part.id),
-            class: "text-blue-600 hover:text-blue-900 font-medium" %>
-      </div>
+      <p class="text-gray-500 italic">No specification generated - configure processing treatments to auto-generate specification</p>
     <% end %>
   </div>
+
+  <!-- Special Instructions -->
+  <% if @part.special_instructions.present? %>
+    <div class="bg-white shadow rounded-lg p-6 mb-6">
+      <h2 class="text-xl font-semibold text-gray-900 mb-4">Special Instructions</h2>
+      <div class="prose max-w-none">
+        <%= simple_format(@part.special_instructions) %>
+      </div>
+    </div>
+  <% end %>
 
   <!-- Recent Works Orders -->
   <div class="bg-white shadow rounded-lg p-6">
     <div class="flex justify-between items-center mb-4">
       <h2 class="text-xl font-semibold text-gray-900">Recent Works Orders</h2>
-      <%= link_to "View All", works_orders_path(part_id: @part.id),
-          class: "text-blue-600 hover:text-blue-900 text-sm" %>
+      <% if @part.enabled %>
+        <%= link_to "Create Works Order", new_works_order_path(part_id: @part.id),
+            class: "bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded text-sm" %>
+      <% end %>
     </div>
 
     <% if @works_orders.any? %>
@@ -196,6 +341,9 @@
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Quantity
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Created
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
@@ -217,17 +365,20 @@
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   <%= works_order.quantity_released %>/<%= works_order.quantity %>
                 </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <%= works_order.created_at.strftime("%d/%m/%Y") %>
+                </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                   <% if works_order.voided %>
                     <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
                       Voided
                     </span>
                   <% elsif works_order.is_open %>
-                    <span class="inline-flex px-2 py-1 text-xs font-medium text-green-600">
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
                       Open
                     </span>
                   <% else %>
-                    <span class="inline-flex px-2 py-1 text-xs font-medium text-gray-600">
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
                       Closed
                     </span>
                   <% end %>
@@ -240,9 +391,20 @@
           </tbody>
         </table>
       </div>
+
+      <% if @part.works_orders.count > 10 %>
+        <div class="mt-4 text-center">
+          <%= link_to "View all works orders for this part", works_orders_path(part_id: @part.id),
+              class: "text-blue-600 hover:text-blue-900" %>
+        </div>
+      <% end %>
     <% else %>
       <div class="text-center py-8">
         <p class="text-gray-500">No works orders for this part yet.</p>
+        <% if @part.enabled %>
+          <%= link_to "Create the first works order", new_works_order_path(part_id: @part.id),
+              class: "text-blue-600 hover:text-blue-900 font-medium" %>
+        <% end %>
       </div>
     <% end %>
   </div>

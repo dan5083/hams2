@@ -1,192 +1,352 @@
-# app/models/works_order.rb - Enhanced with auto-completion
 class WorksOrder < ApplicationRecord
   belongs_to :customer_order
-  belongs_to :part, optional: true
+  belongs_to :part
   belongs_to :release_level
   belongs_to :transport_method
-  belongs_to :ppi, class_name: 'PartProcessingInstruction', optional: true
+  belongs_to :issued_by, class_name: 'User', optional: true
 
   has_many :release_notes, dependent: :restrict_with_error
+  has_one :customer, through: :customer_order
 
+  validates :number, presence: true, uniqueness: true
   validates :part_number, presence: true
   validates :part_issue, presence: true
   validates :part_description, presence: true
   validates :quantity, presence: true, numericality: { greater_than: 0 }
   validates :quantity_released, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validates :lot_price, presence: true, numericality: { greater_than_or_equal_to: 0 }
-  validates :price_type, inclusion: { in: %w[each lot] }
+  validates :price_type, inclusion: { in: ['lot', 'each'] }
+  validates :each_price, numericality: { greater_than_or_equal_to: 0 }, allow_nil: true
+
+  validate :validate_quantity_released
+  validate :validate_each_price_when_required
+  validate :validate_part_matches
 
   scope :active, -> { where(voided: false) }
   scope :voided, -> { where(voided: true) }
-  scope :open, -> { where(is_open: true) }
-  scope :closed, -> { where(is_open: false) }
-  scope :for_customer, ->(customer) { joins(:customer_order).where(customer_orders: { customer: customer }) }
+  scope :open, -> { where(is_open: true, voided: false) }
+  scope :closed, -> { where(is_open: false, voided: false) }
+  scope :with_unreleased_quantity, -> { where('quantity > quantity_released AND voided = false') }
 
-  before_validation :calculate_pricing, if: :pricing_fields_changed?
-  before_validation :set_part_details_from_ppi, if: :ppi_id_changed?
-  before_validation :normalize_part_details
-  before_validation :assign_next_number, if: :new_record?
+  before_validation :set_part_details, if: :part_changed?
+  before_validation :set_works_order_number, if: :new_record?
   after_initialize :set_defaults, if: :new_record?
-
-  # AUTO-COMPLETION: Automatically close when fully released
-  after_update :auto_complete_if_fully_released
+  after_update :update_open_status
 
   def display_name
-    "WO#{number} - #{part_number}"
+    "WO#{number}"
   end
 
-  # Delegate customer info to customer_order
-  def customer
-    customer_order.customer
+  def customer_name
+    customer_order.customer.name
   end
 
-  def invoice_customer_name
-    customer_order.invoice_customer_name
+  def unreleased_quantity
+    [quantity - quantity_released, 0].max
   end
 
-  def invoice_address
-    customer_order.invoice_address
-  end
-
-  def delivery_customer_name
-    customer_order.delivery_customer_name
-  end
-
-  def delivery_address
-    customer_order.delivery_address
-  end
-
-  def specification
-    ppi&.specification || "Process as per customer requirements for #{part_number}-#{part_issue}"
-  end
-
-  def special_instructions
-    ppi&.special_instructions
-  end
-
-  def quantity_remaining
-    quantity - quantity_released
-  end
-
-  # NEW: Check if manufacturing is complete (all parts released)
-  def manufacturing_complete?
+  def fully_released?
     quantity_released >= quantity
   end
 
+  def can_be_released?
+    !voided && !fully_released?
+  end
+
+  def can_be_voided?
+    release_notes.empty?
+  end
+
   def void!
-    transaction do
-      if release_notes.active.exists?
-        raise StandardError, "Cannot void works order with active release notes"
-      end
-      update!(voided: true)
-    end
+    return false unless can_be_voided?
+    update!(voided: true, is_open: false)
   end
 
-  def calculate_quantity_released!
-    total = release_notes.active.sum(:quantity_accepted) + release_notes.active.sum(:quantity_rejected)
-    update!(quantity_released: total)
-    total
+  def total_lot_price
+    lot_price
   end
 
-  def unit_price
-    return 0 if quantity.zero?
+  def total_each_price
+    return 0 unless each_price.present? && price_type == 'each'
+    quantity * each_price
+  end
+
+  def total_price
     case price_type
-    when 'each'
-      each_price || 0
     when 'lot'
-      lot_price / quantity
+      total_lot_price
+    when 'each'
+      total_each_price
     else
       0
     end
   end
 
-  # Invoicing-related methods
-  def can_be_invoiced?
-    quantity_released > 0 && uninvoiced_release_notes.any?
+  def price_per_unit
+    return lot_price / quantity if price_type == 'lot' && quantity > 0
+    return each_price if price_type == 'each' && each_price.present?
+    0
   end
 
-  def uninvoiced_release_notes
-    release_notes.requires_invoicing
+  # Operations and processing information from the part
+  def operations_with_auto_ops
+    part.get_operations_with_auto_ops
   end
 
-  def invoiced_release_notes
-    release_notes.joins(:invoice_item)
+  def operations_text
+    part.operations_text
   end
 
-  def total_uninvoiced_quantity
-    uninvoiced_release_notes.sum(:quantity_accepted)
+  def operations_summary
+    part.operations_summary
   end
 
-  def total_invoiced_quantity
-    invoiced_release_notes.sum(:quantity_accepted)
+  def specification
+    part.specification
   end
 
-  def fully_invoiced?
-    quantity_released > 0 && uninvoiced_release_notes.empty?
+  def special_instructions
+    part.special_instructions
   end
 
-  def self.next_number
-    Sequence.next_value('works_order_number')
+  def process_type
+    part.process_type
   end
 
-  def can_be_deleted?
-    release_notes.empty?
+  def aerospace_defense?
+    part.aerospace_defense?
+  end
+
+  # Treatment information for route cards
+  def anodising_types
+    part.anodising_types
+  end
+
+  def target_thicknesses
+    part.target_thicknesses
+  end
+
+  def alloys
+    part.alloys
+  end
+
+  def anodic_classes
+    part.anodic_classes
+  end
+
+  # Release management
+  def release_quantity(quantity_to_release, user:, remarks: nil)
+    return false unless can_be_released?
+    return false if quantity_to_release <= 0
+    return false if quantity_to_release > unreleased_quantity
+
+    ActiveRecord::Base.transaction do
+      # Create release note
+      release_note = release_notes.create!(
+        number: next_release_note_number,
+        issued_by: user,
+        date: Date.current,
+        quantity_accepted: quantity_to_release,
+        quantity_rejected: 0,
+        remarks: remarks
+      )
+
+      # Update quantity released
+      new_quantity_released = quantity_released + quantity_to_release
+      update!(quantity_released: new_quantity_released)
+
+      release_note
+    end
+  end
+
+  def reject_quantity(quantity_rejected, user:, remarks: nil)
+    return false unless can_be_released?
+    return false if quantity_rejected <= 0
+    return false if quantity_rejected > unreleased_quantity
+
+    ActiveRecord::Base.transaction do
+      release_note = release_notes.create!(
+        number: next_release_note_number,
+        issued_by: user,
+        date: Date.current,
+        quantity_accepted: 0,
+        quantity_rejected: quantity_rejected,
+        remarks: remarks
+      )
+
+      # Update quantity released (rejected quantity still counts as "released")
+      new_quantity_released = quantity_released + quantity_rejected
+      update!(quantity_released: new_quantity_released)
+
+      release_note
+    end
+  end
+
+  def mixed_release(quantity_accepted, quantity_rejected, user:, remarks: nil)
+    total_quantity = quantity_accepted + quantity_rejected
+    return false unless can_be_released?
+    return false if total_quantity <= 0
+    return false if total_quantity > unreleased_quantity
+
+    ActiveRecord::Base.transaction do
+      release_note = release_notes.create!(
+        number: next_release_note_number,
+        issued_by: user,
+        date: Date.current,
+        quantity_accepted: quantity_accepted,
+        quantity_rejected: quantity_rejected,
+        remarks: remarks
+      )
+
+      # Update quantity released
+      new_quantity_released = quantity_released + total_quantity
+      update!(quantity_released: new_quantity_released)
+
+      release_note
+    end
+  end
+
+  # Route card information for shop floor
+  def route_card_data
+    {
+      works_order: self,
+      part: part,
+      customer: customer,
+      operations: operations_with_auto_ops,
+      specification: specification,
+      special_instructions: special_instructions,
+      aerospace_defense: aerospace_defense?,
+      anodising_types: anodising_types,
+      target_thicknesses: target_thicknesses,
+      alloys: alloys
+    }
+  end
+
+  # Status helpers
+  def status
+    return 'voided' if voided
+    return 'closed' unless is_open
+    return 'open' if can_be_released?
+    'open'
+  end
+
+  def status_badge_class
+    case status
+    when 'voided'
+      'bg-red-100 text-red-800'
+    when 'closed'
+      'bg-gray-100 text-gray-800'
+    when 'open'
+      'bg-green-100 text-green-800'
+    else
+      'bg-gray-100 text-gray-800'
+    end
+  end
+
+  # Search and filtering
+  def self.search(term)
+    return all if term.blank?
+
+    term = term.strip.upcase
+    where(
+      "part_number ILIKE ? OR part_issue ILIKE ? OR part_description ILIKE ? OR CAST(number AS TEXT) ILIKE ?",
+      "%#{term}%", "%#{term}%", "%#{term}%", "%#{term}%"
+    )
+  end
+
+  def self.for_customer(customer)
+    joins(:customer_order).where(customer_orders: { customer: customer })
+  end
+
+  def self.for_part(part)
+    where(part: part)
+  end
+
+  def self.with_status(status)
+    case status.to_s
+    when 'open'
+      open
+    when 'closed'
+      closed
+    when 'voided'
+      voided
+    when 'active'
+      active
+    else
+      all
+    end
   end
 
   private
 
   def set_defaults
-    self.voided = false if voided.nil?
     self.is_open = true if is_open.nil?
+    self.voided = false if voided.nil?
     self.quantity_released = 0 if quantity_released.nil?
-    self.part_issue = 'A' if part_issue.blank?
-    self.price_type = 'each' if price_type.blank?
-    self.customised_process_data = {} if customised_process_data.blank?
+    self.price_type = 'lot' if price_type.blank?
   end
 
-  def assign_next_number
-    self.number = self.class.next_number if number.blank?
+  def set_works_order_number
+    sequence = Sequence.find_or_create_by(key: 'works_order_number')
+    self.number = sequence.value
+    sequence.increment!(:value)
   end
 
-  def set_part_details_from_ppi
-    return unless ppi
+  def set_part_details
+    return unless part
 
-    self.part = ppi.part
-    self.part_number = ppi.part_number
-    self.part_issue = ppi.part_issue
-    self.part_description = ppi.part_description if part_description.blank?
+    self.part_number = part.uniform_part_number
+    self.part_issue = part.uniform_part_issue
+    self.part_description = part.display_name if part_description.blank?
   end
 
-  def normalize_part_details
-    self.part_number = Part.make_uniform(part_number) if part_number.present?
-    self.part_issue = Part.make_uniform(part_issue) if part_issue.present?
-    self.part_issue = 'A' if part_issue.blank?
-  end
+  def validate_quantity_released
+    return unless quantity && quantity_released
 
-  def pricing_fields_changed?
-    quantity_changed? || lot_price_changed? || each_price_changed? || price_type_changed?
-  end
+    if quantity_released > quantity
+      errors.add(:quantity_released, "cannot exceed total quantity")
+    end
 
-  def calculate_pricing
-    case price_type
-    when 'each'
-      if each_price.present? && quantity.present?
-        self.lot_price = each_price * quantity
-      end
-    when 'lot'
-      self.each_price = nil
+    if quantity_released < 0
+      errors.add(:quantity_released, "cannot be negative")
     end
   end
 
-  # AUTO-COMPLETION LOGIC
-  def auto_complete_if_fully_released
-    # Only check if quantity_released actually changed
-    return unless quantity_released_previously_changed?
-
-    # Auto-close if manufacturing is complete and still open
-    if manufacturing_complete? && is_open?
-      Rails.logger.info "🔒 AUTO-COMPLETE: Closing WO#{number} - all #{quantity} parts released"
-      update_column(:is_open, false) # Use update_column to avoid triggering callbacks again
+  def validate_each_price_when_required
+    if price_type == 'each' && each_price.blank?
+      errors.add(:each_price, "is required when price type is 'each'")
     end
+  end
+
+  def validate_part_matches
+    return unless part && part_number && part_issue
+
+    if part.uniform_part_number != part_number.upcase.gsub(/[^A-Z0-9]/, '')
+      errors.add(:part, "number does not match selected part")
+    end
+
+    if part.uniform_part_issue != part_issue.upcase.gsub(/[^A-Z0-9]/, '')
+      errors.add(:part, "issue does not match selected part")
+    end
+  end
+
+  def part_changed?
+    part_id_changed?
+  end
+
+  def update_open_status
+    return if voided_changed? # Don't auto-update if manually voided
+
+    # Close if fully released
+    if fully_released? && is_open?
+      update_column(:is_open, false)
+    end
+  end
+
+  def next_release_note_number
+    sequence = Sequence.find_or_create_by(key: 'release_note_number')
+    number = sequence.value
+    sequence.increment!(:value)
+    number
   end
 end

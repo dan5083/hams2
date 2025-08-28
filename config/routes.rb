@@ -9,36 +9,31 @@ Rails.application.routes.draw do
   get '/auth/xero/callback', to: 'xero_auth#callback'
   get '/test_xero_api', to: 'xero_auth#test_api'
 
-  # 1. Parts management - Basic CRUD for parts
+  # 1. Parts management - Now includes integrated processing instructions
   resources :parts do
     member do
       patch :toggle_enabled
     end
     collection do
       get :search
+      # Operations endpoints for the complex treatment form
+      post :filter_operations
+      post :operation_details
+      post :preview_operations
     end
   end
 
-  # Part Processing Instructions
-  resources :part_processing_instructions, path: 'ppis' do
-    member do
-      patch :toggle_enabled
-    end
-    collection do
-      get :search
-    end
-  end
+  # REMOVED: Part Processing Instructions routes - functionality merged into parts
+  # Redirect old PPI routes to parts for any bookmarks/links
+  get '/ppis', to: redirect('/parts')
+  get '/ppis/new', to: redirect('/parts/new')
+  get '/ppis/:id', to: redirect { |params, request| "/parts/#{params[:id]}" }
+  get '/ppis/:id/edit', to: redirect { |params, request| "/parts/#{params[:id]}/edit" }
 
-  # Operations endpoints for AJAX functionality (PPI form and others)
-  resources :operations, only: [] do
-    collection do
-      post :filter
-      post :details
-      post :summary
-      post :preview_with_auto_ops
-      post :calculate_enp_time
-    end
-  end
+  # Legacy operations endpoints - redirect to parts
+  post '/operations/filter', to: 'parts#filter_operations'
+  post '/operations/details', to: 'parts#operation_details'
+  post '/operations/preview_with_auto_ops', to: 'parts#preview_operations'
 
   # 2. Customer Orders - Booking in orders
   resources :customer_orders do
@@ -50,13 +45,12 @@ Rails.application.routes.draw do
     resources :works_orders, only: [:new, :create], shallow: true
   end
 
-  # 3. Works Orders routes (main CRUD) - PDFs for shop floor route cards
+  # 3. Works Orders routes (main CRUD) - Updated to reference parts directly
   resources :works_orders do
     member do
       get :route_card       # Shop floor manufacturing instructions (HTML + PDF)
-      # REMOVED: patch :complete - works orders now auto-complete
       patch :void
-      patch :create_invoice # CHANGED: was book_out, now create_invoice
+      patch :create_invoice # Create invoice from works order
     end
 
     # 5. Release Notes nested under works orders
@@ -84,14 +78,13 @@ Rails.application.routes.draw do
   resources :invoices do
     member do
       patch :void
-      # No PDF route - Xero handles invoice PDFs professionally
     end
 
     collection do
       get :new_manual       # For creating manual invoices
       post :create_manual
       post :create_from_release_notes # Bulk invoice creation
-      post :push_selected_to_xero     # NEW: Bulk push selected invoices to Xero
+      post :push_selected_to_xero     # Bulk push selected invoices to Xero
     end
 
     # Invoice items for partial invoicing
@@ -137,7 +130,7 @@ Rails.application.routes.draw do
     get :customer_summary
   end
 
-  # API routes for AJAX functionality
+  # API routes for AJAX functionality - Updated to use parts
   namespace :api do
     namespace :v1 do
       resources :parts, only: [:index, :show] do
@@ -146,12 +139,7 @@ Rails.application.routes.draw do
         end
       end
 
-      resources :ppis, only: [:index, :show] do
-        collection do
-          get :search
-        end
-      end
-
+      # REMOVED: PPIs API routes - functionality moved to parts
       resources :customer_orders, only: [:index, :show]
     end
   end

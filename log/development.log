@@ -14831,3 +14831,54 @@ Processing by Rails::PwaController#service_worker as */*
 Completed 200 OK in 30ms (Views: 1.3ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
 
 
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (1.2ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (25.8ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (4.0ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+Migrating to ConsolidatePpiIntoParts (20250828080344)
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (18.9ms)[0m  [1m[35mALTER TABLE "parts" ADD "specification" text /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[31mROLLBACK /*application='Hams2'*/[0m
+  [1m[35m (0.3ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (0.3ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.7ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (0.7ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+Migrating to ConsolidatePpiIntoParts (20250828080344)
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (8.7ms)[0m  [1m[35mALTER TABLE "parts" ADD "special_instructions" text /*application='Hams2'*/[0m
+  [1m[35m (1.1ms)[0m  [1m[35mALTER TABLE "parts" ADD "process_type" character varying /*application='Hams2'*/[0m
+  [1m[35m (12.0ms)[0m  [1m[35mALTER TABLE "parts" ADD "customisation_data" jsonb DEFAULT '{}' /*application='Hams2'*/[0m
+  [1m[35m (0.3ms)[0m  [1m[35mALTER TABLE "parts" ADD "replaces_id" uuid /*application='Hams2'*/[0m
+  [1m[35m (28.7ms)[0m  [1m[35mALTER TABLE "parts" ADD CONSTRAINT "fk_rails_817bdf9a72"
+FOREIGN KEY ("replaces_id")
+  REFERENCES "parts" ("id")
+ /*application='Hams2'*/[0m
+  [1m[35m (17.2ms)[0m  [1m[35mCREATE INDEX "index_parts_on_replaces_id" ON "parts" ("replaces_id") /*application='Hams2'*/[0m
+  [1m[35m (2.4ms)[0m  [1m[35mCREATE INDEX "index_parts_on_customisation_data" ON "parts" USING gin ("customisation_data") /*application='Hams2'*/[0m
+  [1m[35m (9.1ms)[0m  [1m[35mALTER TABLE "works_orders" DROP CONSTRAINT "fk_rails_347a85ef9c" /*application='Hams2'*/[0m
+  [1m[35m (2.4ms)[0m  [1m[35mALTER TABLE "works_orders" DROP COLUMN "ppi_id" /*application='Hams2'*/[0m
+  [1m[35m (10.7ms)[0m  [1m[35mCREATE INDEX "index_parts_on_process_type" ON "parts" ("process_type") /*application='Hams2'*/[0m
+  [1m[35m (12.6ms)[0m  [1m[35mCREATE INDEX "index_parts_on_customer_id_and_enabled" ON "parts" ("customer_id", "enabled") /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Create (2.4ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES ('20250828080344') RETURNING "version" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (7.6ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[35m (0.3ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.3ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (0.3ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.8ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (0.7ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+Migrating to DropPartProcessingInstructionsTable (20250828080854)
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (18.1ms)[0m  [1m[35mDROP TABLE "part_processing_instructions" /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Create (0.4ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES ('20250828080854') RETURNING "version" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (16.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[35m (0.4ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.3ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m

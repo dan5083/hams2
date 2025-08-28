@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_14_072006) do
+ActiveRecord::Schema[8.0].define(version: 2025_08_28_080854) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -77,27 +77,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_14_072006) do
     t.index ["xero_contact_id"], name: "index_organizations_on_xero_contact_id"
   end
 
-  create_table "part_processing_instructions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "part_id", null: false
-    t.uuid "customer_id", null: false
-    t.string "part_number", null: false
-    t.string "part_issue", null: false
-    t.string "part_description"
-    t.text "specification"
-    t.text "special_instructions"
-    t.jsonb "customisation_data", default: {}
-    t.boolean "enabled", default: true, null: false
-    t.uuid "replaces_id"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.string "process_type"
-    t.index ["customer_id"], name: "index_part_processing_instructions_on_customer_id"
-    t.index ["enabled"], name: "index_part_processing_instructions_on_enabled"
-    t.index ["part_id"], name: "index_part_processing_instructions_on_part_id"
-    t.index ["part_number", "part_issue"], name: "idx_on_part_number_part_issue_8bf19b3883"
-    t.index ["replaces_id"], name: "index_part_processing_instructions_on_replaces_id"
-  end
-
   create_table "parts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "customer_id", null: false
     t.string "uniform_part_number", null: false
@@ -109,9 +88,17 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_14_072006) do
     t.boolean "enabled", default: true, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.text "special_instructions"
+    t.string "process_type"
+    t.jsonb "customisation_data", default: {}
+    t.uuid "replaces_id"
+    t.index ["customer_id", "enabled"], name: "index_parts_on_customer_id_and_enabled"
     t.index ["customer_id", "uniform_part_number", "uniform_part_issue"], name: "index_parts_on_customer_and_part_number_and_issue", unique: true
     t.index ["customer_id"], name: "index_parts_on_customer_id"
+    t.index ["customisation_data"], name: "index_parts_on_customisation_data", using: :gin
     t.index ["enabled"], name: "index_parts_on_enabled"
+    t.index ["process_type"], name: "index_parts_on_process_type"
+    t.index ["replaces_id"], name: "index_parts_on_replaces_id"
     t.index ["uniform_part_number"], name: "index_parts_on_uniform_part_number"
   end
 
@@ -189,7 +176,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_14_072006) do
     t.integer "number", null: false
     t.uuid "customer_order_id", null: false
     t.uuid "part_id", null: false
-    t.uuid "ppi_id", null: false
     t.uuid "release_level_id", null: false
     t.uuid "transport_method_id", null: false
     t.string "customer_order_line"
@@ -213,7 +199,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_14_072006) do
     t.index ["number"], name: "index_works_orders_on_number", unique: true
     t.index ["part_id"], name: "index_works_orders_on_part_id"
     t.index ["part_number", "part_issue"], name: "index_works_orders_on_part_number_and_part_issue"
-    t.index ["ppi_id"], name: "index_works_orders_on_ppi_id"
     t.index ["release_level_id"], name: "index_works_orders_on_release_level_id"
     t.index ["transport_method_id"], name: "index_works_orders_on_transport_method_id"
     t.index ["voided"], name: "index_works_orders_on_voided"
@@ -241,15 +226,12 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_14_072006) do
   add_foreign_key "invoice_items", "release_notes"
   add_foreign_key "invoices", "organizations", column: "customer_id"
   add_foreign_key "organizations", "xero_contacts"
-  add_foreign_key "part_processing_instructions", "organizations", column: "customer_id"
-  add_foreign_key "part_processing_instructions", "part_processing_instructions", column: "replaces_id"
-  add_foreign_key "part_processing_instructions", "parts"
   add_foreign_key "parts", "organizations", column: "customer_id"
+  add_foreign_key "parts", "parts", column: "replaces_id"
   add_foreign_key "release_notes", "users", column: "issued_by_id"
   add_foreign_key "release_notes", "works_orders"
   add_foreign_key "sessions", "users"
   add_foreign_key "works_orders", "customer_orders"
-  add_foreign_key "works_orders", "part_processing_instructions", column: "ppi_id"
   add_foreign_key "works_orders", "parts"
   add_foreign_key "works_orders", "release_levels"
   add_foreign_key "works_orders", "transport_methods"
