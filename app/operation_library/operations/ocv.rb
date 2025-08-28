@@ -57,7 +57,7 @@ module OperationLibrary
         Operation.new(
           id: base_operation.id,
           process_type: base_operation.process_type,
-          operation_text: "OCV: Batch 1: Time ___m ___s    Temp ___°C\nOCV: Batch 2: Time ___m ___s    Temp ___°C\nOCV: Batch 3: Time ___m ___s    Temp ___°C"
+          operation_text: "Batch 1: Time ___m ___s    Temp ___°C\nBatch 2: Time ___m ___s    Temp ___°C\nBatch 3: Time ___m ___s    Temp ___°C"
         )
       end
     end
@@ -116,7 +116,7 @@ module OperationLibrary
           time_mark = interval * 5
           interval_texts << "#{time_mark}min: ___V"
         end
-        text_lines << "OCV: Batch #{batch}: Temp ___°C [#{interval_texts.join(' | ')}]"
+        text_lines << "Batch #{batch}: Temp ___°C [#{interval_texts.join(' | ')}]"
       end
 
       text_lines.join("\n")
