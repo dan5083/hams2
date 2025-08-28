@@ -76,9 +76,13 @@ module OperationLibrary
           previous_operation = operations_sequence[index - 1]
 
           if non_water_chemical_treatment?(previous_operation)
-            # Find the most recent anodising operation for timing calculation
-            anodising_op = find_most_recent_anodising_operation(operations_sequence, index)
-            ocv_operation = get_ocv_operation(anodising_op, aerospace_defense: aerospace_defense)
+            # Only use voltage monitoring if the rinse directly follows an anodising operation
+            if is_anodising_operation?(previous_operation)
+              ocv_operation = get_ocv_operation(previous_operation, aerospace_defense: aerospace_defense)
+            else
+              # For non-anodising chemical treatments, use time/temp monitoring only
+              ocv_operation = get_ocv_operation(nil, aerospace_defense: aerospace_defense)
+            end
             new_sequence << ocv_operation if ocv_operation
           end
         end
@@ -143,15 +147,6 @@ module OperationLibrary
     # Check if operation is an anodising process
     def self.is_anodising_operation?(operation)
       ['standard_anodising', 'hard_anodising', 'chromic_anodising'].include?(operation.process_type)
-    end
-
-    # Find the most recent anodising operation in the sequence before the given index
-    def self.find_most_recent_anodising_operation(operations_sequence, current_index)
-      (current_index - 1).downto(0) do |i|
-        operation = operations_sequence[i]
-        return operation if is_anodising_operation?(operation)
-      end
-      nil
     end
   end
 end
