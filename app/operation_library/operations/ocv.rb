@@ -108,7 +108,6 @@ module OperationLibrary
     # Build voltage monitoring text with proper intervals
     def self.build_voltage_monitoring_text(voltage_data)
       intervals = voltage_data[:intervals]
-      temp = voltage_data[:temperature]
 
       text_lines = []
       (1..3).each do |batch|
@@ -117,7 +116,7 @@ module OperationLibrary
           time_mark = interval * 5
           interval_texts << "#{time_mark}min: ___V"
         end
-        text_lines << "OCV: Batch #{batch}: Temp #{temp}°C [#{interval_texts.join(' | ')}]"
+        text_lines << "OCV: Batch #{batch}: Temp ___°C [#{interval_texts.join(' | ')}]"
       end
 
       text_lines.join("\n")
@@ -125,47 +124,8 @@ module OperationLibrary
 
     # Calculate appropriate temperature for anodising operation
     def self.calculate_temperature_for_anodising(anodising_operation)
-      case anodising_operation.process_type
-      when 'hard_anodising'
-        25
-      when 'chromic_anodising'
-        22
-      else # standard_anodising
-        20
-      end
-    end
-
-    # Calculate OCV timing based on anodising operation thickness
-    def self.calculate_ocv_timing(anodising_operation)
-      thickness = anodising_operation.target_thickness || 0
-
-      # Calculate 5-minute increments based on thickness
-      base_increments = (thickness / 5.0).ceil
-      base_minutes = base_increments * 5
-
-      # Add some variation based on operation type
-      case anodising_operation.process_type
-      when 'hard_anodising'
-        # Hard anodising requires longer OCV monitoring
-        minutes = base_minutes + 5
-        seconds = 30
-        temperature = 25
-      when 'chromic_anodising'
-        # Chromic anodising uses different timing
-        minutes = [base_minutes, 10].max # Minimum 10 minutes
-        seconds = 0
-        temperature = 22
-      else # standard_anodising
-        minutes = base_minutes
-        seconds = 0
-        temperature = 20
-      end
-
-      {
-        minutes: minutes,
-        seconds: seconds,
-        temperature: temperature
-      }
+      # Temperature should always be blank for operator to fill in
+      "___"
     end
 
     # Check if operation is a non-water chemical treatment

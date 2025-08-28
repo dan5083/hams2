@@ -1067,7 +1067,7 @@ export default class extends Controller {
           <div class="${bgColor} rounded px-3 py-2">
             <span class="text-sm ${textColor}">
               <strong>${index + 1}.</strong>
-              ${op.display_name}: ${op.operation_text}
+              ${op.display_name}: ${isOcvCheck ? op.operation_text.replace(/\n/g, '<br>') : op.operation_text}
               ${autoLabel}
             </span>
           </div>
