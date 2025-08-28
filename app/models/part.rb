@@ -99,7 +99,7 @@ class Part < ApplicationRecord
     selected_enp_pre_heat_treatment.present? && selected_enp_pre_heat_treatment != 'none'
   end
 
-  # Main method - get operations with correct ordering including water break test and ENP heat treatments
+  # Main method - get operations with correct ordering including water break test, OCV, and ENP heat treatments
   def get_operations_with_auto_ops
     treatments = get_treatments
     return [] if treatments.empty?
@@ -135,6 +135,14 @@ class Part < ApplicationRecord
     # 5. Insert water break test if required (after degrease operations)
     if defined?(OperationLibrary::WaterBreakOperations)
       sequence = OperationLibrary::WaterBreakOperations.insert_water_break_test_if_required(
+        sequence,
+        aerospace_defense: aerospace_defense?
+      )
+    end
+
+    # 6. Insert OCV operations if required (after rinses that follow non-water chemical treatments)
+    if defined?(OperationLibrary::Ocv)
+      sequence = OperationLibrary::Ocv.insert_ocv_if_required(
         sequence,
         aerospace_defense: aerospace_defense?
       )
