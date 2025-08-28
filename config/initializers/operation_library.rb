@@ -20,3 +20,4 @@ require Rails.root.join('app', 'operation_library', 'operations', 'water_break_o
 require Rails.root.join('app', 'operation_library', 'operations', 'dye')
 require Rails.root.join('app', 'operation_library', 'operations', 'ptfe')
 require Rails.root.join('app', 'operation_library', 'operations', 'enp_heat_treatments')
+require Rails.root.join('app', 'operation_library', 'operations', 'local_treatment')

@@ -70,10 +70,10 @@ for f in app/views/customer_orders/*.html.erb; do echo "=== $f ==="; cat "$f"; e
 for f in app/views/dashboard/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
 for f in app/views/layouts/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
 
-for f in app/views/part_processing_instructions/[_a-f]*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/part_processing_instructions/[g-z]*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
+for f in app/views/parts/[_a-f]*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
 
-for f in app/views/parts/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
+for f in app/views/parts/[_g-z]*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
+
 for f in app/views/passwords/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
 for f in app/views/passwords_mailer/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
 for f in app/views/registrations/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done

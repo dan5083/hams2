@@ -198,7 +198,7 @@ class PartsController < ApplicationController
     # Filter by target thickness (with tolerance) - skip for chromic anodising
     if criteria[:target_thicknesses].present?
       operations = operations.select do |op|
-        if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'chromic_anodising', 'enp_heat_treatment', 'enp_post_heat_treatment', 'enp_baking'])
+        if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'chromic_anodising', 'enp_heat_treatment', 'enp_post_heat_treatment', 'enp_baking', 'local_treatment'])
           true
         else
           criteria[:target_thicknesses].any? do |target|
@@ -211,7 +211,7 @@ class PartsController < ApplicationController
       if criteria[:target_thicknesses].length == 1
         target = criteria[:target_thicknesses].first
         operations = operations.sort_by do |op|
-          if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'chromic_anodising', 'enp_heat_treatment', 'enp_post_heat_treatment', 'enp_baking'])
+          if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'chromic_anodising', 'enp_heat_treatment', 'enp_post_heat_treatment', 'enp_baking', 'local_treatment'])
             0
           else
             (op.target_thickness - target).abs

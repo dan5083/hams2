@@ -76,6 +76,14 @@ export default class extends Controller {
       'Hytorque Jig'
     ]
 
+    // Available local treatments for anodising
+    this.availableLocalTreatments = [
+      { value: 'none', label: 'No Local Treatment' },
+      { value: 'LOCAL_ALOCHROM_1200_PEN', label: 'Alochrom 1200 (Pen)' },
+      { value: 'LOCAL_SURTEC_650V_PEN', label: 'SurTec 650V (Pen)' },
+      { value: 'LOCAL_PTFE_APPLICATION', label: 'PTFE Application' }
+    ]
+
     this.initializeExistingData()
     this.setupTreatmentButtons()
     this.setupENPPreHeatTreatmentListener()
@@ -225,7 +233,8 @@ export default class extends Controller {
       stripping_method: 'none',
       sealing_method: 'none',
       dye_color: 'none',
-      ptfe_enabled: false
+      ptfe_enabled: false,
+      local_treatment_type: 'none' // New field for local treatments
     }
 
     this.treatments.push(treatment)
@@ -470,6 +479,7 @@ export default class extends Controller {
     const anodisingTypes = ['standard_anodising', 'hard_anodising', 'chromic_anodising']
     const showSealing = anodisingTypes.includes(treatment.type)
     const showDye = anodisingTypes.includes(treatment.type)
+    const showLocalTreatment = anodisingTypes.includes(treatment.type)
 
     return `
       <div class="border-t border-gray-200 pt-4 mt-4">
@@ -553,12 +563,25 @@ export default class extends Controller {
 
           <!-- PTFE Toggle (for anodising only, after sealing) -->
           ${showDye ? `
-          <div class="mt-4 pt-4 border-t border-gray-200">
+          <div class="pt-2 border-t border-gray-200">
             <label class="flex items-center">
               <input type="checkbox" class="ptfe-checkbox rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-offset-0 focus:ring-blue-200 focus:ring-opacity-50" data-treatment-id="${treatment.id}" ${treatment.ptfe_enabled ? 'checked' : ''}>
               <span class="ml-2 text-sm font-medium text-gray-700">Apply PTFE Treatment</span>
             </label>
             <p class="mt-1 text-xs text-gray-500">Anolube treatment applied after sealing</p>
+          </div>
+          ` : ''}
+
+          <!-- Local Treatment Selection (for anodising only) -->
+          ${showLocalTreatment ? `
+          <div class="pt-2 border-t border-gray-200">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Local Treatment</label>
+            <select class="local-treatment-select w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-teal-500 focus:border-teal-500 sm:text-sm" data-treatment-id="${treatment.id}">
+              ${this.availableLocalTreatments.map(localTreat =>
+                `<option value="${localTreat.value}" ${treatment.local_treatment_type === localTreat.value ? 'selected' : ''}>${localTreat.label}</option>`
+              ).join('')}
+            </select>
+            <p class="mt-1 text-xs text-gray-500">Applied after masking removal operations</p>
           </div>
           ` : ''}
         </div>
@@ -656,6 +679,11 @@ export default class extends Controller {
 
     if (event.target.classList.contains('ptfe-checkbox')) {
       treatment.ptfe_enabled = event.target.checked
+    }
+
+    // Handle local treatment selection changes
+    if (event.target.classList.contains('local-treatment-select')) {
+      treatment.local_treatment_type = event.target.value
     }
 
     // Update treatment data based on the changed element
@@ -938,6 +966,10 @@ export default class extends Controller {
         },
         ptfe: {
           enabled: treatment.ptfe_enabled
+        },
+        local_treatment: {
+          enabled: treatment.local_treatment_type !== 'none',
+          type: treatment.local_treatment_type !== 'none' ? treatment.local_treatment_type : null
         }
       }))
 
@@ -982,6 +1014,7 @@ export default class extends Controller {
         const isDye = op.id && (op.id.includes('_DYE') || op.display_name?.includes('Dye'))
         const isPreHeatTreatment = op.id && op.id.startsWith('PRE_ENP_HEAT_TREAT')
         const isPostHeatTreatment = op.id && (op.id.startsWith('POST_ENP_HEAT_TREAT') || op.id.includes('ENP_POST_HEAT_TREAT') || op.id.includes('ENP_BAKE'))
+        const isLocalTreatment = op.id && op.id.startsWith('LOCAL_')
 
         let bgColor = 'bg-blue-100 border border-blue-300'
         let textColor = 'text-gray-900'
@@ -1015,6 +1048,12 @@ export default class extends Controller {
           bgColor = 'bg-orange-50 border border-orange-200'
           textColor = 'text-orange-800'
           autoLabel = '<span class="text-xs text-orange-600 ml-2">(ENP post-heat treatment)</span>'
+        }
+
+        if (isLocalTreatment) {
+          bgColor = 'bg-teal-50 border border-teal-200'
+          textColor = 'text-teal-800'
+          autoLabel = '<span class="text-xs text-teal-600 ml-2">(local treatment)</span>'
         }
 
         return `

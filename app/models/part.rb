@@ -164,7 +164,8 @@ class Part < ApplicationRecord
         stripping: data["stripping"] || {},
         sealing: data["sealing"] || {},
         dye: data["dye"] || {},
-        ptfe: data["ptfe"] || {}
+        ptfe: data["ptfe"] || {},
+        local_treatment: data["local_treatment"] || {}
       }
     end.compact
   end
@@ -338,6 +339,7 @@ class Part < ApplicationRecord
     sealing = treatment[:sealing]
     dye = treatment[:dye]
     ptfe = treatment[:ptfe]
+    local_treatment = treatment[:local_treatment]
 
     # Get jig type for this specific treatment
     treatment_jig_type = treatment_data["selected_jig_type"]
@@ -421,6 +423,14 @@ class Part < ApplicationRecord
         OperationLibrary::Masking.get_masking_removal_operations.each do |removal_op|
           safe_add_to_sequence(sequence, removal_op, "Masking Removal")
         end
+      end
+    end
+
+    # 12. Local treatment (after masking removal, only for anodising operations)
+    if local_treatment["enabled"] && local_treatment["type"].present? && is_anodising?(op)
+      local_treatment_op = OperationLibrary::LocalTreatment.get_local_treatment_operation(local_treatment["type"])
+      if local_treatment_op
+        safe_add_to_sequence(sequence, local_treatment_op, "Local Treatment")
       end
     end
   end
