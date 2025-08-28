@@ -1,6 +1,22 @@
 # app/operation_library/operations/ocv.rb
 module OperationLibrary
   class Ocv
+    # Define non-water chemical processes that require OCV monitoring
+    NON_WATER_CHEMICAL_PROCESSES = %w[
+      degrease
+      pretreatment
+      enp_pretreatment
+      chemical_conversion
+      standard_anodising
+      hard_anodising
+      chromic_anodising
+      electroless_nickel_plating
+      sealing
+      dichromate_sealing
+      stripping
+      dye
+    ].freeze
+
     def self.operations
       [
         # Basic OCV operation with templated timing for 3 batches
@@ -113,21 +129,6 @@ module OperationLibrary
 
     # Check if operation is a non-water chemical treatment
     def self.non_water_chemical_treatment?(operation)
-      NON_WATER_CHEMICAL_PROCESSES = %w[
-        degrease
-        pretreatment
-        enp_pretreatment
-        chemical_conversion
-        standard_anodising
-        hard_anodising
-        chromic_anodising
-        electroless_nickel_plating
-        sealing
-        dichromate_sealing
-        stripping
-        dye
-      ]
-
       NON_WATER_CHEMICAL_PROCESSES.include?(operation.process_type)
     end
 
