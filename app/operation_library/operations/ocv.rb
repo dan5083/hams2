@@ -44,25 +44,20 @@ module OperationLibrary
       base_operation = operations.first
 
       if anodising_operation && is_anodising_operation?(anodising_operation)
-        time_data = calculate_ocv_timing(anodising_operation)
+        # For anodising operations, calculate voltage monitoring intervals
+        voltage_intervals = calculate_voltage_monitoring_intervals(anodising_operation)
 
         Operation.new(
           id: base_operation.id,
           process_type: base_operation.process_type,
-          operation_text: base_operation.operation_text
-            .gsub('{TIME}', time_data[:minutes].to_s)
-            .gsub('{SECONDS}', time_data[:seconds].to_s)
-            .gsub('{TEMP}', time_data[:temperature].to_s)
+          operation_text: build_voltage_monitoring_text(voltage_intervals)
         )
       else
-        # Default OCV operation for non-anodising processes
+        # For non-electrolytic processes, just record time and temp (no voltage)
         Operation.new(
           id: base_operation.id,
           process_type: base_operation.process_type,
-          operation_text: base_operation.operation_text
-            .gsub('{TIME}', '5')
-            .gsub('{SECONDS}', '0')
-            .gsub('{TEMP}', '20')
+          operation_text: "OCV: Batch 1: Time ___m ___s    Temp ___°C\nOCV: Batch 2: Time ___m ___s    Temp ___°C\nOCV: Batch 3: Time ___m ___s    Temp ___°C"
         )
       end
     end
@@ -93,6 +88,52 @@ module OperationLibrary
     end
 
     private
+
+    # Calculate voltage monitoring intervals for anodising operations (every 5 minutes)
+    def self.calculate_voltage_monitoring_intervals(anodising_operation)
+      # Extract time duration from operation text (e.g., "15V-->20V over 2 minutes" -> 2)
+      time_match = anodising_operation.operation_text.match(/over (\d+) minutes/)
+      total_minutes = time_match ? time_match[1].to_i : 20 # Default to 20 minutes
+
+      # Calculate number of 5-minute intervals
+      intervals = (total_minutes / 5.0).ceil
+
+      {
+        total_minutes: total_minutes,
+        intervals: intervals,
+        temperature: calculate_temperature_for_anodising(anodising_operation)
+      }
+    end
+
+    # Build voltage monitoring text with proper intervals
+    def self.build_voltage_monitoring_text(voltage_data)
+      intervals = voltage_data[:intervals]
+      temp = voltage_data[:temperature]
+
+      text_lines = []
+      (1..3).each do |batch|
+        interval_texts = []
+        (1..intervals).each do |interval|
+          time_mark = interval * 5
+          interval_texts << "#{time_mark}min: ___V"
+        end
+        text_lines << "OCV: Batch #{batch}: Temp #{temp}°C [#{interval_texts.join(' | ')}]"
+      end
+
+      text_lines.join("\n")
+    end
+
+    # Calculate appropriate temperature for anodising operation
+    def self.calculate_temperature_for_anodising(anodising_operation)
+      case anodising_operation.process_type
+      when 'hard_anodising'
+        25
+      when 'chromic_anodising'
+        22
+      else # standard_anodising
+        20
+      end
+    end
 
     # Calculate OCV timing based on anodising operation thickness
     def self.calculate_ocv_timing(anodising_operation)
