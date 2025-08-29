@@ -1,6 +1,7 @@
 Rails.application.routes.draw do
   # Authentication routes
   resource :session
+  get '/auth/:token', to: 'sessions#magic_link', as: :magic_link
   resources :passwords, param: :token
   resources :registrations, only: [:new, :create]
 
