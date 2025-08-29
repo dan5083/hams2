@@ -61,11 +61,11 @@ Rails.application.configure do
   }
 
   config.action_mailer.smtp_settings = {
-    port: ENV['MAILGUN_SMTP_PORT'],
-    address: ENV['MAILGUN_SMTP_SERVER'],
+    port: ENV['MAILGUN_SMTP_PORT'] || 587,
+    address: ENV['MAILGUN_SMTP_SERVER'] || 'smtp.mailgun.org',
     user_name: ENV['MAILGUN_SMTP_LOGIN'],
     password: ENV['MAILGUN_SMTP_PASSWORD'],
-    domain: ENV['MAILGUN_DOMAIN'],
+    domain: 'hams-2-4d0b0c1dfab4.herokuapp.com',
     authentication: :plain,
     enable_starttls_auto: true
   }
