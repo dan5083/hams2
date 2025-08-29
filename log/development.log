@@ -14886,3 +14886,29 @@ Migrating to DropPartProcessingInstructionsTable (20250828080854)
 [dotenv] Loaded [33m.env[0m
 [dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
 [dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (1.5ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (2.3ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (1.7ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+Migrating to AddMagicLinkToUsers (20250829095506)
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (11.5ms)[0m  [1m[35mALTER TABLE "users" ADD "magic_link_token" character varying /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[31mROLLBACK /*application='Hams2'*/[0m
+  [1m[35m (0.5ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (0.3ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (1.0ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (0.9ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+Migrating to AddMagicLinkIndexesToUsers (20250829095706)
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (2.8ms)[0m  [1m[35mCREATE UNIQUE INDEX "index_users_on_magic_link_token" ON "users" ("magic_link_token") WHERE magic_link_token IS NOT NULL /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[31mROLLBACK /*application='Hams2'*/[0m
+  [1m[35m (0.4ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
