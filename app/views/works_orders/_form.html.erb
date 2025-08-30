@@ -282,28 +282,55 @@ function togglePriceFields(priceType) {
   }
 }
 
-// Refresh parts dropdown when window regains focus (after creating a part in another tab)
-let isRefreshing = false;
-window.addEventListener('focus', function() {
-  if (!document.hidden && !isRefreshing) {
-    isRefreshing = true;
+// Refresh parts dropdown when clicked (to pick up newly created parts)
+let lastRefreshTime = 0;
+document.addEventListener('click', function(event) {
+  const partSelect = document.querySelector('#works_order_part_id');
 
-    // Only refresh if we're on the works order form and user might have created a part
-    const partSelect = document.querySelector('#works_order_part_id');
-    if (partSelect) {
-      // Store current selection
+  if (event.target === partSelect && partSelect) {
+    const now = Date.now();
+    // Only refresh if it's been more than 5 seconds since last refresh
+    if (now - lastRefreshTime > 5000) {
+      lastRefreshTime = now;
+
+      // Store current selection and customer order
       const currentValue = partSelect.value;
+      const customerOrderId = document.querySelector('#works_order_customer_order_id')?.value;
 
-      // Reload the page to get updated parts list
-      // We do a full reload because we need to refresh @parts from the controller
-      setTimeout(function() {
-        location.reload();
-      }, 100);
+      if (customerOrderId) {
+        // Fetch updated parts list via AJAX
+        fetch(`/parts/search.json?customer_id=${customerOrderId}`)
+          .then(response => response.json())
+          .then(parts => {
+            // Clear current options except the first "Select Part Number" option
+            partSelect.innerHTML = '<option value="">Select Part Number</option>';
+
+            // Add updated parts
+            parts.forEach(part => {
+              const option = document.createElement('option');
+              option.value = part.id;
+              option.textContent = part.display_name;
+              if (part.id.toString() === currentValue) {
+                option.selected = true;
+              }
+              partSelect.appendChild(option);
+            });
+
+            // Update window.partsData for the form
+            window.partsData = {};
+            parts.forEach(part => {
+              window.partsData[part.id] = {
+                uniform_part_number: part.display_name.split('-')[0] || '',
+                uniform_part_issue: part.display_name.split('-')[1] || '',
+                description: part.display_name
+              };
+            });
+          })
+          .catch(error => {
+            console.log('Could not refresh parts list:', error);
+          });
+      }
     }
-
-    setTimeout(function() {
-      isRefreshing = false;
-    }, 1000);
   }
 });
 
