@@ -22,21 +22,26 @@ class WorksOrdersController < ApplicationController
  def show
  end
 
- def new
-   @works_order = WorksOrder.new
+  def new
+    @works_order = WorksOrder.new
 
-   # If coming from nested route, pre-select the customer order
-   if params[:customer_order_id].present?
-     @customer_order = CustomerOrder.find(params[:customer_order_id])
-     @works_order.customer_order = @customer_order
-     @customer_orders = [@customer_order] # Only show the selected customer order
-   else
-     @customer_orders = CustomerOrder.active.includes(:customer).order(created_at: :desc)
-     @customer_order = nil
-   end
+    # If coming from nested route, pre-select the customer order
+    if params[:customer_order_id].present?
+      @customer_order = CustomerOrder.find(params[:customer_order_id])
+      @works_order.customer_order = @customer_order
+      @customer_orders = [@customer_order]
+    else
+      @customer_orders = CustomerOrder.active.includes(:customer).order(created_at: :desc)
+      @customer_order = nil
+    end
 
-   load_reference_data
- end
+    load_reference_data
+
+    # FORCE DEBUG LOGGING AFTER load_reference_data
+    Rails.logger.info "🚨 CONTROLLER POST-LOAD: @parts.count = #{@parts&.count || 'NIL'}"
+    Rails.logger.info "🚨 CONTROLLER POST-LOAD: @parts IDs = #{@parts&.pluck(:id) || 'NIL'}"
+    Rails.logger.info "🚨 CONTROLLER POST-LOAD: @customer_order = #{@customer_order&.customer&.name || 'NIL'}"
+  end
 
  def create
    @works_order = WorksOrder.new(works_order_params)
