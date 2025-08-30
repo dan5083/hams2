@@ -1,4 +1,4 @@
-# app/controllers/works_orders_controller.rb - Updated build_operations_from_process method
+# app/controllers/works_orders_controller.rb - Fixed part_processing_instructions association error
 class WorksOrdersController < ApplicationController
  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :create_invoice]
 
@@ -46,8 +46,8 @@ class WorksOrdersController < ApplicationController
      @works_order.customer_order_id = params[:customer_order_id]
    end
 
-   # Set up the part and PPI automatically
-   if setup_part_and_ppi(@works_order)
+   # Set up the part automatically
+   if setup_part(@works_order)
      if @works_order.save
        redirect_to @works_order, notice: 'Works order was successfully created.'
      else
@@ -66,9 +66,9 @@ class WorksOrdersController < ApplicationController
  end
 
  def update
-   # For updates, we might need to recreate the part/PPI if part details changed
+   # For updates, we might need to update the part if part details changed
    if part_details_changed?
-     setup_part_and_ppi(@works_order)
+     setup_part(@works_order)
    end
 
    if @works_order.update(works_order_params)
@@ -89,7 +89,7 @@ class WorksOrdersController < ApplicationController
  end
 
  def route_card
-   @operations = @works_order.ppi&.build_route_card_operations || []
+   @operations = @works_order.operations_with_auto_ops || []
 
    respond_to do |format|
      format.html { render layout: false }
@@ -186,22 +186,18 @@ class WorksOrdersController < ApplicationController
    @release_levels = ReleaseLevel.enabled.ordered
    @transport_methods = TransportMethod.enabled.ordered
 
-   # Load all parts for the customer (temporarily remove PPI requirement to debug)
+   # Load all parts for the customer
    if @customer_order.present?
      @parts = Part.enabled
                   .for_customer(@customer_order.customer)
-                  .includes(:customer, :part_processing_instructions)
+                  .includes(:customer)
                   .order(:uniform_part_number)
 
      Rails.logger.info "🔍 Loading parts for customer: #{@customer_order.customer.name}"
      Rails.logger.info "🔍 Found #{@parts.count} parts"
-     @parts.each do |part|
-       ppis = part.part_processing_instructions.where(customer: @customer_order.customer, enabled: true)
-       Rails.logger.info "🔍 Part #{part.display_name}: #{ppis.count} PPIs"
-     end
    else
      @parts = Part.enabled
-                  .includes(:customer, :part_processing_instructions)
+                  .includes(:customer)
                   .order(:uniform_part_number)
    end
  end
@@ -220,7 +216,7 @@ class WorksOrdersController < ApplicationController
    load_reference_data
  end
 
- def setup_part_and_ppi(works_order)
+ def setup_part(works_order)
    return false unless works_order.customer_order && works_order.part_id.present?
 
    customer = works_order.customer_order.customer
@@ -233,20 +229,11 @@ class WorksOrdersController < ApplicationController
      works_order.part_issue = part.uniform_part_issue
      works_order.part_description = part.description || "#{part.uniform_part_number} component"
 
-     # Find THE PPI for this part and customer (should only be one)
-     ppi = PartProcessingInstruction.find_by(
-       part: part,
-       customer: customer,
-       enabled: true
-     )
-
-     if ppi.blank?
-       works_order.errors.add(:part_id, "No processing instruction found for #{part.display_name}. Please set up this part properly first.")
+     # Check if part has processing instructions configured
+     if part.customisation_data.blank? || part.customisation_data.dig("operation_selection", "treatments").blank?
+       works_order.errors.add(:part_id, "Part #{part.display_name} does not have processing instructions configured. Please set up this part properly first.")
        return false
      end
-
-     # Use the PPI
-     works_order.ppi = ppi
 
      return true
    rescue => e
