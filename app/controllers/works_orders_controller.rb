@@ -182,20 +182,25 @@ class WorksOrdersController < ApplicationController
    )
  end
 
- def load_reference_data
-   @release_levels = ReleaseLevel.enabled.ordered
-   @transport_methods = TransportMethod.enabled.ordered
+  def load_reference_data
+    @release_levels = ReleaseLevel.enabled.ordered
+    @transport_methods = TransportMethod.enabled.ordered
 
-   # Load all parts for the customer
-   if @customer_order.present?
-     @parts = Part.enabled
+    if @customer_order.present?
+      Rails.logger.info "🔍 Loading parts for customer: #{@customer_order.customer.name} (ID: #{@customer_order.customer.id})"
+
+      @parts = Part.enabled
                   .for_customer(@customer_order.customer)
                   .includes(:customer)
                   .order(:uniform_part_number)
 
-     Rails.logger.info "🔍 Loading parts for customer: #{@customer_order.customer.name}"
-     Rails.logger.info "🔍 Found #{@parts.count} parts"
-   else
+      Rails.logger.info "🔍 Found #{@parts.count} parts in controller"
+      Rails.logger.info "🔍 Part IDs: #{@parts.pluck(:id)}"
+
+      # Force query execution and count from database
+      db_count = Part.enabled.for_customer(@customer_order.customer).count
+      Rails.logger.info "🔍 Direct DB count: #{db_count}"
+    else
      @parts = Part.enabled
                   .includes(:customer)
                   .order(:uniform_part_number)
