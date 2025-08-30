@@ -1,248 +1,329 @@
-# app/controllers/works_orders_controller.rb - Fixed part_processing_instructions association error
-class WorksOrdersController < ApplicationController
- before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :create_invoice]
+<%# app/views/works_orders/_form.html.erb - With currency formatting and part creation link %>
+<%= form_with model: works_order, local: true, class: "space-y-6" do |form| %>
+  <% if works_order.errors.any? %>
+    <div class="bg-red-50 border border-red-200 rounded-md p-4">
+      <div class="flex">
+        <div class="ml-3">
+          <h3 class="text-sm font-medium text-red-800">
+            <%= pluralize(works_order.errors.count, "error") %> prohibited this works order from being saved:
+          </h3>
+          <div class="mt-2 text-sm text-red-700">
+            <ul class="list-disc list-inside space-y-1">
+              <% works_order.errors.full_messages.each do |message| %>
+                <li><%= message %></li>
+              <% end %>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
 
- def index
-   @works_orders = WorksOrder.includes(:customer_order, :part, :release_level, :transport_method)
-                             .active
-                             .order(created_at: :desc)
+  <div class="bg-white shadow rounded-lg p-6">
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Works Order Details</h3>
 
-   # Add filtering if needed
-   if params[:customer_id].present?
-     @works_orders = @works_orders.for_customer(params[:customer_id])
-   end
+    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+      <!-- Customer Order Selection -->
+      <div class="sm:col-span-2">
+        <%= form.label :customer_order_id, class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <% if @customer_order.present? && @customer_orders.length == 1 %>
+          <!-- Show as read-only text when pre-selected -->
+          <div class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-gray-50 text-gray-900">
+            <%= @customer_order.customer.name %> - <%= @customer_order.number %>
+          </div>
+          <%= form.hidden_field :customer_order_id, value: @customer_order.id %>
+          <p class="mt-1 text-xs text-gray-500">Pre-selected from the customer order you came from</p>
+        <% else %>
+          <%= form.select :customer_order_id,
+              options_for_select([['Select Customer Order', '']] + @customer_orders.map { |co| ["#{co.customer.name} - #{co.number}", co.id] }, works_order.customer_order_id),
+              {},
+              {
+                class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+                required: true
+              } %>
+        <% end %>
+      </div>
 
-   if params[:status] == 'open'
-     @works_orders = @works_orders.open
-   elsif params[:status] == 'closed'
-     @works_orders = @works_orders.closed
-   end
- end
+      <!-- Part Number Selection -->
+      <div class="sm:col-span-2">
+        <%= form.label :part_id, "Part Number", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.select :part_id,
+            options_for_select([['Select Part Number', '']] + @parts.map { |p| ["#{p.display_name}", p.id] }, works_order.part_id),
+            {},
+            {
+              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+              required: true,
+              onchange: "updatePartDetails(this)"
+            } %>
+        <p class="mt-1 text-xs text-gray-500">
+          Select the part number to be processed (if you do not see the part
+          <% if @customer_order.present? %>
+            <%= link_to "create it here", new_part_path(customer_id: @customer_order.customer.id),
+                target: "_blank",
+                class: "text-blue-600 hover:text-blue-800 underline",
+                rel: "noopener noreferrer" %>
+          <% else %>
+            <%= link_to "create it here", new_part_path,
+                target: "_blank",
+                class: "text-blue-600 hover:text-blue-800 underline",
+                rel: "noopener noreferrer" %>
+          <% end %>
+          and then it will appear)
+        </p>
+      </div>
 
- def show
- end
+      <!-- Hidden fields to store part details -->
+      <%= form.hidden_field :part_number %>
+      <%= form.hidden_field :part_issue %>
+      <%= form.hidden_field :part_description %>
 
- def new
-   @works_order = WorksOrder.new
+      <!-- Quantity -->
+      <div>
+        <%= form.label :quantity, class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.number_field :quantity,
+            placeholder: "Enter quantity",
+            min: 1,
+            class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+            required: true %>
+      </div>
 
-   # If coming from nested route, pre-select the customer order
-   if params[:customer_order_id].present?
-     @customer_order = CustomerOrder.find(params[:customer_order_id])
-     @works_order.customer_order = @customer_order
-     @customer_orders = [@customer_order] # Only show the selected customer order
-   else
-     @customer_orders = CustomerOrder.active.includes(:customer).order(created_at: :desc)
-     @customer_order = nil
-   end
+      <!-- Release Level -->
+      <div>
+        <%= form.label :release_level_id, class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.select :release_level_id,
+            options_for_select([['Select Release Level', '']] + @release_levels.map { |rl| [rl.name, rl.id] }, works_order.release_level_id),
+            {},
+            {
+              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+              required: true
+            } %>
+      </div>
 
-   load_reference_data
- end
+      <!-- Transport Method -->
+      <div>
+        <%= form.label :transport_method_id, class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.select :transport_method_id,
+            options_for_select([['Select Transport Method', '']] + @transport_methods.map { |tm| [tm.name, tm.id] }, works_order.transport_method_id),
+            {},
+            {
+              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+              required: true
+            } %>
+      </div>
+    </div>
+  </div>
 
- def create
-   @works_order = WorksOrder.new(works_order_params)
+  <!-- Pricing Section -->
+  <div class="bg-white shadow rounded-lg p-6">
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Pricing</h3>
 
-   # If customer_order_id is missing, try to get it from the route
-   if @works_order.customer_order_id.blank? && params[:customer_order_id].present?
-     @works_order.customer_order_id = params[:customer_order_id]
-   end
+    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+      <!-- Price Type -->
+      <div class="sm:col-span-2">
+        <%= form.label :price_type, class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.select :price_type,
+            options_for_select([
+              ['Each (price per part)', 'each'],
+              ['Lot (total job price)', 'lot']
+            ], works_order.price_type || 'each'),
+            {},
+            {
+              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+              required: true,
+              onchange: "togglePriceFields(this.value)"
+            } %>
+      </div>
 
-   # Set up the part automatically
-   if setup_part(@works_order)
-     if @works_order.save
-       redirect_to @works_order, notice: 'Works order was successfully created.'
-     else
-       load_form_data_for_errors
-       render :new, status: :unprocessable_entity
-     end
-   else
-     load_form_data_for_errors
-     render :new, status: :unprocessable_entity
-   end
- end
+      <!-- Each Price (shown when price_type is 'each') -->
+      <div id="each_price_field" class="sm:col-span-2" style="<%= works_order.price_type == 'lot' ? 'display: none;' : '' %>">
+        <%= form.label :each_price, "Price per part (£)", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <div class="mt-1 relative rounded-md shadow-sm">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <span class="text-gray-500 sm:text-sm">£</span>
+          </div>
+          <%= form.number_field :each_price,
+              step: 0.01,
+              min: 0,
+              placeholder: "0.00",
+              class: "block w-full pl-7 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+              id: "each_price_input",
+              onblur: "formatCurrency(this)" %>
+        </div>
+        <p class="mt-1 text-xs text-gray-500">
+          The total job price will be calculated as: quantity × price per part
+        </p>
+      </div>
 
- def edit
-   @customer_orders = [@works_order.customer_order] # For edit, just show the current customer order
-   load_reference_data
- end
+      <!-- Lot Price (shown when price_type is 'lot') -->
+      <div id="lot_price_field" class="sm:col-span-2" style="<%= works_order.price_type == 'each' ? 'display: none;' : '' %>">
+        <%= form.label :lot_price, "Total job price (£)", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <div class="mt-1 relative rounded-md shadow-sm">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <span class="text-gray-500 sm:text-sm">£</span>
+          </div>
+          <%= form.number_field :lot_price,
+              step: 0.01,
+              min: 0,
+              placeholder: "0.00",
+              class: "block w-full pl-7 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+              id: "lot_price_input",
+              onblur: "formatCurrency(this)" %>
+        </div>
+        <p class="mt-1 text-xs text-gray-500">
+          This is the total price for the entire job regardless of quantity
+        </p>
+      </div>
+    </div>
+  </div>
 
- def update
-   # For updates, we might need to update the part if part details changed
-   if part_details_changed?
-     setup_part(@works_order)
-   end
+  <!-- Parts data for JavaScript -->
+  <script>
+    window.partsData = {
+      <% @parts.each do |part| %>
+        "<%= part.id %>": {
+          "uniform_part_number": "<%= j part.uniform_part_number %>",
+          "uniform_part_issue": "<%= j part.uniform_part_issue %>",
+          "description": "<%= j (part.description || "#{part.uniform_part_number} component") %>"
+        },
+      <% end %>
+    };
+  </script>
 
-   if @works_order.update(works_order_params)
-     redirect_to @works_order, notice: 'Works order was successfully updated.'
-   else
-     load_reference_data
-     render :edit, status: :unprocessable_entity
-   end
- end
+  <!-- Form Actions -->
+  <div class="flex justify-end space-x-3">
+    <%= link_to "Cancel", works_order.persisted? ? works_order : works_orders_path,
+        class: "bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded" %>
+    <%= form.submit works_order.persisted? ? "Update Works Order" : "Create Works Order",
+        class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" %>
+  </div>
+<% end %>
 
- def destroy
-   if @works_order.can_be_deleted?
-     @works_order.destroy
-     redirect_to works_orders_url, notice: 'Works order was successfully deleted.'
-   else
-     redirect_to @works_order, alert: 'Cannot delete works order with associated release notes.'
-   end
- end
+<script>
+// Currency formatting function
+function formatCurrency(input) {
+  let value = input.value;
 
- def route_card
-   @operations = @works_order.operations_with_auto_ops || []
+  // Remove any non-numeric characters except decimal point
+  value = value.replace(/[^\d.]/g, '');
 
-   respond_to do |format|
-     format.html { render layout: false }
-     format.pdf do
-       pdf = Grover.new(
-         render_to_string(
-           template: 'works_orders/route_card',
-           layout: false,
-           locals: { works_order: @works_order, operations: @operations }
-         ),
-         format: 'A4',
-         margin: { top: '1cm', bottom: '0.5cm', left: '0.5cm', right: '0.5cm' },
-         print_background: true,
-         prefer_css_page_size: true,
-         emulate_media: 'print'
-       ).to_pdf
+  // Handle multiple decimal points
+  const parts = value.split('.');
+  if (parts.length > 2) {
+    value = parts[0] + '.' + parts.slice(1).join('');
+  }
 
-       send_data pdf,
-                 filename: "route_card_wo#{@works_order.number}.pdf",
-                 type: 'application/pdf',
-                 disposition: 'inline'
-     end
-   end
- end
+  // Convert to number and back to ensure proper formatting
+  const numValue = parseFloat(value);
 
- def create_invoice
-    Rails.logger.info "🚀 STAGE_INVOICE: Starting for WO#{@works_order.number}"
+  if (!isNaN(numValue) && numValue >= 0) {
+    // Format to 2 decimal places
+    input.value = numValue.toFixed(2);
+  } else if (value === '' || value === '.') {
+    // Allow empty or just decimal point while typing
+    input.value = '';
+  } else {
+    // Invalid input, reset to 0.00
+    input.value = '0.00';
+  }
+}
 
-    if @works_order.quantity_released <= 0
-      Rails.logger.info "❌ STAGE_INVOICE: No quantity released (#{@works_order.quantity_released})"
-      redirect_to @works_order, alert: 'No items available to invoice - no quantity has been released yet.'
-      return
-    end
+// Part selection handler
+function updatePartDetails(selectElement) {
+  const partId = selectElement.value;
+  const partNumberField = document.getElementById('works_order_part_number');
+  const partIssueField = document.getElementById('works_order_part_issue');
+  const partDescriptionField = document.getElementById('works_order_part_description');
 
-    begin
-      # Get all uninvoiced release notes for this works order
-      uninvoiced_release_notes = @works_order.release_notes.requires_invoicing
-      Rails.logger.info "🔍 STAGE_INVOICE: Found #{uninvoiced_release_notes.count} uninvoiced release notes"
+  if (partId && window.partsData) {
+    const part = window.partsData[partId];
+    if (part) {
+      partNumberField.value = part.uniform_part_number;
+      partIssueField.value = part.uniform_part_issue;
+      partDescriptionField.value = part.description || `${part.uniform_part_number} component`;
+    }
+  } else {
+    // Clear fields if no part selected
+    partNumberField.value = '';
+    partIssueField.value = '';
+    partDescriptionField.value = '';
+  }
+}
 
-      uninvoiced_release_notes.each do |rn|
-        Rails.logger.info "  - RN#{rn.number}: #{rn.quantity_accepted} accepted, can_be_invoiced=#{rn.can_be_invoiced?}"
-      end
+// Pricing field toggle
+function togglePriceFields(priceType) {
+  const eachPriceField = document.getElementById('each_price_field');
+  const lotPriceField = document.getElementById('lot_price_field');
+  const eachPriceInput = document.getElementById('each_price_input');
+  const lotPriceInput = document.getElementById('lot_price_input');
 
-      if uninvoiced_release_notes.empty?
-        Rails.logger.info "❌ STAGE_INVOICE: No uninvoiced release notes found"
-        redirect_to @works_order, alert: 'No release notes available for invoicing.'
-        return
-      end
+  if (priceType === 'each') {
+    // Show each price field, hide lot price field
+    eachPriceField.style.display = 'block';
+    lotPriceField.style.display = 'none';
 
-      # Create local invoice from release notes (no Xero sync)
-      customer = @works_order.customer
-      Rails.logger.info "🔍 STAGE_INVOICE: Customer: #{customer.name} (ID: #{customer.id})"
+    // Make each price required, lot price not required
+    eachPriceInput.required = true;
+    lotPriceInput.required = false;
 
-      Rails.logger.info "🔍 STAGE_INVOICE: Calling Invoice.create_from_release_notes..."
-      invoice = Invoice.create_from_release_notes(uninvoiced_release_notes, customer, Current.user)
+    // Clear lot price when switching to each pricing
+    lotPriceInput.value = '';
 
-      if invoice.nil?
-        Rails.logger.error "❌ STAGE_INVOICE: Invoice.create_from_release_notes returned nil"
-        redirect_to @works_order, alert: 'Failed to create local invoice from release notes. Check logs for details.'
-        return
-      end
+  } else {
+    // Show lot price field, hide each price field
+    eachPriceField.style.display = 'none';
+    lotPriceField.style.display = 'block';
 
-      Rails.logger.info "✅ STAGE_INVOICE: Local invoice INV#{invoice.number} created successfully"
+    // Make lot price required, each price not required
+    lotPriceInput.required = true;
+    eachPriceInput.required = false;
 
-      redirect_to @works_order,
-                  notice: "✅ Invoice INV#{invoice.number} staged successfully! " \
-                          "Staged #{uninvoiced_release_notes.count} release note(s) " \
-                          "for #{uninvoiced_release_notes.sum(:quantity_accepted)} parts. " \
-                          "Go to the dashboard to push invoices to Xero."
+    // Clear each price when switching to lot pricing
+    eachPriceInput.value = '';
+  }
+}
 
-    rescue StandardError => e
-      Rails.logger.error "💥 STAGE_INVOICE: Exception occurred: #{e.message}"
-      Rails.logger.error "💥 STAGE_INVOICE: Backtrace: #{e.backtrace.first(10).join("\n")}"
+// Refresh parts dropdown when window regains focus (after creating a part in another tab)
+let isRefreshing = false;
+window.addEventListener('focus', function() {
+  if (!document.hidden && !isRefreshing) {
+    isRefreshing = true;
 
-      redirect_to @works_order,
-                  alert: "❌ Failed to stage invoice: #{e.message}. Please try again or contact support."
-    end
-  end
+    // Only refresh if we're on the works order form and user might have created a part
+    const partSelect = document.querySelector('#works_order_part_id');
+    if (partSelect) {
+      // Store current selection
+      const currentValue = partSelect.value;
 
- private
+      // Reload the page to get updated parts list
+      // We do a full reload because we need to refresh @parts from the controller
+      setTimeout(function() {
+        location.reload();
+      }, 100);
+    }
 
- def set_works_order
-   @works_order = WorksOrder.find(params[:id])
- end
+    setTimeout(function() {
+      isRefreshing = false;
+    }, 1000);
+  }
+});
 
- def works_order_params
-   params.require(:works_order).permit(
-     :customer_order_id, :part_id, :quantity, :lot_price, :each_price, :price_type,
-     :part_number, :part_issue, :part_description, :release_level_id, :transport_method_id
-   )
- end
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+  const priceTypeSelect = document.querySelector('#works_order_price_type');
+  if (priceTypeSelect) {
+    togglePriceFields(priceTypeSelect.value);
+  }
 
- def load_reference_data
-   @release_levels = ReleaseLevel.enabled.ordered
-   @transport_methods = TransportMethod.enabled.ordered
+  // Format existing values on page load
+  const eachPriceInput = document.getElementById('each_price_input');
+  const lotPriceInput = document.getElementById('lot_price_input');
 
-   # Load all parts for the customer
-   if @customer_order.present?
-     @parts = Part.enabled
-                  .for_customer(@customer_order.customer)
-                  .includes(:customer)
-                  .order(:uniform_part_number)
+  if (eachPriceInput && eachPriceInput.value) {
+    formatCurrency(eachPriceInput);
+  }
 
-     Rails.logger.info "🔍 Loading parts for customer: #{@customer_order.customer.name}"
-     Rails.logger.info "🔍 Found #{@parts.count} parts"
-   else
-     @parts = Part.enabled
-                  .includes(:customer)
-                  .order(:uniform_part_number)
-   end
- end
-
- def load_form_data_for_errors
-   if params[:customer_order_id].present?
-     @customer_order = CustomerOrder.find(params[:customer_order_id])
-     @customer_orders = [@customer_order]
-   elsif @works_order.customer_order.present?
-     @customer_order = @works_order.customer_order
-     @customer_orders = [@customer_order]
-   else
-     @customer_order = nil
-     @customer_orders = CustomerOrder.active.includes(:customer).order(created_at: :desc)
-   end
-   load_reference_data
- end
-
- def setup_part(works_order)
-   return false unless works_order.customer_order && works_order.part_id.present?
-
-   customer = works_order.customer_order.customer
-
-   begin
-     # Get the selected part
-     part = Part.find(works_order.part_id)
-     works_order.part = part
-     works_order.part_number = part.uniform_part_number
-     works_order.part_issue = part.uniform_part_issue
-     works_order.part_description = part.description || "#{part.uniform_part_number} component"
-
-     # Check if part has processing instructions configured
-     if part.customisation_data.blank? || part.customisation_data.dig("operation_selection", "treatments").blank?
-       works_order.errors.add(:part_id, "Part #{part.display_name} does not have processing instructions configured. Please set up this part properly first.")
-       return false
-     end
-
-     return true
-   rescue => e
-     works_order.errors.add(:base, "Error setting up part: #{e.message}")
-     return false
-   end
- end
-
- def part_details_changed?
-   @works_order.part_number_changed? || @works_order.part_issue_changed?
- end
-end
+  if (lotPriceInput && lotPriceInput.value) {
+    formatCurrency(lotPriceInput);
+  }
+});
+</script>
