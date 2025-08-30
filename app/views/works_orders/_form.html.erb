@@ -68,7 +68,10 @@
                 class: "text-blue-600 hover:text-blue-800 underline",
                 rel: "noopener noreferrer" %>
           <% end %>
-          and then it will appear)
+          and then
+          <%= link_to "refresh", request.url,
+              class: "text-blue-600 hover:text-blue-800 underline cursor-pointer",
+              onclick: "location.reload(); return false;" %>)
         </p>
       </div>
 
@@ -281,28 +284,6 @@ function togglePriceFields(priceType) {
     eachPriceInput.value = '';
   }
 }
-
-// Simple refresh function for parts dropdown
-function refreshPartsDropdown() {
-  // Just reload the page - simple and reliable
-  location.reload();
-}
-
-// Add refresh button next to the dropdown
-document.addEventListener('DOMContentLoaded', function() {
-  const partSelect = document.querySelector('#works_order_part_id');
-  if (partSelect) {
-    // Add a small refresh button next to the select
-    const refreshButton = document.createElement('button');
-    refreshButton.type = 'button';
-    refreshButton.innerHTML = '↻';
-    refreshButton.title = 'Refresh parts list';
-    refreshButton.className = 'ml-2 px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded';
-    refreshButton.onclick = refreshPartsDropdown;
-
-    partSelect.parentNode.appendChild(refreshButton);
-  }
-});
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
