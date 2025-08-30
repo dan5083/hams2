@@ -1,5 +1,6 @@
-<%# app/views/works_orders/_form.html.erb - With currency formatting and part creation link %>
-<%= form_with model: works_order, local: true, class: "space-y-6", data: { turbo: false } do |form| %>  <% if works_order.errors.any? %>
+<%# app/views/works_orders/_form.html.erb - With debug logging and reverted form tag %>
+<%= form_with model: works_order, local: true, class: "space-y-6" do |form| %>
+  <% if works_order.errors.any? %>
     <div class="bg-red-50 border border-red-200 rounded-md p-4">
       <div class="flex">
         <div class="ml-3">
@@ -178,6 +179,13 @@
     </div>
   </div>
 
+  <!-- DEBUG: Parts count in template -->
+  <% Rails.logger.info "TEMPLATE DEBUG: @parts.count = #{@parts.count}" %>
+  <% Rails.logger.info "TEMPLATE DEBUG: @parts IDs = #{@parts.pluck(:id)}" %>
+  <% if @customer_order %>
+    <% Rails.logger.info "TEMPLATE DEBUG: Customer = #{@customer_order.customer.name} (#{@customer_order.customer.id})" %>
+  <% end %>
+
   <!-- Parts data for JavaScript -->
   <script>
     window.partsData = {
@@ -189,6 +197,7 @@
         },
       <% end %>
     };
+    console.log("Parts loaded in JavaScript:", Object.keys(window.partsData).length);
   </script>
 
   <!-- Form Actions -->
