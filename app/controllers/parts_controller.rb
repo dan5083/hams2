@@ -42,6 +42,11 @@ class PartsController < ApplicationController
     @part = Part.new
     @customers = Organization.enabled.order(:name)
 
+    # Pre-select customer if coming from works order form
+    if params[:customer_id].present?
+      @part.customer_id = params[:customer_id]
+    end
+
     # Set up for complex form (formerly PPI form)
     @part.customisation_data = { "operation_selection" => {} }
   end

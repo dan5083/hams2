@@ -1,4 +1,4 @@
-<%# app/views/works_orders/_form.html.erb - With currency formatting %>
+<%# app/views/works_orders/_form.html.erb - With currency formatting and part creation link %>
 <%= form_with model: works_order, local: true, class: "space-y-6" do |form| %>
   <% if works_order.errors.any? %>
     <div class="bg-red-50 border border-red-200 rounded-md p-4">
@@ -55,7 +55,21 @@
               required: true,
               onchange: "updatePartDetails(this)"
             } %>
-        <p class="mt-1 text-xs text-gray-500">Select the part number to be processed</p>
+        <p class="mt-1 text-xs text-gray-500">
+          Select the part number to be processed (if you do not see the part
+          <% if @customer_order.present? %>
+            <%= link_to "create it here", new_part_path(customer_id: @customer_order.customer.id),
+                target: "_blank",
+                class: "text-blue-600 hover:text-blue-800 underline",
+                rel: "noopener noreferrer" %>
+          <% else %>
+            <%= link_to "create it here", new_part_path,
+                target: "_blank",
+                class: "text-blue-600 hover:text-blue-800 underline",
+                rel: "noopener noreferrer" %>
+          <% end %>
+          and then it will appear)
+        </p>
       </div>
 
       <!-- Hidden fields to store part details -->
