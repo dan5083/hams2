@@ -282,6 +282,31 @@ function togglePriceFields(priceType) {
   }
 }
 
+// Refresh parts dropdown when window regains focus (after creating a part in another tab)
+let isRefreshing = false;
+window.addEventListener('focus', function() {
+  if (!document.hidden && !isRefreshing) {
+    isRefreshing = true;
+
+    // Only refresh if we're on the works order form and user might have created a part
+    const partSelect = document.querySelector('#works_order_part_id');
+    if (partSelect) {
+      // Store current selection
+      const currentValue = partSelect.value;
+
+      // Reload the page to get updated parts list
+      // We do a full reload because we need to refresh @parts from the controller
+      setTimeout(function() {
+        location.reload();
+      }, 100);
+    }
+
+    setTimeout(function() {
+      isRefreshing = false;
+    }, 1000);
+  }
+});
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
   const priceTypeSelect = document.querySelector('#works_order_price_type');
