@@ -282,55 +282,25 @@ function togglePriceFields(priceType) {
   }
 }
 
-// Refresh parts dropdown when clicked (to pick up newly created parts)
-let lastRefreshTime = 0;
-document.addEventListener('click', function(event) {
+// Simple refresh function for parts dropdown
+function refreshPartsDropdown() {
+  // Just reload the page - simple and reliable
+  location.reload();
+}
+
+// Add refresh button next to the dropdown
+document.addEventListener('DOMContentLoaded', function() {
   const partSelect = document.querySelector('#works_order_part_id');
+  if (partSelect) {
+    // Add a small refresh button next to the select
+    const refreshButton = document.createElement('button');
+    refreshButton.type = 'button';
+    refreshButton.innerHTML = '↻';
+    refreshButton.title = 'Refresh parts list';
+    refreshButton.className = 'ml-2 px-2 py-1 text-sm bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded';
+    refreshButton.onclick = refreshPartsDropdown;
 
-  if (event.target === partSelect && partSelect) {
-    const now = Date.now();
-    // Only refresh if it's been more than 5 seconds since last refresh
-    if (now - lastRefreshTime > 5000) {
-      lastRefreshTime = now;
-
-      // Store current selection and customer order
-      const currentValue = partSelect.value;
-      const customerOrderId = document.querySelector('#works_order_customer_order_id')?.value;
-
-      if (customerOrderId) {
-        // Fetch updated parts list via AJAX
-        fetch(`/parts/search.json?customer_id=${customerOrderId}`)
-          .then(response => response.json())
-          .then(parts => {
-            // Clear current options except the first "Select Part Number" option
-            partSelect.innerHTML = '<option value="">Select Part Number</option>';
-
-            // Add updated parts
-            parts.forEach(part => {
-              const option = document.createElement('option');
-              option.value = part.id;
-              option.textContent = part.display_name;
-              if (part.id.toString() === currentValue) {
-                option.selected = true;
-              }
-              partSelect.appendChild(option);
-            });
-
-            // Update window.partsData for the form
-            window.partsData = {};
-            parts.forEach(part => {
-              window.partsData[part.id] = {
-                uniform_part_number: part.display_name.split('-')[0] || '',
-                uniform_part_issue: part.display_name.split('-')[1] || '',
-                description: part.display_name
-              };
-            });
-          })
-          .catch(error => {
-            console.log('Could not refresh parts list:', error);
-          });
-      }
-    }
+    partSelect.parentNode.appendChild(refreshButton);
   }
 });
 
