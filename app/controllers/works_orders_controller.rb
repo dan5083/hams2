@@ -23,6 +23,11 @@ class WorksOrdersController < ApplicationController
  end
 
   def new
+    # Prevent browser caching
+    response.headers['Cache-Control'] = 'no-cache, no-store, max-age=0, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+
     @works_order = WorksOrder.new
 
     # If coming from nested route, pre-select the customer order
@@ -36,11 +41,6 @@ class WorksOrdersController < ApplicationController
     end
 
     load_reference_data
-
-    # FORCE DEBUG LOGGING AFTER load_reference_data
-    Rails.logger.info "🚨 CONTROLLER POST-LOAD: @parts.count = #{@parts&.count || 'NIL'}"
-    Rails.logger.info "🚨 CONTROLLER POST-LOAD: @parts IDs = #{@parts&.pluck(:id) || 'NIL'}"
-    Rails.logger.info "🚨 CONTROLLER POST-LOAD: @customer_order = #{@customer_order&.customer&.name || 'NIL'}"
   end
 
  def create
