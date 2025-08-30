@@ -12,7 +12,6 @@ class Part < ApplicationRecord
     scope: [:customer_id, :uniform_part_issue],
     message: "and issue must be unique per customer"
   }
-  validates :process_type, inclusion: { in: ProcessBuilder.available_types }, allow_blank: true
   validate :validate_treatments
 
   scope :enabled, -> { where(enabled: true) }
