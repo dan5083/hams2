@@ -49,16 +49,11 @@ module OperationLibrary
 
     # Build the multi-batch foil verification text
     def self.build_foil_verification_text
-      batch_template = "Meter no:_ Foil value 1:___ Measured foil thickness:___ Foil value 2:___ Measured foil thickness:___"
-
       [
-        "**Elcometer foil verification**",
-        "",
-        "Batch 1: #{batch_template}",
-        "",
-        "Batch 2: #{batch_template}",
-        "",
-        "Batch 3: #{batch_template}"
+        "**Elcometer foil verification** (Aerospace/Defense requirement)",
+        "Batch 1: Meter no:_ Foil value 1:___ Measured foil thickness:___ Foil value 2:___ Measured foil thickness:___",
+        "Batch 2: Meter no:_ Foil value 1:___ Measured foil thickness:___ Foil value 2:___ Measured foil thickness:___",
+        "Batch 3: Meter no:_ Foil value 1:___ Measured foil thickness:___ Foil value 2:___ Measured foil thickness:___"
       ].join("\n")
     end
   end
