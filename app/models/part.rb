@@ -98,16 +98,26 @@ class Part < ApplicationRecord
     selected_enp_pre_heat_treatment.present? && selected_enp_pre_heat_treatment != 'none'
   end
 
-  # Main method - get operations with correct ordering including water break test, OCV, and ENP heat treatments
+  # Main method - get operations with correct ordering including water break test, foil verification, OCV, and ENP heat treatments
   def get_operations_with_auto_ops
     treatments = get_treatments
     return [] if treatments.empty?
 
     sequence = []
     has_enp = treatments.any? { |t| t[:operation].process_type == 'electroless_nickel_plating' }
+    has_anodising = treatments.any? { |t| ['standard_anodising', 'hard_anodising', 'chromic_anodising'].include?(t[:operation].process_type) }
 
     # Beginning ops (always first)
     safe_add_to_sequence(sequence, OperationLibrary::ContractReviewOperations.get_contract_review_operation, "Contract Review")
+
+    # Foil verification (for aerospace/defense anodising applications, after contract review but before any other operations)
+    if defined?(OperationLibrary::FoilVerification) && has_anodising
+      sequence = OperationLibrary::FoilVerification.insert_foil_verification_if_required(
+        sequence,
+        aerospace_defense: aerospace_defense?
+      )
+    end
+
     safe_add_to_sequence(sequence, OperationLibrary::InspectFinalInspectVatInspect.get_incoming_inspection_operation, "Incoming Inspection")
     safe_add_to_sequence(sequence, OperationLibrary::InspectFinalInspectVatInspect.get_vat_inspection_operation, "VAT Inspection")
 

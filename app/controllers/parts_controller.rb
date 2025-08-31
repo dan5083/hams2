@@ -284,19 +284,19 @@ class PartsController < ApplicationController
 
     Rails.logger.info "Preview params: treatments=#{treatments_data.length}, pre_heat_treatment=#{selected_enp_pre_heat_treatment}, post_heat_treatment=#{selected_enp_heat_treatment}, aerospace=#{aerospace_defense}"
 
-    # Get operations using the treatment cycle system - includes OCV insertion
+    # Get operations using the treatment cycle system - includes OCV and foil verification insertion
     operations_with_auto_ops = Part.simulate_operations_with_auto_ops(
       treatments_data,
       nil,  # selected_jig_type no longer used globally
       selected_alloy,
       selected_operations,
       enp_strip_type,
-      aerospace_defense, # This parameter enables both water break and OCV insertion
+      aerospace_defense, # This parameter enables water break, foil verification, and OCV insertion
       selected_enp_heat_treatment,
       selected_enp_pre_heat_treatment
     )
 
-    Rails.logger.info "Generated operations: #{operations_with_auto_ops.length} operations (includes water break and OCV if aerospace_defense=#{aerospace_defense})"
+    Rails.logger.info "Generated operations: #{operations_with_auto_ops.length} operations (includes water break, foil verification, and OCV if aerospace_defense=#{aerospace_defense})"
 
     render json: { operations: operations_with_auto_ops }
   end

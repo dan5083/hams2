@@ -197,7 +197,7 @@ export default class extends Controller {
 
         // Provide visual feedback when enabled
         if (this.aerospaceDefense) {
-          console.log("Aerospace/Defense mode enabled - water break tests and OCV operations will be included")
+          console.log("Aerospace/Defense mode enabled - foil verification, water break tests and OCV operations will be included")
         }
       })
     }
@@ -1011,6 +1011,7 @@ export default class extends Controller {
       this.selectedContainerTarget.innerHTML = operations.map((op, index) => {
         const isAutoInserted = op.auto_inserted
         const isWaterBreakTest = op.id === 'WATER_BREAK_TEST'
+        const isFoilVerification = op.id === 'FOIL_VERIFICATION'
         const isOcvCheck = op.id === 'OCV_CHECK'
         const isDye = op.id && (op.id.includes('_DYE') || op.display_name?.includes('Dye'))
         const isPreHeatTreatment = op.id && op.id.startsWith('PRE_ENP_HEAT_TREAT')
@@ -1031,6 +1032,12 @@ export default class extends Controller {
           bgColor = 'bg-red-50 border border-red-200'
           textColor = 'text-red-800'
           autoLabel = '<span class="text-xs text-red-600 ml-2">(requires manual recording)</span>'
+        }
+
+        if (isFoilVerification) {
+          bgColor = 'bg-yellow-50 border border-yellow-200'
+          textColor = 'text-yellow-800'
+          autoLabel = '<span class="text-xs text-yellow-600 ml-2">(aerospace/defense verification)</span>'
         }
 
         if (isOcvCheck) {

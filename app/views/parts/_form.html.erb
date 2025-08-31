@@ -81,10 +81,10 @@
                 data: { parts_form_target: "aerospaceDefenseCheckbox" }
               } %>
           <%= label_tag "part[customisation_data][operation_selection][aerospace_defense]",
-              "Aerospace/Defense (requires water break test and OCV)",
+              "Aerospace/Defense (requires foil verification, water break test and OCV)",
               class: "ml-2 text-sm text-gray-900" %>
         </div>
-        <p class="mt-1 text-xs text-gray-500">Auto-inserts water break test after degreasing operations</p>
+        <p class="mt-1 text-xs text-gray-500">Auto-inserts foil verification, water break test, and OCV operations</p>
       </div>
 
       <!-- Enabled Status (for editing) -->
@@ -230,16 +230,19 @@
             <% if operation %>
               <% is_auto_inserted = operation.respond_to?(:auto_inserted?) && operation.auto_inserted? %>
               <% is_water_break_test = operation.respond_to?(:water_break_test?) && operation.water_break_test? %>
+              <% is_foil_verification = operation.respond_to?(:foil_verification?) && operation.foil_verification? %>
               <% is_dye = operation.respond_to?(:dye?) && operation.dye? %>
               <% is_heat_treatment = operation.respond_to?(:enp_heat_treatment?) && operation.enp_heat_treatment? %>
               <% is_local_treatment = operation.respond_to?(:local_treatment?) && operation.local_treatment? %>
               <% bg_color_class = is_auto_inserted ? 'bg-gray-100 border border-gray-300' : 'bg-blue-100 border border-blue-300' %>
               <% bg_color_class = 'bg-red-50 border border-red-200' if is_water_break_test %>
+              <% bg_color_class = 'bg-yellow-50 border border-yellow-200' if is_foil_verification %>
               <% bg_color_class = 'bg-purple-50 border border-purple-200' if is_dye %>
               <% bg_color_class = 'bg-orange-50 border border-orange-200' if is_heat_treatment %>
               <% bg_color_class = 'bg-teal-50 border border-teal-200' if is_local_treatment %>
               <% text_color_class = is_auto_inserted ? 'italic text-gray-600' : 'text-gray-900' %>
               <% text_color_class = 'text-red-800' if is_water_break_test %>
+              <% text_color_class = 'text-yellow-800' if is_foil_verification %>
               <% text_color_class = 'text-purple-800' if is_dye %>
               <% text_color_class = 'text-orange-800' if is_heat_treatment %>
               <% text_color_class = 'text-teal-800' if is_local_treatment %>
@@ -253,6 +256,9 @@
                   <% end %>
                   <% if is_water_break_test %>
                     <span class="text-xs text-red-600 ml-2">(requires manual recording)</span>
+                  <% end %>
+                  <% if is_foil_verification %>
+                    <span class="text-xs text-yellow-600 ml-2">(aerospace/defense verification)</span>
                   <% end %>
                   <% if is_dye %>
                     <span class="text-xs text-purple-600 ml-2">(dye operation)</span>
