@@ -12,15 +12,10 @@ module OperationLibrary
       ]
     end
 
-    # Foil verification is required only for aerospace/defense applications with anodising
-    def self.foil_verification_required?(operations_sequence, aerospace_defense: false)
+    # FIXED: Check for anodising treatments, not operations in sequence
+    def self.foil_verification_required?(has_anodising_treatments, aerospace_defense: false)
       return false unless aerospace_defense
-      return false if operations_sequence.empty?
-
-      # Check if any anodising operations are present in the sequence
-      anodising_process_types = ['standard_anodising', 'hard_anodising', 'chromic_anodising']
-      has_anodising = operations_sequence.any? { |op| anodising_process_types.include?(op.process_type) }
-      has_anodising
+      has_anodising_treatments
     end
 
     # Get the foil verification operation
@@ -28,9 +23,9 @@ module OperationLibrary
       operations.first
     end
 
-    # Insert foil verification at the beginning of the sequence (before degreasing)
-    def self.insert_foil_verification_if_required(operations_sequence, aerospace_defense: false)
-      return operations_sequence unless foil_verification_required?(operations_sequence, aerospace_defense: aerospace_defense)
+    # FIXED: Take has_anodising parameter instead of checking sequence
+    def self.insert_foil_verification_if_required(operations_sequence, has_anodising_treatments: false, aerospace_defense: false)
+      return operations_sequence unless foil_verification_required?(has_anodising_treatments, aerospace_defense: aerospace_defense)
 
       # Check if foil verification is already present
       has_foil_verification = operations_sequence.any? { |op| op.process_type == 'verification' }
@@ -54,7 +49,7 @@ module OperationLibrary
 
     # Build the multi-batch foil verification text
     def self.build_foil_verification_text
-      batch_template = "Meter no: ___ Foil value 1: ___ Measured foil thickness: ___ Foil value 2: ___ Measured foil thickness: ___"
+      batch_template = "Meter no: __ Foil value 1: __ Measured foil thickness: __ Foil value 2: __ Measured foil thickness: __"
 
       [
         "**Elcometer foil verification**",

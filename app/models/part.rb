@@ -114,6 +114,7 @@ class Part < ApplicationRecord
     if defined?(OperationLibrary::FoilVerification) && has_anodising
       sequence = OperationLibrary::FoilVerification.insert_foil_verification_if_required(
         sequence,
+        has_anodising_treatments: has_anodising,
         aerospace_defense: aerospace_defense?
       )
     end
