@@ -413,7 +413,7 @@
 <% end %>
 
 <!-- Sticky Switch to Manual Mode Button (only for unlocked parts with operations configured) -->
-<% if !part.locked_for_editing? && part.persisted? && part.get_operations_with_auto_ops.any? %>
+<% if !part.locked_for_editing? && part.get_operations_with_auto_ops.any? %>
   <div class="fixed bottom-6 right-6 z-50">
     <%= button_to "Switch to Manual Mode",
         lock_operations_part_path(part),
