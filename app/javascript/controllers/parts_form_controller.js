@@ -995,6 +995,10 @@ export default class extends Controller {
     if (this.treatments.length === 0) {
       this.selectedContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">No treatments selected</p>'
       this.specificationFieldTarget.value = ''
+      // Hide sticky button when no treatments
+      if (this.hasStickyButtonTarget) {
+        this.stickyButtonTarget.style.display = 'none'
+      }
       return
     }
 
@@ -1004,6 +1008,10 @@ export default class extends Controller {
     if (treatmentsWithOperations.length === 0) {
       this.selectedContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">Select operations for treatments to see preview</p>'
       this.specificationFieldTarget.value = ''
+      // Hide sticky button when no operations selected
+      if (this.hasStickyButtonTarget) {
+        this.stickyButtonTarget.style.display = 'none'
+      }
       return
     }
 
@@ -1012,6 +1020,10 @@ export default class extends Controller {
     if (treatmentsWithoutJigs.length > 0) {
       this.selectedContainerTarget.innerHTML = '<p class="text-yellow-600 text-sm">Select jig types for all treatments to see preview</p>'
       this.specificationFieldTarget.value = ''
+      // Hide sticky button when configuration incomplete
+      if (this.hasStickyButtonTarget) {
+        this.stickyButtonTarget.style.display = 'none'
+      }
       return
     }
 
@@ -1083,6 +1095,10 @@ export default class extends Controller {
       if (operations.length === 0) {
         this.selectedContainerTarget.innerHTML = '<p class="text-yellow-600 text-sm">No operations generated - check treatment configuration</p>'
         this.specificationFieldTarget.value = ''
+        // Hide sticky button when no operations generated
+        if (this.hasStickyButtonTarget) {
+          this.stickyButtonTarget.style.display = 'none'
+        }
         return
       }
 
@@ -1159,14 +1175,19 @@ export default class extends Controller {
         `
       }).join('')
 
-      // Show/hide sticky button based on whether operations are configured
+      // Show sticky button when operations are successfully configured
       if (this.hasStickyButtonTarget) {
-        this.stickyButtonTarget.style.display = operations && operations.length > 0 ? 'block' : 'none'
+        console.log('Has sticky button target:', this.hasStickyButtonTarget, 'Operations count:', operations.length)
+        this.stickyButtonTarget.style.display = operations.length > 0 ? 'block' : 'none'
       }
 
     } catch (error) {
       console.error('Error updating preview:', error)
       this.selectedContainerTarget.innerHTML = '<p class="text-red-500 text-sm">Error loading preview</p>'
+      // Hide sticky button on error
+      if (this.hasStickyButtonTarget) {
+        this.stickyButtonTarget.style.display = 'none'
+      }
     }
   }
 
