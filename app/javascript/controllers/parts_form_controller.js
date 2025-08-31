@@ -17,7 +17,8 @@ export default class extends Controller {
     "enpStripMaskCheckbox",
     "enpStripMaskField",
     "aerospaceDefenseCheckbox",
-    "aerospaceDefenseField"
+    "aerospaceDefenseField",
+    "stickyButton"
   ]
 
   static values = {
@@ -1157,6 +1158,11 @@ export default class extends Controller {
           </div>
         `
       }).join('')
+
+      // Show/hide sticky button based on whether operations are configured
+      if (this.hasStickyButtonTarget) {
+        this.stickyButtonTarget.style.display = operations && operations.length > 0 ? 'block' : 'none'
+      }
 
     } catch (error) {
       console.error('Error updating preview:', error)

@@ -412,22 +412,35 @@
   </div>
 <% end %>
 
-<!-- Sticky Switch to Manual Mode Button (only for unlocked parts with operations configured) -->
+<!-- Sticky Switch to Manual Mode Button (only for unlocked parts) -->
 <% if !part.locked_for_editing? %>
-  <div class="fixed bottom-6 right-6 z-50">
-    <%= button_to "Switch to Manual Mode",
-        lock_operations_part_path(part),
-        method: :patch,
-        class: "bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center space-x-2",
-        form: {
-          data: {
-            confirm: "This will switch to manual editing mode where you can customize each operation's text. You won't be able to return to automatic treatment configuration. Are you sure?"
-          }
-        } do %>
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-      </svg>
-      <span>Switch to Manual Mode</span>
+  <div class="fixed bottom-6 right-6 z-50" style="display: none;" data-parts-form-target="stickyButton">
+    <% if part.persisted? %>
+      <%= button_to "Switch to Manual Mode",
+          lock_operations_part_path(part),
+          method: :patch,
+          class: "bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center space-x-2",
+          form: {
+            data: {
+              confirm: "This will switch to manual editing mode where you can customize each operation's text. You won't be able to return to automatic treatment configuration. Are you sure?"
+            }
+          } do %>
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+        </svg>
+        <span>Switch to Manual Mode</span>
+      <% end %>
+    <% else %>
+      <!-- For new parts, use JavaScript to trigger the lock -->
+      <button type="button"
+              class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center space-x-2"
+              data-action="click->parts-form#lockOperations"
+              data-confirm="This will switch to manual editing mode where you can customize each operation's text. You won't be able to return to automatic treatment configuration. Are you sure?">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+        </svg>
+        <span>Switch to Manual Mode</span>
+      </button>
     <% end %>
   </div>
 <% end %>
