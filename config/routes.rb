@@ -14,6 +14,8 @@ Rails.application.routes.draw do
   resources :parts do
     member do
       patch :toggle_enabled
+      patch :lock_operations
+      patch :update_locked_operations
     end
     collection do
       get :search

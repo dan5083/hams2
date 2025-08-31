@@ -73,6 +73,56 @@ class Part < ApplicationRecord
     enabled && customer&.active?
   end
 
+  # Lock-in-and-edit feature methods
+  def locked_for_editing?
+    # Auto-lock existing parts (any persisted part) OR explicitly locked parts
+    persisted? || customisation_data.dig("operation_selection", "locked") == true
+  end
+
+  def lock_operations!
+    current_ops = get_operations_with_auto_ops
+
+    self.customisation_data = customisation_data.dup || {}
+    self.customisation_data["operation_selection"] ||= {}
+    self.customisation_data["operation_selection"]["locked"] = true
+    self.customisation_data["operation_selection"]["locked_operations"] = current_ops.map.with_index do |op, index|
+      {
+        "id" => op.id,
+        "display_name" => op.display_name,
+        "operation_text" => op.operation_text,
+        "position" => index + 1,
+        "specifications" => op.specifications,
+        "vat_numbers" => op.vat_numbers,
+        "process_type" => op.process_type,
+        "target_thickness" => op.target_thickness,
+        "auto_inserted" => op.respond_to?(:auto_inserted?) ? op.auto_inserted? : false
+      }
+    end
+    save!
+  end
+
+  def locked_operations
+    return [] unless locked_for_editing?
+
+    operations_data = customisation_data.dig("operation_selection", "locked_operations") || []
+    operations_data.sort_by { |op| op["position"] }
+  end
+
+  def update_locked_operation!(operation_id, new_text)
+    return false unless locked_for_editing?
+
+    operations_data = customisation_data.dig("operation_selection", "locked_operations") || []
+    operation = operations_data.find { |op| op["id"] == operation_id }
+
+    if operation
+      operation["operation_text"] = new_text
+      self.customisation_data = customisation_data.dup
+      save!
+    else
+      false
+    end
+  end
+
   # Get aerospace/defense flag from customisation data
   def aerospace_defense?
     operation_selection["aerospace_defense"] == true || operation_selection["aerospace_defense"] == "true"
@@ -100,6 +150,24 @@ class Part < ApplicationRecord
 
   # Main method - get operations with correct ordering including water break test, foil verification, OCV, and ENP heat treatments
   def get_operations_with_auto_ops
+    # If locked, return the locked operations as Operation-like objects
+    if locked_for_editing? && customisation_data.dig("operation_selection", "locked_operations").present?
+      return locked_operations.map do |op_data|
+        # Create a simple operation-like object from stored data
+        OpenStruct.new(
+          id: op_data["id"],
+          display_name: op_data["display_name"],
+          operation_text: op_data["operation_text"],
+          specifications: op_data["specifications"],
+          vat_numbers: op_data["vat_numbers"] || [],
+          process_type: op_data["process_type"],
+          target_thickness: op_data["target_thickness"] || 0,
+          auto_inserted?: op_data["auto_inserted"] || false
+        )
+      end
+    end
+
+    # Original dynamic operation generation for unlocked parts
     treatments = get_treatments
     return [] if treatments.empty?
 

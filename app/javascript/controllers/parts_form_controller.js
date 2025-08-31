@@ -29,6 +29,17 @@ export default class extends Controller {
 
   connect() {
     console.log("Parts Form controller connected")
+
+    // Check if we're in locked editing mode
+    this.isLockedMode = this.element.querySelector('[data-locked-mode="true"]') !== null
+
+    if (this.isLockedMode) {
+      console.log("Parts form in locked editing mode - skipping treatment configuration")
+      this.setupLockedMode()
+      return
+    }
+
+    // Initialize unlocked mode variables and setup
     this.treatments = []
     this.treatmentCounts = {
       standard_anodising: 0,
@@ -93,8 +104,24 @@ export default class extends Controller {
     this.setupAerospaceDefenseListener()
   }
 
-  // Initialize with existing treatment data
+  // Setup locked mode - minimal functionality for manual editing
+  setupLockedMode() {
+    console.log("Setting up locked mode - operations are manually editable")
+
+    // Add any locked mode specific event listeners here if needed
+    // For now, locked operations are handled by standard form submission
+
+    // Disable any treatment configuration elements that might still be present
+    this.element.querySelectorAll('.treatment-btn').forEach(button => {
+      button.disabled = true
+      button.classList.add('opacity-50', 'cursor-not-allowed')
+    })
+  }
+
+  // Initialize with existing treatment data (unlocked mode only)
   initializeExistingData() {
+    if (this.isLockedMode) return
+
     try {
       const existingData = JSON.parse(this.treatmentsFieldTarget.value || '[]')
       this.treatments = existingData
@@ -132,79 +159,83 @@ export default class extends Controller {
     }
   }
 
-  // Set up treatment button click handlers
+  // Set up treatment button click handlers (unlocked mode only)
   setupTreatmentButtons() {
+    if (this.isLockedMode) return
+
     this.element.querySelectorAll('.treatment-btn').forEach(button => {
       button.addEventListener('click', (e) => this.handleTreatmentClick(e))
     })
   }
 
-  // Set up ENP pre-heat treatment dropdown listener
+  // Set up ENP pre-heat treatment dropdown listener (unlocked mode only)
   setupENPPreHeatTreatmentListener() {
-    if (this.hasEnpPreHeatTreatmentSelectTarget) {
-      this.enpPreHeatTreatmentSelectTarget.addEventListener('change', (e) => {
-        this.selectedEnpPreHeatTreatment = e.target.value
-        this.enpPreHeatTreatmentFieldTarget.value = this.selectedEnpPreHeatTreatment
-        console.log("ENP Pre-Heat Treatment changed to:", this.selectedEnpPreHeatTreatment)
-        this.updatePreview()
-      })
-    }
+    if (this.isLockedMode || !this.hasEnpPreHeatTreatmentSelectTarget) return
+
+    this.enpPreHeatTreatmentSelectTarget.addEventListener('change', (e) => {
+      this.selectedEnpPreHeatTreatment = e.target.value
+      this.enpPreHeatTreatmentFieldTarget.value = this.selectedEnpPreHeatTreatment
+      console.log("ENP Pre-Heat Treatment changed to:", this.selectedEnpPreHeatTreatment)
+      this.updatePreview()
+    })
   }
 
-  // Set up ENP post-heat treatment dropdown listener
+  // Set up ENP post-heat treatment dropdown listener (unlocked mode only)
   setupENPHeatTreatmentListener() {
-    if (this.hasEnpHeatTreatmentSelectTarget) {
-      this.enpHeatTreatmentSelectTarget.addEventListener('change', (e) => {
-        this.selectedEnpHeatTreatment = e.target.value
-        this.enpHeatTreatmentFieldTarget.value = this.selectedEnpHeatTreatment
-        console.log("ENP Post-Heat Treatment changed to:", this.selectedEnpHeatTreatment)
-        this.updatePreview()
-      })
-    }
+    if (this.isLockedMode || !this.hasEnpHeatTreatmentSelectTarget) return
+
+    this.enpHeatTreatmentSelectTarget.addEventListener('change', (e) => {
+      this.selectedEnpHeatTreatment = e.target.value
+      this.enpHeatTreatmentFieldTarget.value = this.selectedEnpHeatTreatment
+      console.log("ENP Post-Heat Treatment changed to:", this.selectedEnpHeatTreatment)
+      this.updatePreview()
+    })
   }
 
-  // Set up ENP strip type radio button listener
+  // Set up ENP strip type radio button listener (unlocked mode only)
   setupENPStripTypeListener() {
-    if (this.hasEnpStripTypeRadioTarget) {
-      this.enpStripTypeRadioTargets.forEach(radio => {
-        radio.addEventListener('change', (e) => {
-          this.enpStripType = e.target.value
-          this.enpStripTypeFieldTarget.value = this.enpStripType
-          this.updatePreview()
-        })
+    if (this.isLockedMode || !this.hasEnpStripTypeRadioTarget) return
+
+    this.enpStripTypeRadioTargets.forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        this.enpStripType = e.target.value
+        this.enpStripTypeFieldTarget.value = this.enpStripType
+        this.updatePreview()
       })
-    }
+    })
   }
 
-  // Set up ENP strip mask checkbox listener
+  // Set up ENP strip mask checkbox listener (unlocked mode only)
   setupENPStripMaskListener() {
-    if (this.hasEnpStripMaskCheckboxTarget) {
-      this.enpStripMaskCheckboxTarget.addEventListener('change', (e) => {
-        this.enpStripMaskEnabled = e.target.checked
-        this.updateENPStripMaskField()
-        this.updatePreview()
-      })
-    }
+    if (this.isLockedMode || !this.hasEnpStripMaskCheckboxTarget) return
+
+    this.enpStripMaskCheckboxTarget.addEventListener('change', (e) => {
+      this.enpStripMaskEnabled = e.target.checked
+      this.updateENPStripMaskField()
+      this.updatePreview()
+    })
   }
 
-  // Set up aerospace/defense checkbox listener
+  // Set up aerospace/defense checkbox listener (unlocked mode only)
   setupAerospaceDefenseListener() {
-    if (this.hasAerospaceDefenseCheckboxTarget) {
-      this.aerospaceDefenseCheckboxTarget.addEventListener('change', (e) => {
-        this.aerospaceDefense = e.target.checked
-        this.aerospaceDefenseFieldTarget.value = this.aerospaceDefense
-        this.updatePreview()
+    if (this.isLockedMode || !this.hasAerospaceDefenseCheckboxTarget) return
 
-        // Provide visual feedback when enabled
-        if (this.aerospaceDefense) {
-          console.log("Aerospace/Defense mode enabled - foil verification, water break tests and OCV operations will be included")
-        }
-      })
-    }
+    this.aerospaceDefenseCheckboxTarget.addEventListener('change', (e) => {
+      this.aerospaceDefense = e.target.checked
+      this.aerospaceDefenseFieldTarget.value = this.aerospaceDefense
+      this.updatePreview()
+
+      // Provide visual feedback when enabled
+      if (this.aerospaceDefense) {
+        console.log("Aerospace/Defense mode enabled - foil verification, water break tests and OCV operations will be included")
+      }
+    })
   }
 
-  // Handle treatment button clicks
+  // Handle treatment button clicks (unlocked mode only)
   handleTreatmentClick(event) {
+    if (this.isLockedMode) return
+
     event.preventDefault()
     const button = event.currentTarget
     const treatmentType = button.dataset.treatment
@@ -217,8 +248,10 @@ export default class extends Controller {
     this.addTreatment(treatmentType, button)
   }
 
-  // Add a new treatment
+  // Add a new treatment (unlocked mode only)
   addTreatment(treatmentType, button) {
+    if (this.isLockedMode) return
+
     this.treatmentIdCounter++
 
     const treatment = {
@@ -245,8 +278,10 @@ export default class extends Controller {
     this.updateENPOptionsVisibility()
   }
 
-  // Update ENP options visibility based on treatment selection
+  // Update ENP options visibility based on treatment selection (unlocked mode only)
   updateENPOptionsVisibility() {
+    if (this.isLockedMode) return
+
     const hasENPTreatment = this.treatments.some(t => t.type === 'electroless_nickel_plating')
 
     if (this.hasEnpOptionsContainerTarget) {
@@ -254,8 +289,10 @@ export default class extends Controller {
     }
   }
 
-  // Update button appearance
+  // Update button appearance (unlocked mode only)
   updateButtonAppearance(button, treatmentType) {
+    if (this.isLockedMode) return
+
     const countBadge = button.querySelector('.count-badge')
     button.classList.remove('border-gray-300')
 
@@ -274,8 +311,10 @@ export default class extends Controller {
     countBadge.textContent = this.treatmentCounts[treatmentType]
   }
 
-  // Update treatment counts from current treatments array
+  // Update treatment counts from current treatments array (unlocked mode only)
   updateTreatmentCounts() {
+    if (this.isLockedMode) return
+
     // Reset counts
     Object.keys(this.treatmentCounts).forEach(type => {
       this.treatmentCounts[type] = 0
@@ -299,8 +338,10 @@ export default class extends Controller {
     })
   }
 
-  // Render treatment cards
+  // Render treatment cards (unlocked mode only)
   renderTreatmentCards() {
+    if (this.isLockedMode) return
+
     if (this.treatments.length === 0) {
       this.treatmentsContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">Select treatments above to configure them</p>'
       return
@@ -314,8 +355,10 @@ export default class extends Controller {
     this.addTreatmentCardListeners()
   }
 
-  // Generate HTML for a treatment card
+  // Generate HTML for a treatment card (unlocked mode only)
   generateTreatmentCardHTML(treatment, index) {
+    if (this.isLockedMode) return ''
+
     const treatmentName = this.formatTreatmentName(treatment.type)
     const isENP = treatment.type === 'electroless_nickel_plating'
 
@@ -355,8 +398,10 @@ export default class extends Controller {
     `
   }
 
-  // Generate criteria selection HTML
+  // Generate criteria selection HTML (unlocked mode only)
   generateCriteriaHTML(treatment) {
+    if (this.isLockedMode) return ''
+
     if (treatment.type === 'chemical_conversion') {
       return '' // Chemical conversion needs no criteria
     }
@@ -372,8 +417,10 @@ export default class extends Controller {
     return this.generateAnodisingCriteriaHTML(treatment)
   }
 
-  // Generate chromic criteria HTML (only alloy selection, no thickness or class)
+  // Generate chromic criteria HTML (only alloy selection, no thickness or class) (unlocked mode only)
   generateChromicCriteriaHTML(treatment) {
+    if (this.isLockedMode) return ''
+
     return `
       <div class="grid grid-cols-1 gap-4 mb-4">
         <div>
@@ -392,8 +439,10 @@ export default class extends Controller {
     `
   }
 
-  // Generate ENP criteria HTML
+  // Generate ENP criteria HTML (unlocked mode only)
   generateENPCriteriaHTML(treatment) {
+    if (this.isLockedMode) return ''
+
     return `
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-4">
         <div>
@@ -431,8 +480,10 @@ export default class extends Controller {
     `
   }
 
-  // Generate anodising criteria HTML (for standard and hard anodising)
+  // Generate anodising criteria HTML (for standard and hard anodising) (unlocked mode only)
   generateAnodisingCriteriaHTML(treatment) {
+    if (this.isLockedMode) return ''
+
     return `
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-4">
         <div>
@@ -474,8 +525,10 @@ export default class extends Controller {
     `
   }
 
-  // Generate treatment modifiers HTML
+  // Generate treatment modifiers HTML (unlocked mode only)
   generateTreatmentModifiersHTML(treatment) {
+    if (this.isLockedMode) return ''
+
     const anodisingTypes = ['standard_anodising', 'hard_anodising', 'chromic_anodising']
     const showSealing = anodisingTypes.includes(treatment.type)
     const showDye = anodisingTypes.includes(treatment.type)
@@ -589,8 +642,10 @@ export default class extends Controller {
     `
   }
 
-  // Add event listeners to treatment cards
+  // Add event listeners to treatment cards (unlocked mode only)
   addTreatmentCardListeners() {
+    if (this.isLockedMode) return
+
     this.treatmentsContainerTarget.querySelectorAll('select, input').forEach(element => {
       element.addEventListener('change', (e) => this.handleTreatmentChange(e))
       if (element.type === 'text') {
@@ -604,8 +659,10 @@ export default class extends Controller {
     })
   }
 
-  // Handle changes in treatment configuration
+  // Handle changes in treatment configuration (unlocked mode only)
   handleTreatmentChange(event) {
+    if (this.isLockedMode) return
+
     const treatmentId = event.target.dataset.treatmentId
     if (!treatmentId) return
 
@@ -700,8 +757,10 @@ export default class extends Controller {
     this.updatePreview()
   }
 
-  // Load operations for a treatment
+  // Load operations for a treatment (unlocked mode only)
   async loadOperationsForTreatment(treatmentId) {
+    if (this.isLockedMode) return
+
     const treatment = this.treatments.find(t => t.id === treatmentId)
     if (!treatment) return
 
@@ -718,8 +777,10 @@ export default class extends Controller {
     }
   }
 
-  // Build criteria for operation filtering
+  // Build criteria for operation filtering (unlocked mode only)
   buildCriteriaForTreatment(treatment, card) {
+    if (this.isLockedMode) return {}
+
     const criteria = { anodising_types: [treatment.type] }
 
     if (treatment.type === 'electroless_nickel_plating') {
@@ -750,8 +811,10 @@ export default class extends Controller {
     return criteria
   }
 
-  // Display operations in card
+  // Display operations in card (unlocked mode only)
   displayOperationsInCard(operations, container, treatmentId) {
+    if (this.isLockedMode) return
+
     if (operations.length === 0) {
       container.innerHTML = '<p class="text-gray-500 text-xs">No matching operations found</p>'
       return
@@ -777,8 +840,10 @@ export default class extends Controller {
     })
   }
 
-  // Select operation for treatment
+  // Select operation for treatment (unlocked mode only)
   selectOperationForTreatment(operationId, treatmentId) {
+    if (this.isLockedMode) return
+
     const treatment = this.treatments.find(t => t.id === treatmentId)
     if (!treatment) {
       console.error(`Treatment not found: ${treatmentId}`)
@@ -834,8 +899,10 @@ export default class extends Controller {
     this.updatePreview()
   }
 
-  // Remove treatment
+  // Remove treatment (unlocked mode only)
   removeTreatment(event) {
+    if (this.isLockedMode) return
+
     const treatmentId = event.params.treatmentId
     const treatmentIndex = this.treatments.findIndex(t => t.id === treatmentId)
 
@@ -866,8 +933,10 @@ export default class extends Controller {
     this.updatePreview()
   }
 
-  // Reset button appearance
+  // Reset button appearance (unlocked mode only)
   resetButtonAppearance(button) {
+    if (this.isLockedMode) return
+
     const countBadge = button.querySelector('.count-badge')
 
     // Remove all color classes
@@ -887,14 +956,18 @@ export default class extends Controller {
     countBadge.textContent = '0'
   }
 
-  // Update ENP strip mask field
+  // Update ENP strip mask field (unlocked mode only)
   updateENPStripMaskField() {
+    if (this.isLockedMode) return
+
     const enpStripMaskOps = this.enpStripMaskEnabled ? this.getENPStripMaskOperationIds(this.enpStripType) : []
     this.enpStripMaskFieldTarget.value = JSON.stringify(enpStripMaskOps)
   }
 
-  // Get ENP Strip Mask operation IDs
+  // Get ENP Strip Mask operation IDs (unlocked mode only)
   getENPStripMaskOperationIds(stripType) {
+    if (this.isLockedMode) return []
+
     const stripOperation = stripType === 'metex_dekote' ? 'ENP_STRIP_METEX' : 'ENP_STRIP_NITRIC'
     return [
       'ENP_MASK',
@@ -905,13 +978,17 @@ export default class extends Controller {
     ]
   }
 
-  // Update treatments field
+  // Update treatments field (unlocked mode only)
   updateTreatmentsField() {
+    if (this.isLockedMode) return
+
     this.treatmentsFieldTarget.value = JSON.stringify(this.treatments)
   }
 
-  // Update preview
+  // Update preview (unlocked mode only)
   async updatePreview() {
+    if (this.isLockedMode) return
+
     console.log('Updating preview with treatments:', this.treatments, 'ENP Pre-Heat:', this.selectedEnpPreHeatTreatment, 'ENP Post-Heat:', this.selectedEnpHeatTreatment, 'Aerospace/Defense:', this.aerospaceDefense)
 
     if (this.treatments.length === 0) {
@@ -1087,8 +1164,10 @@ export default class extends Controller {
     }
   }
 
-  // Fetch operations from server
+  // Fetch operations from server (unlocked mode only)
   async fetchOperations(criteria) {
+    if (this.isLockedMode) return []
+
     const response = await fetch(this.filterPathValue, {
       method: 'POST',
       headers: {
@@ -1105,8 +1184,10 @@ export default class extends Controller {
     return await response.json()
   }
 
-  // Format treatment name
+  // Format treatment name (unlocked mode only)
   formatTreatmentName(treatmentType) {
+    if (this.isLockedMode) return ''
+
     return treatmentType
       .replace('_anodising', '')
       .replace('_conversion', '')

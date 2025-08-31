@@ -1,5 +1,5 @@
 class PartsController < ApplicationController
-  before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled]
+  before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled, :lock_operations, :update_locked_operations]
 
   def index
     @parts = Part.includes(:customer, :works_orders)
@@ -74,11 +74,23 @@ class PartsController < ApplicationController
   def edit
     @customers = [@part.customer] # Don't allow changing customer on existing part
 
-    # Ensure customisation_data structure exists
-    @part.customisation_data = { "operation_selection" => {} } if @part.customisation_data.blank?
+    # Ensure customisation_data structure exists for unlocked parts
+    if !@part.locked_for_editing?
+      @part.customisation_data = { "operation_selection" => {} } if @part.customisation_data.blank?
+    end
   end
 
   def update
+    # Handle locked operations update differently
+    if @part.locked_for_editing? && params[:locked_operations].present?
+      if update_locked_operations_text
+        redirect_to @part, notice: 'Operations were successfully updated.'
+      else
+        render :edit, status: :unprocessable_entity
+      end
+      return
+    end
+
     # For parts, changing customer/part_number/issue creates a new part
     if part_details_changed?
       new_part = Part.ensure(
@@ -122,6 +134,29 @@ class PartsController < ApplicationController
     @part.update!(enabled: !@part.enabled)
     status = @part.enabled? ? 'enabled' : 'disabled'
     redirect_to @part, notice: "Part was successfully #{status}."
+  end
+
+  def lock_operations
+    if @part.locked_for_editing?
+      redirect_to edit_part_path(@part), alert: 'Part operations are already locked.'
+      return
+    end
+
+    begin
+      @part.lock_operations!
+      redirect_to edit_part_path(@part), notice: 'Operations locked for editing. You can now customize the operation text.'
+    rescue => e
+      Rails.logger.error "Error locking operations: #{e.message}"
+      redirect_to edit_part_path(@part), alert: 'Failed to lock operations. Please ensure operations are configured first.'
+    end
+  end
+
+  def update_locked_operations
+    if update_locked_operations_text
+      redirect_to @part, notice: 'Operations were successfully updated.'
+    else
+      redirect_to edit_part_path(@part), alert: 'Failed to update operations.'
+    end
   end
 
   def search
@@ -346,6 +381,27 @@ class PartsController < ApplicationController
 
     first_treatment = treatments.first
     first_treatment&.dig("type") || 'anodising'
+  end
+
+  def update_locked_operations_text
+    return false unless @part.locked_for_editing?
+
+    locked_operations_params = params[:locked_operations] || {}
+    success = true
+
+    locked_operations_params.each do |operation_id, operation_text|
+      unless @part.update_locked_operation!(operation_id, operation_text)
+        success = false
+        Rails.logger.error "Failed to update operation #{operation_id} with text: #{operation_text}"
+      end
+    end
+
+    if success
+      # Regenerate specification from updated operations
+      @part.update!(specification: @part.operations_text)
+    end
+
+    success
   end
 
   # Helper method to parse JSON parameters safely
