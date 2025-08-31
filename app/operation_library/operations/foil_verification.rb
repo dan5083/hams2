@@ -12,7 +12,7 @@ module OperationLibrary
       ]
     end
 
-    # FIXED: Check for anodising treatments, not operations in sequence
+    # Check if foil verification is required (aerospace/defense + anodising treatments)
     def self.foil_verification_required?(has_anodising_treatments, aerospace_defense: false)
       return false unless aerospace_defense
       has_anodising_treatments
@@ -20,10 +20,14 @@ module OperationLibrary
 
     # Get the foil verification operation
     def self.get_foil_verification_operation
-      operations.first
+      Operation.new(
+        id: 'FOIL_VERIFICATION',
+        process_type: 'verification',
+        operation_text: build_foil_verification_text
+      )
     end
 
-    # FIXED: Take has_anodising parameter instead of checking sequence
+    # Insert foil verification at the beginning of the sequence (after contract review)
     def self.insert_foil_verification_if_required(operations_sequence, has_anodising_treatments: false, aerospace_defense: false)
       return operations_sequence unless foil_verification_required?(has_anodising_treatments, aerospace_defense: aerospace_defense)
 
@@ -47,14 +51,17 @@ module OperationLibrary
 
     private
 
-    # Build the multi-batch foil verification text
+    # Build the multi-batch foil verification text (matching OCV format exactly)
     def self.build_foil_verification_text
-      [
-        "**Elcometer foil verification** (Aerospace/Defense requirement)",
-        "Batch 1: Meter no:_ Foil value 1:___ Measured foil thickness:___ Foil value 2:___ Measured foil thickness:___",
-        "Batch 2: Meter no:_ Foil value 1:___ Measured foil thickness:___ Foil value 2:___ Measured foil thickness:___",
-        "Batch 3: Meter no:_ Foil value 1:___ Measured foil thickness:___ Foil value 2:___ Measured foil thickness:___"
-      ].join("\n")
+      batch_template = "Meter no:_ Foil value 1:___ Measured foil thickness:___ Foil value 2:___ Measured foil thickness:___"
+
+      text_lines = []
+      text_lines << "**Elcometer foil verification** (Aerospace/Defense requirement)"
+      (1..3).each do |batch|
+        text_lines << "Batch #{batch}: #{batch_template}"
+      end
+
+      text_lines.join("\n")
     end
   end
 end
