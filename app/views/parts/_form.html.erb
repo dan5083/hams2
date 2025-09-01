@@ -412,7 +412,7 @@
   </div>
 <% end %>
 
-<!-- Replace the sticky button section with this -->
+<!-- Sticky Switch to Manual Mode Button (only for unlocked parts) -->
 <% if !part.locked_for_editing? %>
   <div class="fixed bottom-6 right-6 z-50">
     <% if part.persisted? %>
@@ -438,15 +438,19 @@
         </svg>
         <span>Switch to Manual Mode</span>
       </button>
-    <% end %>
+    <% else %>
     <p class="text-xs text-white text-center mt-2 opacity-75">Available anytime - even with no operations configured</p>
   </div>
 
   <script>
     document.addEventListener('DOMContentLoaded', function() {
+      console.log('Looking for switch-to-manual-btn...');
       const btn = document.getElementById('switch-to-manual-btn');
+      console.log('Found button:', btn);
+
       if (btn) {
         btn.addEventListener('click', function() {
+          console.log('Switch to manual button clicked!');
           if (confirm('This will switch to manual editing mode. You can save the part to access manual operation editing, or refresh to return to automatic mode. Continue?')) {
             // Hide treatment configuration
             document.querySelectorAll('.treatment-btn').forEach(btn => btn.style.display = 'none');
@@ -461,7 +465,7 @@
             );
 
             if (processingSection) {
-              processingSection.innerHTML = `
+              processingSection.innerHTML = \`
                 <div class="text-center p-8">
                   <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-orange-100 mb-4">
                     <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -479,7 +483,7 @@
                     </button>
                   </div>
                 </div>
-              `;
+              \`;
             }
 
             // Hide the button
@@ -496,6 +500,8 @@
             }
           }
         });
+      } else {
+        console.log('Button not found!');
       }
     });
   </script>
