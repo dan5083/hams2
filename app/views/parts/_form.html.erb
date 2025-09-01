@@ -459,28 +459,56 @@
         console.log('Found', operationDivs.length, 'operations to capture');
 
         operationDivs.forEach((div, index) => {
-          const textContent = div.querySelector('span')?.textContent || '';
+          const textSpan = div.querySelector('span');
+          if (!textSpan) return;
 
-          // Extract operation details from the text
-          const match = textContent.match(/^(\d+)\.\s*([^:]+):\s*(.*?)(?:\s*\([^)]*\))?$/);
+          const fullText = textSpan.textContent || '';
+          console.log('Processing operation text:', fullText);
+
+          // More flexible parsing - look for number, display name, and operation text
+          const match = fullText.match(/^(\d+)\.\s*([^:]+):\s*(.+)$/);
           if (match) {
             const [, position, displayName, operationText] = match;
 
-            currentOperations.push({
+            // Clean up the operation text by removing any parenthetical notes at the end
+            const cleanOperationText = operationText.replace(/\s*\([^)]*\)\s*$/, '').trim();
+
+            const operation = {
               id: `MANUAL_OP_${index + 1}`,
               display_name: displayName.trim(),
-              operation_text: operationText.trim(),
+              operation_text: cleanOperationText,
               position: parseInt(position),
               specifications: '',
               vat_numbers: [],
               process_type: 'manual',
               target_thickness: 0,
               auto_inserted: false
-            });
+            };
+
+            currentOperations.push(operation);
+            console.log('Captured operation:', operation);
+          } else {
+            console.log('Failed to parse operation:', fullText);
+
+            // Fallback - just use the text as-is
+            const operation = {
+              id: `MANUAL_OP_${index + 1}`,
+              display_name: `Operation ${index + 1}`,
+              operation_text: fullText.trim(),
+              position: index + 1,
+              specifications: '',
+              vat_numbers: [],
+              process_type: 'manual',
+              target_thickness: 0,
+              auto_inserted: false
+            };
+
+            currentOperations.push(operation);
+            console.log('Used fallback for operation:', operation);
           }
         });
 
-        console.log('Captured operations:', currentOperations);
+        console.log('Total captured operations:', currentOperations.length);
       }
 
       // Hide treatment configuration
@@ -519,6 +547,11 @@
         });
         form.appendChild(input);
         console.log('Added form data with', currentOperations.length, 'operations');
+      }
+
+      if (currentOperations.length === 0) {
+        console.warn('No operations were captured! You may need to configure some treatments first.');
+        alert('No operations found to capture. Try configuring some treatments first, then switch to manual mode.');
       }
     }
   }
