@@ -366,14 +366,17 @@
   <div class="bg-white shadow rounded-lg p-6">
     <h3 class="text-lg font-medium text-gray-900 mb-4">Specification</h3>
 
+  <!-- Specification Section -->
+  <div class="bg-white shadow rounded-lg p-6">
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Specification</h3>
+
     <%= form.text_area :specification,
-        placeholder: part.locked_for_editing? ? "Specification generated from operations..." : "Will be automatically generated from selected treatments...",
+        placeholder: "Enter specification text (optional)...",
         rows: 4,
-        class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm #{'bg-gray-50' unless part.locked_for_editing?}",
-        readonly: !part.locked_for_editing?,
+        class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
         data: { parts_form_target: "specificationField" } %>
     <p class="mt-1 text-xs text-gray-500">
-      <%= part.locked_for_editing? ? "You can edit the specification in manual mode" : "Auto-generated from selected treatments" %>
+      Optional specification text - operations are managed separately below
     </p>
   </div>
 

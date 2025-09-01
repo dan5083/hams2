@@ -19,7 +19,7 @@ class Part < ApplicationRecord
   scope :for_customer, ->(customer) { where(customer: customer) }
 
   before_validation :normalize_part_details
-  before_validation :build_specification_from_operations, if: :treatments_changed?
+  # REMOVED: before_validation :build_specification_from_operations, if: :treatments_changed?
   after_initialize :set_defaults, if: :new_record?
   after_create :disable_replaced_part
 
@@ -633,10 +633,6 @@ class Part < ApplicationRecord
     else
       treatments || []
     end
-  end
-
-  def build_specification_from_operations
-    self.specification = operations_text if get_treatments.any?
   end
 
   def set_defaults
