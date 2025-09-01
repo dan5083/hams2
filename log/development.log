@@ -14920,3 +14920,122 @@ Migrating to AddMagicLinkIndexesToUsers (20250829095706)
 [dotenv] Loaded [33m.env[0m
 [dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
 [dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[36mActiveRecord::SchemaMigration Load (3.8ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mUser Load (17.1ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'adrian@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.4ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (0.9ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."email_address" = 'adrian@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (0.4ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."username" = 'adrian.bishop' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Create (12.0ms)[0m  [1m[32mINSERT INTO "users" ("email_address", "password_digest", "username", "full_name", "enabled", "created_at", "updated_at", "magic_link_token", "magic_link_expires_at") VALUES ('adrian@hardanodisingstl.com', '$2a$12$BWunn3yE4caZBma4GkoCG.UOc.vXrVNm0PZ.xB0loc/HfCm50dac.', 'adrian.bishop', 'Adrian Bishop', TRUE, '2025-09-01 11:41:41.706217', '2025-09-01 11:41:41.706217', NULL, NULL) RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (12.6ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mUser Load (0.7ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'alan@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (2.3ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."email_address" = 'alan@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (0.3ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."username" = 'alan.vaughan' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Create (0.6ms)[0m  [1m[32mINSERT INTO "users" ("email_address", "password_digest", "username", "full_name", "enabled", "created_at", "updated_at", "magic_link_token", "magic_link_expires_at") VALUES ('alan@hardanodisingstl.com', '$2a$12$YNCUfpqmOZJE3ith.nHqOOAzWYn59XWAf6/lEGzmAoSm2hyP2dKJq', 'alan.vaughan', 'Alan Vaughan', TRUE, '2025-09-01 11:41:42.099454', '2025-09-01 11:41:42.099454', NULL, NULL) RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (6.0ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mUser Load (0.4ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'ben@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (2.2ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."email_address" = 'ben@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (0.3ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."username" = 'ben.mcgowan' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Create (0.4ms)[0m  [1m[32mINSERT INTO "users" ("email_address", "password_digest", "username", "full_name", "enabled", "created_at", "updated_at", "magic_link_token", "magic_link_expires_at") VALUES ('ben@hardanodisingstl.com', '$2a$12$1d/gp2cI/e8e/.klFpiyqO0G338GeoOOkO8F4M0l7IJ45USBXH.qK', 'ben.mcgowan', 'Ben Mcgowan', TRUE, '2025-09-01 11:41:42.445166', '2025-09-01 11:41:42.445166', NULL, NULL) RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mUser Load (0.5ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'brian@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Load (0.3ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'chris@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.4ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (2.6ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."email_address" = 'chris@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (0.3ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."username" = 'chris.connon' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Create (0.6ms)[0m  [1m[32mINSERT INTO "users" ("email_address", "password_digest", "username", "full_name", "enabled", "created_at", "updated_at", "magic_link_token", "magic_link_expires_at") VALUES ('chris@hardanodisingstl.com', '$2a$12$WqTe.y98Y5tqnxTRu.lCsedhijdhuL4FxbsMeEE7td4ZwrbHVktWm', 'chris.connon', 'Chris Connon', TRUE, '2025-09-01 11:41:42.789057', '2025-09-01 11:41:42.789057', NULL, NULL) RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.8ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mUser Load (0.3ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'chris.bayliss@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (2.6ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."email_address" = 'chris.bayliss@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (0.5ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."username" = 'chris.bayliss' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Create (0.5ms)[0m  [1m[32mINSERT INTO "users" ("email_address", "password_digest", "username", "full_name", "enabled", "created_at", "updated_at", "magic_link_token", "magic_link_expires_at") VALUES ('chris.bayliss@hardanodisingstl.com', '$2a$12$t57Ke.fP9Ae3ecA/o6ecPOPUGHRtBaXPcccSV0YdYokFIOd5ERIUS', 'chris.bayliss', 'Chris Bayliss', TRUE, '2025-09-01 11:41:43.132470', '2025-09-01 11:41:43.132470', NULL, NULL) RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (6.0ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mUser Load (0.4ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'daniel@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Load (0.5ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'dave@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (2.6ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."email_address" = 'dave@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (0.3ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."username" = 'dave.bennett' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Create (0.4ms)[0m  [1m[32mINSERT INTO "users" ("email_address", "password_digest", "username", "full_name", "enabled", "created_at", "updated_at", "magic_link_token", "magic_link_expires_at") VALUES ('dave@hardanodisingstl.com', '$2a$12$N68wZCW2dE6dz4o1Qo7snOPncYyoXuJ696Xiej682MLCYevqARxxO', 'dave.bennett', 'Dave Bennett', TRUE, '2025-09-01 11:41:43.488164', '2025-09-01 11:41:43.488164', NULL, NULL) RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (8.0ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mUser Load (0.4ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'elena@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (2.4ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."email_address" = 'elena@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (0.3ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."username" = 'elena.oprea' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Create (0.6ms)[0m  [1m[32mINSERT INTO "users" ("email_address", "password_digest", "username", "full_name", "enabled", "created_at", "updated_at", "magic_link_token", "magic_link_expires_at") VALUES ('elena@hardanodisingstl.com', '$2a$12$vI.ZembecnKWPmgSbUCMp.drni2ntdodOzbfia5txWPgO0wTC2TIC', 'elena.oprea', 'Elena Oprea', TRUE, '2025-09-01 11:41:43.336816', '2025-09-01 11:41:43.336816', NULL, NULL) RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.8ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mUser Load (1.0ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'gary@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (2.6ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."email_address" = 'gary@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (0.4ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."username" = 'gary.rickets' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Create (0.4ms)[0m  [1m[32mINSERT INTO "users" ("email_address", "password_digest", "username", "full_name", "enabled", "created_at", "updated_at", "magic_link_token", "magic_link_expires_at") VALUES ('gary@hardanodisingstl.com', '$2a$12$7GywfmX2biqFOQp88yLa8eEA8QWXxERPpKDVbHfpCHKqN4FpnQbZK', 'gary.rickets', 'Gary Rickets', TRUE, '2025-09-01 11:41:43.683079', '2025-09-01 11:41:43.683079', NULL, NULL) RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (21.3ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mUser Load (0.5ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'gio@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (2.4ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."email_address" = 'gio@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (0.4ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."username" = 'gio.iacono' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Create (0.5ms)[0m  [1m[32mINSERT INTO "users" ("email_address", "password_digest", "username", "full_name", "enabled", "created_at", "updated_at", "magic_link_token", "magic_link_expires_at") VALUES ('gio@hardanodisingstl.com', '$2a$12$ea5fw0qSzPqdV6Mt6m0BlecgRROOiQClmp0vbgHazPtJvje/61Ga2', 'gio.iacono', 'Gio Iacono', TRUE, '2025-09-01 11:41:44.042429', '2025-09-01 11:41:44.042429', NULL, NULL) RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mUser Load (0.5ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'hams-2-app@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (2.2ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."email_address" = 'hams-2-app@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (0.3ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."username" = 'hams.service' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Create (0.4ms)[0m  [1m[32mINSERT INTO "users" ("email_address", "password_digest", "username", "full_name", "enabled", "created_at", "updated_at", "magic_link_token", "magic_link_expires_at") VALUES ('hams-2-app@hardanodisingstl.com', '$2a$12$7ZA1bliRrnYocoKfCL/Bn.xsPaKFZb0R8jQskSM37sUYZ6roK8Z/G', 'hams.service', 'HAMS Application Service', TRUE, '2025-09-01 11:41:44.385589', '2025-09-01 11:41:44.385589', NULL, NULL) RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (6.1ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mUser Load (0.5ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'quality@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (2.6ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."email_address" = 'quality@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (0.3ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."username" = 'jim.ledger' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Create (0.4ms)[0m  [1m[32mINSERT INTO "users" ("email_address", "password_digest", "username", "full_name", "enabled", "created_at", "updated_at", "magic_link_token", "magic_link_expires_at") VALUES ('quality@hardanodisingstl.com', '$2a$12$.7lczh6zAP2oDpOHNckTrOSW0Oa59wbWLuxGPeL8cdl.l8zK3Ob..', 'jim.ledger', 'Jim Ledger', TRUE, '2025-09-01 11:41:44.730116', '2025-09-01 11:41:44.730116', NULL, NULL) RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.7ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mUser Load (0.5ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'judy@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.4ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (3.7ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."email_address" = 'judy@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (0.5ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."username" = 'judy.horton' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Create (0.5ms)[0m  [1m[32mINSERT INTO "users" ("email_address", "password_digest", "username", "full_name", "enabled", "created_at", "updated_at", "magic_link_token", "magic_link_expires_at") VALUES ('judy@hardanodisingstl.com', '$2a$12$afaYSlpLi/STjHwtobpK7.cry4BsRqzLpNe3ZiokcEzs3jqgQHs6u', 'judy.horton', 'Judy Horton', TRUE, '2025-09-01 11:41:45.092090', '2025-09-01 11:41:45.092090', NULL, NULL) RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.4ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mUser Load (0.4ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'julia@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (2.5ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."email_address" = 'julia@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (1.1ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."username" = 'julia.chapman' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Create (0.4ms)[0m  [1m[32mINSERT INTO "users" ("email_address", "password_digest", "username", "full_name", "enabled", "created_at", "updated_at", "magic_link_token", "magic_link_expires_at") VALUES ('julia@hardanodisingstl.com', '$2a$12$eM/yeDSGWIceufQJy7Qc9.1vdlGDoghcq07OFaUqQIaESyaEJFTXW', 'julia.chapman', 'Julia Chapman', TRUE, '2025-09-01 11:41:45.438999', '2025-09-01 11:41:45.438999', NULL, NULL) RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.5ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mUser Load (0.5ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'nigel@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (2.8ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."email_address" = 'nigel@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (0.5ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."username" = 'nigel.harrington' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Create (1.1ms)[0m  [1m[32mINSERT INTO "users" ("email_address", "password_digest", "username", "full_name", "enabled", "created_at", "updated_at", "magic_link_token", "magic_link_expires_at") VALUES ('nigel@hardanodisingstl.com', '$2a$12$G8mIpIzgHyiKJLIZvNa3iedOm0zWWwpH1F5HP0QexPl/46DUMNh2a', 'nigel.harrington', 'Nigel Harrington', TRUE, '2025-09-01 11:41:45.787662', '2025-09-01 11:41:45.787662', NULL, NULL) RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.6ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mUser Load (0.4ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'phil@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (2.4ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."email_address" = 'phil@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (0.3ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."username" = 'phil.bayliss' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Create (0.8ms)[0m  [1m[32mINSERT INTO "users" ("email_address", "password_digest", "username", "full_name", "enabled", "created_at", "updated_at", "magic_link_token", "magic_link_expires_at") VALUES ('phil@hardanodisingstl.com', '$2a$12$6gXoZdV/bZAEQ0LADUz60uQTB7v.Ib2DXkRBirY5/PKeisjZOzdrG', 'phil.bayliss', 'Phil Bayliss', TRUE, '2025-09-01 11:41:46.131097', '2025-09-01 11:41:46.131097', NULL, NULL) RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.5ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mUser Load (0.6ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'ross@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (2.5ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."email_address" = 'ross@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (0.3ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."username" = 'ross.wilson' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Create (0.6ms)[0m  [1m[32mINSERT INTO "users" ("email_address", "password_digest", "username", "full_name", "enabled", "created_at", "updated_at", "magic_link_token", "magic_link_expires_at") VALUES ('ross@hardanodisingstl.com', '$2a$12$Ev2cNiH/9ZTvzv7AvMU6auv9YaWgYdjLhgxdKeDPk5EO3FA2Z6Hee', 'ross.wilson', 'Ross Wilson', TRUE, '2025-09-01 11:41:46.475292', '2025-09-01 11:41:46.475292', NULL, NULL) RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mUser Load (0.4ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'sophie@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (3.0ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."email_address" = 'sophie@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (0.3ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."username" = 'sophie.davis' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Create (0.4ms)[0m  [1m[32mINSERT INTO "users" ("email_address", "password_digest", "username", "full_name", "enabled", "created_at", "updated_at", "magic_link_token", "magic_link_expires_at") VALUES ('sophie@hardanodisingstl.com', '$2a$12$5W7cEWemdXuL2A4ML7qir.A0wuDk9U3BXw2xNtzYkn1gFuLOc68bG', 'sophie.davis', 'Sophie Davis', TRUE, '2025-09-01 11:41:46.819603', '2025-09-01 11:41:46.819603', NULL, NULL) RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.8ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mUser Load (0.5ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'tariq@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (3.1ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."email_address" = 'tariq@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (0.4ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."username" = 'tariq.anwar' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Create (0.4ms)[0m  [1m[32mINSERT INTO "users" ("email_address", "password_digest", "username", "full_name", "enabled", "created_at", "updated_at", "magic_link_token", "magic_link_expires_at") VALUES ('tariq@hardanodisingstl.com', '$2a$12$mE.bXMSJcbOVFFHz9A6Wb.Ls12xituEhoaVXqvu1.NUzh1aon7WNC', 'tariq.anwar', 'Tariq Anwar', TRUE, '2025-09-01 11:41:47.165921', '2025-09-01 11:41:47.165921', NULL, NULL) RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.7ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mUser Load (0.6ms)[0m  [1m[34mSELECT "users".* FROM "users" WHERE "users"."email_address" = 'careers@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.4ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (2.5ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."email_address" = 'careers@hardanodisingstl.com' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Exists? (1.0ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."username" = 'tariq.anwar.careers' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mUser Create (0.5ms)[0m  [1m[32mINSERT INTO "users" ("email_address", "password_digest", "username", "full_name", "enabled", "created_at", "updated_at", "magic_link_token", "magic_link_expires_at") VALUES ('careers@hardanodisingstl.com', '$2a$12$W0MKiI4yjwfxuf2PH4bWU.Feeuq0figqYMEjndsp0yuBmNeGD56si', 'tariq.anwar.careers', 'Tariq Anwar', TRUE, '2025-09-01 11:41:47.513555', '2025-09-01 11:41:47.513555', NULL, NULL) RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.5ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
