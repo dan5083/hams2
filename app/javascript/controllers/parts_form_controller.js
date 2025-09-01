@@ -103,6 +103,9 @@ export default class extends Controller {
     this.setupENPStripTypeListener()
     this.setupENPStripMaskListener()
     this.setupAerospaceDefenseListener()
+
+    // Sticky button is always visible for unlocked parts - no need to manage visibility
+    console.log("Sticky button should be visible for unlocked parts")
   }
 
   // Setup locked mode - minimal functionality for manual editing
@@ -995,10 +998,6 @@ export default class extends Controller {
     if (this.treatments.length === 0) {
       this.selectedContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">No treatments selected</p>'
       this.specificationFieldTarget.value = ''
-      // Hide sticky button when no treatments
-      if (this.hasStickyButtonTarget) {
-        this.stickyButtonTarget.style.display = 'none'
-      }
       return
     }
 
@@ -1008,10 +1007,6 @@ export default class extends Controller {
     if (treatmentsWithOperations.length === 0) {
       this.selectedContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">Select operations for treatments to see preview</p>'
       this.specificationFieldTarget.value = ''
-      // Hide sticky button when no operations selected
-      if (this.hasStickyButtonTarget) {
-        this.stickyButtonTarget.style.display = 'none'
-      }
       return
     }
 
@@ -1020,10 +1015,6 @@ export default class extends Controller {
     if (treatmentsWithoutJigs.length > 0) {
       this.selectedContainerTarget.innerHTML = '<p class="text-yellow-600 text-sm">Select jig types for all treatments to see preview</p>'
       this.specificationFieldTarget.value = ''
-      // Hide sticky button when configuration incomplete
-      if (this.hasStickyButtonTarget) {
-        this.stickyButtonTarget.style.display = 'none'
-      }
       return
     }
 
@@ -1095,10 +1086,6 @@ export default class extends Controller {
       if (operations.length === 0) {
         this.selectedContainerTarget.innerHTML = '<p class="text-yellow-600 text-sm">No operations generated - check treatment configuration</p>'
         this.specificationFieldTarget.value = ''
-        // Hide sticky button when no operations generated
-        if (this.hasStickyButtonTarget) {
-          this.stickyButtonTarget.style.display = 'none'
-        }
         return
       }
 
@@ -1175,19 +1162,9 @@ export default class extends Controller {
         `
       }).join('')
 
-      // Show sticky button when operations are successfully configured
-      if (this.hasStickyButtonTarget) {
-        console.log('Has sticky button target:', this.hasStickyButtonTarget, 'Operations count:', operations.length)
-        this.stickyButtonTarget.style.display = operations.length > 0 ? 'block' : 'none'
-      }
-
     } catch (error) {
       console.error('Error updating preview:', error)
       this.selectedContainerTarget.innerHTML = '<p class="text-red-500 text-sm">Error loading preview</p>'
-      // Hide sticky button on error
-      if (this.hasStickyButtonTarget) {
-        this.stickyButtonTarget.style.display = 'none'
-      }
     }
   }
 
@@ -1211,16 +1188,224 @@ export default class extends Controller {
     return await response.json()
   }
 
-  // Format treatment name (unlocked mode only)
-  formatTreatmentName(treatmentType) {
-    if (this.isLockedMode) return ''
+  // Handle switching to manual mode for new parts (unlocked mode only)
+  lockOperations(event) {
+    if (this.isLockedMode) return
 
-    return treatmentType
-      .replace('_anodising', '')
-      .replace('_conversion', '')
-      .replace('_nickel_plating', '')
-      .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ')
+    console.log("Switching to manual mode for new part")
+
+    // Get current operations if any are configured
+    this.getCurrentOperationsForLocking()
+      .then(currentOperations => {
+        // Create locked operations structure
+        this.createLockedOperationsStructure(currentOperations)
+
+        // Transform the form to locked mode
+        this.switchToLockedMode()
+      })
+      .catch(error => {
+        console.error("Error switching to manual mode:", error)
+        // Still switch to manual mode even if we can't get current operations
+        this.createLockedOperationsStructure([])
+        this.switchToLockedMode()
+      })
   }
-}
+
+  // Get current operations for locking (unlocked mode only)
+  async getCurrentOperationsForLocking() {
+    if (this.isLockedMode) return []
+
+    // If no treatments are configured, return empty array
+    if (this.treatments.length === 0) {
+      return []
+    }
+
+    // Filter treatments that have operations selected
+    const treatmentsWithOperations = this.treatments.filter(t => t.operation_id)
+    if (treatmentsWithOperations.length === 0) {
+      return []
+    }
+
+    // Check if all treatments have jig types selected
+    const treatmentsWithoutJigs = treatmentsWithOperations.filter(t => !t.selected_jig_type)
+    if (treatmentsWithoutJigs.length > 0) {
+      return []
+    }
+
+    try {
+      // Use the same logic as updatePreview to get current operations
+      const treatmentsData = treatmentsWithOperations.map(treatment => ({
+        id: treatment.id,
+        type: treatment.type,
+        operation_id: treatment.operation_id,
+        selected_alloy: treatment.selected_alloy,
+        target_thickness: treatment.target_thickness,
+        selected_jig_type: treatment.selected_jig_type,
+        masking: {
+          enabled: Object.keys(treatment.masking_methods || {}).length > 0,
+          methods: treatment.masking_methods || {}
+        },
+        stripping: {
+          enabled: treatment.stripping_method !== 'none',
+          type: treatment.stripping_method !== 'none' ?
+            (treatment.stripping_method === 'nitric' || treatment.stripping_method === 'metex_dekote' ? 'enp_stripping' : 'anodising_stripping') : null,
+          method: treatment.stripping_method !== 'none' ? treatment.stripping_method : null
+        },
+        sealing: {
+          enabled: treatment.sealing_method !== 'none',
+          type: treatment.sealing_method !== 'none' ? treatment.sealing_method : null
+        },
+        dye: {
+          enabled: treatment.dye_color !== 'none',
+          color: treatment.dye_color !== 'none' ? treatment.dye_color : null
+        },
+        ptfe: {
+          enabled: treatment.ptfe_enabled
+        },
+        local_treatment: {
+          enabled: treatment.local_treatment_type !== 'none',
+          type: treatment.local_treatment_type !== 'none' ? treatment.local_treatment_type : null
+        }
+      }))
+
+      const requestData = {
+        treatments_data: treatmentsData,
+        aerospace_defense: this.aerospaceDefense,
+        selected_enp_pre_heat_treatment: this.selectedEnpPreHeatTreatment,
+        selected_enp_heat_treatment: this.selectedEnpHeatTreatment
+      }
+
+      // Add ENP strip mask if enabled
+      if (this.enpStripMaskEnabled) {
+        requestData.enp_strip_type = this.enpStripType
+        requestData.selected_operations = this.getENPStripMaskOperationIds(this.enpStripType)
+      }
+
+      const response = await fetch(this.previewPathValue, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': this.csrfTokenValue
+        },
+        body: JSON.stringify(requestData)
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      return data.operations || []
+    } catch (error) {
+      console.error('Error getting current operations:', error)
+      return []
+    }
+  }
+
+  // Create locked operations structure (unlocked mode only)
+  createLockedOperationsStructure(operations) {
+    if (this.isLockedMode) return
+
+    const lockedData = {
+      locked: true,
+      locked_operations: operations.map((op, index) => ({
+        id: op.id,
+        display_name: op.display_name,
+        operation_text: op.operation_text,
+        position: index + 1,
+        specifications: op.specifications,
+        vat_numbers: op.vat_numbers || [],
+        process_type: op.process_type,
+        target_thickness: op.target_thickness || 0,
+        auto_inserted: op.auto_inserted || false
+      }))
+    }
+
+    // Update the form's customisation_data
+    const currentData = this.treatmentsFieldTarget.value ? JSON.parse(this.treatmentsFieldTarget.value) : {}
+    const customisationData = {
+      operation_selection: {
+        ...currentData,
+        ...lockedData
+      }
+    }
+
+    // Find or create the customisation_data hidden field
+    let customisationField = this.element.querySelector('input[name="part[customisation_data][operation_selection][locked]"]')
+    if (!customisationField) {
+      // Create the field if it doesn't exist
+      customisationField = document.createElement('input')
+      customisationField.type = 'hidden'
+      customisationField.name = 'part[customisation_data]'
+      this.element.querySelector('form').appendChild(customisationField)
+    }
+
+    customisationField.value = JSON.stringify(customisationData)
+    console.log('Set customisation data:', customisationData)
+  }
+
+  // Switch form to locked mode (unlocked mode only)
+  switchToLockedMode() {
+    if (this.isLockedMode) return
+
+    // Hide treatment configuration elements
+    this.element.querySelectorAll('.treatment-btn').forEach(btn => {
+      btn.style.display = 'none'
+    })
+
+    if (this.hasTreatmentsContainerTarget) {
+      this.treatmentsContainerTarget.style.display = 'none'
+    }
+
+    if (this.hasEnpOptionsContainerTarget) {
+      this.enpOptionsContainerTarget.style.display = 'none'
+    }
+
+    // Find the processing instructions container
+    const processingContainer = this.element.querySelector('.bg-white.shadow.rounded-lg.p-6')
+    if (processingContainer && processingContainer.querySelector('h3')?.textContent === 'Processing Instructions') {
+      processingContainer.innerHTML = `
+        <div class="text-center p-8">
+          <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-orange-100 mb-4">
+            <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+            </svg>
+          </div>
+          <h3 class="text-lg font-medium text-gray-900 mb-4">Switched to Manual Mode</h3>
+          <p class="text-gray-600 mb-4">Operations are now ready for manual editing. Save the part to access the manual operation editing interface, or refresh the page to return to automatic treatment configuration.</p>
+          <div class="space-x-3">
+            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+              Save Part
+            </button>
+            <button type="button" onclick="window.location.reload()" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">
+              Return to Auto Mode
+            </button>
+          </div>
+        </div>
+      `
+    }
+
+    // Hide sticky button
+    if (this.hasStickyButtonTarget) {
+      this.stickyButtonTarget.style.display = 'none'
+    }
+
+    // Mark as locked mode to prevent further operations
+    this.isLockedMode = true
+
+    console.log("Successfully switched to manual mode")
+  }
+
+  // Format treatment name (unlocked mode only)
+    formatTreatmentName(treatmentType) {
+      if (this.isLockedMode) return ''
+
+      return treatmentType
+        .replace('_anodising', '')
+        .replace('_conversion', '')
+        .replace('_nickel_plating', '')
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ')
+    }
+  }

@@ -414,7 +414,7 @@
 
 <!-- Sticky Switch to Manual Mode Button (only for unlocked parts) -->
 <% if !part.locked_for_editing? %>
-  <div class="fixed bottom-6 right-6 z-50" style="display: none;" data-parts-form-target="stickyButton">
+  <div class="fixed bottom-6 right-6 z-50" data-parts-form-target="stickyButton">
     <% if part.persisted? %>
       <%= button_to "Switch to Manual Mode",
           lock_operations_part_path(part),
@@ -435,10 +435,11 @@
               class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center space-x-2"
               data-action="click->parts-form#lockOperations">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
         </svg>
         <span>Switch to Manual Mode</span>
       </button>
     <% end %>
+    <p class="text-xs text-white text-center mt-2 opacity-75">Available anytime - even with no operations configured</p>
   </div>
 <% end %>
