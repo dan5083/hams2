@@ -1,4 +1,4 @@
-# app/models/works_order.rb - Fixed pricing calculation
+# app/models/works_order.rb - Fixed pricing calculation and operations handling
 class WorksOrder < ApplicationRecord
   belongs_to :customer_order
   belongs_to :part
@@ -98,50 +98,61 @@ class WorksOrder < ApplicationRecord
     0
   end
 
-  # Operations and processing information from the part
-  def operations_with_auto_ops
-    part.get_operations_with_auto_ops
-  end
-
-  def operations_text
-    part.operations_text
-  end
-
-  def operations_summary
-    part.operations_summary
-  end
-
+  # FIXED: Delegate to part's actual specification field, not operations
   def specification
-    part.specification
+    part&.specification.presence || ""
   end
 
   def special_instructions
-    part.special_instructions
+    part&.special_instructions
   end
 
   def process_type
-    part.process_type
+    part&.process_type
   end
 
   def aerospace_defense?
-    part.aerospace_defense?
+    part&.aerospace_defense? || false
+  end
+
+  # FIXED: Get operations from part for route cards
+  def operations_with_auto_ops
+    return [] unless part
+
+    part.get_operations_with_auto_ops
+  rescue => e
+    Rails.logger.error "Error getting operations for WO#{number}: #{e.message}"
+    []
+  end
+
+  # For backwards compatibility - delegate to operations_with_auto_ops
+  def operations_text
+    operations_with_auto_ops.map.with_index(1) do |operation, index|
+      "Operation #{index}: #{operation.operation_text}"
+    end.join("\n\n")
+  end
+
+  def operations_summary
+    ops = operations_with_auto_ops
+    return "No operations configured" if ops.empty?
+    ops.map(&:display_name).join(" → ")
   end
 
   # Treatment information for route cards
   def anodising_types
-    part.anodising_types
+    part&.anodising_types || []
   end
 
   def target_thicknesses
-    part.target_thicknesses
+    part&.target_thicknesses || []
   end
 
   def alloys
-    part.alloys
+    part&.alloys || []
   end
 
   def anodic_classes
-    part.anodic_classes
+    part&.anodic_classes || []
   end
 
   # Release management
@@ -367,7 +378,7 @@ class WorksOrder < ApplicationRecord
     number
   end
 
-  # NEW: Pricing calculation logic
+  # Pricing calculation logic
   def should_calculate_lot_price?
     price_type == 'each' && quantity.present? && each_price.present?
   end

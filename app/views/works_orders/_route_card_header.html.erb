@@ -29,7 +29,9 @@
       <div class="header-row-inner">
         <div class="header-row-inner2">
           <div class="header-field-label">Spec</div>
-          <div class="header-field-value"><%= works_order.specification %></div>
+          <div class="header-field-value">
+            <%= works_order.specification.presence || "No specification provided" %>
+          </div>
           <div class="header-field-label">Qty</div>
           <div class="header-field-value"><%= works_order.quantity %></div>
         </div>
