@@ -30,12 +30,19 @@ export default class extends Controller {
   connect() {
     console.log("Parts Form controller connected")
 
-    // Check if we're in locked editing mode
-    this.isLockedMode = this.element.querySelector('[data-locked-mode="true"]') !== null
+    // Check if we're in locked editing mode by looking for locked operations
+    this.isLockedMode = this.element.querySelector('.bg-orange-100.text-orange-800') !== null ||
+                       document.querySelector('[data-locked-mode="true"]') !== null
 
     if (this.isLockedMode) {
       console.log("Parts form in locked editing mode - skipping treatment configuration")
       this.setupLockedMode()
+      return
+    }
+
+    // Check if we have the required targets for unlocked mode
+    if (!this.hasTreatmentsFieldTarget || !this.hasTreatmentsContainerTarget || !this.hasSelectedContainerTarget) {
+      console.log("Required targets missing - likely in locked mode or different view")
       return
     }
 
@@ -117,7 +124,7 @@ export default class extends Controller {
 
   // Initialize with existing treatment data (unlocked mode only)
   initializeExistingData() {
-    if (this.isLockedMode) return
+    if (this.isLockedMode || !this.hasTreatmentsFieldTarget) return
 
     try {
       const existingData = JSON.parse(this.treatmentsFieldTarget.value || '[]')
@@ -126,23 +133,19 @@ export default class extends Controller {
       this.renderTreatmentCards()
 
       // Initialize ENP pre-heat treatment selection
-      if (this.hasEnpPreHeatTreatmentFieldTarget) {
+      if (this.hasEnpPreHeatTreatmentFieldTarget && this.hasEnpPreHeatTreatmentSelectTarget) {
         this.selectedEnpPreHeatTreatment = this.enpPreHeatTreatmentFieldTarget.value || 'none'
-        if (this.hasEnpPreHeatTreatmentSelectTarget) {
-          this.enpPreHeatTreatmentSelectTarget.value = this.selectedEnpPreHeatTreatment
-        }
+        this.enpPreHeatTreatmentSelectTarget.value = this.selectedEnpPreHeatTreatment
       }
 
       // Initialize ENP post-heat treatment selection
-      if (this.hasEnpHeatTreatmentFieldTarget) {
+      if (this.hasEnpHeatTreatmentFieldTarget && this.hasEnpHeatTreatmentSelectTarget) {
         this.selectedEnpHeatTreatment = this.enpHeatTreatmentFieldTarget.value || 'none'
-        if (this.hasEnpHeatTreatmentSelectTarget) {
-          this.enpHeatTreatmentSelectTarget.value = this.selectedEnpHeatTreatment
-        }
+        this.enpHeatTreatmentSelectTarget.value = this.selectedEnpHeatTreatment
       }
 
       // Initialize aerospace/defense flag
-      if (this.hasAerospaceDefenseCheckboxTarget) {
+      if (this.hasAerospaceDefenseCheckboxTarget && this.hasAerospaceDefenseFieldTarget) {
         this.aerospaceDefense = this.aerospaceDefenseCheckboxTarget.checked
         this.aerospaceDefenseFieldTarget.value = this.aerospaceDefense
       }
@@ -167,7 +170,7 @@ export default class extends Controller {
 
   // Set up ENP pre-heat treatment dropdown listener (unlocked mode only)
   setupENPPreHeatTreatmentListener() {
-    if (this.isLockedMode || !this.hasEnpPreHeatTreatmentSelectTarget) return
+    if (this.isLockedMode || !this.hasEnpPreHeatTreatmentSelectTarget || !this.hasEnpPreHeatTreatmentFieldTarget) return
 
     this.enpPreHeatTreatmentSelectTarget.addEventListener('change', (e) => {
       this.selectedEnpPreHeatTreatment = e.target.value
@@ -179,7 +182,7 @@ export default class extends Controller {
 
   // Set up ENP post-heat treatment dropdown listener (unlocked mode only)
   setupENPHeatTreatmentListener() {
-    if (this.isLockedMode || !this.hasEnpHeatTreatmentSelectTarget) return
+    if (this.isLockedMode || !this.hasEnpHeatTreatmentSelectTarget || !this.hasEnpHeatTreatmentFieldTarget) return
 
     this.enpHeatTreatmentSelectTarget.addEventListener('change', (e) => {
       this.selectedEnpHeatTreatment = e.target.value
@@ -191,7 +194,7 @@ export default class extends Controller {
 
   // Set up ENP strip type radio button listener (unlocked mode only)
   setupENPStripTypeListener() {
-    if (this.isLockedMode || !this.hasEnpStripTypeRadioTarget) return
+    if (this.isLockedMode || !this.hasEnpStripTypeRadioTarget || !this.hasEnpStripTypeFieldTarget) return
 
     this.enpStripTypeRadioTargets.forEach(radio => {
       radio.addEventListener('change', (e) => {
@@ -204,7 +207,7 @@ export default class extends Controller {
 
   // Set up ENP strip mask checkbox listener (unlocked mode only)
   setupENPStripMaskListener() {
-    if (this.isLockedMode || !this.hasEnpStripMaskCheckboxTarget) return
+    if (this.isLockedMode || !this.hasEnpStripMaskCheckboxTarget || !this.hasEnpStripMaskFieldTarget) return
 
     this.enpStripMaskCheckboxTarget.addEventListener('change', (e) => {
       this.enpStripMaskEnabled = e.target.checked
@@ -215,7 +218,7 @@ export default class extends Controller {
 
   // Set up aerospace/defense checkbox listener (unlocked mode only)
   setupAerospaceDefenseListener() {
-    if (this.isLockedMode || !this.hasAerospaceDefenseCheckboxTarget) return
+    if (this.isLockedMode || !this.hasAerospaceDefenseCheckboxTarget || !this.hasAerospaceDefenseFieldTarget) return
 
     this.aerospaceDefenseCheckboxTarget.addEventListener('change', (e) => {
       this.aerospaceDefense = e.target.checked
@@ -276,13 +279,10 @@ export default class extends Controller {
 
   // Update ENP options visibility based on treatment selection (unlocked mode only)
   updateENPOptionsVisibility() {
-    if (this.isLockedMode) return
+    if (this.isLockedMode || !this.hasEnpOptionsContainerTarget) return
 
     const hasENPTreatment = this.treatments.some(t => t.type === 'electroless_nickel_plating')
-
-    if (this.hasEnpOptionsContainerTarget) {
-      this.enpOptionsContainerTarget.style.display = hasENPTreatment ? 'block' : 'none'
-    }
+    this.enpOptionsContainerTarget.style.display = hasENPTreatment ? 'block' : 'none'
   }
 
   // Update button appearance (unlocked mode only)
@@ -336,7 +336,7 @@ export default class extends Controller {
 
   // Render treatment cards (unlocked mode only)
   renderTreatmentCards() {
-    if (this.isLockedMode) return
+    if (this.isLockedMode || !this.hasTreatmentsContainerTarget) return
 
     if (this.treatments.length === 0) {
       this.treatmentsContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">Select treatments above to configure them</p>'
@@ -640,7 +640,7 @@ export default class extends Controller {
 
   // Add event listeners to treatment cards (unlocked mode only)
   addTreatmentCardListeners() {
-    if (this.isLockedMode) return
+    if (this.isLockedMode || !this.hasTreatmentsContainerTarget) return
 
     this.treatmentsContainerTarget.querySelectorAll('select, input').forEach(element => {
       element.addEventListener('change', (e) => this.handleTreatmentChange(e))
@@ -750,13 +750,16 @@ export default class extends Controller {
 
   // Load operations for a treatment (unlocked mode only)
   async loadOperationsForTreatment(treatmentId) {
-    if (this.isLockedMode) return
+    if (this.isLockedMode || !this.hasTreatmentsContainerTarget) return
 
     const treatment = this.treatments.find(t => t.id === treatmentId)
     if (!treatment) return
 
     const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
+    if (!card) return
+
     const operationsList = card.querySelector('.operations-list')
+    if (!operationsList) return
 
     try {
       const criteria = this.buildCriteriaForTreatment(treatment, card)
@@ -847,8 +850,8 @@ export default class extends Controller {
     // For ENP treatments, store alloy and thickness
     if (treatment.type === 'electroless_nickel_plating') {
       const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
-      const alloySelect = card.querySelector('.alloy-select')
-      const thicknessInput = card.querySelector('.thickness-input')
+      const alloySelect = card?.querySelector('.alloy-select')
+      const thicknessInput = card?.querySelector('.thickness-input')
 
       if (alloySelect && alloySelect.value && !treatment.selected_alloy) {
         treatment.selected_alloy = alloySelect.value
@@ -862,7 +865,7 @@ export default class extends Controller {
     // For chromic treatments, store alloy
     if (treatment.type === 'chromic_anodising') {
       const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
-      const alloySelect = card.querySelector('.alloy-select')
+      const alloySelect = card?.querySelector('.alloy-select')
 
       if (alloySelect && alloySelect.value && !treatment.selected_alloy) {
         treatment.selected_alloy = alloySelect.value
@@ -870,20 +873,24 @@ export default class extends Controller {
     }
 
     // Update visual feedback
-    const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
-    const operationsList = card.querySelector('.operations-list')
+    if (this.hasTreatmentsContainerTarget) {
+      const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
+      const operationsList = card?.querySelector('.operations-list')
 
-    operationsList.querySelectorAll('[data-operation-id]').forEach(div => {
-      div.classList.remove('bg-blue-100')
-      const btn = div.querySelector('.select-operation-btn')
-      if (btn) btn.textContent = 'Select'
-    })
+      if (operationsList) {
+        operationsList.querySelectorAll('[data-operation-id]').forEach(div => {
+          div.classList.remove('bg-blue-100')
+          const btn = div.querySelector('.select-operation-btn')
+          if (btn) btn.textContent = 'Select'
+        })
 
-    const selectedDiv = operationsList.querySelector(`[data-operation-id="${operationId}"]`)
-    if (selectedDiv) {
-      selectedDiv.classList.add('bg-blue-100')
-      const btn = selectedDiv.querySelector('.select-operation-btn')
-      if (btn) btn.textContent = 'Selected'
+        const selectedDiv = operationsList.querySelector(`[data-operation-id="${operationId}"]`)
+        if (selectedDiv) {
+          selectedDiv.classList.add('bg-blue-100')
+          const btn = selectedDiv.querySelector('.select-operation-btn')
+          if (btn) btn.textContent = 'Selected'
+        }
+      }
     }
 
     this.updateTreatmentsField()
@@ -914,7 +921,7 @@ export default class extends Controller {
       const button = this.element.querySelector(`[data-treatment="${treatment.type}"]`)
       if (button) {
         const countBadge = button.querySelector('.count-badge')
-        countBadge.textContent = this.treatmentCounts[treatment.type]
+        if (countBadge) countBadge.textContent = this.treatmentCounts[treatment.type]
       }
     }
 
@@ -942,14 +949,16 @@ export default class extends Controller {
     button.classList.remove(...colorClasses)
     button.classList.add('border-gray-300')
 
-    countBadge.classList.remove('bg-blue-500', 'bg-purple-500', 'bg-green-500', 'bg-orange-500', 'bg-indigo-500', 'text-white')
-    countBadge.classList.add('bg-gray-100')
-    countBadge.textContent = '0'
+    if (countBadge) {
+      countBadge.classList.remove('bg-blue-500', 'bg-purple-500', 'bg-green-500', 'bg-orange-500', 'bg-indigo-500', 'text-white')
+      countBadge.classList.add('bg-gray-100')
+      countBadge.textContent = '0'
+    }
   }
 
   // Update ENP strip mask field (unlocked mode only)
   updateENPStripMaskField() {
-    if (this.isLockedMode) return
+    if (this.isLockedMode || !this.hasEnpStripMaskFieldTarget) return
 
     const enpStripMaskOps = this.enpStripMaskEnabled ? this.getENPStripMaskOperationIds(this.enpStripType) : []
     this.enpStripMaskFieldTarget.value = JSON.stringify(enpStripMaskOps)
@@ -971,20 +980,20 @@ export default class extends Controller {
 
   // Update treatments field (unlocked mode only)
   updateTreatmentsField() {
-    if (this.isLockedMode) return
+    if (this.isLockedMode || !this.hasTreatmentsFieldTarget) return
 
     this.treatmentsFieldTarget.value = JSON.stringify(this.treatments)
   }
 
   // Update preview (unlocked mode only)
   async updatePreview() {
-    if (this.isLockedMode) return
+    if (this.isLockedMode || !this.hasSelectedContainerTarget) return
 
     console.log('Updating preview with treatments:', this.treatments, 'ENP Pre-Heat:', this.selectedEnpPreHeatTreatment, 'ENP Post-Heat:', this.selectedEnpHeatTreatment, 'Aerospace/Defense:', this.aerospaceDefense)
 
     if (this.treatments.length === 0) {
       this.selectedContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">No treatments selected</p>'
-      this.specificationFieldTarget.value = ''
+      if (this.hasSpecificationFieldTarget) this.specificationFieldTarget.value = ''
       return
     }
 
@@ -993,7 +1002,7 @@ export default class extends Controller {
 
     if (treatmentsWithOperations.length === 0) {
       this.selectedContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">Select operations for treatments to see preview</p>'
-      this.specificationFieldTarget.value = ''
+      if (this.hasSpecificationFieldTarget) this.specificationFieldTarget.value = ''
       return
     }
 
@@ -1001,7 +1010,7 @@ export default class extends Controller {
     const treatmentsWithoutJigs = treatmentsWithOperations.filter(t => !t.selected_jig_type)
     if (treatmentsWithoutJigs.length > 0) {
       this.selectedContainerTarget.innerHTML = '<p class="text-yellow-600 text-sm">Select jig types for all treatments to see preview</p>'
-      this.specificationFieldTarget.value = ''
+      if (this.hasSpecificationFieldTarget) this.specificationFieldTarget.value = ''
       return
     }
 
@@ -1072,7 +1081,7 @@ export default class extends Controller {
 
       if (operations.length === 0) {
         this.selectedContainerTarget.innerHTML = '<p class="text-yellow-600 text-sm">No operations generated - check treatment configuration</p>'
-        this.specificationFieldTarget.value = ''
+        if (this.hasSpecificationFieldTarget) this.specificationFieldTarget.value = ''
         return
       }
 
