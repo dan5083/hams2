@@ -1,4 +1,4 @@
-<%# app/views/parts/_form.html.erb - Consolidated Parts/PPI Form with Lock-in-and-Edit %>
+<%# app/views/parts/_form.html.erb - Consolidated Parts/PPI Form with Simplified Lock-in-and-Edit %>
 <%= form_with model: part, local: true, class: "space-y-6",
     data: {
       controller: "parts-form",
@@ -26,6 +26,9 @@
       </div>
     </div>
   <% end %>
+
+  <!-- Hidden field for manual mode switch -->
+  <%= hidden_field_tag :switch_to_manual, false, id: "switch_to_manual_field" %>
 
   <!-- Part Details Section -->
   <div class="bg-white shadow rounded-lg p-6">
@@ -407,153 +410,48 @@
   <div class="flex justify-end space-x-3">
     <%= link_to "Cancel", part.persisted? ? part : parts_path,
         class: "bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded" %>
+
+    <% if !part.locked_for_editing? %>
+      <!-- Switch to Manual Mode Button (disguised submit) -->
+      <%= button_tag "Switch to Manual Mode",
+          type: "button",
+          onclick: "switchToManualMode()",
+          class: "bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded mr-3",
+          style: "#{'display: none;' if part.persisted?}"
+          %>
+    <% end %>
+
     <%= form.submit part.persisted? ? "Update Part" : "Create Part",
         class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" %>
   </div>
 <% end %>
 
-<!-- Sticky Switch to Manual Mode Button (only for unlocked parts) -->
 <% if !part.locked_for_editing? %>
-  <div class="fixed bottom-6 right-6 z-50">
-    <% if part.persisted? %>
-      <%= button_to "Switch to Manual Mode",
-          lock_operations_part_path(part),
-          method: :patch,
-          class: "bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center space-x-2",
-          form: {
-            data: {
-              confirm: "This will switch to manual editing mode where you can customize each operation's text. You won't be able to return to automatic treatment configuration. Are you sure?"
-            }
-          } do %>
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-        </svg>
-        <span>Switch to Manual Mode</span>
-      <% end %>
-    <% else %>
-      <button type="button"
-              onclick="switchToManualMode()"
-              class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center space-x-2">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-        </svg>
-        <span>Switch to Manual Mode</span>
-      </button>
-    <% end %>
-    <p class="text-xs text-white text-center mt-2 opacity-75">Available anytime</p>
-  </div>
-
   <script>
-  function switchToManualMode() {
-    console.log('Manual mode function called');
+    function switchToManualMode() {
+      // Check if user has configured any treatments
+      const treatmentsField = document.querySelector('[data-parts-form-target="treatmentsField"]');
+      const treatments = treatmentsField ? JSON.parse(treatmentsField.value || '[]') : [];
 
-    if (confirm('Switch to manual editing mode? You can save the part to access manual operation editing, or refresh to return to automatic mode.')) {
-      console.log('Confirmed, switching to manual mode');
-
-      // FIRST: Capture current operations from the preview
-      const operationsPreview = document.querySelector('[data-parts-form-target="selectedContainer"]');
-      const currentOperations = [];
-
-      if (operationsPreview) {
-        const operationDivs = operationsPreview.querySelectorAll('div.rounded.px-3.py-2');
-        console.log('Found', operationDivs.length, 'operations to capture');
-
-        operationDivs.forEach((div, index) => {
-          const textSpan = div.querySelector('span');
-          if (!textSpan) return;
-
-          const fullText = textSpan.textContent || '';
-          console.log('Processing operation text:', fullText);
-
-          // More flexible parsing - look for number, display name, and operation text
-          const match = fullText.match(/^(\d+)\.\s*([^:]+):\s*(.+)$/);
-          if (match) {
-            const [, position, displayName, operationText] = match;
-
-            // Clean up the operation text by removing any parenthetical notes at the end
-            const cleanOperationText = operationText.replace(/\s*\([^)]*\)\s*$/, '').trim();
-
-            const operation = {
-              id: `MANUAL_OP_${index + 1}`,
-              display_name: displayName.trim(),
-              operation_text: cleanOperationText,
-              position: parseInt(position),
-              specifications: '',
-              vat_numbers: [],
-              process_type: 'manual',
-              target_thickness: 0,
-              auto_inserted: false
-            };
-
-            currentOperations.push(operation);
-            console.log('Captured operation:', operation);
-          } else {
-            console.log('Failed to parse operation:', fullText);
-
-            // Fallback - just use the text as-is
-            const operation = {
-              id: `MANUAL_OP_${index + 1}`,
-              display_name: `Operation ${index + 1}`,
-              operation_text: fullText.trim(),
-              position: index + 1,
-              specifications: '',
-              vat_numbers: [],
-              process_type: 'manual',
-              target_thickness: 0,
-              auto_inserted: false
-            };
-
-            currentOperations.push(operation);
-            console.log('Used fallback for operation:', operation);
-          }
-        });
-
-        console.log('Total captured operations:', currentOperations.length);
+      if (treatments.length === 0) {
+        alert('Please configure some treatments first before switching to manual mode.');
+        return;
       }
 
-      // Hide treatment configuration
-      document.querySelectorAll('.treatment-btn').forEach(btn => btn.style.display = 'none');
-
-      const treatmentsContainer = document.querySelector('[data-parts-form-target="treatmentsContainer"]');
-      if (treatmentsContainer) treatmentsContainer.style.display = 'none';
-
-      const enpContainer = document.querySelector('[data-parts-form-target="enpOptionsContainer"]');
-      if (enpContainer) enpContainer.style.display = 'none';
-
-      // Find processing instructions section and replace it
-      const sections = document.querySelectorAll('.bg-white.shadow.rounded-lg.p-6');
-      for (const section of sections) {
-        const h3 = section.querySelector('h3');
-        if (h3 && h3.textContent.trim() === 'Processing Instructions') {
-          section.innerHTML = '<div class="text-center p-8"><h3 class="text-lg font-medium text-gray-900 mb-4">Switched to Manual Mode</h3><p class="text-gray-600 mb-4">Operations are ready for manual editing. Save the part to access manual operation editing.</p><div class="space-x-3"><button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Save Part</button><button type="button" onclick="window.location.reload()" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">Return to Auto Mode</button></div></div>';
-          break;
-        }
+      // Check if treatments have operations selected
+      const hasOperations = treatments.some(t => t.operation_id);
+      if (!hasOperations) {
+        alert('Please select operations for your treatments before switching to manual mode.');
+        return;
       }
 
-      // Hide this button
-      event.target.closest('.fixed').style.display = 'none';
+      if (confirm('Switch to manual editing mode? This will save your current configuration and allow you to customize each operation individually. You cannot return to automatic mode after this change.')) {
+        // Set the manual mode flag
+        document.getElementById('switch_to_manual_field').value = 'true';
 
-      // Add form data with captured operations
-      const form = document.querySelector('form');
-      if (form) {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'part[customisation_data]';
-        input.value = JSON.stringify({
-          operation_selection: {
-            locked: true,
-            locked_operations: currentOperations
-          }
-        });
-        form.appendChild(input);
-        console.log('Added form data with', currentOperations.length, 'operations');
-      }
-
-      if (currentOperations.length === 0) {
-        console.warn('No operations were captured! You may need to configure some treatments first.');
-        alert('No operations found to capture. Try configuring some treatments first, then switch to manual mode.');
+        // Submit the form
+        document.querySelector('form').submit();
       }
     }
-  }
   </script>
 <% end %>

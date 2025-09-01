@@ -54,6 +54,7 @@ class PartsController < ApplicationController
   def create
     Rails.logger.info "🔍 Raw Params: #{params.inspect}"
     Rails.logger.info "🔍 Part Params: #{part_params.inspect}"
+    Rails.logger.info "🔍 Switch to Manual: #{params[:switch_to_manual]}"
 
     @part = Part.new(part_params)
 
@@ -62,8 +63,58 @@ class PartsController < ApplicationController
     # Set defaults for new parts with processing instructions
     @part.process_type = determine_process_type if @part.process_type.blank?
 
+    # Handle manual mode switch - generate operations and lock them before save
+    if params[:switch_to_manual] == 'true'
+      Rails.logger.info "🔄 Processing manual mode switch for new part"
+
+      begin
+        # Generate operations from current configuration
+        current_ops = @part.get_operations_with_auto_ops
+
+        if current_ops.empty?
+          Rails.logger.warn "⚠️ No operations generated for manual mode switch"
+          @part.errors.add(:base, "No operations found to switch to manual mode. Please configure treatments first.")
+          load_form_data_for_errors
+          render :new, status: :unprocessable_entity
+          return
+        end
+
+        # Lock the operations before saving
+        @part.customisation_data = @part.customisation_data.dup || {}
+        @part.customisation_data["operation_selection"] ||= {}
+        @part.customisation_data["operation_selection"]["locked"] = true
+        @part.customisation_data["operation_selection"]["locked_operations"] = current_ops.map.with_index do |op, index|
+          {
+            "id" => op.id,
+            "display_name" => op.display_name,
+            "operation_text" => op.operation_text,
+            "position" => index + 1,
+            "specifications" => op.specifications,
+            "vat_numbers" => op.vat_numbers,
+            "process_type" => op.process_type,
+            "target_thickness" => op.target_thickness,
+            "auto_inserted" => op.respond_to?(:auto_inserted?) ? op.auto_inserted? : false
+          }
+        end
+
+        Rails.logger.info "🔒 Locked #{current_ops.length} operations for manual editing"
+
+      rescue => e
+        Rails.logger.error "❌ Error during manual mode switch: #{e.message}"
+        Rails.logger.error e.backtrace.join("\n")
+        @part.errors.add(:base, "Failed to switch to manual mode: #{e.message}")
+        load_form_data_for_errors
+        render :new, status: :unprocessable_entity
+        return
+      end
+    end
+
     if @part.save
-      redirect_to @part, notice: 'Part was successfully created.'
+      if params[:switch_to_manual] == 'true'
+        redirect_to edit_part_path(@part), notice: 'Part created and switched to manual editing mode. You can now customize each operation.'
+      else
+        redirect_to @part, notice: 'Part was successfully created.'
+      end
     else
       Rails.logger.error "🚨 Part Save Errors: #{@part.errors.full_messages}"
       load_form_data_for_errors
@@ -81,6 +132,58 @@ class PartsController < ApplicationController
   end
 
   def update
+    # Handle manual mode switch for existing parts
+    if params[:switch_to_manual] == 'true'
+      Rails.logger.info "🔄 Processing manual mode switch for existing part"
+
+      begin
+        # Generate operations from current configuration
+        current_ops = @part.get_operations_with_auto_ops
+
+        if current_ops.empty?
+          Rails.logger.warn "⚠️ No operations generated for manual mode switch"
+          redirect_to edit_part_path(@part), alert: 'No operations found to switch to manual mode. Please configure treatments first.'
+          return
+        end
+
+        # Update with new data first, then lock operations
+        if @part.update(part_params)
+          # Now lock the operations
+          @part.customisation_data = @part.customisation_data.dup || {}
+          @part.customisation_data["operation_selection"] ||= {}
+          @part.customisation_data["operation_selection"]["locked"] = true
+          @part.customisation_data["operation_selection"]["locked_operations"] = current_ops.map.with_index do |op, index|
+            {
+              "id" => op.id,
+              "display_name" => op.display_name,
+              "operation_text" => op.operation_text,
+              "position" => index + 1,
+              "specifications" => op.specifications,
+              "vat_numbers" => op.vat_numbers,
+              "process_type" => op.process_type,
+              "target_thickness" => op.target_thickness,
+              "auto_inserted" => op.respond_to?(:auto_inserted?) ? op.auto_inserted? : false
+            }
+          end
+
+          @part.save!
+          Rails.logger.info "🔒 Locked #{current_ops.length} operations for manual editing"
+          redirect_to edit_part_path(@part), notice: 'Part updated and switched to manual editing mode. You can now customize each operation.'
+          return
+        else
+          @customers = [@part.customer]
+          render :edit, status: :unprocessable_entity
+          return
+        end
+
+      rescue => e
+        Rails.logger.error "❌ Error during manual mode switch: #{e.message}"
+        Rails.logger.error e.backtrace.join("\n")
+        redirect_to edit_part_path(@part), alert: "Failed to switch to manual mode: #{e.message}"
+        return
+      end
+    end
+
     # Handle locked operations update differently
     if @part.locked_for_editing? && params[:locked_operations].present?
       if update_locked_operations_text
@@ -142,49 +245,18 @@ class PartsController < ApplicationController
       return
     end
 
-    # Handle new parts - create locked structure without saving
+    # This method is now only for existing parts - new parts use the switch_to_manual approach
     if !@part.persisted?
-      begin
-        # Get current operations from form data
-        current_ops = @part.get_operations_with_auto_ops
+      redirect_to edit_part_path(@part), alert: 'Cannot lock operations on unsaved parts. Use the manual mode switch instead.'
+      return
+    end
 
-        if current_ops.empty?
-          redirect_to edit_part_path(@part), alert: 'Configure some operations first before switching to manual mode.'
-          return
-        end
-
-        # Create locked operations structure
-        @part.customisation_data = @part.customisation_data.dup || {}
-        @part.customisation_data["operation_selection"] ||= {}
-        @part.customisation_data["operation_selection"]["locked"] = true
-        @part.customisation_data["operation_selection"]["locked_operations"] = current_ops.map.with_index do |op, index|
-          {
-            "id" => op.id,
-            "display_name" => op.display_name,
-            "operation_text" => op.operation_text,
-            "position" => index + 1,
-            "specifications" => op.specifications,
-            "vat_numbers" => op.vat_numbers,
-            "process_type" => op.process_type,
-            "target_thickness" => op.target_thickness,
-            "auto_inserted" => op.respond_to?(:auto_inserted?) ? op.auto_inserted? : false
-          }
-        end
-
-        redirect_to edit_part_path(@part), notice: 'Switched to manual mode. You can now customize each operation before saving.'
-      rescue => e
-        Rails.logger.error "Error switching to manual mode: #{e.message}"
-        redirect_to edit_part_path(@part), alert: 'Failed to switch to manual mode. Please ensure operations are configured first.'
-      end
-    else
-      # Handle existing parts
-      begin
-        @part.lock_operations!
-        redirect_to edit_part_path(@part), notice: 'Operations locked for editing. You can now customize the operation text.'
-      rescue => e
-        Rails.logger.error "Error locking operations: #{e.message}"
-        redirect_to edit_part_path(@part), alert: 'Failed to lock operations. Please ensure operations are configured first.'
-      end
+    begin
+      @part.lock_operations!
+      redirect_to edit_part_path(@part), notice: 'Operations locked for editing. You can now customize the operation text.'
+    rescue => e
+      Rails.logger.error "Error locking operations: #{e.message}"
+      redirect_to edit_part_path(@part), alert: 'Failed to lock operations. Please ensure operations are configured first.'
     end
   end
 
