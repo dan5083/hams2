@@ -1,4 +1,4 @@
-# app/controllers/works_orders_controller.rb - Fixed part_processing_instructions association error
+# app/controllers/works_orders_controller.rb - Fixed pricing parameter handling
 class WorksOrdersController < ApplicationController
  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :create_invoice]
 
@@ -180,12 +180,37 @@ class WorksOrdersController < ApplicationController
    @works_order = WorksOrder.find(params[:id])
  end
 
- def works_order_params
-   params.require(:works_order).permit(
-     :customer_order_id, :part_id, :quantity, :lot_price, :each_price, :price_type,
-     :part_number, :part_issue, :part_description, :release_level_id, :transport_method_id
-   )
- end
+  # UPDATED: Smart parameter filtering based on price_type
+  def works_order_params
+    # Always allow these core parameters
+    permitted_params = [
+      :customer_order_id, :part_id, :quantity, :price_type,
+      :part_number, :part_issue, :part_description,
+      :release_level_id, :transport_method_id
+    ]
+
+    # Only permit the relevant price field based on price_type
+    price_type = params[:works_order][:price_type]
+    Rails.logger.info "🔢 PRICING PARAMS: price_type = #{price_type}"
+
+    case price_type
+    when 'each'
+      permitted_params << :each_price
+      Rails.logger.info "🔢 PRICING PARAMS: Permitting each_price only"
+    when 'lot'
+      permitted_params << :lot_price
+      Rails.logger.info "🔢 PRICING PARAMS: Permitting lot_price only"
+    else
+      # Default case - allow both for backward compatibility, but log warning
+      Rails.logger.warn "🔢 PRICING PARAMS: Unknown price_type '#{price_type}', allowing both price fields"
+      permitted_params += [:each_price, :lot_price]
+    end
+
+    filtered_params = params.require(:works_order).permit(*permitted_params)
+    Rails.logger.info "🔢 PRICING PARAMS: Filtered params = #{filtered_params.to_h}"
+
+    filtered_params
+  end
 
   def load_reference_data
     @release_levels = ReleaseLevel.enabled.ordered

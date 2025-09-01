@@ -1,3 +1,4 @@
+# app/models/works_order.rb - Fixed pricing calculation
 class WorksOrder < ApplicationRecord
   belongs_to :customer_order
   belongs_to :part
@@ -28,6 +29,7 @@ class WorksOrder < ApplicationRecord
   scope :closed, -> { where(is_open: false, voided: false) }
   scope :with_unreleased_quantity, -> { where('quantity > quantity_released AND voided = false') }
 
+  before_validation :calculate_lot_price_from_each_price, if: :should_calculate_lot_price?
   before_validation :set_part_details, if: :part_changed?
   before_validation :set_works_order_number, if: :new_record?
   after_initialize :set_defaults, if: :new_record?
@@ -45,8 +47,16 @@ class WorksOrder < ApplicationRecord
     [quantity - quantity_released, 0].max
   end
 
+  def quantity_remaining
+    unreleased_quantity
+  end
+
   def fully_released?
     quantity_released >= quantity
+  end
+
+  def manufacturing_complete?
+    fully_released?
   end
 
   def can_be_released?
@@ -206,6 +216,12 @@ class WorksOrder < ApplicationRecord
     end
   end
 
+  # Calculate quantity released from release notes
+  def calculate_quantity_released!
+    total = release_notes.active.sum(:quantity_accepted) + release_notes.active.sum(:quantity_rejected)
+    update_column(:quantity_released, total)
+  end
+
   # Route card information for shop floor
   def route_card_data
     {
@@ -283,7 +299,8 @@ class WorksOrder < ApplicationRecord
     self.is_open = true if is_open.nil?
     self.voided = false if voided.nil?
     self.quantity_released = 0 if quantity_released.nil?
-    self.price_type = 'lot' if price_type.blank?
+    self.price_type = 'each' if price_type.blank? # Changed default to 'each'
+    self.lot_price = 0.0 if lot_price.nil?
   end
 
   def set_works_order_number
@@ -348,5 +365,17 @@ class WorksOrder < ApplicationRecord
     number = sequence.value
     sequence.increment!(:value)
     number
+  end
+
+  # NEW: Pricing calculation logic
+  def should_calculate_lot_price?
+    price_type == 'each' && quantity.present? && each_price.present?
+  end
+
+  def calculate_lot_price_from_each_price
+    Rails.logger.info "🔢 PRICING: Calculating lot_price from each_price (#{each_price}) × quantity (#{quantity})"
+    calculated_price = (quantity * each_price).round(2)
+    Rails.logger.info "🔢 PRICING: Calculated lot_price = #{calculated_price}"
+    self.lot_price = calculated_price
   end
 end

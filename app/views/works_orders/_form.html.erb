@@ -1,4 +1,4 @@
-<%# app/views/works_orders/_form.html.erb - With debug logging and reverted form tag %>
+<%# app/views/works_orders/_form.html.erb - Fixed pricing calculation %>
 <%= form_with model: works_order, local: true, class: "space-y-6" do |form| %>
   <% if works_order.errors.any? %>
     <div class="bg-red-50 border border-red-200 rounded-md p-4">
@@ -87,7 +87,8 @@
             placeholder: "Enter quantity",
             min: 1,
             class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
-            required: true %>
+            required: true,
+            onchange: "recalculateTotalPrice()" %>
       </div>
 
       <!-- Release Level -->
@@ -138,7 +139,7 @@
       </div>
 
       <!-- Each Price (shown when price_type is 'each') -->
-      <div id="each_price_field" class="sm:col-span-2" style="<%= works_order.price_type == 'lot' ? 'display: none;' : '' %>">
+      <div id="each_price_field" class="sm:col-span-1" style="<%= works_order.price_type == 'lot' ? 'display: none;' : '' %>">
         <%= form.label :each_price, "Price per part (£)", class: "block text-sm font-medium text-gray-700 mb-1" %>
         <div class="mt-1 relative rounded-md shadow-sm">
           <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -150,10 +151,29 @@
               placeholder: "0.00",
               class: "block w-full pl-7 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
               id: "each_price_input",
-              onblur: "formatCurrency(this)" %>
+              onblur: "formatCurrency(this)",
+              onchange: "recalculateTotalPrice()" %>
         </div>
         <p class="mt-1 text-xs text-gray-500">
-          The total job price will be calculated as: quantity × price per part
+          Enter the price per individual part
+        </p>
+      </div>
+
+      <!-- Total Price Display (shown when price_type is 'each') -->
+      <div id="total_price_display" class="sm:col-span-1" style="<%= works_order.price_type == 'lot' ? 'display: none;' : '' %>">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Total Job Price (calculated)</label>
+        <div class="mt-1 relative rounded-md shadow-sm">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <span class="text-gray-500 sm:text-sm">£</span>
+          </div>
+          <input type="text"
+                 id="total_price_readonly"
+                 readonly
+                 placeholder="0.00"
+                 class="block w-full pl-7 border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-gray-50 text-gray-900 sm:text-sm cursor-not-allowed">
+        </div>
+        <p class="mt-1 text-xs text-gray-500">
+          Automatically calculated as: quantity × price per part
         </p>
       </div>
 
@@ -173,7 +193,7 @@
               onblur: "formatCurrency(this)" %>
         </div>
         <p class="mt-1 text-xs text-gray-500">
-          This is the total price for the entire job regardless of quantity
+          Enter the total price for the entire job regardless of quantity
         </p>
       </div>
     </div>
@@ -236,6 +256,11 @@ function formatCurrency(input) {
     // Invalid input, reset to 0.00
     input.value = '0.00';
   }
+
+  // Recalculate total if this is the each price field
+  if (input.id === 'each_price_input') {
+    recalculateTotalPrice();
+  }
 }
 
 // Part selection handler
@@ -260,28 +285,47 @@ function updatePartDetails(selectElement) {
   }
 }
 
-// Pricing field toggle
+// NEW: Calculate total price for 'each' pricing
+function recalculateTotalPrice() {
+  const priceType = document.getElementById('works_order_price_type').value;
+
+  if (priceType === 'each') {
+    const quantity = parseInt(document.getElementById('works_order_quantity').value) || 0;
+    const eachPrice = parseFloat(document.getElementById('each_price_input').value) || 0;
+    const totalPrice = quantity * eachPrice;
+
+    const totalPriceDisplay = document.getElementById('total_price_readonly');
+    if (totalPriceDisplay) {
+      totalPriceDisplay.value = totalPrice.toFixed(2);
+    }
+  }
+}
+
+// UPDATED: Pricing field toggle - no longer clears lot_price
 function togglePriceFields(priceType) {
   const eachPriceField = document.getElementById('each_price_field');
+  const totalPriceDisplay = document.getElementById('total_price_display');
   const lotPriceField = document.getElementById('lot_price_field');
   const eachPriceInput = document.getElementById('each_price_input');
   const lotPriceInput = document.getElementById('lot_price_input');
 
   if (priceType === 'each') {
-    // Show each price field, hide lot price field
+    // Show each price fields, hide lot price field
     eachPriceField.style.display = 'block';
+    totalPriceDisplay.style.display = 'block';
     lotPriceField.style.display = 'none';
 
     // Make each price required, lot price not required
     eachPriceInput.required = true;
     lotPriceInput.required = false;
 
-    // Clear lot price when switching to each pricing
-    lotPriceInput.value = '';
+    // Calculate total price
+    recalculateTotalPrice();
 
   } else {
-    // Show lot price field, hide each price field
+    // Show lot price field, hide each price fields
     eachPriceField.style.display = 'none';
+    totalPriceDisplay.style.display = 'none';
     lotPriceField.style.display = 'block';
 
     // Make lot price required, each price not required
@@ -311,5 +355,8 @@ document.addEventListener('DOMContentLoaded', function() {
   if (lotPriceInput && lotPriceInput.value) {
     formatCurrency(lotPriceInput);
   }
+
+  // Calculate initial total price if in 'each' mode
+  recalculateTotalPrice();
 });
 </script>
