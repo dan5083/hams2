@@ -431,7 +431,8 @@
         <span>Switch to Manual Mode</span>
       <% end %>
     <% else %>
-      <button type="button" id="switch-to-manual-btn"
+      <button type="button"
+              onclick="switchToManualMode()"
               class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center space-x-2">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
@@ -439,70 +440,48 @@
         <span>Switch to Manual Mode</span>
       </button>
     <% end %>
-    <p class="text-xs text-white text-center mt-2 opacity-75">Available anytime - even with no operations configured</p>
+    <p class="text-xs text-white text-center mt-2 opacity-75">Available anytime</p>
   </div>
 
   <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      console.log('Looking for switch-to-manual-btn...');
-      const btn = document.getElementById('switch-to-manual-btn');
-      console.log('Found button:', btn);
+    function switchToManualMode() {
+      console.log('Manual mode function called');
 
-      if (btn) {
-        btn.addEventListener('click', function() {
-          console.log('Switch to manual button clicked!');
-          if (confirm('This will switch to manual editing mode. You can save the part to access manual operation editing, or refresh to return to automatic mode. Continue?')) {
-            // Hide treatment configuration
-            document.querySelectorAll('.treatment-btn').forEach(btn => btn.style.display = 'none');
-            const treatmentsContainer = document.querySelector('[data-parts-form-target="treatmentsContainer"]');
-            if (treatmentsContainer) treatmentsContainer.style.display = 'none';
-            const enpContainer = document.querySelector('[data-parts-form-target="enpOptionsContainer"]');
-            if (enpContainer) enpContainer.style.display = 'none';
+      if (confirm('Switch to manual editing mode? You can save the part to access manual operation editing, or refresh to return to automatic mode.')) {
+        console.log('Confirmed, switching to manual mode');
 
-            // Find and replace the processing instructions section
-            const processingSection = Array.from(document.querySelectorAll('.bg-white.shadow.rounded-lg.p-6')).find(el =>
-              el.querySelector('h3')?.textContent === 'Processing Instructions'
-            );
+        // Hide treatment configuration
+        document.querySelectorAll('.treatment-btn').forEach(btn => btn.style.display = 'none');
 
-            if (processingSection) {
-              processingSection.innerHTML = \`
-                <div class="text-center p-8">
-                  <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-orange-100 mb-4">
-                    <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                    </svg>
-                  </div>
-                  <h3 class="text-lg font-medium text-gray-900 mb-4">Switched to Manual Mode</h3>
-                  <p class="text-gray-600 mb-4">Operations are now ready for manual editing. Save the part to access the manual operation editing interface, or refresh the page to return to automatic treatment configuration.</p>
-                  <div class="space-x-3">
-                    <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                      Save Part
-                    </button>
-                    <button type="button" onclick="window.location.reload()" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">
-                      Return to Auto Mode
-                    </button>
-                  </div>
-                </div>
-              \`;
-            }
+        const treatmentsContainer = document.querySelector('[data-parts-form-target="treatmentsContainer"]');
+        if (treatmentsContainer) treatmentsContainer.style.display = 'none';
 
-            // Hide the button
-            btn.parentElement.style.display = 'none';
+        const enpContainer = document.querySelector('[data-parts-form-target="enpOptionsContainer"]');
+        if (enpContainer) enpContainer.style.display = 'none';
 
-            // Set locked flag in form data
-            const form = document.querySelector('form');
-            if (form) {
-              const input = document.createElement('input');
-              input.type = 'hidden';
-              input.name = 'part[customisation_data]';
-              input.value = JSON.stringify({operation_selection: {locked: true, locked_operations: []}});
-              form.appendChild(input);
-            }
+        // Find processing instructions section and replace it
+        const sections = document.querySelectorAll('.bg-white.shadow.rounded-lg.p-6');
+        for (const section of sections) {
+          const h3 = section.querySelector('h3');
+          if (h3 && h3.textContent.trim() === 'Processing Instructions') {
+            section.innerHTML = '<div class="text-center p-8"><h3 class="text-lg font-medium text-gray-900 mb-4">Switched to Manual Mode</h3><p class="text-gray-600 mb-4">Operations are ready for manual editing. Save the part to access manual operation editing.</p><div class="space-x-3"><button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Save Part</button><button type="button" onclick="window.location.reload()" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">Return to Auto Mode</button></div></div>';
+            break;
           }
-        });
-      } else {
-        console.log('Button not found!');
+        }
+
+        // Hide this button
+        event.target.closest('.fixed').style.display = 'none';
+
+        // Add form data
+        const form = document.querySelector('form');
+        if (form) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'part[customisation_data]';
+          input.value = JSON.stringify({operation_selection: {locked: true, locked_operations: []}});
+          form.appendChild(input);
+        }
       }
-    });
+    }
   </script>
 <% end %>
