@@ -165,10 +165,10 @@ class ReleaseNote < ApplicationRecord
   end
 
   def get_thickness(process_type)
-    return nil unless measured_thicknesses.is_a?(Array)
+    return nil unless self.measured_thicknesses.is_a?(Array)
     position = THICKNESS_POSITIONS[process_type]
     return nil unless position
-    measured_thicknesses[position]
+    self.measured_thicknesses[position]
   end
 
   def set_thickness(process_type, value)
@@ -180,11 +180,11 @@ class ReleaseNote < ApplicationRecord
 
     # Set value at position (convert to float if valid number)
     if value.blank?
-      measured_thicknesses[position] = nil
+      self.measured_thicknesses[position] = nil
     else
       # Validate and round to 3 significant figures
       float_value = Float(value.to_s)
-      measured_thicknesses[position] = round_to_n_significant_figures(float_value, 3)
+      self.measured_thicknesses[position] = round_to_n_significant_figures(float_value, 3)
     end
 
     true
@@ -193,7 +193,7 @@ class ReleaseNote < ApplicationRecord
   end
 
   def has_thickness_measurements?
-    measured_thicknesses.present? && measured_thicknesses.compact.any?
+    self.measured_thicknesses.present? && self.measured_thicknesses.compact.any?
   end
 
   def thickness_measurements_summary
@@ -201,7 +201,7 @@ class ReleaseNote < ApplicationRecord
 
     measurements = []
     THICKNESS_POSITIONS.each do |process_type, position|
-      thickness = measured_thicknesses[position]
+      thickness = self.measured_thicknesses[position]
       next unless thickness
 
       process_name = process_type.humanize.gsub('_', ' ').titleize
@@ -261,8 +261,8 @@ class ReleaseNote < ApplicationRecord
   end
 
   def validate_thickness_measurements
-    return unless measured_thicknesses.present?
-    return unless measured_thicknesses.is_a?(Array)
+    return unless self.measured_thicknesses.present?
+    return unless self.measured_thicknesses.is_a?(Array)
 
     # Only validate if this release note requires thickness measurements
     if requires_thickness_measurements?
@@ -283,7 +283,7 @@ class ReleaseNote < ApplicationRecord
       end
     else
       # If thickness measurements aren't required but are provided, just validate format
-      measured_thicknesses.each_with_index do |thickness, index|
+      self.measured_thicknesses.each_with_index do |thickness, index|
         next if thickness.nil?
 
         if !thickness.is_a?(Numeric) || thickness <= 0
