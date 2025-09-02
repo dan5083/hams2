@@ -47,6 +47,11 @@ class ReleaseNotesController < ApplicationController
     @release_note = @works_order.release_notes.build(release_note_params)
     @release_note.issued_by = Current.user
 
+    # Handle thickness measurements if present
+    if thickness_measurements_provided?
+      process_thickness_measurements
+    end
+
     if @release_note.save
       redirect_to @release_note, notice: 'Release note was successfully created.'
     else
@@ -58,6 +63,11 @@ class ReleaseNotesController < ApplicationController
   end
 
   def update
+    # Handle thickness measurements if present
+    if thickness_measurements_provided?
+      process_thickness_measurements
+    end
+
     if @release_note.update(release_note_params)
       redirect_to @release_note, notice: 'Release note was successfully updated.'
     else
@@ -135,7 +145,48 @@ class ReleaseNotesController < ApplicationController
       :quantity_accepted,
       :quantity_rejected,
       :remarks,
-      :no_invoice
+      :no_invoice,
+      :measured_thicknesses
     )
+  end
+
+  def thickness_measurements_provided?
+    # Check if individual thickness fields were provided
+    thickness_field_names = ReleaseNote::MEASURABLE_PROCESS_TYPES.map { |type| "thickness_#{type}" }
+    thickness_field_names.any? { |field| params[field].present? }
+  end
+
+  def process_thickness_measurements
+    # Process individual thickness fields and convert to JSONB array
+    Rails.logger.info "Processing thickness measurements for release note"
+
+    required_types = @release_note.get_required_thickness_types
+    Rails.logger.info "Required thickness types: #{required_types}"
+
+    # Initialize the measurements array if needed
+    @release_note.measured_thicknesses ||= Array.new(ReleaseNote::THICKNESS_POSITIONS.size)
+
+    # Process each required thickness type
+    required_types.each do |process_type|
+      field_name = "thickness_#{process_type}"
+      field_value = params[field_name]
+
+      Rails.logger.info "Processing #{field_name}: #{field_value}"
+
+      if field_value.present?
+        success = @release_note.set_thickness(process_type, field_value)
+        Rails.logger.info "Set thickness for #{process_type}: #{success}"
+
+        unless success
+          @release_note.errors.add(:measured_thicknesses,
+            "Invalid thickness value for #{process_type.humanize.gsub('_', ' ').titleize}")
+        end
+      elsif @release_note.requires_thickness_measurements?
+        # If thickness is required but not provided, the model validation will catch this
+        Rails.logger.warn "Missing required thickness for #{process_type}"
+      end
+    end
+
+    Rails.logger.info "Final measured_thicknesses: #{@release_note.measured_thicknesses}"
   end
 end

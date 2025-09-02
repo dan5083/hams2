@@ -102,9 +102,11 @@
         height: 3rem;
       }
 
-      .handwriting {
-        font-family: cursive;
-        font-size: 2em;
+      .signature-name {
+        font-family: 'Times New Roman', serif;
+        font-size: 1.2em;
+        font-style: italic;
+        font-weight: bold;
       }
 
       .statement {
@@ -197,7 +199,7 @@
             <td><%= @release_note.works_order.part_description %></td>
           </tr>
           <tr>
-            <th>Treatment Specification</th>
+            <th>Specification</th>
             <td><%= @release_note.specification %></td>
           </tr>
           <tr>
@@ -216,6 +218,32 @@
             <tr>
               <th>Remarks</th>
               <td><%= simple_format(@release_note.remarks) %></td>
+            </tr>
+          <% end %>
+          <% if @release_note.has_thickness_measurements? %>
+            <tr>
+              <th>Measured Thicknesses</th>
+              <td>
+                <% ReleaseNote::THICKNESS_POSITIONS.each do |process_type, position| %>
+                  <% thickness = @release_note.get_thickness(process_type) %>
+                  <% if thickness.present? %>
+                    <%= process_type.humanize.gsub('_', ' ').titleize %>: <strong><%= thickness %> µm</strong><br/>
+                  <% end %>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+          <% if @release_note.has_thickness_measurements? %>
+            <tr>
+              <th>Measured Thicknesses</th>
+              <td>
+                <% ReleaseNote::THICKNESS_POSITIONS.each do |process_type, position| %>
+                  <% thickness = @release_note.get_thickness(process_type) %>
+                  <% if thickness.present? %>
+                    <%= process_type.humanize.gsub('_', ' ').titleize %>: <strong><%= thickness %> µm</strong><br/>
+                  <% end %>
+                <% end %>
+              </td>
             </tr>
           <% end %>
         </tbody>
@@ -313,7 +341,7 @@
             <td><%= @release_note.works_order.part_description %></td>
           </tr>
           <tr>
-            <th>Treatment Specification</th>
+            <th>Specification</th>
             <td><%= @release_note.specification %></td>
           </tr>
           <tr>
@@ -345,7 +373,7 @@
       <!-- Signature Block -->
       <div class="signature-block">
         <p>
-          <span class="handwriting"><%= @release_note.issued_by.display_name %></span><br/>
+          <span class="signature-name"><%= @release_note.issued_by.display_name %></span><br/>
           For and on behalf of <%= @company_name || "Hard Anodising Surface Treatments Ltd" %>
         </p>
       </div>

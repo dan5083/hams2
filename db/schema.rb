@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_09_02_100503) do
+ActiveRecord::Schema[8.0].define(version: 2025_09_02_180920) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -138,6 +138,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_02_100503) do
     t.boolean "voided", default: false, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.jsonb "measured_thicknesses"
     t.index ["date"], name: "index_release_notes_on_date"
     t.index ["issued_by_id"], name: "index_release_notes_on_issued_by_id"
     t.index ["no_invoice"], name: "index_release_notes_on_no_invoice"

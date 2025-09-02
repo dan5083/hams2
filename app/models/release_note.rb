@@ -1,4 +1,4 @@
-# app/models/release_note.rb - Verified and enhanced for invoicing
+# app/models/release_note.rb - Verified and enhanced for invoicing and thickness measurements
 class ReleaseNote < ApplicationRecord
   belongs_to :works_order
   belongs_to :issued_by, class_name: 'User'
@@ -9,6 +9,7 @@ class ReleaseNote < ApplicationRecord
   validates :quantity_rejected, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validate :total_quantity_must_be_positive
   validate :quantity_available_for_release
+  validate :validate_thickness_measurements
 
   scope :active, -> { where(voided: false) }
   scope :voided, -> { where(voided: true) }
@@ -32,6 +33,16 @@ class ReleaseNote < ApplicationRecord
   after_initialize :set_defaults, if: :new_record?
   after_save :update_works_order_quantity_released
   after_destroy :update_works_order_quantity_released
+
+  # Thickness measurement constants - array positions
+  THICKNESS_POSITIONS = {
+    'chromic_anodising' => 0,
+    'electroless_nickel_plating' => 1,
+    'hard_anodising' => 2,
+    'standard_anodising' => 3
+  }.freeze
+
+  MEASURABLE_PROCESS_TYPES = THICKNESS_POSITIONS.keys.freeze
 
   def display_name
     "RN#{number}"
@@ -130,6 +141,76 @@ class ReleaseNote < ApplicationRecord
     end
   end
 
+  # THICKNESS MEASUREMENT METHODS
+
+  def requires_thickness_measurements?
+    return false unless works_order.part&.aerospace_defense?
+    get_required_thickness_types.any?
+  end
+
+  def get_required_thickness_types
+    return [] unless works_order.part
+
+    begin
+      # Get treatments from the part's customisation data
+      treatments_data = works_order.part.send(:parse_treatments_data)
+      process_types = treatments_data.map { |treatment| treatment["type"] }.compact.uniq
+
+      # Return intersection with measurable types
+      process_types & MEASURABLE_PROCESS_TYPES
+    rescue => e
+      Rails.logger.error "Error getting process types for thickness measurement: #{e.message}"
+      []
+    end
+  end
+
+  def get_thickness(process_type)
+    return nil unless measured_thicknesses.is_a?(Array)
+    position = THICKNESS_POSITIONS[process_type]
+    return nil unless position
+    measured_thicknesses[position]
+  end
+
+  def set_thickness(process_type, value)
+    position = THICKNESS_POSITIONS[process_type]
+    return false unless position
+
+    # Initialize array if nil
+    self.measured_thicknesses ||= Array.new(THICKNESS_POSITIONS.size)
+
+    # Set value at position (convert to float if valid number)
+    if value.blank?
+      measured_thicknesses[position] = nil
+    else
+      # Validate and round to 3 significant figures
+      float_value = Float(value.to_s)
+      measured_thicknesses[position] = round_to_n_significant_figures(float_value, 3)
+    end
+
+    true
+  rescue ArgumentError
+    false
+  end
+
+  def has_thickness_measurements?
+    measured_thicknesses.present? && measured_thicknesses.compact.any?
+  end
+
+  def thickness_measurements_summary
+    return nil unless has_thickness_measurements?
+
+    measurements = []
+    THICKNESS_POSITIONS.each do |process_type, position|
+      thickness = measured_thicknesses[position]
+      next unless thickness
+
+      process_name = process_type.humanize.gsub('_', ' ').titleize
+      measurements << "#{process_name}: #{thickness} µm"
+    end
+
+    measurements.join(', ')
+  end
+
   def self.next_number
     Sequence.next_value('release_note_number')
   end
@@ -179,7 +260,50 @@ class ReleaseNote < ApplicationRecord
     end
   end
 
+  def validate_thickness_measurements
+    return unless measured_thicknesses.present?
+    return unless measured_thicknesses.is_a?(Array)
+
+    # Only validate if this release note requires thickness measurements
+    if requires_thickness_measurements?
+      required_types = get_required_thickness_types
+
+      required_types.each do |process_type|
+        thickness = get_thickness(process_type)
+        if thickness.blank?
+          process_name = process_type.humanize.gsub('_', ' ').titleize
+          errors.add(:measured_thicknesses, "#{process_name} thickness is required for aerospace/defense parts")
+        elsif thickness <= 0
+          process_name = process_type.humanize.gsub('_', ' ').titleize
+          errors.add(:measured_thicknesses, "#{process_name} thickness must be greater than 0")
+        elsif thickness > 1000 # Sanity check - no coating should be > 1mm
+          process_name = process_type.humanize.gsub('_', ' ').titleize
+          errors.add(:measured_thicknesses, "#{process_name} thickness seems unrealistically high (>1000µm)")
+        end
+      end
+    else
+      # If thickness measurements aren't required but are provided, just validate format
+      measured_thicknesses.each_with_index do |thickness, index|
+        next if thickness.nil?
+
+        if !thickness.is_a?(Numeric) || thickness <= 0
+          errors.add(:measured_thicknesses, "Invalid thickness measurement at position #{index}")
+        elsif thickness > 1000
+          errors.add(:measured_thicknesses, "Thickness measurement at position #{index} seems unrealistically high (>1000µm)")
+        end
+      end
+    end
+  end
+
   def update_works_order_quantity_released
     works_order&.calculate_quantity_released!
+  end
+
+  # Helper method to round to n significant figures
+  def round_to_n_significant_figures(number, n)
+    return 0.0 if number == 0
+    magnitude = (Math.log10(number.abs)).floor
+    factor = 10.0 ** (n - 1 - magnitude)
+    (number * factor).round / factor
   end
 end
