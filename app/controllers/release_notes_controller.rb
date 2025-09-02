@@ -160,11 +160,26 @@ class ReleaseNotesController < ApplicationController
     # Process individual thickness fields and convert to JSONB array
     Rails.logger.info "Processing thickness measurements for release note"
 
+    # Check if measurements were sent as JSON string (from JavaScript)
+    if release_note_params[:measured_thicknesses].present?
+      begin
+        json_data = JSON.parse(release_note_params[:measured_thicknesses])
+        if json_data.is_a?(Array)
+          Rails.logger.info "Found JSON thickness data: #{json_data}"
+          @release_note.measured_thicknesses = json_data
+          return
+        end
+      rescue JSON::ParserError => e
+        Rails.logger.warn "Failed to parse JSON thickness data: #{e.message}"
+      end
+    end
+
+    # Fall back to processing individual fields
     required_types = @release_note.get_required_thickness_types
     Rails.logger.info "Required thickness types: #{required_types}"
 
     # Initialize the measurements array if needed
-    @release_note.measured_thicknesses ||= Array.new(ReleaseNote::THICKNESS_POSITIONS.size)
+    @release_note.measured_thicknesses = Array.new(ReleaseNote::THICKNESS_POSITIONS.size, nil) if @release_note.measured_thicknesses.nil?
 
     # Process each required thickness type
     required_types.each do |process_type|

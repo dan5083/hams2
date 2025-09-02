@@ -175,8 +175,10 @@ class ReleaseNote < ApplicationRecord
     position = THICKNESS_POSITIONS[process_type]
     return false unless position
 
-    # Initialize array if nil
-    self.measured_thicknesses ||= Array.new(THICKNESS_POSITIONS.size)
+    # Initialize array if nil - ensure it's a proper array, not a string
+    if self.measured_thicknesses.nil? || !self.measured_thicknesses.is_a?(Array)
+      self.measured_thicknesses = Array.new(THICKNESS_POSITIONS.size, nil)
+    end
 
     # Set value at position (convert to float if valid number)
     if value.blank?
