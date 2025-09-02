@@ -1,81 +1,158 @@
-# Specification Presets Seed Data
-# Run this in Heroku console after migration
+# Release Levels Seed Data
+# Run this in Heroku console after clearing existing data with: ReleaseLevel.destroy_all
 
-specification_presets_data = [
-  { name: "DS 26 00 D&B, BS EN ISO 4527", content: "DS 26 00 D&B, BS EN ISO 4527 specification requirements" },
-  { name: "BS ISO 10074-2021", content: "BS ISO 10074-2021 specification requirements" },
-  { name: "BA Tubes C5-35", content: "BA Tubes C5-35 specification requirements" },
-  { name: "DEF STAN 03-5", content: "DEF STAN 03-5 specification requirements" },
-  { name: "DEF STAN 03-24", content: "DEF STAN 03-24 specification requirements" },
-  { name: "DEF STAN 03-24 & MIL-C-5541", content: "DEF STAN 03-24 & MIL-C-5541 specification requirements" },
-  { name: "Chromic 914-032-095 & Hard 914-032031", content: "Chromic 914-032-095 & Hard 914-032031 specification requirements" },
-  { name: "DEF STAN 03726", content: "DEF STAN 03726 specification requirements" },
-  { name: "DEF STAN 03725", content: "DEF STAN 03725 specification requirements" },
-  { name: "DEF 151 Type 3", content: "DEF 151 Type 3 specification requirements" },
-  { name: "Hard 914-032-031", content: "Hard 914-032-031 specification requirements" },
-  { name: "BS 1615", content: "BS 1615 specification requirements" },
-  { name: "BS 5599", content: "BS 5599 specification requirements" },
-  { name: "PF16", content: "PF16 specification requirements" },
-  { name: "P2P1Z1956 & P2P1Z121947/10/25 (ENP)", content: "P2P1Z1956 & P2P1Z121947/10/25 (ENP) specification requirements" },
-  { name: "TS2-25-102", content: "TS2-25-102 specification requirements" },
-  { name: "DEF STAN 03-18 (Alocrom)", content: "DEF STAN 03-18 (Alocrom) specification requirements" },
-  { name: "TI 44/15", content: "TI 44/15 specification requirements" },
-  { name: "MWSG000010000", content: "MWSG000010000 specification requirements" },
-  { name: "RC 2019", content: "RC 2019 specification requirements" },
-  { name: "NWS 1000/52-3", content: "NWS 1000/52-3 specification requirements" },
-  { name: "424/1000-88", content: "424/1000-88 specification requirements" },
-  { name: "RC2035", content: "RC2035 specification requirements" },
-  { name: "MIL-DTL-5541F", content: "MIL-DTL-5541F specification requirements" },
-  { name: "BAC5821, CLASS 1", content: "BAC5821, CLASS 1 specification requirements" },
-  { name: "ST-A-120", content: "ST-A-120 specification requirements" },
-  { name: "RC2019A50", content: "RC2019A50 specification requirements" },
-  { name: "ST-A-145 ISSUE 10", content: "ST-A-145 ISSUE 10 specification requirements" },
-  { name: "RC2019AD50", content: "RC2019AD50 specification requirements" },
-  { name: "AMS 03-25 & BS ISO 10074", content: "AMS 03-25 & BS ISO 10074 specification requirements" },
-  { name: "RC2139W", content: "RC2139W specification requirements" },
-  { name: "SAE AMS 03-25, BS ISO 10074:2010 & WSHTDS2785", content: "SAE AMS 03-25, BS ISO 10074:2010 & WSHTDS2785 specification requirements" },
-  { name: "APRT0053", content: "APRT0053 specification requirements" },
-  { name: "SPS03", content: "SPS03 specification requirements" },
-  { name: "ST-A-142", content: "ST-A-142 specification requirements" },
-  { name: "APRT0004", content: "APRT0004 specification requirements" },
-  { name: "MIL-PRF-8625 (issue F2) & MIL-DTL-5541F", content: "MIL-PRF-8625 (issue F2) & MIL-DTL-5541F specification requirements" },
-  { name: "MIL-PRF-8625 (issue F2) TYPE III, Class 1", content: "MIL-PRF-8625 (issue F2) TYPE III, Class 1 specification requirements" },
-  { name: "MIL-PRF-8625 (issue F2) TYPE I, Class 1", content: "MIL-PRF-8625 (issue F2) TYPE I, Class 1 specification requirements" },
-  { name: "MIL-PRF-8625 (issue F2) TYPE II Class 1", content: "MIL-PRF-8625 (issue F2) TYPE II Class 1 specification requirements" },
-  { name: "WSTI 5031", content: "WSTI 5031 specification requirements" },
-  { name: "AD00376/CA1", content: "AD00376/CA1 specification requirements" },
-  { name: "BS EN ISO 4527:2003 (ENP)", content: "BS EN ISO 4527:2003 (ENP) specification requirements" },
-  { name: "AMS2469G", content: "AMS2469G specification requirements" },
-  { name: "TS-112 D4A", content: "TS-112 D4A specification requirements" },
-  { name: "R4 003", content: "R4 003 specification requirements" },
-  { name: "RC2019AL50", content: "RC2019AL50 specification requirements" },
-  { name: "VS 1-3-5-104", content: "VS 1-3-5-104 specification requirements" },
-  { name: "TI 5031", content: "TI 5031 specification requirements" },
-  { name: "R4 014", content: "R4 014 specification requirements" },
-  { name: "R4 014 & R4 003", content: "R4 014 & R4 003 specification requirements" },
-  { name: "APRT0005", content: "APRT0005 specification requirements" },
-  { name: "0731-625", content: "0731-625 specification requirements" },
-  { name: "DS26.00", content: "DS26.00 specification requirements" },
-  { name: "TS-112 ISS.24 TS-130 ISS.3 D4A", content: "TS-112 ISS.24 TS-130 ISS.3 D4A specification requirements" },
-  { name: "TS2-23-28", content: "TS2-23-28 specification requirements" },
-  { name: "TS112 F3 + D4 (DEF STAN 03-26)", content: "TS112 F3 + D4 (DEF STAN 03-26) specification requirements" },
-  { name: "ALOCROM 1200 MIL-DTL-5541 & HARD ANODISE TI5031", content: "ALOCROM 1200 MIL-DTL-5541 & HARD ANODISE TI5031 specification requirements" },
-  { name: "MIL-DTL-5541 Type 1, Class 3", content: "MIL-DTL-5541 Type 1, Class 3 specification requirements" },
-  { name: "MSF045 PART 1 & MSF PART 2", content: "MSF045 PART 1 & MSF PART 2 specification requirements" },
-  { name: "JPS047", content: "JPS047 specification requirements" },
-  { name: "ISO 7599:2012", content: "ISO 7599:2012 specification requirements" },
-  { name: "AD00376/HA2", content: "AD00376/HA2 specification requirements" },
-  { name: "R4 078", content: "R4 078 specification requirements" },
-  { name: "SURTEC 650V DS26.00 & PCP-0597", content: "SURTEC 650V DS26.00 & PCP-0597 specification requirements" },
-  { name: "RBT-PS-SPS03-V3", content: "RBT-PS-SPS03-V3 specification requirements" },
-  { name: "LUFT- SULPHURIC ACID ANODISE MIL-A-8625, TYPE 2.", content: "LUFT- SULPHURIC ACID ANODISE MIL-A-8625, TYPE 2. specification requirements" }
+release_levels_data = [
+  {
+    name: "General",
+    statement: "Certificate of conformity - We certify that the above work has been processed and inspected according to the terms of your order."
+  },
+  {
+    name: "For Non-Conforming Work",
+    statement: "Certificate of Conformity - We certify that the above work has been processed and inspected according to the requirements. REF CQS-00005568 Degresse to DS 26 00 (F3) SAE AMS 03-2 ANNEX C Electroless nickel plate to DS 26 22 ISS 14 AMS2402 CLASS 4 Nitric acid strip as required. Verification has been carried out only in respect of parameter relating to the enclosed reports."
+  },
+  {
+    name: "LPE ENP HEAT TREAT & CONVERSION COAT",
+    statement: "Certificate of Conformity - We certify that the above work has been processed and inspected according to the requirements of BSENISO4527:2021 HEAT TREAT BS EN ISO 4527:2021 PARA 6.12 CONVERSION COAT: DS26.00 ISS.37 D&B DS16.52 ISS.19 TYPE 2 CLASS 1A and the terms of your order."
+  },
+  {
+    name: "LPE HEAT TREAT/CONVERSION COAT",
+    statement: "Certificate of Conformity - We certify that the above work has been processed and inspected according to the requirements of BSENISO4527:2021 PCP-2073 ISS 1. HEAT TREAT BSENISO4527:2021 PARA 6.12 CONVERSION COAT: DS26.00 ISS.37 D&B DS16.52 TYPE 2 CLASS 1A (ISSUE 19) and the terms of your order."
+  },
+  {
+    name: "Lufthansa chromic acid",
+    statement: "Certificate of conformity - We certify that the above work has been processed according to the requirements of (for chromic acid anodising) 22 Volts IAW BAC5019 Class 3, and (for sealing) MIL-A-8625F, Type 1 (MIL-A8625 PARAGRAPH 3.8.1.1) instead of BAC5019. Refer to SR 4-5653901371 and the terms of your order, and inspected. A dry film thickness report has been attached."
+  },
+  {
+    name: "Lymington nickel",
+    statement: "Certificate of conformity - We certify that the above work has been processed and inspected according to the requirements of DS26.00, BS EN ISO 4527 and the terms of your PCP order."
+  },
+  {
+    name: "TI 5031 & MIL-DTL-5541 Type 2 Class 3",
+    statement: "Certificate of conformity - We certify that the above work has been processed and inspected according to the requirements of TI 5031 & MIL-DTL-5541 Type 2 Class 3 and the terms of your order."
+  },
+  {
+    name: "RODFORD I.A.W DS26.00 F1 + AA (DS26.22) AMS 2404N CLASS 1.PRE HEAT TREAT AMS 2404 POST TREAT AMS 2759/9",
+    statement: "WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED ACCORDING TO THE REQUIREMENTS OF ENP I.A.W DS26.00 F1 + AA (DS26.22) AMS2404 CLASS 1 MID-PHOS DEPOSIT RANGE OF BETWEEN 5-9% COATING THICKNESS TO BE 12 MICRONS (0.0005\") PRE HEAT TREAT @ 191 DEG C +/- 14 DEG C FOR 4 HOURS (AS PER AMS 2404) POST HEAT TREAT @ 191 DEG C +/- 14 DEG C FOR 23 HOURS MIN (AS PER AMS 2759/9)."
+  },
+  {
+    name: "BSEN12373-1:2001 CLASS 25 EO",
+    statement: "WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED ACCORDING TO THE REQUIREMENT OF BSEN12373-1:2001 CLASS 25 EO."
+  },
+  {
+    name: "LUFTHANSA. MIL-A-8625 TYPE 111 & BAC5821",
+    statement: "WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED ACCORDING TO THE REQUIREMENT OF MIL-A-8625 TYPE 111 & BAC5821 SECTION IV RDR HPA-AFA-16-0103-02B BOEING BAC & SOPM PROCESS SPEC & PRACTICE ANUAL (S) WHICH ARE DETAILED ON THE LTLGS PURCHASE ORDER(S) ISSUED."
+  },
+  {
+    name: "LUFTHANSA MIL-A-8625 & MIL-C-5541",
+    statement: "WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED ACCORDING TO THE REQUIREMENT OF BAC5019 MIL-A-8625 CLASS 1 TYPE 1B & ALOCROM 1200 MIL-C-5541 CLASS 1A OR BAC5719 CLASS A OR C. & PROCESSED TO SPECIFICITIONS & PRACTICE MANUAL WHICH ISSUED. REF SR 4-5653901371."
+  },
+  {
+    name: "MIL-A-8625 TYPE 3 CLASS 1 & MIL-A-8625 TYPE 1 CLASS 1",
+    statement: "Certificate of Conformity - WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED ACCORDING TO THE REQUIREMENTS OF MIL-A-8625 TYPE 3 CLASS 1 & MIL-A-8625 TYPE 1 CLASS 1 (HOT WATER SEAL) & THE TERMS OF ORDER & INSPECTED. VERIFICATION HAS BEEN CARRIED OUT ONLY IN RESPECT OF PARAMETERS RELATING TO ENCLOSED REPORTS."
+  },
+  {
+    name: "Certificate of conformity AS9100 & BS EN ISO 9001 2015",
+    statement: "Certificate of conformity - We certify that the above work has been processed and inspected according to the requirements of our AS9100 & BS EN ISO registration. In addition, the abovementioned works were carried out to [SPECIFICATION], and the terms of your order. HARD ANODISING SURFACE TREATMENTS LTD has been assessed and registered by NQA against the provisions of AS9100D & BS EN ISO 9001 2015. Certificate No: 22732 Hard Anodising Surface Treatments Limited has NADCAP accreditation for Chemical Processing Certificate Number 7426210256."
+  },
+  {
+    name: "Inflite ENP with Vapour blast",
+    statement: "CERTIFICATE OF CONFORMITY - We certify that the above work has been processed and inspected according to our AS9100 & BS EN ISO registration requirements. In addition, the abovementioned works were carried out to, DS26.00AA & DS26.22 ISS.14. VAPOUR BLAST DEF STAN 03-02, CQS-00005568, and the terms of your order. HARD ANODISING SURFACE TREATMENTS LTD has been assessed and registered by NQA against AS9100D & BS EN ISO 9001 2015 provisions. Certificate No: 22732 Hard Anodising Surface Treatments Limited has NADCAP accreditation for Chemical Processing Certificate Number 7426210256."
+  },
+  {
+    name: "TITANIUM ANODISE DTD 942",
+    statement: "WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED ACCORDING TO THE REQ. OF DTD 942 & THE TERMS OF YOUR ORDER & INSPECTED."
+  },
+  {
+    name: "LYMINGTON BSENISO4527:2021 PCP-2073",
+    statement: "CERTIFICATE OF CONFORMITY: - We certify that the above work has been processed, and inspected according to the requirements OF PARA 6.12 CONVERSION COAT: DS26.00 ISS.37 D&B DS16.52 ISS.19 TYPE 2 CLASS 1A & TERMS OF YOUR ORDER."
+  },
+  {
+    name: "LYMINGTON ENP & SURTEC",
+    statement: "CERTIFICATE OF CONFORMITY- I CERTIFY THE ABOVE WORK HAS BEEN PROCESSED & INSPECTED TO THE REQUIREMENTS OF ELECTROLESS MEDIUM PHOS NICKEL PLATE. THICKNESS 45-55 MICRONS TO BSENISO4527:2003 & PCP-0597 ISS.9 ADHESION HEAT TREAT TO BS EN ISO 4527:2003 PARA 6.12 SURTEC 650. TO DS26.00. ISS.37 D&B & PCP-0597 ISS 9 & THE TERMS OF YOUR ORDER."
+  },
+  {
+    name: "SURTEC 650V DS26.00 & PCP-0597",
+    statement: "Certificate of Conformity I certify that the above work has been processed and inspected according to the requirements of SURTEC 650V DS26.00 ISS.37 D&B & PCP-0597 ISS 9 and the terms of your order."
+  },
+  {
+    name: "RBT-PS-SPS03-V3",
+    statement: "Certificate of Conformity I certify that the above work has been processed and inspected according to the requirements of RBT-PS-SPS03-V3 and the terms of your order."
+  },
+  {
+    name: "LYMINGTON ENP PCP-2073",
+    statement: "CERTIFICATE OF CONFORMITY- WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED & INSPECTED ACCORDING TO THE REQUIREMENTS OF YOUR ORDER: ELECTROLESS NICKEL PLATE IN ACCORDANCE WITH CMS QUALITY PLAN PCP-2073. ELECTROLESS MEDIUM PHOSPHOROUS (6-8%) NICKEL PLATE IN ACCORDANCE WITH BSENISO 4527 & PCP-2073. PLATING THICKNESS 45-55 MICRONS. HEAT TREAT 1 HOUR AT 120C CELSIUS IN ACCORDANCE WITH BSENISO 4527 PARA 6.12. ENP CONVERSION COAT ENTIRE TUBE VIA SUBMERSION PROCESS IN ACCORDANCE WITH DS 26.00 CODE D&B ISS 37 & PCP-2073."
+  },
+  {
+    name: "STRIP & CHROMIC ANODISE LUFTHANSA",
+    statement: "CERTIFICATE OF CONFORMITY - WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED ACCORDING TO THE REQUIREMENTS STATED ON THE ORDER: STRIP HARD ANODISE FROM THE OD & CHROMIC ACID ANODISE FROM THE REMAINING AREAS PER MIL-A-8625 TYPE 1 CLASS 1."
+  },
+  {
+    name: "LUFTHANSA - SPACER STRIP & RE HARD ANODISE",
+    statement: "CERTIFICATE OF CONFORMITY- WE CERTIFY THAT THE ABOVE HAS BEEN PROCESSED & INSPECTED ACCORDING TO THE REQUIREMENTS OF YOUR ORDER & STRIP & HARD ANODISE SOPM 20-30-02. RE-HARD ANODISE PER MIL-A-8625,TYPE 111 BUT WITH BAC5821 SECTION 11 CLASS 11. HPA-AFA-16-0103-02B."
+  },
+  {
+    name: "LUFT-SULPHURIC ANODISE",
+    statement: "CERTIFICATE OF CONFORMITY- WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED & INSPECTED ACCORDING TO THE REQUIREMENTS - SULPHURIC ACID ANODISE MIL-A-8625,TYPE 2."
+  },
+  {
+    name: "LUFT CHROMIC MIL-A-8625, TYPE 1B,CLASS 1 REQTS",
+    statement: "CERTIFICATE OF CONFORMITY- WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED ACCORDING TO THE REQUIREMENTS OF CHROMIC ACID ANODISE RE WORKED AREAS PER MIL-A-8625, TYPE 1B, CLASS 1 REQTS. REF P/N-2143M6265-1."
+  },
+  {
+    name: "LUFTHANSA - MIL-A-8625",
+    statement: "CERTIFICATE OF CONFORMITY - WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED ACCORDING TO THE REQUIREMENTS STATED ON THE ORDER: CHROMIC ACID ANODISE AT 22 VOLTS IN ACCORDANCE WITH BAC5019, CLASS 3 AND AS SPECIFIED IN PROVIDED CMM FIGURES. SEALING IAW MIL-A-8625, TYPE 1, CLASS 1 SEAL (MIL-A8625 PARAGRAPH 3.8.1.1) IN LIEU OF BAC5019. REFER TO SR 4-5653901371."
+  },
+  {
+    name: "LUFT-VALCE-RECOIL 161A1162-1",
+    statement: "CERTIFICATE OF CONFORMITY- WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED ACCORDING TO THE REQUIREMENTS OF YOUR ORDER- CHROMIC ANODISE AT 22 VOLTS IN ACCORDANCE WITH BAC5019,CLASS 3 & AS SPECIFIED IN PROVIDED CMM FIGURES. CARRY OUT SEALING IAW MIL-A-8625,TYP 1,CLASS 1 SEAL (MIL-A-8625 PARAGRAPH 3.8.1.1) IN LIEU OF BAC5019 REF SR 4-5653901371. REF P/N 161A1162-1."
+  },
+  {
+    name: "LUFTHANSA - STRIP",
+    statement: "CERTIFICATE OF CONFORMITY- WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED ACCORDING TO THE REQUIREMENTS STATED ON YOUR ORDER: STRIP ALL CHROMIC ACID ANODISE FROM PART 20-43-03 BAC5765. REF P/N 275A5302-2 CMM 32-21-12 REV -67 DATED 01.03.2023."
+  },
+  {
+    name: "SURTEC 650V & ENP",
+    statement: "CERTIFICATE OF CONFORMITY- I CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED AND INSPECTED ACCORDING TO THE REQUIREMENTS OF SURTEC 650V DS26.00 ISS.37 D&B PCP-0597 ISS 9 & ENP CONVERSION COAT IAW DS 26.00 D&B ISSUE 37 AND TERMS OF YOUR ORDER."
+  },
+  {
+    name: "LYM- ENP SURTEC",
+    statement: "CERTIFICATE OF CONFORMITY- I CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED & INSPECTED ACCORDING TO THE REQUIREMENTS OF BSENISO4527:2021 PCP-597 ISS. 9 HEAT TREAT BSENISO4527:2021 PARA 6.12 CONVERSION COAT DS26.00 ISS.37 D&B DS16.52 TYPE 2 CLASS 1A (ISSUE 19) SURTEC 650 & THE TERMS OF YOUR ORDER."
+  },
+  {
+    name: "LPE PCP-597 ISS. 9",
+    statement: "CERTIFICATE OF CONFORMITY- I CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED & INSPECTED ACCORDING TO THE REQUIREMENTS OF BSENISO4527:2021. PCP-597 ISS. 9 HEAT TREAT BSENISO4527:2021 PARA 6.12 CONVERSION COAT DS26.00 ISS.37 D&B DS16.52 TYPE 2 CLASS 1A (ISS.19) & THE TERMS OF YOUR ORDER."
+  },
+  {
+    name: "OTTAWAY- BELL HSG",
+    statement: "CERTIFICATE OF CONFORMITY- I CERTIFY THE ABOVE WORK HAS BEEN PROCESSED & INSPECTED TO THE REQUIREMENTS OF OUR AS9100 & BS EN ISO REGISTRATION. IN ADDITION, THE ABOVE MENTIONED WORKS WERE CARRIED OUT TO, HARD ANODISE 21 TO 28 MICRONS IAW DS26.00 F3 + D4B ISSUE 37-(NOTE 2B NICKEL ACETATE SEAL MIL-A-8625 TYPE III) INCLUDING AFTER TREATMENT ISS 17 NOTE 2 ON DRG. IRIDITE MIL-DTL-5541F,TYPE II,CLASS 3. TEST IS NOT REQUIRED AS STATED ON THE DRAWING., AND THE TERMS OF YOUR ORDER. HARD ANODISING SURFACE TREATMENTS LTD HAS BEEN ASSESSED & REGISTERED BY NQA AGAINST THE PROVISIONS OF AS9100D & BS EN ISO 9001:2015. CERTIFICATE NO: 22732 HARD ANODISING SURFACE TREATMENTS LTD HAS NADCAP ACCREDITATION FOR CHEMICAL PROCESSING CERTIFICATE NUMBER 7426210256."
+  },
+  {
+    name: "LYMINGTON- TUBE #1",
+    statement: "CERTIFICATE OF CONFORMITY- WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED & INSPECTED ACCORDING TO THE REQUIREMENTS OF OUR AS9100 & BS EN ISO REGISTRATION. IN ADDITION, THE ABOVE MENTIONED WORKS WERE CARRIED OUT TO, DS26.00 ISS.37 F3 DS26.44 ISS.9. D4 DS26.03 ISS.15 HARD ANODISE TO BSS599 DICHROMATE SEAL 0.8450 055MM THICK SURFACE GROWTH = 0.025. ALOCROM I.A.W DS16.52 ISS.19, AND THE TERMS OF YOUR ORDER."
+  },
+  {
+    name: "Ottaway - RIB",
+    statement: "CERTIFICATE OF CONFORMITY- I CERTIFY THE ABOVE WORK HAS BEEN PROCESSED & INSPECTED TO THE REQUIREMENTS OF OUR AS9100 & BS EN ISO REGISTRATION. IN ADDITION, THE ABOVE MENTIONED WORKS WERE CARRIED OUT TO, HARD ANODISE 27.0 TO 28.8 MICRONS DS26.00 F3 + D4C ISS.37. IRIDITE I.A.W DS26.00 D6B ISS.37 SAE AMS 2402 PARA 3.3.4 COEFFICIENT OF FRICTION TEST IS NOT REQUIRED AS STATED ON THE DRAWING, AND THE TERMS OF YOUR ORDER. HARD ANODISING SURFACE TREATMENTS LTD HAS BEEN ASSESSED & REGISTERED BY NQA AGAINST THE PROVISIONS OF AS9100D & BS EN ISO 9001:2015. CERTIF NO:22732 HARD ANODISING SURFACE TTREAMENTS LTD HAS NADCAP ACCREDITATION FOR CHEMICAL PROCESSING CERTIFICATE NUMBER 7426210256."
+  },
+  {
+    name: "OTTAWAY- OUTER CASING",
+    statement: "CERTIFICATE OF CONFORMITY- I CERTIFY THE ABOVE WORK HAS BEEN PROCESSED & INSPECTED TO THE REQUIREMENTS OF OUR AS9100 & BS EN ISO REGISTRATION. IN ADDITION, THE ABOVE MENTIONED WORKS WERE CARRIED OUT TO, I.A.W DS26.00 F3 + D4B ISS.37 HARD ANODISE 21 TO 28 MICRONS MIL-A-8625 TYPE III. IRIDITE MIL-DTL-5541F,TYPE II,CLASS 3. TEST IS NOT REQUIRED AS STATED ON THE DRAWING , AND THE TERMS OF YOUR ORDER. HARD ANODISING SURFACE TREATMENTS LTD HAS BEEN ASSESSED & REGISTERED BY NQA AGAINST THE PROVISIONS OF AS9100D & BS EN ISO 9001:2015. CERTIFICATE NO: 22732 HARD ANODISE SURFACE TREATMENTS LTD HAS NADCAP ACCREDITATION FOR CHEMICAL PROCESSING CERTIFICATE NUMBER 7426210256."
+  },
+  {
+    name: "OTTAWAY- RIB,ROBUST HIGH SPEED V20",
+    statement: "CERTIFICATE OF CONFORMITY- I CERTIFY THE ABOVE WORK HAS BEEN PROCESSED & INSPECTED TO THE REQUIREMENTS OF OUR AS9100 & BS EN ISO REGISTRATION. IN ADDITION, THE ABOVE MENTIONED WORKS WERE CARRIED OUT TO, HARD ANODISE 25 TO 28 MICRONS DS26.00 F3 + D4A ISS.37. BRUSH ALOCROM I.A.W DS26.00 D6B ISS.37 SAE AMS 2402. TYPE I PARA 3.3.4 COEFFICIENT OF FRICTION TEST IS NOT REQUIRED AS STATED ON THE DRAWING, AND THE TERMS OF YOUR ORDER. HARD ANODISING SURFACE TREATMENTS LTD HAS BEEN ASSESSED & REGISTERED BY NQA AGAINST THE PROVISIONS OF AS9100D & BS EN ISO 9001:2015. CERTIFICATE NO: 22732 HARD ANODISING SURFACE TTREAMENTS LTD HAS NADCAP ACCREDITATION FOR CHEMICAL PROCESSING CERTIFICATE NUMBER 7426210256."
+  },
+  {
+    name: "OTTAWAY- BALL JOINT",
+    statement: "CERTIFICATE OF CONFORMITY- WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED & INSPECTED ACCORDING TO THE REQUIREMENTS DEGRESSE TO DS26.00 F2 ISS.37 AS PER NOTE 7. ON DRG. TREAT AMS2454A GRADE 2,TYPE 4,CLASS 2 AS PER NOTE 7. ON DRG. INCLUDING POST PLATING TEST. DISREGARDING NOTE 7.E.INTERNAL DIA MARKED #### WILL BE MACHINED AFTER TREATMENT TO SATISFY NOTE 7.E HARDNESS OF 383 HK ACHIEVED. 7.6 TO 9 MICRONS. STAINLESS STEEL."
+  }
 ]
 
-# Create all specification presets
+# Create all release levels
 created_count = 0
-specification_presets_data.each do |data|
+release_levels_data.each do |data|
   begin
-    SpecificationPreset.create!(data)
+    ReleaseLevel.create!(data)
     created_count += 1
     puts "Created: #{data[:name]}"
   rescue => e
@@ -83,5 +160,5 @@ specification_presets_data.each do |data|
   end
 end
 
-puts "\nSpecification Presets seed completed: #{created_count}/#{specification_presets_data.length} created"
-puts "Total specification presets in database: #{SpecificationPreset.count}"
+puts "\nSeed completed: #{created_count}/#{release_levels_data.length} release levels created"
+puts "Total release levels in database: #{ReleaseLevel.count}"
