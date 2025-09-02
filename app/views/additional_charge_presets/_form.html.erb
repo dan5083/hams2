@@ -1,0 +1,117 @@
+<%# app/views/additional_charge_presets/_form.html.erb %>
+<div class="bg-white shadow rounded-lg p-6">
+  <%= form_with(model: charge_preset, local: true, class: "space-y-6") do |form| %>
+    <% if charge_preset.errors.any? %>
+      <div class="bg-red-50 border border-red-200 rounded-md p-4">
+        <div class="flex">
+          <div class="ml-3">
+            <h3 class="text-sm font-medium text-red-800">
+              <%= pluralize(charge_preset.errors.count, "error") %> prohibited this charge preset from being saved:
+            </h3>
+            <div class="mt-2 text-sm text-red-700">
+              <ul class="list-disc pl-5 space-y-1">
+                <% charge_preset.errors.full_messages.each do |message| %>
+                  <li><%= message %></li>
+                <% end %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% end %>
+
+    <div>
+      <%= form.label :name, class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= form.text_field :name,
+          placeholder: "e.g., Freight 32 kg DPD, Expedite Charge, etc.",
+          class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+          required: true %>
+      <p class="mt-1 text-xs text-gray-500">Enter the charge name or description</p>
+    </div>
+
+    <div>
+      <%= form.label :description, class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= form.text_area :description,
+          rows: 3,
+          placeholder: "Optional detailed description of this charge...",
+          class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
+      <p class="mt-1 text-xs text-gray-500">Additional details about when this charge applies</p>
+    </div>
+
+    <div class="flex items-center mb-4">
+      <%= form.check_box :is_variable,
+          class: "h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded",
+          onchange: "toggleVariableCharge(this)" %>
+      <%= form.label :is_variable, "Variable Charge",
+          class: "ml-2 block text-sm text-gray-900" %>
+      <p class="ml-2 text-xs text-gray-500">(Check if the amount varies per order/job)</p>
+    </div>
+
+    <div id="amount-field" style="<%= charge_preset.is_variable? ? 'display: none;' : '' %>">
+      <%= form.label :amount, "Amount (£)", class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <div class="mt-1 relative rounded-md shadow-sm">
+        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <span class="text-gray-500 sm:text-sm">£</span>
+        </div>
+        <%= form.number_field :amount,
+            step: 0.01,
+            min: 0,
+            placeholder: "0.00",
+            class: "block w-full pl-7 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
+      </div>
+      <p class="mt-1 text-xs text-gray-500">Fixed amount for this charge (leave empty for variable charges)</p>
+    </div>
+
+    <div>
+      <%= form.label :calculation_type, "Calculation Type", class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= form.select :calculation_type,
+          options_for_select([
+            ['Fixed charge', 'fixed'],
+            ['Weight-based standard', 'weight_based'],
+            ['Weight-based next day', 'weight_based_next_day'],
+            ['Weight-based premium', 'weight_based_premium'],
+            ['Variable charge', 'variable']
+          ], charge_preset.calculation_type),
+          { include_blank: "Select calculation method..." },
+          {
+            class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+          } %>
+      <p class="mt-1 text-xs text-gray-500">How this charge is calculated (optional)</p>
+    </div>
+
+    <div class="flex items-center">
+      <%= form.check_box :enabled,
+          class: "h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" %>
+      <%= form.label :enabled, "Enabled",
+          class: "ml-2 block text-sm text-gray-900" %>
+      <p class="ml-2 text-xs text-gray-500">(Disabled charges won't be available for selection)</p>
+    </div>
+
+    <div class="flex justify-end space-x-3">
+      <%= link_to "Cancel", additional_charge_presets_path,
+          class: "bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded" %>
+      <%= form.submit charge_preset.persisted? ? "Update Charge Preset" : "Create Charge Preset",
+          class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" %>
+    </div>
+  <% end %>
+</div>
+
+<script>
+function toggleVariableCharge(checkbox) {
+  const amountField = document.getElementById('amount-field');
+  if (checkbox.checked) {
+    amountField.style.display = 'none';
+    document.getElementById('additional_charge_preset_amount').value = '';
+  } else {
+    amountField.style.display = 'block';
+  }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+  const variableCheckbox = document.getElementById('additional_charge_preset_is_variable');
+  if (variableCheckbox) {
+    toggleVariableCharge(variableCheckbox);
+  }
+});
+</script>

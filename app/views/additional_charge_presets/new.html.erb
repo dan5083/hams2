@@ -1,0 +1,25 @@
+<%# app/views/additional_charge_presets/new.html.erb %>
+<div class="container mx-auto px-4 py-6">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold text-gray-900">New Additional Charge Preset</h1>
+    <div class="flex space-x-2">
+      <%= link_to "Back to Charge Presets", additional_charge_presets_path,
+          class: "bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" %>
+    </div>
+  </div>
+
+  <!-- Help Text -->
+  <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+    <h2 class="text-lg font-semibold text-gray-900 mb-2">Creating Charge Presets</h2>
+    <div class="text-sm text-gray-700">
+      <ul class="list-disc pl-5 space-y-1">
+        <li><strong>Fixed charges:</strong> Have a set amount (e.g., expedite fees, certificates)</li>
+        <li><strong>Variable charges:</strong> Amount depends on the specific order (e.g., chemical costs)</li>
+        <li><strong>Weight-based:</strong> Calculated shipping charges based on package weight</li>
+        <li>Disabled presets won't appear in selection lists but remain in the database</li>
+      </ul>
+    </div>
+  </div>
+
+  <%= render 'form', charge_preset: @additional_charge_preset %>
+</div>

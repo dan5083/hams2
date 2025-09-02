@@ -1,0 +1,58 @@
+<%# app/views/additional_charge_presets/edit.html.erb %>
+<div class="container mx-auto px-4 py-6">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold text-gray-900">
+      Edit Charge Preset: <%= @additional_charge_preset.name %>
+    </h1>
+    <div class="flex space-x-2">
+      <%= link_to "Back to Charge Presets", additional_charge_presets_path,
+          class: "bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" %>
+    </div>
+  </div>
+
+  <!-- Current Status -->
+  <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+    <h2 class="text-lg font-semibold text-gray-900 mb-2">Current Charge Details</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-700">
+      <div>
+        <strong>Status:</strong>
+        <% if @additional_charge_preset.enabled %>
+          <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 ml-1">
+            Enabled
+          </span>
+        <% else %>
+          <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 ml-1">
+            Disabled
+          </span>
+        <% end %>
+      </div>
+      <div>
+        <strong>Type:</strong>
+        <% if @additional_charge_preset.is_variable %>
+          <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800 ml-1">
+            Variable
+          </span>
+        <% else %>
+          <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800 ml-1">
+            Fixed
+          </span>
+        <% end %>
+      </div>
+      <div>
+        <strong>Current Amount:</strong> <%= @additional_charge_preset.formatted_amount %>
+      </div>
+    </div>
+    <% if @additional_charge_preset.description.present? %>
+      <div class="mt-2">
+        <strong>Description:</strong> <%= @additional_charge_preset.description %>
+      </div>
+    <% end %>
+    <% if @additional_charge_preset.calculation_type.present? %>
+      <div class="mt-2">
+        <strong>Calculation Type:</strong> <%= @additional_charge_preset.calculation_type.humanize %>
+      </div>
+    <% end %>
+  </div>
+
+  <%= render 'form', charge_preset: @additional_charge_preset %>
+</div>

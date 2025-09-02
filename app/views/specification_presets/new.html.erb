@@ -1,0 +1,12 @@
+<%# app/views/specification_presets/new.html.erb %>
+<div class="container mx-auto px-4 py-6">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold text-gray-900">New Specification Preset</h1>
+    <div class="flex space-x-2">
+      <%= link_to "Back to Specification Presets", specification_presets_path,
+          class: "bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" %>
+    </div>
+  </div>
+
+  <%= render 'form', specification_preset: @specification_preset %>
+</div>
