@@ -1,394 +1,87 @@
-# Additional Charge Presets Seed Data
+# Specification Presets Seed Data
 # Run this in Heroku console after migration
 
-additional_charge_presets_data = [
-  # Fixed charges
-  {
-    name: "Freight 32 kg (next Day) DPD Local UK",
-    description: "Large package freight charge for next day DPD delivery within UK",
-    amount: 39.58,
-    is_variable: false,
-    calculation_type: nil
-  },
-  {
-    name: "FAIR CHARGE",
-    description: "Standard fair charge applied to orders",
-    amount: 200.00,
-    is_variable: false,
-    calculation_type: nil
-  },
-  {
-    name: "C OF C CHARGE",
-    description: "Certificate of Conformity charge",
-    amount: 20.00,
-    is_variable: false,
-    calculation_type: nil
-  },
-  {
-    name: "Expedite £200",
-    description: "Express processing charge",
-    amount: 200.00,
-    is_variable: false,
-    calculation_type: nil
-  },
-
-  # Variable charges
-  {
-    name: "COST OF CHEMICALS",
-    description: "Variable cost for chemical materials - updated per order",
-    amount: 2778.60,
-    is_variable: true,
-    calculation_type: nil
-  },
-  {
-    name: "COST OF CHEMICALS FOR STRIPPING ENP",
-    description: "Chemical costs specifically for ENP stripping process",
-    amount: nil,
-    is_variable: true,
-    calculation_type: nil
-  },
-  {
-    name: "SMALL BARREL",
-    description: "Small barrel processing charge",
-    amount: nil,
-    is_variable: true,
-    calculation_type: nil
-  },
-  {
-    name: "DIE FEED PIPE",
-    description: "Die feed pipe processing charge",
-    amount: nil,
-    is_variable: true,
-    calculation_type: nil
-  },
-  {
-    name: "COLLECTION & DELIVERY CHARGES ASTL COLLECT",
-    description: "Collection and delivery charges for ASTL",
-    amount: nil,
-    is_variable: true,
-    calculation_type: nil
-  },
-
-  # Calculated shipping charges (weight-based)
-  {
-    name: "Next day DPD (up to 10 kg)",
-    description: "Next day DPD delivery for packages up to 10kg",
-    amount: 8.00,
-    is_variable: false,
-    calculation_type: "weight_based_next_day"
-  },
-  {
-    name: "Next day DPD 11 kg",
-    description: "Next day DPD delivery for 11kg package",
-    amount: 8.89,
-    is_variable: false,
-    calculation_type: "weight_based_next_day"
-  },
-  {
-    name: "Next day DPD 12 kg",
-    description: "Next day DPD delivery for 12kg package",
-    amount: 9.26,
-    is_variable: false,
-    calculation_type: "weight_based_next_day"
-  },
-  {
-    name: "Next Day DPD 13 kg",
-    description: "Next day DPD delivery for 13kg package",
-    amount: 9.64,
-    is_variable: false,
-    calculation_type: "weight_based_next_day"
-  },
-  {
-    name: "Next day DPD 14 kg",
-    description: "Next day DPD delivery for 14kg package",
-    amount: 10.01,
-    is_variable: false,
-    calculation_type: "weight_based_next_day"
-  },
-  {
-    name: "Next day DPD 15 kg",
-    description: "Next day DPD delivery for 15kg package",
-    amount: 10.38,
-    is_variable: false,
-    calculation_type: "weight_based_next_day"
-  },
-  {
-    name: "Next day DPD 16 kg",
-    description: "Next day DPD delivery for 16kg package",
-    amount: 10.38,
-    is_variable: false,
-    calculation_type: "weight_based_next_day"
-  },
-  {
-    name: "Next day DPD 17 kg",
-    description: "Next day DPD delivery for 17kg package",
-    amount: 10.76,
-    is_variable: false,
-    calculation_type: "weight_based_next_day"
-  },
-  {
-    name: "Next day DPD 18 kg",
-    description: "Next day DPD delivery for 18kg package",
-    amount: 11.51,
-    is_variable: false,
-    calculation_type: "weight_based_next_day"
-  },
-  {
-    name: "Next day DPD 19 kg",
-    description: "Next day DPD delivery for 19kg package",
-    amount: 11.88,
-    is_variable: false,
-    calculation_type: "weight_based_next_day"
-  },
-  {
-    name: "Next day DPD 20 kg",
-    description: "Next day DPD delivery for 20kg package",
-    amount: 12.25,
-    is_variable: false,
-    calculation_type: "weight_based_next_day"
-  },
-  {
-    name: "Next day DPD 21 kg",
-    description: "Next day DPD delivery for 21kg package",
-    amount: 12.63,
-    is_variable: false,
-    calculation_type: "weight_based_next_day"
-  },
-  {
-    name: "Next day DPD 22 kg",
-    description: "Next day DPD delivery for 22kg package",
-    amount: 13.00,
-    is_variable: false,
-    calculation_type: "weight_based_next_day"
-  },
-  {
-    name: "Next day DPD 23 kg",
-    description: "Next day DPD delivery for 23kg package",
-    amount: 13.38,
-    is_variable: false,
-    calculation_type: "weight_based_next_day"
-  },
-  {
-    name: "Next day DPD 24 kg",
-    description: "Next day DPD delivery for 24kg package",
-    amount: 13.75,
-    is_variable: false,
-    calculation_type: "weight_based_next_day"
-  },
-  {
-    name: "Next day DPD 25 kg",
-    description: "Next day DPD delivery for 25kg package",
-    amount: 14.12,
-    is_variable: false,
-    calculation_type: "weight_based_next_day"
-  },
-  {
-    name: "Next day DPD 26 kg",
-    description: "Next day DPD delivery for 26kg package",
-    amount: 14.50,
-    is_variable: false,
-    calculation_type: "weight_based_next_day"
-  },
-  {
-    name: "Next day DPD 27 kg",
-    description: "Next day DPD delivery for 27kg package",
-    amount: 14.87,
-    is_variable: false,
-    calculation_type: "weight_based_next_day"
-  },
-  {
-    name: "Next day DPD 28 kg",
-    description: "Next day DPD delivery for 28kg package",
-    amount: 15.25,
-    is_variable: false,
-    calculation_type: "weight_based_next_day"
-  },
-  {
-    name: "Next day DPD 29 kg",
-    description: "Next day DPD delivery for 29kg package",
-    amount: 15.62,
-    is_variable: false,
-    calculation_type: "weight_based_next_day"
-  },
-  {
-    name: "Next day DPD 30 kg",
-    description: "Next day DPD delivery for 30kg package",
-    amount: 15.99,
-    is_variable: false,
-    calculation_type: "weight_based_next_day"
-  },
-
-  # Premium 10:30 delivery charges
-  {
-    name: "by 10:30 DPD up to 10 kg",
-    description: "Premium 10:30 DPD delivery for packages up to 10kg",
-    amount: 19.48,
-    is_variable: false,
-    calculation_type: "weight_based_premium"
-  },
-  {
-    name: "by 10:30 DPD 11 kg",
-    description: "Premium 10:30 DPD delivery for 11kg package",
-    amount: 21.92,
-    is_variable: false,
-    calculation_type: "weight_based_premium"
-  },
-  {
-    name: "by 10:30 DPD 12 kg",
-    description: "Premium 10:30 DPD delivery for 12kg package",
-    amount: 22.42,
-    is_variable: false,
-    calculation_type: "weight_based_premium"
-  },
-  {
-    name: "by 10:30 DPD 13 kg",
-    description: "Premium 10:30 DPD delivery for 13kg package",
-    amount: 22.91,
-    is_variable: false,
-    calculation_type: "weight_based_premium"
-  },
-  {
-    name: "by 10:30 DPD 14 kg",
-    description: "Premium 10:30 DPD delivery for 14kg package",
-    amount: 23.41,
-    is_variable: false,
-    calculation_type: "weight_based_premium"
-  },
-  {
-    name: "by 10:30 DPD 15 kg",
-    description: "Premium 10:30 DPD delivery for 15kg package",
-    amount: 23.90,
-    is_variable: false,
-    calculation_type: "weight_based_premium"
-  },
-  {
-    name: "by 10:30 DPD 16 kg",
-    description: "Premium 10:30 DPD delivery for 16kg package",
-    amount: 24.40,
-    is_variable: false,
-    calculation_type: "weight_based_premium"
-  },
-  {
-    name: "by 10:30 DPD 17 kg",
-    description: "Premium 10:30 DPD delivery for 17kg package",
-    amount: 24.89,
-    is_variable: false,
-    calculation_type: "weight_based_premium"
-  },
-  {
-    name: "by 10:30 DPD 18 kg",
-    description: "Premium 10:30 DPD delivery for 18kg package",
-    amount: 25.39,
-    is_variable: false,
-    calculation_type: "weight_based_premium"
-  },
-  {
-    name: "by 10:30 DPD 19 kg",
-    description: "Premium 10:30 DPD delivery for 19kg package",
-    amount: 25.88,
-    is_variable: false,
-    calculation_type: "weight_based_premium"
-  },
-  {
-    name: "by 10:30 DPD 20 kg",
-    description: "Premium 10:30 DPD delivery for 20kg package",
-    amount: 26.38,
-    is_variable: false,
-    calculation_type: "weight_based_premium"
-  },
-  {
-    name: "by 10:30 DPD 21 kg",
-    description: "Premium 10:30 DPD delivery for 21kg package",
-    amount: 26.87,
-    is_variable: false,
-    calculation_type: "weight_based_premium"
-  },
-  {
-    name: "by 10:30 DPD 22 kg",
-    description: "Premium 10:30 DPD delivery for 22kg package",
-    amount: 27.37,
-    is_variable: false,
-    calculation_type: "weight_based_premium"
-  },
-  {
-    name: "by 10:30 DPD 23 kg",
-    description: "Premium 10:30 DPD delivery for 23kg package",
-    amount: 27.86,
-    is_variable: false,
-    calculation_type: "weight_based_premium"
-  },
-  {
-    name: "by 10:30 DPD 24 kg",
-    description: "Premium 10:30 DPD delivery for 24kg package",
-    amount: 28.36,
-    is_variable: false,
-    calculation_type: "weight_based_premium"
-  },
-  {
-    name: "by 10:30 DPD 25 kg",
-    description: "Premium 10:30 DPD delivery for 25kg package",
-    amount: 28.85,
-    is_variable: false,
-    calculation_type: "weight_based_premium"
-  },
-  {
-    name: "by 10:30 DPD 26 kg",
-    description: "Premium 10:30 DPD delivery for 26kg package",
-    amount: 29.35,
-    is_variable: false,
-    calculation_type: "weight_based_premium"
-  },
-  {
-    name: "by 10:30 DPD 27 kg",
-    description: "Premium 10:30 DPD delivery for 27kg package",
-    amount: 29.84,
-    is_variable: false,
-    calculation_type: "weight_based_premium"
-  },
-  {
-    name: "by 10:30 DPD 28 kg",
-    description: "Premium 10:30 DPD delivery for 28kg package",
-    amount: 30.34,
-    is_variable: false,
-    calculation_type: "weight_based_premium"
-  },
-  {
-    name: "by 10:30 DPD 29 kg",
-    description: "Premium 10:30 DPD delivery for 29kg package",
-    amount: 30.83,
-    is_variable: false,
-    calculation_type: "weight_based_premium"
-  },
-  {
-    name: "by 10:30 DPD 30 kg",
-    description: "Premium 10:30 DPD delivery for 30kg package",
-    amount: 31.33,
-    is_variable: false,
-    calculation_type: "weight_based_premium"
-  }
+specification_presets_data = [
+  { name: "DS 26 00 D&B, BS EN ISO 4527", content: "DS 26 00 D&B, BS EN ISO 4527 specification requirements" },
+  { name: "BS ISO 10074-2021", content: "BS ISO 10074-2021 specification requirements" },
+  { name: "BA Tubes C5-35", content: "BA Tubes C5-35 specification requirements" },
+  { name: "DEF STAN 03-5", content: "DEF STAN 03-5 specification requirements" },
+  { name: "DEF STAN 03-24", content: "DEF STAN 03-24 specification requirements" },
+  { name: "DEF STAN 03-24 & MIL-C-5541", content: "DEF STAN 03-24 & MIL-C-5541 specification requirements" },
+  { name: "Chromic 914-032-095 & Hard 914-032031", content: "Chromic 914-032-095 & Hard 914-032031 specification requirements" },
+  { name: "DEF STAN 03726", content: "DEF STAN 03726 specification requirements" },
+  { name: "DEF STAN 03725", content: "DEF STAN 03725 specification requirements" },
+  { name: "DEF 151 Type 3", content: "DEF 151 Type 3 specification requirements" },
+  { name: "Hard 914-032-031", content: "Hard 914-032-031 specification requirements" },
+  { name: "BS 1615", content: "BS 1615 specification requirements" },
+  { name: "BS 5599", content: "BS 5599 specification requirements" },
+  { name: "PF16", content: "PF16 specification requirements" },
+  { name: "P2P1Z1956 & P2P1Z121947/10/25 (ENP)", content: "P2P1Z1956 & P2P1Z121947/10/25 (ENP) specification requirements" },
+  { name: "TS2-25-102", content: "TS2-25-102 specification requirements" },
+  { name: "DEF STAN 03-18 (Alocrom)", content: "DEF STAN 03-18 (Alocrom) specification requirements" },
+  { name: "TI 44/15", content: "TI 44/15 specification requirements" },
+  { name: "MWSG000010000", content: "MWSG000010000 specification requirements" },
+  { name: "RC 2019", content: "RC 2019 specification requirements" },
+  { name: "NWS 1000/52-3", content: "NWS 1000/52-3 specification requirements" },
+  { name: "424/1000-88", content: "424/1000-88 specification requirements" },
+  { name: "RC2035", content: "RC2035 specification requirements" },
+  { name: "MIL-DTL-5541F", content: "MIL-DTL-5541F specification requirements" },
+  { name: "BAC5821, CLASS 1", content: "BAC5821, CLASS 1 specification requirements" },
+  { name: "ST-A-120", content: "ST-A-120 specification requirements" },
+  { name: "RC2019A50", content: "RC2019A50 specification requirements" },
+  { name: "ST-A-145 ISSUE 10", content: "ST-A-145 ISSUE 10 specification requirements" },
+  { name: "RC2019AD50", content: "RC2019AD50 specification requirements" },
+  { name: "AMS 03-25 & BS ISO 10074", content: "AMS 03-25 & BS ISO 10074 specification requirements" },
+  { name: "RC2139W", content: "RC2139W specification requirements" },
+  { name: "SAE AMS 03-25, BS ISO 10074:2010 & WSHTDS2785", content: "SAE AMS 03-25, BS ISO 10074:2010 & WSHTDS2785 specification requirements" },
+  { name: "APRT0053", content: "APRT0053 specification requirements" },
+  { name: "SPS03", content: "SPS03 specification requirements" },
+  { name: "ST-A-142", content: "ST-A-142 specification requirements" },
+  { name: "APRT0004", content: "APRT0004 specification requirements" },
+  { name: "MIL-PRF-8625 (issue F2) & MIL-DTL-5541F", content: "MIL-PRF-8625 (issue F2) & MIL-DTL-5541F specification requirements" },
+  { name: "MIL-PRF-8625 (issue F2) TYPE III, Class 1", content: "MIL-PRF-8625 (issue F2) TYPE III, Class 1 specification requirements" },
+  { name: "MIL-PRF-8625 (issue F2) TYPE I, Class 1", content: "MIL-PRF-8625 (issue F2) TYPE I, Class 1 specification requirements" },
+  { name: "MIL-PRF-8625 (issue F2) TYPE II Class 1", content: "MIL-PRF-8625 (issue F2) TYPE II Class 1 specification requirements" },
+  { name: "WSTI 5031", content: "WSTI 5031 specification requirements" },
+  { name: "AD00376/CA1", content: "AD00376/CA1 specification requirements" },
+  { name: "BS EN ISO 4527:2003 (ENP)", content: "BS EN ISO 4527:2003 (ENP) specification requirements" },
+  { name: "AMS2469G", content: "AMS2469G specification requirements" },
+  { name: "TS-112 D4A", content: "TS-112 D4A specification requirements" },
+  { name: "R4 003", content: "R4 003 specification requirements" },
+  { name: "RC2019AL50", content: "RC2019AL50 specification requirements" },
+  { name: "VS 1-3-5-104", content: "VS 1-3-5-104 specification requirements" },
+  { name: "TI 5031", content: "TI 5031 specification requirements" },
+  { name: "R4 014", content: "R4 014 specification requirements" },
+  { name: "R4 014 & R4 003", content: "R4 014 & R4 003 specification requirements" },
+  { name: "APRT0005", content: "APRT0005 specification requirements" },
+  { name: "0731-625", content: "0731-625 specification requirements" },
+  { name: "DS26.00", content: "DS26.00 specification requirements" },
+  { name: "TS-112 ISS.24 TS-130 ISS.3 D4A", content: "TS-112 ISS.24 TS-130 ISS.3 D4A specification requirements" },
+  { name: "TS2-23-28", content: "TS2-23-28 specification requirements" },
+  { name: "TS112 F3 + D4 (DEF STAN 03-26)", content: "TS112 F3 + D4 (DEF STAN 03-26) specification requirements" },
+  { name: "ALOCROM 1200 MIL-DTL-5541 & HARD ANODISE TI5031", content: "ALOCROM 1200 MIL-DTL-5541 & HARD ANODISE TI5031 specification requirements" },
+  { name: "MIL-DTL-5541 Type 1, Class 3", content: "MIL-DTL-5541 Type 1, Class 3 specification requirements" },
+  { name: "MSF045 PART 1 & MSF PART 2", content: "MSF045 PART 1 & MSF PART 2 specification requirements" },
+  { name: "JPS047", content: "JPS047 specification requirements" },
+  { name: "ISO 7599:2012", content: "ISO 7599:2012 specification requirements" },
+  { name: "AD00376/HA2", content: "AD00376/HA2 specification requirements" },
+  { name: "R4 078", content: "R4 078 specification requirements" },
+  { name: "SURTEC 650V DS26.00 & PCP-0597", content: "SURTEC 650V DS26.00 & PCP-0597 specification requirements" },
+  { name: "RBT-PS-SPS03-V3", content: "RBT-PS-SPS03-V3 specification requirements" },
+  { name: "LUFT- SULPHURIC ACID ANODISE MIL-A-8625, TYPE 2.", content: "LUFT- SULPHURIC ACID ANODISE MIL-A-8625, TYPE 2. specification requirements" }
 ]
 
-# Create all additional charge presets
+# Create all specification presets
 created_count = 0
-additional_charge_presets_data.each do |data|
+specification_presets_data.each do |data|
   begin
-    AdditionalChargePreset.create!(data)
+    SpecificationPreset.create!(data)
     created_count += 1
-    puts "Created: #{data[:name]} - £#{data[:amount] || 'Variable'}"
+    puts "Created: #{data[:name]}"
   rescue => e
     puts "Failed to create '#{data[:name]}': #{e.message}"
   end
 end
 
-puts "\nAdditional Charge Presets seed completed: #{created_count}/#{additional_charge_presets_data.length} created"
-puts "Total additional charge presets in database: #{AdditionalChargePreset.count}"
-
-# Summary by type
-fixed_charges = AdditionalChargePreset.where(is_variable: false, calculation_type: nil).count
-variable_charges = AdditionalChargePreset.where(is_variable: true).count
-shipping_charges = AdditionalChargePreset.where.not(calculation_type: nil).count
-
-puts "\nBreakdown:"
-puts "- Fixed charges: #{fixed_charges}"
-puts "- Variable charges: #{variable_charges}"
-puts "- Calculated shipping charges: #{shipping_charges}"
+puts "\nSpecification Presets seed completed: #{created_count}/#{specification_presets_data.length} created"
+puts "Total specification presets in database: #{SpecificationPreset.count}"
