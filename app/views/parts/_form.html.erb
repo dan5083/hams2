@@ -72,6 +72,18 @@
         <p class="mt-1 text-xs text-gray-500">Defaults to 'A' if not specified</p>
       </div>
 
+      <!-- Specification Selection -->
+      <div>
+        <%= form.label :specification, "Specification", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.select :specification,
+            options_for_select([['Select Specification', '']] + @specification_presets.map { |preset| [preset.name, preset.content] }),
+            {},
+            {
+              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            } %>
+        <p class="mt-1 text-xs text-gray-500">Select a standard specification for this part</p>
+      </div>
+
       <!-- Aerospace/Defense Application (only for unlocked parts) -->
       <% unless part.locked_for_editing? %>
         <div>
@@ -362,24 +374,6 @@
     </div>
   <% end %>
 
-  <!-- Specification Section -->
-  <div class="bg-white shadow rounded-lg p-6">
-    <h3 class="text-lg font-medium text-gray-900 mb-4">Specification</h3>
-
-  <!-- Specification Section -->
-  <div class="bg-white shadow rounded-lg p-6">
-    <h3 class="text-lg font-medium text-gray-900 mb-4">Specification</h3>
-
-    <%= form.text_area :specification,
-        placeholder: "Enter specification text (optional)...",
-        rows: 4,
-        class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
-        data: { parts_form_target: "specificationField" } %>
-    <p class="mt-1 text-xs text-gray-500">
-      Optional specification text - operations are managed separately below
-    </p>
-  </div>
-
   <!-- Special Instructions Section -->
   <div class="bg-white shadow rounded-lg p-6">
     <h3 class="text-lg font-medium text-gray-900 mb-4">Special Instructions</h3>
@@ -400,7 +394,7 @@
         </h3>
         <div class="mt-2 text-sm text-blue-700">
           <% if part.locked_for_editing? %>
-            <p>Operations are in manual editing mode. You can customize the text for each operation above. The specification field is also editable. This mode is permanent for this part - you cannot return to automatic treatment configuration.</p>
+            <p>Operations are in manual editing mode. You can customize the text for each operation above. This mode is permanent for this part - you cannot return to automatic treatment configuration.</p>
           <% else %>
             <p>This integrated form creates a part with complete processing instructions. Select treatments in the order you want them processed. Each treatment can have its own jig type, masking, stripping, dye, sealing, and local treatment options. ENP treatments include optional pre-heat treatment (before jigging), post-heat treatment (after unjig), and ENP Strip/Mask systems. Local treatments are available for anodising processes and are applied after masking removal. Auto-operations (inspections, rinses, etc.) are automatically inserted in the correct sequence.</p>
           <% end %>

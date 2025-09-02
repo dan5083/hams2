@@ -98,7 +98,7 @@ class WorksOrder < ApplicationRecord
     0
   end
 
-  # FIXED: Delegate to part's actual specification field, not operations
+  # FIXED: Get specification from part's specification field
   def specification
     part&.specification.presence || ""
   end

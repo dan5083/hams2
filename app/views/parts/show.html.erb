@@ -47,6 +47,17 @@
         </div>
 
         <div>
+          <dt class="text-sm font-medium text-gray-500">Specification</dt>
+          <dd class="text-sm text-gray-900">
+            <% if @part.specification.present? %>
+              <%= simple_format(@part.specification) %>
+            <% else %>
+              <span class="text-gray-500 italic">No specification selected</span>
+            <% end %>
+          </dd>
+        </div>
+
+        <div>
           <dt class="text-sm font-medium text-gray-500">Process Type</dt>
           <dd class="text-sm text-gray-900"><%= @part.process_type&.humanize %></dd>
         </div>
@@ -237,18 +248,6 @@
       </div>
     </div>
   <% end %>
-
-  <!-- Specification -->
-  <div class="bg-white shadow rounded-lg p-6 mb-6">
-    <h2 class="text-xl font-semibold text-gray-900 mb-4">Specification</h2>
-    <% if @part.specification.present? %>
-      <div class="prose max-w-none">
-        <%= simple_format(@part.specification) %>
-      </div>
-    <% else %>
-      <p class="text-gray-500 italic">No specification generated - configure processing treatments to auto-generate specification</p>
-    <% end %>
-  </div>
 
   <!-- Special Instructions -->
   <% if @part.special_instructions.present? %>

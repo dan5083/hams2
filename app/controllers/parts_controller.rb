@@ -41,6 +41,7 @@ class PartsController < ApplicationController
   def new
     @part = Part.new
     @customers = Organization.enabled.order(:name)
+    @specification_presets = SpecificationPreset.enabled.ordered
 
     # Pre-select customer if coming from works order form
     if params[:customer_id].present?
@@ -124,6 +125,7 @@ class PartsController < ApplicationController
 
   def edit
     @customers = [@part.customer] # Don't allow changing customer on existing part
+    @specification_presets = SpecificationPreset.enabled.ordered
 
     # Ensure customisation_data structure exists for unlocked parts
     if !@part.locked_for_editing?
@@ -172,6 +174,7 @@ class PartsController < ApplicationController
           return
         else
           @customers = [@part.customer]
+          @specification_presets = SpecificationPreset.enabled.ordered
           render :edit, status: :unprocessable_entity
           return
         end
@@ -189,6 +192,8 @@ class PartsController < ApplicationController
       if update_locked_operations_text
         redirect_to @part, notice: 'Operations were successfully updated.'
       else
+        @customers = [@part.customer]
+        @specification_presets = SpecificationPreset.enabled.ordered
         render :edit, status: :unprocessable_entity
       end
       return
@@ -220,6 +225,7 @@ class PartsController < ApplicationController
       redirect_to @part, notice: 'Part was successfully updated.'
     else
       @customers = [@part.customer]
+      @specification_presets = SpecificationPreset.enabled.ordered
       render :edit, status: :unprocessable_entity
     end
   end
@@ -471,6 +477,7 @@ class PartsController < ApplicationController
 
   def load_form_data_for_errors
     @customers = Organization.enabled.order(:name)
+    @specification_presets = SpecificationPreset.enabled.ordered
   end
 
   def part_details_changed?

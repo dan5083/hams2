@@ -7,14 +7,21 @@ for file in app/models/[k-p]*.rb; do echo "=== $file ==="; cat "$file"; echo; do
 for file in app/models/[q-z]*.rb; do echo "=== $file ==="; cat "$file"; echo; done
 
 # Show controllers.rb files starting with a-i
-for file in app/controllers/[a-i]*.rb; do
+for file in app/controllers/[a-e]*.rb; do
   echo "=== $file ==="
   cat "$file"
   echo
 done
 
 # Show controllers.rb files starting with j-z
-for file in app/controllers/[j-p]*.rb; do
+for file in app/controllers/[f-j]*.rb; do
+  echo "=== $file ==="
+  cat "$file"
+  echo
+done
+
+# Show controllers.rb files starting with j-z
+for file in app/controllers/[k-p]*.rb; do
   echo "=== $file ==="
   cat "$file"
   echo
