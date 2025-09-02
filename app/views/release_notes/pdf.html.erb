@@ -202,6 +202,19 @@
             <th>Specification</th>
             <td><%= @release_note.specification %></td>
           </tr>
+          <% if @release_note.has_thickness_measurements? %>
+            <tr>
+              <th>Measured Thicknesses</th>
+              <td>
+                <% ReleaseNote::THICKNESS_POSITIONS.each do |process_type, position| %>
+                  <% thickness = @release_note.get_thickness(process_type) %>
+                  <% if thickness.present? %>
+                    <%= process_type.humanize.gsub('_', ' ').titleize %>: <strong><%= thickness %> µm</strong><br/>
+                  <% end %>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
           <tr>
             <th>Quantity Accepted</th>
             <td><%= @release_note.quantity_accepted %></td>
@@ -218,19 +231,6 @@
             <tr>
               <th>Remarks</th>
               <td><%= simple_format(@release_note.remarks) %></td>
-            </tr>
-          <% end %>
-          <% if @release_note.has_thickness_measurements? %>
-            <tr>
-              <th>Measured Thicknesses</th>
-              <td>
-                <% ReleaseNote::THICKNESS_POSITIONS.each do |process_type, position| %>
-                  <% thickness = @release_note.get_thickness(process_type) %>
-                  <% if thickness.present? %>
-                    <%= process_type.humanize.gsub('_', ' ').titleize %>: <strong><%= thickness %> µm</strong><br/>
-                  <% end %>
-                <% end %>
-              </td>
             </tr>
           <% end %>
           <% if @release_note.has_thickness_measurements? %>

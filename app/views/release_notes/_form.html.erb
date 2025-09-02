@@ -72,11 +72,9 @@
                       <span class="text-red-500">*</span>
                     </label>
                     <div class="mt-1 relative rounded-md shadow-sm">
-                      <%= number_field_tag field_name, current_value,
+                      <%= text_field_tag field_name, current_value,
                             id: field_name,
-                            step: 0.1,
-                            min: 0.1,
-                            max: 1000,
+                            pattern: "[0-9]+(\.[0-9]+)?",
                             placeholder: "e.g. 25.4",
                             class: "block w-full pr-12 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
                             required: true %>
