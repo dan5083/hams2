@@ -304,6 +304,23 @@ class WorksOrder < ApplicationRecord
     end
   end
 
+  # Invoice and delivery information for release notes
+  def invoice_customer_name
+    customer_name
+  end
+
+  def invoice_address
+    customer&.contact_address
+  end
+
+  def delivery_customer_name
+    customer_name
+  end
+
+  def delivery_address
+    customer&.contact_address
+  end
+
   private
 
   def set_defaults
@@ -360,22 +377,6 @@ class WorksOrder < ApplicationRecord
 
   def part_changed?
     part_id_changed?
-  end
-
-  def invoice_customer_name
-    customer_name
-  end
-
-  def invoice_address
-    customer&.contact_address
-  end
-
-  def delivery_customer_name
-    customer_name
-  end
-
-  def delivery_address
-    customer&.contact_address
   end
 
   def update_open_status
