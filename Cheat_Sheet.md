@@ -90,22 +90,25 @@ for f in app/views/transport_methods/*.html.erb; do echo "=== $f ==="; cat "$f";
 for f in app/views/works_orders/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
 for f in app/views/xero_auth/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
 
-# Show all js controllers with filenames as headers:
-for file in app/javascript/controllers/**/[a-z]*_controller.js; do echo "=== $file ==="; cat "$file"; echo; done
 
+<!-- HOW TO SEQUENCE FROM 1 -->
 
-<!-- # See the helpers
-for file in app/helpers/*.rb; do echo "=== $file ==="; cat "$file"; echo; done -->
-<!-- # See the logic classes for recovery tracking
-for file in app/logic/*.rb; do echo "=== $file ==="; cat "$file"; echo; done -->
+# Step 1: Start the console
+heroku console
 
+# Step 2: Clear the data (in the console) Clear dependent records first, then independent ones
+InvoiceItem.delete_all
+Invoice.delete_all
+ReleaseNote.delete_all
+WorksOrder.delete_all
+CustomerOrder.delete_all
+Part.delete_all
+Sequence.delete_all
 
+puts "All records cleared"
 
-# For all CSS files in stylesheets/Components A
-for file in app/assets/stylesheets/components/[a]*.css; do echo "=== $file ==="; cat "$file"; echo; done
-# For all CSS files in stylesheets/Components B
-for file in app/assets/stylesheets/components/[b]*.css; do echo "=== $file ==="; cat "$file"; echo; done
-# For all CSS files in stylesheets/Components C
-for file in app/assets/stylesheets/components/[c]*.css; do echo "=== $file ==="; cat "$file"; echo; done
-# For all CSS files in stylesheets/Components E–Z
-for file in app/assets/stylesheets/components/[e-z]*.css; do echo "=== $file ==="; cat "$file"; echo; done -->
+# Step 3: Create sequences (still in console) Create the required sequences
+['works_order_number', 'release_note_number', 'invoice_number', 'customer_order_number'].each do |key|
+  seq = Sequence.create!(key: key, value: 1)
+  puts "Created sequence: #{key} = #{seq.value}"
+end

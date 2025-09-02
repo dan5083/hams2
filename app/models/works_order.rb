@@ -362,6 +362,22 @@ class WorksOrder < ApplicationRecord
     part_id_changed?
   end
 
+  def invoice_customer_name
+    customer_name
+  end
+
+  def invoice_address
+    customer&.contact_address
+  end
+
+  def delivery_customer_name
+    customer_name
+  end
+
+  def delivery_address
+    customer&.contact_address
+  end
+
   def update_open_status
     return if voided_changed? # Don't auto-update if manually voided
 
