@@ -2,7 +2,7 @@
 class AdditionalChargePreset < ApplicationRecord
   validates :name, presence: true, uniqueness: true
   validates :amount, presence: true, numericality: { greater_than_or_equal_to: 0 }, unless: :is_variable
-  validates :calculation_type, inclusion: { in: %w[fixed weight_based variable] }, allow_blank: true
+  validates :calculation_type, inclusion: { in: %w[fixed weight_based variable weight_based_next_day weight_based_premium] }, allow_blank: true
 
   scope :enabled, -> { where(enabled: true) }
   scope :disabled, -> { where(enabled: false) }
