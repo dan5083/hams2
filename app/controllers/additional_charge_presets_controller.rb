@@ -1,6 +1,7 @@
 # app/controllers/additional_charge_presets_controller.rb
 class AdditionalChargePresetsController < ApplicationController
   before_action :set_additional_charge_preset, only: [:show, :edit, :update, :destroy, :toggle_enabled]
+  before_action :set_cache_headers
 
   def index
     @additional_charge_presets = AdditionalChargePreset.all.order(:name)
@@ -57,5 +58,11 @@ class AdditionalChargePresetsController < ApplicationController
 
   def additional_charge_preset_params
     params.require(:additional_charge_preset).permit(:name, :description, :amount, :is_variable, :calculation_type, :enabled)
+  end
+
+  def set_cache_headers
+    response.headers['Cache-Control'] = 'no-cache, no-store, max-age=0, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
   end
 end
