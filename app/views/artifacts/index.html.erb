@@ -4,7 +4,7 @@
     <h1 class="text-3xl font-bold text-gray-900">Artifacts Management</h1>
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
     <!-- Release Levels Card -->
     <div class="bg-white rounded-lg shadow-md p-6">
       <h2 class="text-xl font-semibold text-gray-800 mb-4">Release Levels</h2>
@@ -53,25 +53,50 @@
       </div>
     </div>
 
-    <!-- Quick Actions Card -->
+    <!-- Specification Presets Card -->
     <div class="bg-white rounded-lg shadow-md p-6">
-      <h2 class="text-xl font-semibold text-gray-800 mb-4">Quick Actions</h2>
-      <p class="text-gray-600 mb-4">Common administrative tasks.</p>
+      <h2 class="text-xl font-semibr text-gray-800 mb-4">Specification Presets</h2>
+      <p class="text-gray-600 mb-4">Manage treatment specification templates.</p>
+
+      <div class="space-y-2 text-sm mb-4">
+        <div><strong>Total:</strong> <%= @specification_presets_count %></div>
+        <div><strong>Enabled:</strong> <%= @enabled_specification_presets_count %></div>
+        <div><strong>Disabled:</strong> <%= @specification_presets_count - @enabled_specification_presets_count %></div>
+      </div>
 
       <div class="space-y-2">
-        <%= link_to new_customer_order_path,
-            class: "block w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded text-sm text-center" do %>
-          📋 New Customer Order
-        <% end %>
-
-        <%= link_to new_works_order_path,
+        <%= link_to specification_presets_path,
             class: "block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm text-center" do %>
-          🏭 New Works Order
+          📄 Manage Specifications
         <% end %>
 
-        <%= link_to root_path,
-            class: "block w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded text-sm text-center" do %>
-          🏠 Back to Dashboard
+        <%= link_to new_specification_preset_path,
+            class: "block w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded text-sm text-center" do %>
+          ➕ Add New Specification
+        <% end %>
+      </div>
+    </div>
+
+    <!-- Additional Charge Presets Card -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+      <h2 class="text-xl font-semibold text-gray-800 mb-4">Additional Charges</h2>
+      <p class="text-gray-600 mb-4">Manage additional charge presets and rates.</p>
+
+      <div class="space-y-2 text-sm mb-4">
+        <div><strong>Total:</strong> <%= @additional_charge_presets_count %></div>
+        <div><strong>Enabled:</strong> <%= @enabled_additional_charge_presets_count %></div>
+        <div><strong>Disabled:</strong> <%= @additional_charge_presets_count - @enabled_additional_charge_presets_count %></div>
+      </div>
+
+      <div class="space-y-2">
+        <%= link_to additional_charge_presets_path,
+            class: "block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm text-center" do %>
+          💰 Manage Charges
+        <% end %>
+
+        <%= link_to new_additional_charge_preset_path,
+            class: "block w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded text-sm text-center" do %>
+          ➕ Add New Charge
         <% end %>
       </div>
     </div>
@@ -83,9 +108,9 @@
       <div class="ml-3">
         <h3 class="text-sm font-medium text-blue-800">About Artifacts Management</h3>
         <div class="mt-2 text-sm text-blue-700">
-          <p>This page provides centralized access to manage release levels and transport methods
-          that are needed when creating works orders. Use these tools to set up the reference data
-          before creating works orders.</p>
+          <p>This page provides centralized access to manage all system reference data including
+          release levels, transport methods, specification presets, and additional charges.
+          Use these tools to maintain the reference data used throughout the application.</p>
         </div>
       </div>
     </div>

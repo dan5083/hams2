@@ -10,10 +10,24 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_08_28_080854) do
+ActiveRecord::Schema[8.0].define(version: 2025_09_02_100503) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
+
+  create_table "additional_charge_presets", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "name", null: false
+    t.text "description"
+    t.decimal "amount", precision: 10, scale: 2
+    t.boolean "is_variable", default: false, null: false
+    t.string "calculation_type"
+    t.boolean "enabled", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["enabled"], name: "index_additional_charge_presets_on_enabled"
+    t.index ["is_variable"], name: "index_additional_charge_presets_on_is_variable"
+    t.index ["name"], name: "index_additional_charge_presets_on_name", unique: true
+  end
 
   create_table "customer_orders", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "customer_id", null: false
@@ -151,6 +165,16 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_28_080854) do
     t.index ["user_id"], name: "index_sessions_on_user_id"
   end
 
+  create_table "specification_presets", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "name", null: false
+    t.text "content", null: false
+    t.boolean "enabled", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["enabled"], name: "index_specification_presets_on_enabled"
+    t.index ["name"], name: "index_specification_presets_on_name", unique: true
+  end
+
   create_table "transport_methods", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "name", null: false
     t.boolean "enabled", default: true, null: false
@@ -163,13 +187,17 @@ ActiveRecord::Schema[8.0].define(version: 2025_08_28_080854) do
 
   create_table "users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "email_address", null: false
-    t.string "password_digest", null: false
+    t.string "password_digest"
     t.string "username"
     t.string "full_name"
     t.boolean "enabled"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "magic_link_token"
+    t.datetime "magic_link_expires_at"
     t.index ["email_address"], name: "index_users_on_email_address", unique: true
+    t.index ["magic_link_expires_at"], name: "index_users_on_magic_link_expires_at"
+    t.index ["magic_link_token"], name: "index_users_on_magic_link_token", unique: true, where: "(magic_link_token IS NOT NULL)"
   end
 
   create_table "works_orders", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|

@@ -15039,3 +15039,715 @@ Migrating to AddMagicLinkIndexesToUsers (20250829095706)
   [1m[36mUser Exists? (1.0ms)[0m  [1m[34mSELECT 1 AS one FROM "users" WHERE "users"."username" = 'tariq.anwar.careers' LIMIT 1 /*application='Hams2'*/[0m
   [1m[36mUser Create (0.5ms)[0m  [1m[32mINSERT INTO "users" ("email_address", "password_digest", "username", "full_name", "enabled", "created_at", "updated_at", "magic_link_token", "magic_link_expires_at") VALUES ('careers@hardanodisingstl.com', '$2a$12$W0MKiI4yjwfxuf2PH4bWU.Feeuq0figqYMEjndsp0yuBmNeGD56si', 'tariq.anwar.careers', 'Tariq Anwar', TRUE, '2025-09-01 11:41:47.513555', '2025-09-01 11:41:47.513555', NULL, NULL) RETURNING "id" /*application='Hams2'*/[0m
   [1m[36mTRANSACTION (5.5ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[36mActiveRecord::SchemaMigration Load (5.2ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.5ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (12.1ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'General' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (2.9ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('General', 'Certificate of conformity - We certify that the above work has been processed and inspected according to the terms of your order.', TRUE, '2025-09-02 10:00:00.760105', '2025-09-02 10:00:00.760105') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (10.7ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (15.6ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'For Non-Conforming Work' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.5ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('For Non-Conforming Work', 'Certificate of Conformity - We certify that the above work has been processed and inspected according to the requirements. REF CQS-00005568 Degresse to DS 26 00 (F3) SAE AMS 03-2 ANNEX C Electroless nickel plate to DS 26 22 ISS 14 AMS2402 CLASS 4 Nitric acid strip as required. Verification has been carried out only in respect of parameter relating to the enclosed reports.', TRUE, '2025-09-02 10:00:00.823596', '2025-09-02 10:00:00.823596') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.6ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (10.4ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'LPE ENP HEAT TREAT & CONVERSION COAT' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.8ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('LPE ENP HEAT TREAT & CONVERSION COAT', 'Certificate of Conformity - We certify that the above work has been processed and inspected according to the requirements of BSENISO4527:2021 HEAT TREAT BS EN ISO 4527:2021 PARA 6.12 CONVERSION COAT: DS26.00 ISS.37 D&B DS16.52 ISS.19 TYPE 2 CLASS 1A and the terms of your order.', TRUE, '2025-09-02 10:00:00.867705', '2025-09-02 10:00:00.867705') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.8ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.1ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'LPE HEAT TREAT/CONVERSION COAT' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.5ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('LPE HEAT TREAT/CONVERSION COAT', 'Certificate of Conformity - We certify that the above work has been processed and inspected according to the requirements of BSENISO4527:2021 PCP-2073 ISS 1. HEAT TREAT BSENISO4527:2021 PARA 6.12 CONVERSION COAT: DS26.00 ISS.37 D&B DS16.52 TYPE 2 CLASS 1A (ISSUE 19) and the terms of your order.', TRUE, '2025-09-02 10:00:00.883750', '2025-09-02 10:00:00.883750') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.4ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.4ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'Lufthansa chromic acid' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.4ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('Lufthansa chromic acid', 'Certificate of conformity - We certify that the above work has been processed according to the requirements of (for chromic acid anodising) 22 Volts IAW BAC5019 Class 3, and (for sealing) MIL-A-8625F, Type 1 (MIL-A8625 PARAGRAPH 3.8.1.1) instead of BAC5019. Refer to SR 4-5653901371 and the terms of your order, and inspected. A dry film thickness report has been attached.', TRUE, '2025-09-02 10:00:00.898448', '2025-09-02 10:00:00.898448') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.8ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.4ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.5ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'Lymington nickel' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.5ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('Lymington nickel', 'Certificate of conformity - We certify that the above work has been processed and inspected according to the requirements of DS26.00, BS EN ISO 4527 and the terms of your PCP order.', TRUE, '2025-09-02 10:00:00.914453', '2025-09-02 10:00:00.914453') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (6.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.1ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'TI 5031 & MIL-DTL-5541 Type 2 Class 3' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.7ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('TI 5031 & MIL-DTL-5541 Type 2 Class 3', 'Certificate of conformity - We certify that the above work has been processed and inspected according to the requirements of TI 5031 & MIL-DTL-5541 Type 2 Class 3 and the terms of your order.', TRUE, '2025-09-02 10:00:00.929351', '2025-09-02 10:00:00.929351') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (6.0ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.1ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'RODFORD I.A.W DS26.00 F1 + AA (DS26.22) AMS 2404N CLASS 1.PRE HEAT TREAT AMS 2404 POST TREAT AMS 2759/9' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.6ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('RODFORD I.A.W DS26.00 F1 + AA (DS26.22) AMS 2404N CLASS 1.PRE HEAT TREAT AMS 2404 POST TREAT AMS 2759/9', 'WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED ACCORDING TO THE REQUIREMENTS OF ENP I.A.W DS26.00 F1 + AA (DS26.22) AMS2404 CLASS 1 MID-PHOS DEPOSIT RANGE OF BETWEEN 5-9% COATING THICKNESS TO BE 12 MICRONS (0.0005") PRE HEAT TREAT @ 191 DEG C +/- 14 DEG C FOR 4 HOURS (AS PER AMS 2404) POST HEAT TREAT @ 191 DEG C +/- 14 DEG C FOR 23 HOURS MIN (AS PER AMS 2759/9).', TRUE, '2025-09-02 10:00:00.944398', '2025-09-02 10:00:00.944398') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.6ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.1ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'BSEN12373-1:2001 CLASS 25 EO' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.6ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('BSEN12373-1:2001 CLASS 25 EO', 'WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED ACCORDING TO THE REQUIREMENT OF BSEN12373-1:2001 CLASS 25 EO.', TRUE, '2025-09-02 10:00:00.959524', '2025-09-02 10:00:00.959524') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.6ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.5ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'LUFTHANSA. MIL-A-8625 TYPE 111 & BAC5821' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.8ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('LUFTHANSA. MIL-A-8625 TYPE 111 & BAC5821', 'WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED ACCORDING TO THE REQUIREMENT OF MIL-A-8625 TYPE 111 & BAC5821 SECTION IV RDR HPA-AFA-16-0103-02B BOEING BAC & SOPM PROCESS SPEC & PRACTICE ANUAL (S) WHICH ARE DETAILED ON THE LTLGS PURCHASE ORDER(S) ISSUED.', TRUE, '2025-09-02 10:00:00.974201', '2025-09-02 10:00:00.974201') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.6ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.9ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'LUFTHANSA MIL-A-8625 & MIL-C-5541' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.4ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('LUFTHANSA MIL-A-8625 & MIL-C-5541', 'WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED ACCORDING TO THE REQUIREMENT OF BAC5019 MIL-A-8625 CLASS 1 TYPE 1B & ALOCROM 1200 MIL-C-5541 CLASS 1A OR BAC5719 CLASS A OR C. & PROCESSED TO SPECIFICITIONS & PRACTICE MANUAL WHICH ISSUED. REF SR 4-5653901371.', TRUE, '2025-09-02 10:00:00.989427', '2025-09-02 10:00:00.989427') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.8ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.2ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'MIL-A-8625 TYPE 3 CLASS 1 & MIL-A-8625 TYPE 1 CLASS 1' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.5ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('MIL-A-8625 TYPE 3 CLASS 1 & MIL-A-8625 TYPE 1 CLASS 1', 'Certificate of Conformity - WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED ACCORDING TO THE REQUIREMENTS OF MIL-A-8625 TYPE 3 CLASS 1 & MIL-A-8625 TYPE 1 CLASS 1 (HOT WATER SEAL) & THE TERMS OF ORDER & INSPECTED. VERIFICATION HAS BEEN CARRIED OUT ONLY IN RESPECT OF PARAMETERS RELATING TO ENCLOSED REPORTS.', TRUE, '2025-09-02 10:00:01.003958', '2025-09-02 10:00:01.003958') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.6ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.3ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'Certificate of conformity AS9100 & BS EN ISO 9001 2015' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.6ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('Certificate of conformity AS9100 & BS EN ISO 9001 2015', 'Certificate of conformity - We certify that the above work has been processed and inspected according to the requirements of our AS9100 & BS EN ISO registration. In addition, the abovementioned works were carried out to [SPECIFICATION], and the terms of your order. HARD ANODISING SURFACE TREATMENTS LTD has been assessed and registered by NQA against the provisions of AS9100D & BS EN ISO 9001 2015. Certificate No: 22732 Hard Anodising Surface Treatments Limited has NADCAP accreditation for Chemical Processing Certificate Number 7426210256.', TRUE, '2025-09-02 10:00:01.018298', '2025-09-02 10:00:01.018298') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.5ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.2ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'Inflite ENP with Vapour blast' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.5ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('Inflite ENP with Vapour blast', 'CERTIFICATE OF CONFORMITY - We certify that the above work has been processed and inspected according to our AS9100 & BS EN ISO registration requirements. In addition, the abovementioned works were carried out to, DS26.00AA & DS26.22 ISS.14. VAPOUR BLAST DEF STAN 03-02, CQS-00005568, and the terms of your order. HARD ANODISING SURFACE TREATMENTS LTD has been assessed and registered by NQA against AS9100D & BS EN ISO 9001 2015 provisions. Certificate No: 22732 Hard Anodising Surface Treatments Limited has NADCAP accreditation for Chemical Processing Certificate Number 7426210256.', TRUE, '2025-09-02 10:00:01.033300', '2025-09-02 10:00:01.033300') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.6ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.0ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'TITANIUM ANODISE DTD 942' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.5ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('TITANIUM ANODISE DTD 942', 'WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED ACCORDING TO THE REQ. OF DTD 942 & THE TERMS OF YOUR ORDER & INSPECTED.', TRUE, '2025-09-02 10:00:01.047245', '2025-09-02 10:00:01.047245') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.7ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.6ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'LYMINGTON BSENISO4527:2021 PCP-2073' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.4ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('LYMINGTON BSENISO4527:2021 PCP-2073', 'CERTIFICATE OF CONFORMITY: - We certify that the above work has been processed, and inspected according to the requirements OF PARA 6.12 CONVERSION COAT: DS26.00 ISS.37 D&B DS16.52 ISS.19 TYPE 2 CLASS 1A & TERMS OF YOUR ORDER.', TRUE, '2025-09-02 10:00:01.062259', '2025-09-02 10:00:01.062259') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.8ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.5ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'LYMINGTON ENP & SURTEC' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.5ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('LYMINGTON ENP & SURTEC', 'CERTIFICATE OF CONFORMITY- I CERTIFY THE ABOVE WORK HAS BEEN PROCESSED & INSPECTED TO THE REQUIREMENTS OF ELECTROLESS MEDIUM PHOS NICKEL PLATE. THICKNESS 45-55 MICRONS TO BSENISO4527:2003 & PCP-0597 ISS.9 ADHESION HEAT TREAT TO BS EN ISO 4527:2003 PARA 6.12 SURTEC 650. TO DS26.00. ISS.37 D&B & PCP-0597 ISS 9 & THE TERMS OF YOUR ORDER.', TRUE, '2025-09-02 10:00:01.077099', '2025-09-02 10:00:01.077099') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.6ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.4ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'SURTEC 650V DS26.00 & PCP-0597' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.5ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('SURTEC 650V DS26.00 & PCP-0597', 'Certificate of Conformity I certify that the above work has been processed and inspected according to the requirements of SURTEC 650V DS26.00 ISS.37 D&B & PCP-0597 ISS 9 and the terms of your order.', TRUE, '2025-09-02 10:00:01.091446', '2025-09-02 10:00:01.091446') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (7.1ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.3ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'RBT-PS-SPS03-V3' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.4ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('RBT-PS-SPS03-V3', 'Certificate of Conformity I certify that the above work has been processed and inspected according to the requirements of RBT-PS-SPS03-V3 and the terms of your order.', TRUE, '2025-09-02 10:00:01.107688', '2025-09-02 10:00:01.107688') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (6.1ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.4ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'LYMINGTON ENP PCP-2073' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.9ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('LYMINGTON ENP PCP-2073', 'CERTIFICATE OF CONFORMITY- WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED & INSPECTED ACCORDING TO THE REQUIREMENTS OF YOUR ORDER: ELECTROLESS NICKEL PLATE IN ACCORDANCE WITH CMS QUALITY PLAN PCP-2073. ELECTROLESS MEDIUM PHOSPHOROUS (6-8%) NICKEL PLATE IN ACCORDANCE WITH BSENISO 4527 & PCP-2073. PLATING THICKNESS 45-55 MICRONS. HEAT TREAT 1 HOUR AT 120C CELSIUS IN ACCORDANCE WITH BSENISO 4527 PARA 6.12. ENP CONVERSION COAT ENTIRE TUBE VIA SUBMERSION PROCESS IN ACCORDANCE WITH DS 26.00 CODE D&B ISS 37 & PCP-2073.', TRUE, '2025-09-02 10:00:01.122290', '2025-09-02 10:00:01.122290') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (6.2ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.2ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'STRIP & CHROMIC ANODISE LUFTHANSA' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.5ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('STRIP & CHROMIC ANODISE LUFTHANSA', 'CERTIFICATE OF CONFORMITY - WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED ACCORDING TO THE REQUIREMENTS STATED ON THE ORDER: STRIP HARD ANODISE FROM THE OD & CHROMIC ACID ANODISE FROM THE REMAINING AREAS PER MIL-A-8625 TYPE 1 CLASS 1.', TRUE, '2025-09-02 10:00:01.154068', '2025-09-02 10:00:01.154068') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (6.0ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (1.8ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'LUFTHANSA - SPACER STRIP & RE HARD ANODISE' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.3ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('LUFTHANSA - SPACER STRIP & RE HARD ANODISE', 'CERTIFICATE OF CONFORMITY- WE CERTIFY THAT THE ABOVE HAS BEEN PROCESSED & INSPECTED ACCORDING TO THE REQUIREMENTS OF YOUR ORDER & STRIP & HARD ANODISE SOPM 20-30-02. RE-HARD ANODISE PER MIL-A-8625,TYPE 111 BUT WITH BAC5821 SECTION 11 CLASS 11. HPA-AFA-16-0103-02B.', TRUE, '2025-09-02 10:00:01.167664', '2025-09-02 10:00:01.167664') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (1.9ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'LUFT-SULPHURIC ANODISE' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.4ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('LUFT-SULPHURIC ANODISE', 'CERTIFICATE OF CONFORMITY- WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED & INSPECTED ACCORDING TO THE REQUIREMENTS - SULPHURIC ACID ANODISE MIL-A-8625,TYPE 2.', TRUE, '2025-09-02 10:00:01.182820', '2025-09-02 10:00:01.182820') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.7ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.2ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'LUFT CHROMIC MIL-A-8625, TYPE 1B,CLASS 1 REQTS' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.4ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('LUFT CHROMIC MIL-A-8625, TYPE 1B,CLASS 1 REQTS', 'CERTIFICATE OF CONFORMITY- WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED ACCORDING TO THE REQUIREMENTS OF CHROMIC ACID ANODISE RE WORKED AREAS PER MIL-A-8625, TYPE 1B, CLASS 1 REQTS. REF P/N-2143M6265-1.', TRUE, '2025-09-02 10:00:01.196985', '2025-09-02 10:00:01.196985') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.7ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.1ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'LUFTHANSA - MIL-A-8625' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.6ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('LUFTHANSA - MIL-A-8625', 'CERTIFICATE OF CONFORMITY - WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED ACCORDING TO THE REQUIREMENTS STATED ON THE ORDER: CHROMIC ACID ANODISE AT 22 VOLTS IN ACCORDANCE WITH BAC5019, CLASS 3 AND AS SPECIFIED IN PROVIDED CMM FIGURES. SEALING IAW MIL-A-8625, TYPE 1, CLASS 1 SEAL (MIL-A8625 PARAGRAPH 3.8.1.1) IN LIEU OF BAC5019. REFER TO SR 4-5653901371.', TRUE, '2025-09-02 10:00:01.214746', '2025-09-02 10:00:01.214746') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (8.2ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.0ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'LUFT-VALCE-RECOIL 161A1162-1' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.5ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('LUFT-VALCE-RECOIL 161A1162-1', 'CERTIFICATE OF CONFORMITY- WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED ACCORDING TO THE REQUIREMENTS OF YOUR ORDER- CHROMIC ANODISE AT 22 VOLTS IN ACCORDANCE WITH BAC5019,CLASS 3 & AS SPECIFIED IN PROVIDED CMM FIGURES. CARRY OUT SEALING IAW MIL-A-8625,TYP 1,CLASS 1 SEAL (MIL-A-8625 PARAGRAPH 3.8.1.1) IN LIEU OF BAC5019 REF SR 4-5653901371. REF P/N 161A1162-1.', TRUE, '2025-09-02 10:00:01.231334', '2025-09-02 10:00:01.231334') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.6ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (1.9ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'LUFTHANSA - STRIP' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.3ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('LUFTHANSA - STRIP', 'CERTIFICATE OF CONFORMITY- WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED ACCORDING TO THE REQUIREMENTS STATED ON YOUR ORDER: STRIP ALL CHROMIC ACID ANODISE FROM PART 20-43-03 BAC5765. REF P/N 275A5302-2 CMM 32-21-12 REV -67 DATED 01.03.2023.', TRUE, '2025-09-02 10:00:01.246787', '2025-09-02 10:00:01.246787') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.6ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.5ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'SURTEC 650V & ENP' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.5ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('SURTEC 650V & ENP', 'CERTIFICATE OF CONFORMITY- I CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED AND INSPECTED ACCORDING TO THE REQUIREMENTS OF SURTEC 650V DS26.00 ISS.37 D&B PCP-0597 ISS 9 & ENP CONVERSION COAT IAW DS 26.00 D&B ISSUE 37 AND TERMS OF YOUR ORDER.', TRUE, '2025-09-02 10:00:01.260569', '2025-09-02 10:00:01.260569') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (6.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (3.1ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'LYM- ENP SURTEC' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.6ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('LYM- ENP SURTEC', 'CERTIFICATE OF CONFORMITY- I CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED & INSPECTED ACCORDING TO THE REQUIREMENTS OF BSENISO4527:2021 PCP-597 ISS. 9 HEAT TREAT BSENISO4527:2021 PARA 6.12 CONVERSION COAT DS26.00 ISS.37 D&B DS16.52 TYPE 2 CLASS 1A (ISSUE 19) SURTEC 650 & THE TERMS OF YOUR ORDER.', TRUE, '2025-09-02 10:00:01.277695', '2025-09-02 10:00:01.277695') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.7ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.1ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'LPE PCP-597 ISS. 9' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.4ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('LPE PCP-597 ISS. 9', 'CERTIFICATE OF CONFORMITY- I CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED & INSPECTED ACCORDING TO THE REQUIREMENTS OF BSENISO4527:2021. PCP-597 ISS. 9 HEAT TREAT BSENISO4527:2021 PARA 6.12 CONVERSION COAT DS26.00 ISS.37 D&B DS16.52 TYPE 2 CLASS 1A (ISS.19) & THE TERMS OF YOUR ORDER.', TRUE, '2025-09-02 10:00:01.292070', '2025-09-02 10:00:01.292070') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (6.0ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.9ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'OTTAWAY- BELL HSG' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.5ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('OTTAWAY- BELL HSG', 'CERTIFICATE OF CONFORMITY- I CERTIFY THE ABOVE WORK HAS BEEN PROCESSED & INSPECTED TO THE REQUIREMENTS OF OUR AS9100 & BS EN ISO REGISTRATION. IN ADDITION, THE ABOVE MENTIONED WORKS WERE CARRIED OUT TO, HARD ANODISE 21 TO 28 MICRONS IAW DS26.00 F3 + D4B ISSUE 37-(NOTE 2B NICKEL ACETATE SEAL MIL-A-8625 TYPE III) INCLUDING AFTER TREATMENT ISS 17 NOTE 2 ON DRG. IRIDITE MIL-DTL-5541F,TYPE II,CLASS 3. TEST IS NOT REQUIRED AS STATED ON THE DRAWING., AND THE TERMS OF YOUR ORDER. HARD ANODISING SURFACE TREATMENTS LTD HAS BEEN ASSESSED & REGISTERED BY NQA AGAINST THE PROVISIONS OF AS9100D & BS EN ISO 9001:2015. CERTIFICATE NO: 22732 HARD ANODISING SURFACE TREATMENTS LTD HAS NADCAP ACCREDITATION FOR CHEMICAL PROCESSING CERTIFICATE NUMBER 7426210256.', TRUE, '2025-09-02 10:00:01.307040', '2025-09-02 10:00:01.307040') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.3ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'LYMINGTON- TUBE #1' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.5ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('LYMINGTON- TUBE #1', 'CERTIFICATE OF CONFORMITY- WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED & INSPECTED ACCORDING TO THE REQUIREMENTS OF OUR AS9100 & BS EN ISO REGISTRATION. IN ADDITION, THE ABOVE MENTIONED WORKS WERE CARRIED OUT TO, DS26.00 ISS.37 F3 DS26.44 ISS.9. D4 DS26.03 ISS.15 HARD ANODISE TO BSS599 DICHROMATE SEAL 0.8450 055MM THICK SURFACE GROWTH = 0.025. ALOCROM I.A.W DS16.52 ISS.19, AND THE TERMS OF YOUR ORDER.', TRUE, '2025-09-02 10:00:01.322199', '2025-09-02 10:00:01.322199') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (6.1ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.3ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'Ottaway - RIB' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.4ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('Ottaway - RIB', 'CERTIFICATE OF CONFORMITY- I CERTIFY THE ABOVE WORK HAS BEEN PROCESSED & INSPECTED TO THE REQUIREMENTS OF OUR AS9100 & BS EN ISO REGISTRATION. IN ADDITION, THE ABOVE MENTIONED WORKS WERE CARRIED OUT TO, HARD ANODISE 27.0 TO 28.8 MICRONS DS26.00 F3 + D4C ISS.37. IRIDITE I.A.W DS26.00 D6B ISS.37 SAE AMS 2402 PARA 3.3.4 COEFFICIENT OF FRICTION TEST IS NOT REQUIRED AS STATED ON THE DRAWING, AND THE TERMS OF YOUR ORDER. HARD ANODISING SURFACE TREATMENTS LTD HAS BEEN ASSESSED & REGISTERED BY NQA AGAINST THE PROVISIONS OF AS9100D & BS EN ISO 9001:2015. CERTIF NO:22732 HARD ANODISING SURFACE TTREAMENTS LTD HAS NADCAP ACCREDITATION FOR CHEMICAL PROCESSING CERTIFICATE NUMBER 7426210256.', TRUE, '2025-09-02 10:00:01.336863', '2025-09-02 10:00:01.336863') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.2ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'OTTAWAY- OUTER CASING' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.5ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('OTTAWAY- OUTER CASING', 'CERTIFICATE OF CONFORMITY- I CERTIFY THE ABOVE WORK HAS BEEN PROCESSED & INSPECTED TO THE REQUIREMENTS OF OUR AS9100 & BS EN ISO REGISTRATION. IN ADDITION, THE ABOVE MENTIONED WORKS WERE CARRIED OUT TO, I.A.W DS26.00 F3 + D4B ISS.37 HARD ANODISE 21 TO 28 MICRONS MIL-A-8625 TYPE III. IRIDITE MIL-DTL-5541F,TYPE II,CLASS 3. TEST IS NOT REQUIRED AS STATED ON THE DRAWING , AND THE TERMS OF YOUR ORDER. HARD ANODISING SURFACE TREATMENTS LTD HAS BEEN ASSESSED & REGISTERED BY NQA AGAINST THE PROVISIONS OF AS9100D & BS EN ISO 9001:2015. CERTIFICATE NO: 22732 HARD ANODISE SURFACE TREATMENTS LTD HAS NADCAP ACCREDITATION FOR CHEMICAL PROCESSING CERTIFICATE NUMBER 7426210256.', TRUE, '2025-09-02 10:00:01.350821', '2025-09-02 10:00:01.350821') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.6ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.0ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'OTTAWAY- RIB,ROBUST HIGH SPEED V20' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.3ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('OTTAWAY- RIB,ROBUST HIGH SPEED V20', 'CERTIFICATE OF CONFORMITY- I CERTIFY THE ABOVE WORK HAS BEEN PROCESSED & INSPECTED TO THE REQUIREMENTS OF OUR AS9100 & BS EN ISO REGISTRATION. IN ADDITION, THE ABOVE MENTIONED WORKS WERE CARRIED OUT TO, HARD ANODISE 25 TO 28 MICRONS DS26.00 F3 + D4A ISS.37. BRUSH ALOCROM I.A.W DS26.00 D6B ISS.37 SAE AMS 2402. TYPE I PARA 3.3.4 COEFFICIENT OF FRICTION TEST IS NOT REQUIRED AS STATED ON THE DRAWING, AND THE TERMS OF YOUR ORDER. HARD ANODISING SURFACE TREATMENTS LTD HAS BEEN ASSESSED & REGISTERED BY NQA AGAINST THE PROVISIONS OF AS9100D & BS EN ISO 9001:2015. CERTIFICATE NO: 22732 HARD ANODISING SURFACE TTREAMENTS LTD HAS NADCAP ACCREDITATION FOR CHEMICAL PROCESSING CERTIFICATE NUMBER 7426210256.', TRUE, '2025-09-02 10:00:01.364581', '2025-09-02 10:00:01.364581') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.6ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Exists? (2.0ms)[0m  [1m[34mSELECT 1 AS one FROM "release_levels" WHERE "release_levels"."name" = 'OTTAWAY- BALL JOINT' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Create (0.7ms)[0m  [1m[32mINSERT INTO "release_levels" ("name", "statement", "enabled", "created_at", "updated_at") VALUES ('OTTAWAY- BALL JOINT', 'CERTIFICATE OF CONFORMITY- WE CERTIFY THAT THE ABOVE WORK HAS BEEN PROCESSED & INSPECTED ACCORDING TO THE REQUIREMENTS DEGRESSE TO DS26.00 F2 ISS.37 AS PER NOTE 7. ON DRG. TREAT AMS2454A GRADE 2,TYPE 4,CLASS 2 AS PER NOTE 7. ON DRG. INCLUDING POST PLATING TEST. DISREGARDING NOTE 7.E.INTERNAL DIA MARKED #### WILL BE MACHINED AFTER TREATMENT TO SATISFY NOTE 7.E HARDNESS OF 383 HK ACHIEVED. 7.6 TO 9 MICRONS. STAINLESS STEEL.', TRUE, '2025-09-02 10:00:01.377683', '2025-09-02 10:00:01.377683') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.7ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mReleaseLevel Count (3.2ms)[0m  [1m[34mSELECT COUNT(*) FROM "release_levels" /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (2.1ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (1.9ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (3.8ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+Migrating to CreateSpecificationPresets (20250902100501)
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (91.8ms)[0m  [1m[35mCREATE TABLE "specification_presets" ("id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, "name" character varying NOT NULL, "content" text NOT NULL, "enabled" boolean DEFAULT TRUE NOT NULL, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL) /*application='Hams2'*/[0m
+  [1m[35m (15.0ms)[0m  [1m[35mCREATE INDEX "index_specification_presets_on_enabled" ON "specification_presets" ("enabled") /*application='Hams2'*/[0m
+  [1m[35m (13.2ms)[0m  [1m[35mCREATE UNIQUE INDEX "index_specification_presets_on_name" ON "specification_presets" ("name") /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Create (1.1ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES ('20250902100501') RETURNING "version" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (10.2ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+Migrating to CreateAdditionalChargePresets (20250902100503)
+  [1m[36mTRANSACTION (0.7ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (23.6ms)[0m  [1m[35mCREATE TABLE "additional_charge_presets" ("id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY, "name" character varying NOT NULL, "description" text, "amount" decimal(10,2), "is_variable" boolean DEFAULT FALSE NOT NULL, "calculation_type" character varying, "enabled" boolean DEFAULT TRUE NOT NULL, "created_at" timestamp(6) NOT NULL, "updated_at" timestamp(6) NOT NULL) /*application='Hams2'*/[0m
+  [1m[35m (9.8ms)[0m  [1m[35mCREATE INDEX "index_additional_charge_presets_on_enabled" ON "additional_charge_presets" ("enabled") /*application='Hams2'*/[0m
+  [1m[35m (11.1ms)[0m  [1m[35mCREATE UNIQUE INDEX "index_additional_charge_presets_on_name" ON "additional_charge_presets" ("name") /*application='Hams2'*/[0m
+  [1m[35m (10.8ms)[0m  [1m[35mCREATE INDEX "index_additional_charge_presets_on_is_variable" ON "additional_charge_presets" ("is_variable") /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Create (0.4ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES ('20250902100503') RETURNING "version" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (6.2ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[35m (0.6ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (2.0ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[36mActiveRecord::SchemaMigration Load (1.9ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[36mActiveRecord::SchemaMigration Load (1.9ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (12.3ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'DS 26 00 D&B, BS EN ISO 4527' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (3.2ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('DS 26 00 D&B, BS EN ISO 4527', 'DS 26 00 D&B, BS EN ISO 4527 specification requirements', TRUE, '2025-09-02 10:34:10.582597', '2025-09-02 10:34:10.582597') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (10.1ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (4.5ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'BS ISO 10074-2021' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.5ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('BS ISO 10074-2021', 'BS ISO 10074-2021 specification requirements', TRUE, '2025-09-02 10:34:10.612344', '2025-09-02 10:34:10.612344') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (131.6ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.7ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (23.0ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'BA Tubes C5-35' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.7ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('BA Tubes C5-35', 'BA Tubes C5-35 specification requirements', TRUE, '2025-09-02 10:34:10.799793', '2025-09-02 10:34:10.799793') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (91.1ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.8ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (17.1ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'DEF STAN 03-5' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.7ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('DEF STAN 03-5', 'DEF STAN 03-5 specification requirements', TRUE, '2025-09-02 10:34:10.952136', '2025-09-02 10:34:10.952136') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (113.8ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (6.2ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'DEF STAN 03-24' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.2ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('DEF STAN 03-24', 'DEF STAN 03-24 specification requirements', TRUE, '2025-09-02 10:34:11.096454', '2025-09-02 10:34:11.096454') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (140.3ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (5.9ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'DEF STAN 03-24 & MIL-C-5541' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.3ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('DEF STAN 03-24 & MIL-C-5541', 'DEF STAN 03-24 & MIL-C-5541 specification requirements', TRUE, '2025-09-02 10:34:11.262036', '2025-09-02 10:34:11.262036') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (136.2ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.7ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (6.6ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'Chromic 914-032-095 & Hard 914-032031' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.8ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('Chromic 914-032-095 & Hard 914-032031', 'Chromic 914-032-095 & Hard 914-032031 specification requirements', TRUE, '2025-09-02 10:34:11.427632', '2025-09-02 10:34:11.427632') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (163.0ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (2.3ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'DEF STAN 03726' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.5ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('DEF STAN 03726', 'DEF STAN 03726 specification requirements', TRUE, '2025-09-02 10:34:11.601661', '2025-09-02 10:34:11.601661') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (181.5ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (5.8ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'DEF STAN 03725' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.2ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('DEF STAN 03725', 'DEF STAN 03725 specification requirements', TRUE, '2025-09-02 10:34:11.799959', '2025-09-02 10:34:11.799959') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (163.8ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.7ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (5.8ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'DEF 151 Type 3' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.1ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('DEF 151 Type 3', 'DEF 151 Type 3 specification requirements', TRUE, '2025-09-02 10:34:11.987731', '2025-09-02 10:34:11.987731') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (169.4ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (7.2ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'Hard 914-032-031' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.2ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('Hard 914-032-031', 'Hard 914-032-031 specification requirements', TRUE, '2025-09-02 10:34:12.183787', '2025-09-02 10:34:12.183787') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (171.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (6.2ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'BS 1615' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.9ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('BS 1615', 'BS 1615 specification requirements', TRUE, '2025-09-02 10:34:12.380377', '2025-09-02 10:34:12.380377') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (161.7ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (3.8ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'BS 5599' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.8ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('BS 5599', 'BS 5599 specification requirements', TRUE, '2025-09-02 10:34:12.555841', '2025-09-02 10:34:12.555841') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (172.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.8ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (7.2ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'PF16' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.2ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('PF16', 'PF16 specification requirements', TRUE, '2025-09-02 10:34:12.752505', '2025-09-02 10:34:12.752505') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (163.8ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (3.5ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'P2P1Z1956 & P2P1Z121947/10/25 (ENP)' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.7ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('P2P1Z1956 & P2P1Z121947/10/25 (ENP)', 'P2P1Z1956 & P2P1Z121947/10/25 (ENP) specification requirements', TRUE, '2025-09-02 10:34:12.932993', '2025-09-02 10:34:12.932993') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (153.2ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.4ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (3.9ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'TS2-25-102' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.9ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('TS2-25-102', 'TS2-25-102 specification requirements', TRUE, '2025-09-02 10:34:13.100201', '2025-09-02 10:34:13.100201') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (167.3ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.8ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (7.7ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'DEF STAN 03-18 (Alocrom)' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.7ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('DEF STAN 03-18 (Alocrom)', 'DEF STAN 03-18 (Alocrom) specification requirements', TRUE, '2025-09-02 10:34:13.290571', '2025-09-02 10:34:13.290571') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (133.7ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (7.3ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'TI 44/15' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.0ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('TI 44/15', 'TI 44/15 specification requirements', TRUE, '2025-09-02 10:34:13.449407', '2025-09-02 10:34:13.449407') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (126.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.7ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (7.2ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'MWSG000010000' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.3ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('MWSG000010000', 'MWSG000010000 specification requirements', TRUE, '2025-09-02 10:34:13.601463', '2025-09-02 10:34:13.601463') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (135.1ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.7ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (7.2ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'RC 2019' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.2ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('RC 2019', 'RC 2019 specification requirements', TRUE, '2025-09-02 10:34:13.764233', '2025-09-02 10:34:13.764233') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (137.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.7ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (6.9ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'NWS 1000/52-3' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.4ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('NWS 1000/52-3', 'NWS 1000/52-3 specification requirements', TRUE, '2025-09-02 10:34:13.926555', '2025-09-02 10:34:13.926555') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (121.3ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.7ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (39.5ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = '424/1000-88' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.3ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('424/1000-88', '424/1000-88 specification requirements', TRUE, '2025-09-02 10:34:14.198356', '2025-09-02 10:34:14.198356') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (6.7ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.4ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (3.2ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'RC2035' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.7ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('RC2035', 'RC2035 specification requirements', TRUE, '2025-09-02 10:34:14.220819', '2025-09-02 10:34:14.220819') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (7.6ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.4ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (6.8ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'MIL-DTL-5541F' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.0ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('MIL-DTL-5541F', 'MIL-DTL-5541F specification requirements', TRUE, '2025-09-02 10:34:14.245702', '2025-09-02 10:34:14.245702') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (132.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (6.7ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'BAC5821, CLASS 1' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.4ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('BAC5821, CLASS 1', 'BAC5821, CLASS 1 specification requirements', TRUE, '2025-09-02 10:34:14.400041', '2025-09-02 10:34:14.400041') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (9.5ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (7.0ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'ST-A-120' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.6ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('ST-A-120', 'ST-A-120 specification requirements', TRUE, '2025-09-02 10:34:14.430744', '2025-09-02 10:34:14.430744') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.4ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (2.8ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'RC2019A50' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.6ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('RC2019A50', 'RC2019A50 specification requirements', TRUE, '2025-09-02 10:34:14.447629', '2025-09-02 10:34:14.447629') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (131.3ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (5.7ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'ST-A-145 ISSUE 10' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (2.1ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('ST-A-145 ISSUE 10', 'ST-A-145 ISSUE 10 specification requirements', TRUE, '2025-09-02 10:34:14.727672', '2025-09-02 10:34:14.727672') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (9.2ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.7ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (6.3ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'RC2019AD50' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.6ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('RC2019AD50', 'RC2019AD50 specification requirements', TRUE, '2025-09-02 10:34:14.758755', '2025-09-02 10:34:14.758755') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (132.7ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (5.6ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'AMS 03-25 & BS ISO 10074' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.2ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('AMS 03-25 & BS ISO 10074', 'AMS 03-25 & BS ISO 10074 specification requirements', TRUE, '2025-09-02 10:34:14.909412', '2025-09-02 10:34:14.909412') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (122.8ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.7ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (6.1ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'RC2139W' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.6ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('RC2139W', 'RC2139W specification requirements', TRUE, '2025-09-02 10:34:15.054294', '2025-09-02 10:34:15.054294') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (150.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.7ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (6.0ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'SAE AMS 03-25, BS ISO 10074:2010 & WSHTDS2785' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.8ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('SAE AMS 03-25, BS ISO 10074:2010 & WSHTDS2785', 'SAE AMS 03-25, BS ISO 10074:2010 & WSHTDS2785 specification requirements', TRUE, '2025-09-02 10:34:15.224046', '2025-09-02 10:34:15.224046') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (128.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (7.4ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'APRT0053' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.6ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('APRT0053', 'APRT0053 specification requirements', TRUE, '2025-09-02 10:34:15.378500', '2025-09-02 10:34:15.378500') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (121.2ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (6.1ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'SPS03' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.2ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('SPS03', 'SPS03 specification requirements', TRUE, '2025-09-02 10:34:15.519038', '2025-09-02 10:34:15.519038') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (120.1ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (5.8ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'ST-A-142' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.7ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('ST-A-142', 'ST-A-142 specification requirements', TRUE, '2025-09-02 10:34:15.658765', '2025-09-02 10:34:15.658765') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (109.4ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (5.7ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'APRT0004' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.1ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('APRT0004', 'APRT0004 specification requirements', TRUE, '2025-09-02 10:34:15.785261', '2025-09-02 10:34:15.785261') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (109.7ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (6.2ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'MIL-PRF-8625 (issue F2) & MIL-DTL-5541F' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.8ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('MIL-PRF-8625 (issue F2) & MIL-DTL-5541F', 'MIL-PRF-8625 (issue F2) & MIL-DTL-5541F specification requirements', TRUE, '2025-09-02 10:34:15.917059', '2025-09-02 10:34:15.917059') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (114.2ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (6.2ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'MIL-PRF-8625 (issue F2) TYPE III, Class 1' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.2ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('MIL-PRF-8625 (issue F2) TYPE III, Class 1', 'MIL-PRF-8625 (issue F2) TYPE III, Class 1 specification requirements', TRUE, '2025-09-02 10:34:16.051420', '2025-09-02 10:34:16.051420') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (114.6ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (6.1ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'MIL-PRF-8625 (issue F2) TYPE I, Class 1' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.2ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('MIL-PRF-8625 (issue F2) TYPE I, Class 1', 'MIL-PRF-8625 (issue F2) TYPE I, Class 1 specification requirements', TRUE, '2025-09-02 10:34:16.187956', '2025-09-02 10:34:16.187956') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (83.4ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (2.9ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'MIL-PRF-8625 (issue F2) TYPE II Class 1' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.7ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('MIL-PRF-8625 (issue F2) TYPE II Class 1', 'MIL-PRF-8625 (issue F2) TYPE II Class 1 specification requirements', TRUE, '2025-09-02 10:34:16.308203', '2025-09-02 10:34:16.308203') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (113.0ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (2.5ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'WSTI 5031' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.5ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('WSTI 5031', 'WSTI 5031 specification requirements', TRUE, '2025-09-02 10:34:16.433573', '2025-09-02 10:34:16.433573') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (112.1ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (2.4ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'AD00376/CA1' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.4ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('AD00376/CA1', 'AD00376/CA1 specification requirements', TRUE, '2025-09-02 10:34:16.556814', '2025-09-02 10:34:16.556814') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (114.3ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.7ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (6.1ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'BS EN ISO 4527:2003 (ENP)' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.2ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('BS EN ISO 4527:2003 (ENP)', 'BS EN ISO 4527:2003 (ENP) specification requirements', TRUE, '2025-09-02 10:34:16.686467', '2025-09-02 10:34:16.686467') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (102.6ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (2.3ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'AMS2469G' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.3ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('AMS2469G', 'AMS2469G specification requirements', TRUE, '2025-09-02 10:34:16.805724', '2025-09-02 10:34:16.805724') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (112.2ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (6.2ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'TS-112 D4A' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.2ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('TS-112 D4A', 'TS-112 D4A specification requirements', TRUE, '2025-09-02 10:34:16.935035', '2025-09-02 10:34:16.935035') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (98.8ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.4ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (4.3ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'R4 003' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.7ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('R4 003', 'R4 003 specification requirements', TRUE, '2025-09-02 10:34:17.051151', '2025-09-02 10:34:17.051151') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (106.5ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.7ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (6.3ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'RC2019AL50' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.3ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('RC2019AL50', 'RC2019AL50 specification requirements', TRUE, '2025-09-02 10:34:17.176988', '2025-09-02 10:34:17.176988') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (97.6ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (2.6ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'VS 1-3-5-104' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.9ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('VS 1-3-5-104', 'VS 1-3-5-104 specification requirements', TRUE, '2025-09-02 10:34:17.290143', '2025-09-02 10:34:17.290143') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (111.2ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.7ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (5.9ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'TI 5031' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.4ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('TI 5031', 'TI 5031 specification requirements', TRUE, '2025-09-02 10:34:17.420254', '2025-09-02 10:34:17.420254') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (101.0ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (5.8ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'R4 014' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.5ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('R4 014', 'R4 014 specification requirements', TRUE, '2025-09-02 10:34:17.543578', '2025-09-02 10:34:17.543578') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (118.5ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (7.3ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'R4 014 & R4 003' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.8ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('R4 014 & R4 003', 'R4 014 & R4 003 specification requirements', TRUE, '2025-09-02 10:34:17.688296', '2025-09-02 10:34:17.688296') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (102.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.7ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (6.0ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'APRT0005' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.8ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('APRT0005', 'APRT0005 specification requirements', TRUE, '2025-09-02 10:34:17.810854', '2025-09-02 10:34:17.810854') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (106.5ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (6.4ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = '0731-625' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.3ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('0731-625', '0731-625 specification requirements', TRUE, '2025-09-02 10:34:17.937525', '2025-09-02 10:34:17.937525') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (101.1ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (3.2ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'DS26.00' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.5ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('DS26.00', 'DS26.00 specification requirements', TRUE, '2025-09-02 10:34:18.053909', '2025-09-02 10:34:18.053909') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (112.4ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.4ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (3.5ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'TS-112 ISS.24 TS-130 ISS.3 D4A' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.8ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('TS-112 ISS.24 TS-130 ISS.3 D4A', 'TS-112 ISS.24 TS-130 ISS.3 D4A specification requirements', TRUE, '2025-09-02 10:34:18.179506', '2025-09-02 10:34:18.179506') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (119.0ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (6.6ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'TS2-23-28' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.7ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('TS2-23-28', 'TS2-23-28 specification requirements', TRUE, '2025-09-02 10:34:18.318372', '2025-09-02 10:34:18.318372') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (123.4ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (6.0ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'TS112 F3 + D4 (DEF STAN 03-26)' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (2.5ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('TS112 F3 + D4 (DEF STAN 03-26)', 'TS112 F3 + D4 (DEF STAN 03-26) specification requirements', TRUE, '2025-09-02 10:34:18.471140', '2025-09-02 10:34:18.471140') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (109.7ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (5.8ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'ALOCROM 1200 MIL-DTL-5541 & HARD ANODISE TI5031' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.3ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('ALOCROM 1200 MIL-DTL-5541 & HARD ANODISE TI5031', 'ALOCROM 1200 MIL-DTL-5541 & HARD ANODISE TI5031 specification requirements', TRUE, '2025-09-02 10:34:18.604049', '2025-09-02 10:34:18.604049') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (138.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (5.8ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'MIL-DTL-5541 Type 1, Class 3' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.8ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('MIL-DTL-5541 Type 1, Class 3', 'MIL-DTL-5541 Type 1, Class 3 specification requirements', TRUE, '2025-09-02 10:34:18.768455', '2025-09-02 10:34:18.768455') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (139.7ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (6.7ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'MSF045 PART 1 & MSF PART 2' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.5ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('MSF045 PART 1 & MSF PART 2', 'MSF045 PART 1 & MSF PART 2 specification requirements', TRUE, '2025-09-02 10:34:18.932805', '2025-09-02 10:34:18.932805') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (130.7ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.7ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (12.6ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'JPS047' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.3ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('JPS047', 'JPS047 specification requirements', TRUE, '2025-09-02 10:34:19.261756', '2025-09-02 10:34:19.261756') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (9.6ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.8ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (6.3ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'ISO 7599:2012' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (1.4ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('ISO 7599:2012', 'ISO 7599:2012 specification requirements', TRUE, '2025-09-02 10:34:19.295887', '2025-09-02 10:34:19.295887') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.6ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (2.6ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'AD00376/HA2' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.5ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('AD00376/HA2', 'AD00376/HA2 specification requirements', TRUE, '2025-09-02 10:34:19.316446', '2025-09-02 10:34:19.316446') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (70.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (1.7ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'R4 078' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.4ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('R4 078', 'R4 078 specification requirements', TRUE, '2025-09-02 10:34:19.399194', '2025-09-02 10:34:19.399194') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (34.3ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (2.5ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'SURTEC 650V DS26.00 & PCP-0597' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (4.6ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('SURTEC 650V DS26.00 & PCP-0597', 'SURTEC 650V DS26.00 & PCP-0597 specification requirements', TRUE, '2025-09-02 10:34:19.442691', '2025-09-02 10:34:19.442691') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (9.3ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.4ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (5.6ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'RBT-PS-SPS03-V3' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.6ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('RBT-PS-SPS03-V3', 'RBT-PS-SPS03-V3 specification requirements', TRUE, '2025-09-02 10:34:19.473509', '2025-09-02 10:34:19.473509') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (7.1ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Exists? (2.8ms)[0m  [1m[34mSELECT 1 AS one FROM "specification_presets" WHERE "specification_presets"."name" = 'LUFT- SULPHURIC ACID ANODISE MIL-A-8625, TYPE 2.' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Create (0.5ms)[0m  [1m[32mINSERT INTO "specification_presets" ("name", "content", "enabled", "created_at", "updated_at") VALUES ('LUFT- SULPHURIC ACID ANODISE MIL-A-8625, TYPE 2.', 'LUFT- SULPHURIC ACID ANODISE MIL-A-8625, TYPE 2. specification requirements', TRUE, '2025-09-02 10:34:19.490279', '2025-09-02 10:34:19.490279') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.0ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mSpecificationPreset Count (0.5ms)[0m  [1m[34mSELECT COUNT(*) FROM "specification_presets" /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[36mActiveRecord::SchemaMigration Load (2.2ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (5.6ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'Freight 32 kg (next Day) DPD Local UK' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (2.5ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('Freight 32 kg (next Day) DPD Local UK', 'Large package freight charge for next day DPD delivery within UK', 39.58, FALSE, NULL, TRUE, '2025-09-02 10:36:00.681371', '2025-09-02 10:36:00.681371') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (6.4ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (12.4ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'FAIR CHARGE' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.6ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('FAIR CHARGE', 'Standard fair charge applied to orders', 200.0, FALSE, NULL, TRUE, '2025-09-02 10:36:00.729972', '2025-09-02 10:36:00.729972') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (20.0ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (9.3ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'C OF C CHARGE' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.4ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('C OF C CHARGE', 'Certificate of Conformity charge', 20.0, FALSE, NULL, TRUE, '2025-09-02 10:36:00.777975', '2025-09-02 10:36:00.777975') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (9.0ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (2.3ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'Expedite £200' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.4ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('Expedite £200', 'Express processing charge', 200.0, FALSE, NULL, TRUE, '2025-09-02 10:36:00.796085', '2025-09-02 10:36:00.796085') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (25.5ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (2.2ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'COST OF CHEMICALS' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.3ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('COST OF CHEMICALS', 'Variable cost for chemical materials - updated per order', 2778.6, TRUE, NULL, TRUE, '2025-09-02 10:36:00.830014', '2025-09-02 10:36:00.830014') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (26.2ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (1.7ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'COST OF CHEMICALS FOR STRIPPING ENP' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.3ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('COST OF CHEMICALS FOR STRIPPING ENP', 'Chemical costs specifically for ENP stripping process', NULL, TRUE, NULL, TRUE, '2025-09-02 10:36:00.862922', '2025-09-02 10:36:00.862922') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (27.1ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (1.8ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'SMALL BARREL' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.4ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('SMALL BARREL', 'Small barrel processing charge', NULL, TRUE, NULL, TRUE, '2025-09-02 10:36:00.897346', '2025-09-02 10:36:00.897346') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (5.1ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (2.0ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'DIE FEED PIPE' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.4ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('DIE FEED PIPE', 'Die feed pipe processing charge', NULL, TRUE, NULL, TRUE, '2025-09-02 10:36:00.910484', '2025-09-02 10:36:00.910484') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (28.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.5ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (5.0ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'COLLECTION & DELIVERY CHARGES ASTL COLLECT' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (1.3ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('COLLECTION & DELIVERY CHARGES ASTL COLLECT', 'Collection and delivery charges for ASTL', NULL, TRUE, NULL, TRUE, '2025-09-02 10:36:00.953532', '2025-09-02 10:36:00.953532') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (14.2ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.6ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (4.5ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'Next day DPD (up to 10 kg)' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.7ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('Next day DPD (up to 10 kg)', 'Next day DPD delivery for packages up to 10kg', 8.0, FALSE, 'weight_based_next_day', TRUE, '2025-09-02 10:36:00.987141', '2025-09-02 10:36:00.987141') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (16.1ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (2.6ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'Next day DPD 11 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.5ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('Next day DPD 11 kg', 'Next day DPD delivery for 11kg package', 8.89, FALSE, 'weight_based_next_day', TRUE, '2025-09-02 10:36:01.014012', '2025-09-02 10:36:01.014012') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (22.3ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (2.3ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'Next day DPD 12 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.4ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('Next day DPD 12 kg', 'Next day DPD delivery for 12kg package', 9.26, FALSE, 'weight_based_next_day', TRUE, '2025-09-02 10:36:01.045661', '2025-09-02 10:36:01.045661') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (24.0ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (1.9ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'Next Day DPD 13 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.4ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('Next Day DPD 13 kg', 'Next day DPD delivery for 13kg package', 9.64, FALSE, 'weight_based_next_day', TRUE, '2025-09-02 10:36:01.078010', '2025-09-02 10:36:01.078010') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (24.4ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (2.4ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'Next day DPD 14 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.4ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('Next day DPD 14 kg', 'Next day DPD delivery for 14kg package', 10.01, FALSE, 'weight_based_next_day', TRUE, '2025-09-02 10:36:01.111630', '2025-09-02 10:36:01.111630') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (23.2ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.5ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (5.2ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'Next day DPD 15 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (1.0ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('Next day DPD 15 kg', 'Next day DPD delivery for 15kg package', 10.38, FALSE, 'weight_based_next_day', TRUE, '2025-09-02 10:36:01.150653', '2025-09-02 10:36:01.150653') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (13.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.4ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (3.3ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'Next day DPD 16 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.6ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('Next day DPD 16 kg', 'Next day DPD delivery for 16kg package', 10.38, FALSE, 'weight_based_next_day', TRUE, '2025-09-02 10:36:01.179725', '2025-09-02 10:36:01.179725') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (19.2ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.4ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (3.3ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'Next day DPD 17 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.7ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('Next day DPD 17 kg', 'Next day DPD delivery for 17kg package', 10.76, FALSE, 'weight_based_next_day', TRUE, '2025-09-02 10:36:01.211061', '2025-09-02 10:36:01.211061') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (20.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (3.9ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'Next day DPD 18 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.7ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('Next day DPD 18 kg', 'Next day DPD delivery for 18kg package', 11.51, FALSE, 'weight_based_next_day', TRUE, '2025-09-02 10:36:01.244204', '2025-09-02 10:36:01.244204') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (21.0ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.5ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (5.9ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'Next day DPD 19 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.5ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('Next day DPD 19 kg', 'Next day DPD delivery for 19kg package', 11.88, FALSE, 'weight_based_next_day', TRUE, '2025-09-02 10:36:01.281861', '2025-09-02 10:36:01.281861') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (16.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (2.4ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'Next day DPD 20 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.5ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('Next day DPD 20 kg', 'Next day DPD delivery for 20kg package', 12.25, FALSE, 'weight_based_next_day', TRUE, '2025-09-02 10:36:01.307528', '2025-09-02 10:36:01.307528') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (8.5ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (1.7ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'Next day DPD 21 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.6ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('Next day DPD 21 kg', 'Next day DPD delivery for 21kg package', 12.63, FALSE, 'weight_based_next_day', TRUE, '2025-09-02 10:36:01.338263', '2025-09-02 10:36:01.338263') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (23.7ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (1.7ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'Next day DPD 22 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.3ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('Next day DPD 22 kg', 'Next day DPD delivery for 22kg package', 13.0, FALSE, 'weight_based_next_day', TRUE, '2025-09-02 10:36:01.369663', '2025-09-02 10:36:01.369663') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (22.6ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (1.9ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'Next day DPD 23 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.4ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('Next day DPD 23 kg', 'Next day DPD delivery for 23kg package', 13.38, FALSE, 'weight_based_next_day', TRUE, '2025-09-02 10:36:01.402123', '2025-09-02 10:36:01.402123') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (26.3ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (1.7ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'Next day DPD 24 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.3ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('Next day DPD 24 kg', 'Next day DPD delivery for 24kg package', 13.75, FALSE, 'weight_based_next_day', TRUE, '2025-09-02 10:36:01.434941', '2025-09-02 10:36:01.434941') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (24.2ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.5ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (5.8ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'Next day DPD 25 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (1.5ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('Next day DPD 25 kg', 'Next day DPD delivery for 25kg package', 14.12, FALSE, 'weight_based_next_day', TRUE, '2025-09-02 10:36:01.481522', '2025-09-02 10:36:01.481522') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (25.7ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (2.3ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'Next day DPD 26 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.7ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('Next day DPD 26 kg', 'Next day DPD delivery for 26kg package', 14.5, FALSE, 'weight_based_next_day', TRUE, '2025-09-02 10:36:01.522244', '2025-09-02 10:36:01.522244') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (22.4ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (5.0ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'Next day DPD 27 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.8ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('Next day DPD 27 kg', 'Next day DPD delivery for 27kg package', 14.87, FALSE, 'weight_based_next_day', TRUE, '2025-09-02 10:36:01.558725', '2025-09-02 10:36:01.558725') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (19.2ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (2.9ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'Next day DPD 28 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.8ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('Next day DPD 28 kg', 'Next day DPD delivery for 28kg package', 15.25, FALSE, 'weight_based_next_day', TRUE, '2025-09-02 10:36:01.590636', '2025-09-02 10:36:01.590636') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (19.8ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (4.3ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'Next day DPD 29 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.7ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('Next day DPD 29 kg', 'Next day DPD delivery for 29kg package', 15.62, FALSE, 'weight_based_next_day', TRUE, '2025-09-02 10:36:01.625015', '2025-09-02 10:36:01.625015') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (17.8ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (2.8ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'Next day DPD 30 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.8ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('Next day DPD 30 kg', 'Next day DPD delivery for 30kg package', 15.99, FALSE, 'weight_based_next_day', TRUE, '2025-09-02 10:36:01.654355', '2025-09-02 10:36:01.654355') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (20.0ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (4.1ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'by 10:30 DPD up to 10 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (1.0ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('by 10:30 DPD up to 10 kg', 'Premium 10:30 DPD delivery for packages up to 10kg', 19.48, FALSE, 'weight_based_premium', TRUE, '2025-09-02 10:36:01.688523', '2025-09-02 10:36:01.688523') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (15.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (2.8ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'by 10:30 DPD 11 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.7ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('by 10:30 DPD 11 kg', 'Premium 10:30 DPD delivery for 11kg package', 21.92, FALSE, 'weight_based_premium', TRUE, '2025-09-02 10:36:01.718339', '2025-09-02 10:36:01.718339') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (20.5ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (1.7ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'by 10:30 DPD 12 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.4ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('by 10:30 DPD 12 kg', 'Premium 10:30 DPD delivery for 12kg package', 22.42, FALSE, 'weight_based_premium', TRUE, '2025-09-02 10:36:01.747429', '2025-09-02 10:36:01.747429') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (25.5ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (3.0ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'by 10:30 DPD 13 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.5ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('by 10:30 DPD 13 kg', 'Premium 10:30 DPD delivery for 13kg package', 22.91, FALSE, 'weight_based_premium', TRUE, '2025-09-02 10:36:01.782657', '2025-09-02 10:36:01.782657') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (21.7ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (2.0ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'by 10:30 DPD 14 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.5ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('by 10:30 DPD 14 kg', 'Premium 10:30 DPD delivery for 14kg package', 23.41, FALSE, 'weight_based_premium', TRUE, '2025-09-02 10:36:01.813296', '2025-09-02 10:36:01.813296') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (23.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (2.0ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'by 10:30 DPD 15 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.4ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('by 10:30 DPD 15 kg', 'Premium 10:30 DPD delivery for 15kg package', 23.9, FALSE, 'weight_based_premium', TRUE, '2025-09-02 10:36:01.845060', '2025-09-02 10:36:01.845060') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (24.8ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (1.7ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'by 10:30 DPD 16 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.4ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('by 10:30 DPD 16 kg', 'Premium 10:30 DPD delivery for 16kg package', 24.4, FALSE, 'weight_based_premium', TRUE, '2025-09-02 10:36:01.877511', '2025-09-02 10:36:01.877511') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (24.0ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (1.9ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'by 10:30 DPD 17 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.6ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('by 10:30 DPD 17 kg', 'Premium 10:30 DPD delivery for 17kg package', 24.89, FALSE, 'weight_based_premium', TRUE, '2025-09-02 10:36:01.918716', '2025-09-02 10:36:01.918716') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (60.0ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.4ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (4.2ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'by 10:30 DPD 18 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (1.6ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('by 10:30 DPD 18 kg', 'Premium 10:30 DPD delivery for 18kg package', 25.39, FALSE, 'weight_based_premium', TRUE, '2025-09-02 10:36:01.992027', '2025-09-02 10:36:01.992027') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (15.3ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.4ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (8.5ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'by 10:30 DPD 19 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (1.3ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('by 10:30 DPD 19 kg', 'Premium 10:30 DPD delivery for 19kg package', 25.88, FALSE, 'weight_based_premium', TRUE, '2025-09-02 10:36:02.028254', '2025-09-02 10:36:02.028254') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (11.2ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (2.4ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'by 10:30 DPD 20 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.5ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('by 10:30 DPD 20 kg', 'Premium 10:30 DPD delivery for 20kg package', 26.38, FALSE, 'weight_based_premium', TRUE, '2025-09-02 10:36:02.051473', '2025-09-02 10:36:02.051473') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (23.6ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.4ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (4.5ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'by 10:30 DPD 21 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (1.0ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('by 10:30 DPD 21 kg', 'Premium 10:30 DPD delivery for 21kg package', 26.87, FALSE, 'weight_based_premium', TRUE, '2025-09-02 10:36:02.091857', '2025-09-02 10:36:02.091857') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (14.5ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (1.8ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'by 10:30 DPD 22 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.4ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('by 10:30 DPD 22 kg', 'Premium 10:30 DPD delivery for 22kg package', 27.37, FALSE, 'weight_based_premium', TRUE, '2025-09-02 10:36:02.114163', '2025-09-02 10:36:02.114163') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (25.3ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (1.8ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'by 10:30 DPD 23 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.3ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('by 10:30 DPD 23 kg', 'Premium 10:30 DPD delivery for 23kg package', 27.86, FALSE, 'weight_based_premium', TRUE, '2025-09-02 10:36:02.146352', '2025-09-02 10:36:02.146352') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (24.9ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.2ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (2.1ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'by 10:30 DPD 24 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.4ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('by 10:30 DPD 24 kg', 'Premium 10:30 DPD delivery for 24kg package', 28.36, FALSE, 'weight_based_premium', TRUE, '2025-09-02 10:36:02.179166', '2025-09-02 10:36:02.179166') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (23.8ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (2.0ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'by 10:30 DPD 25 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.4ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('by 10:30 DPD 25 kg', 'Premium 10:30 DPD delivery for 25kg package', 28.85, FALSE, 'weight_based_premium', TRUE, '2025-09-02 10:36:02.210602', '2025-09-02 10:36:02.210602') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (24.3ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.5ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (5.9ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'by 10:30 DPD 26 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.9ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('by 10:30 DPD 26 kg', 'Premium 10:30 DPD delivery for 26kg package', 29.35, FALSE, 'weight_based_premium', TRUE, '2025-09-02 10:36:02.249425', '2025-09-02 10:36:02.249425') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (15.2ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (3.0ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'by 10:30 DPD 27 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.6ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('by 10:30 DPD 27 kg', 'Premium 10:30 DPD delivery for 27kg package', 29.84, FALSE, 'weight_based_premium', TRUE, '2025-09-02 10:36:02.277985', '2025-09-02 10:36:02.277985') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (21.0ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.4ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (4.2ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'by 10:30 DPD 28 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.6ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('by 10:30 DPD 28 kg', 'Premium 10:30 DPD delivery for 28kg package', 30.34, FALSE, 'weight_based_premium', TRUE, '2025-09-02 10:36:02.312004', '2025-09-02 10:36:02.312004') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (19.0ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (2.9ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'by 10:30 DPD 29 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.6ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('by 10:30 DPD 29 kg', 'Premium 10:30 DPD delivery for 29kg package', 30.83, FALSE, 'weight_based_premium', TRUE, '2025-09-02 10:36:02.341675', '2025-09-02 10:36:02.341675') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (21.7ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Exists? (2.6ms)[0m  [1m[34mSELECT 1 AS one FROM "additional_charge_presets" WHERE "additional_charge_presets"."name" = 'by 10:30 DPD 30 kg' LIMIT 1 /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Create (0.7ms)[0m  [1m[32mINSERT INTO "additional_charge_presets" ("name", "description", "amount", "is_variable", "calculation_type", "enabled", "created_at", "updated_at") VALUES ('by 10:30 DPD 30 kg', 'Premium 10:30 DPD delivery for 30kg package', 31.33, FALSE, 'weight_based_premium', TRUE, '2025-09-02 10:36:02.373868', '2025-09-02 10:36:02.373868') RETURNING "id" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (21.8ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Count (0.7ms)[0m  [1m[34mSELECT COUNT(*) FROM "additional_charge_presets" /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Count (0.5ms)[0m  [1m[34mSELECT COUNT(*) FROM "additional_charge_presets" WHERE "additional_charge_presets"."is_variable" = FALSE AND "additional_charge_presets"."calculation_type" IS NULL /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Count (0.7ms)[0m  [1m[34mSELECT COUNT(*) FROM "additional_charge_presets" WHERE "additional_charge_presets"."is_variable" = TRUE /*application='Hams2'*/[0m
+  [1m[36mAdditionalChargePreset Count (0.5ms)[0m  [1m[34mSELECT COUNT(*) FROM "additional_charge_presets" WHERE "additional_charge_presets"."calculation_type" IS NOT NULL /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+Started GET "/" for 127.0.0.1 at 2025-09-02 11:51:22 +0100
+  [1m[36mActiveRecord::SchemaMigration Load (2.1ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+Processing by DashboardController#index as HTML
+Redirected to http://127.0.0.1:3000/session/new
+Filter chain halted as :require_authentication rendered or redirected
+Completed 302 Found in 40ms (ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/session/new" for 127.0.0.1 at 2025-09-02 11:51:23 +0100
+Processing by SessionsController#new as HTML
+  Rendering layout layouts/application.html.erb
+  Rendering sessions/new.html.erb within layouts/application
+  Rendered sessions/new.html.erb within layouts/application (Duration: 50.8ms | GC: 0.0ms)
+  Rendered shared/_navbar.html.erb (Duration: 2.6ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 75.5ms | GC: 0.0ms)
+Completed 200 OK in 131ms (Views: 82.7ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/assets/controllers/parts_form_controller-dcab0542.js" for 127.0.0.1 at 2025-09-02 11:51:23 +0100
+Started GET "/manifest" for 127.0.0.1 at 2025-09-02 11:51:23 +0100
+Processing by Rails::PwaController#manifest as */*
+  Rendering pwa/manifest.json.erb
+  Rendered pwa/manifest.json.erb (Duration: 2.2ms | GC: 0.0ms)
+Completed 200 OK in 19ms (Views: 5.1ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/artifacts" for 127.0.0.1 at 2025-09-02 11:51:24 +0100
+Processing by ArtifactsController#index as HTML
+Redirected to http://127.0.0.1:3000/session/new
+Filter chain halted as :require_authentication rendered or redirected
+Completed 302 Found in 13ms (ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/session/new" for 127.0.0.1 at 2025-09-02 11:51:24 +0100
+Processing by SessionsController#new as HTML
+  Rendering layout layouts/application.html.erb
+  Rendering sessions/new.html.erb within layouts/application
+  Rendered sessions/new.html.erb within layouts/application (Duration: 3.0ms | GC: 0.0ms)
+  Rendered shared/_navbar.html.erb (Duration: 0.6ms | GC: 0.0ms)
+  Rendered layout layouts/application.html.erb (Duration: 6.5ms | GC: 0.0ms)
+Completed 200 OK in 23ms (Views: 7.2ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
+Started GET "/service-worker" for 127.0.0.1 at 2025-09-02 11:51:25 +0100
+Processing by Rails::PwaController#service_worker as */*
+  Rendering pwa/service-worker.js
+  Rendered pwa/service-worker.js (Duration: 0.5ms | GC: 0.0ms)
+Completed 200 OK in 22ms (Views: 6.0ms | ActiveRecord: 0.0ms (0 queries, 0 cached) | GC: 0.0ms)
+
+
