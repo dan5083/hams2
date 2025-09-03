@@ -78,6 +78,65 @@ class Part < ApplicationRecord
     persisted? || customisation_data.dig("operation_selection", "locked") == true
   end
 
+  def has_locked_operations_data?
+    customisation_data.dig("operation_selection", "locked_operations").present?
+  end
+
+  def locked_operations
+    return [] unless locked_for_editing?
+
+    # If this is a persisted part but doesn't have locked operations data, auto-generate it
+    if persisted? && !has_locked_operations_data?
+      auto_lock_for_editing!
+    end
+
+    operations_data = customisation_data.dig("operation_selection", "locked_operations") || []
+    operations_data.sort_by { |op| op["position"] || 0 }
+  end
+
+  def auto_lock_for_editing!
+    return false if has_locked_operations_data? # Already locked
+
+    current_ops = get_operations_with_auto_ops
+
+    # If no operations can be generated from the current configuration,
+    # create a manual operations entry with current specification
+    if current_ops.empty?
+      current_ops = [
+        OpenStruct.new(
+          id: 'MANUAL_OPERATIONS',
+          display_name: 'Manual Operations',
+          operation_text: specification.presence || 'Enter operation details...',
+          specifications: '',
+          vat_numbers: [],
+          process_type: process_type || 'manual',
+          target_thickness: 0
+        )
+      ]
+    end
+
+    # Set up the locked operations structure
+    self.customisation_data = customisation_data.dup || {}
+    self.customisation_data["operation_selection"] ||= {}
+    self.customisation_data["operation_selection"]["locked"] = true
+    self.customisation_data["operation_selection"]["locked_operations"] = current_ops.map.with_index do |op, index|
+      {
+        "id" => op.id,
+        "display_name" => op.display_name,
+        "operation_text" => op.operation_text,
+        "position" => index + 1,
+        "specifications" => op.respond_to?(:specifications) ? (op.specifications || '') : '',
+        "vat_numbers" => op.respond_to?(:vat_numbers) ? (op.vat_numbers || []) : [],
+        "process_type" => op.respond_to?(:process_type) ? (op.process_type || 'manual') : 'manual',
+        "target_thickness" => op.respond_to?(:target_thickness) ? (op.target_thickness || 0) : 0,
+        "auto_inserted" => op.respond_to?(:auto_inserted?) ? op.auto_inserted? : false
+      }
+    end
+
+    save! if persisted?
+    true
+  end
+
   def lock_operations!
     current_ops = get_operations_with_auto_ops
 
@@ -98,13 +157,6 @@ class Part < ApplicationRecord
       }
     end
     save!
-  end
-
-  def locked_operations
-    return [] unless locked_for_editing?
-
-    operations_data = customisation_data.dig("operation_selection", "locked_operations") || []
-    operations_data.sort_by { |op| op["position"] }
   end
 
   def update_locked_operation!(operation_id, new_text)
