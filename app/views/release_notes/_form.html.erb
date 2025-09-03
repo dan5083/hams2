@@ -120,12 +120,30 @@
           </div>
         <% end %>
 
-        <!-- Remarks -->
+        <!-- Statement (using remarks field) -->
         <div class="sm:col-span-6">
-          <%= form.label :remarks, class: "block text-sm font-medium text-gray-700" %>
-          <%= form.text_area :remarks, rows: 3,
+          <%= form.label :remarks, "Statement", class: "block text-sm font-medium text-gray-700" %>
+          <%
+            # Pre-populate with template if this is a new record and remarks is blank
+            default_statement = ""
+            if @release_note.new_record? && @release_note.remarks.blank?
+              if @works_order.release_level&.statement
+                default_statement = @works_order.release_level.statement
+                if @works_order.specification.present?
+                  default_statement = default_statement.gsub('[SPECIFICATION]', @works_order.specification)
+                end
+              end
+            end
+
+            field_value = @release_note.remarks.present? ? @release_note.remarks : default_statement
+          %>
+          <%= form.text_area :remarks, rows: 4,
+                             value: field_value,
                              class: "mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
-                             placeholder: "Optional remarks about this release..." %>
+                             placeholder: "Enter the release statement for this release note..." %>
+          <p class="mt-1 text-xs text-gray-500">
+            Customize the release statement for this specific release note. The default comes from the release level template.
+          </p>
         </div>
 
         <!-- No Invoice Checkbox -->
