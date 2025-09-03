@@ -15,6 +15,7 @@ module OperationLibrary
       sealing
       dichromate_sealing
       stripping
+      stripping_only
       dye
     ].freeze
 
@@ -25,6 +26,7 @@ module OperationLibrary
       chromic_anodising
       dichromate_sealing
       stripping
+      stripping_only
     ].freeze
 
     # Define which process types are extreme pH processes WITH sulphates (requiring 5-minute wait)
@@ -100,9 +102,9 @@ module OperationLibrary
     end
 
     # If extreme pH process without sulphates, use standard cascade rinse
-    # BUT skip bung removal for stripping operations - only do it for main treatments
+    # BUT skip bung removal for stripping operations (both regular stripping and strip-only)
     if EXTREME_PH_SANS_SULPHATES_PROCESSES.include?(previous_operation.process_type)
-      if bungs_present_in_masking?(masking) && previous_operation.process_type != 'stripping'
+      if bungs_present_in_masking?(masking) && !['stripping', 'stripping_only'].include?(previous_operation.process_type)
         return operations.find { |op| op.id == 'CASCADE_RINSE_BUNGS' }
       else
         return operations.find { |op| op.id == 'CASCADE_RINSE' }
