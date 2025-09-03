@@ -591,7 +591,7 @@ export default class extends Controller {
             <option value="2000_series_alloys" ${treatment.selected_alloy === '2000_series_alloys' ? 'selected' : ''}>2000 Series Alloys</option>
             <option value="stainless_steel_with_oxides" ${treatment.selected_alloy === 'stainless_steel_with_oxides' ? 'selected' : ''}>Stainless Steel with Oxides</option>
             <option value="copper_sans_electrical_contact" ${treatment.selected_alloy === 'copper_sans_electrical_contact' ? 'selected' : ''}>Copper (Sans Electrical Contact)</option>
-            <option value="cast_aluminium_william_cope" ${treatment.selected_alloy === 'cast_aluminium_william_cope' ? 'selected' : ''}>Cast Aluminium (William Cope)</option>
+            <option value="cope_rolled_aluminium" ${treatment.selected_alloy === 'cope_rolled_aluminium' ? 'selected' : ''}>Cope Rolled Aluminium</option>
             <option value="mclaren_sta142_procedure_d" ${treatment.selected_alloy === 'mclaren_sta142_procedure_d' ? 'selected' : ''}>McLaren STA142 Procedure D</option>
           </select>
         </div>

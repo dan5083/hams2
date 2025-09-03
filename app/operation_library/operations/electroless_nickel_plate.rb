@@ -6,7 +6,7 @@ module OperationLibrary
         # High Phosphorous - Vandalloy 4100
         Operation.new(
           id: 'HIGH_PHOS_VANDALLOY_4100',
-          alloys: ['steel', 'stainless_steel', '316_stainless_steel', 'aluminium', 'copper', '2000_series_alloys', 'brass', 'stainless_steel_with_oxides', 'copper_sans_electrical_contact', 'cast_aluminium_william_cope', 'mclaren_sta142_procedure_d'],
+          alloys: ['steel', 'stainless_steel', '316_stainless_steel', 'aluminium', 'copper', '2000_series_alloys', 'brass', 'stainless_steel_with_oxides', 'copper_sans_electrical_contact', 'cope_rolled_aluminium', 'mclaren_sta142_procedure_d'],
           process_type: 'electroless_nickel_plating',
           enp_type: 'high_phosphorous',
           target_thickness: nil, # Calculated based on time
@@ -18,7 +18,7 @@ module OperationLibrary
         # Medium Phosphorous - Nicklad 767
         Operation.new(
           id: 'MEDIUM_PHOS_NICKLAD_767',
-          alloys: ['steel', 'stainless_steel', '316_stainless_steel', 'aluminium', 'copper', '2000_series_alloys', 'brass', 'stainless_steel_with_oxides', 'copper_sans_electrical_contact', 'cast_aluminium_william_cope', 'mclaren_sta142_procedure_d'],
+          alloys: ['steel', 'stainless_steel', '316_stainless_steel', 'aluminium', 'copper', '2000_series_alloys', 'brass', 'stainless_steel_with_oxides', 'copper_sans_electrical_contact', 'cope_rolled_aluminium', 'mclaren_sta142_procedure_d'],
           process_type: 'electroless_nickel_plating',
           enp_type: 'medium_phosphorous',
           target_thickness: nil, # Calculated based on time
@@ -30,7 +30,7 @@ module OperationLibrary
         # Low Phosphorous - Nicklad ELV 824
         Operation.new(
           id: 'LOW_PHOS_NICKLAD_ELV_824',
-          alloys: ['steel', 'stainless_steel', '316_stainless_steel', 'aluminium', 'copper', '2000_series_alloys', 'brass', 'stainless_steel_with_oxides', 'copper_sans_electrical_contact', 'cast_aluminium_william_cope', 'mclaren_sta142_procedure_d'],
+          alloys: ['steel', 'stainless_steel', '316_stainless_steel', 'aluminium', 'copper', '2000_series_alloys', 'brass', 'stainless_steel_with_oxides', 'copper_sans_electrical_contact', 'cope_rolled_aluminium', 'mclaren_sta142_procedure_d'],
           process_type: 'electroless_nickel_plating',
           enp_type: 'low_phosphorous',
           target_thickness: nil, # Calculated based on time
@@ -42,7 +42,7 @@ module OperationLibrary
         # PTFE Composite - Nicklad Ice
         Operation.new(
           id: 'PTFE_NICKLAD_ICE',
-          alloys: ['steel', 'stainless_steel', '316_stainless_steel', 'aluminium', 'copper', '2000_series_alloys', 'brass', 'stainless_steel_with_oxides', 'copper_sans_electrical_contact', 'cast_aluminium_william_cope', 'mclaren_sta142_procedure_d'],
+          alloys: ['steel', 'stainless_steel', '316_stainless_steel', 'aluminium', 'copper', '2000_series_alloys', 'brass', 'stainless_steel_with_oxides', 'copper_sans_electrical_contact', 'cope_rolled_aluminium', 'mclaren_sta142_procedure_d'],
           process_type: 'electroless_nickel_plating',
           enp_type: 'ptfe_composite',
           target_thickness: nil, # Calculated based on time

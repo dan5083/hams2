@@ -27,11 +27,11 @@ module OperationLibrary
           operation_text: 'Immerse in Keycote 245 at 35-80°C for 5-20 minutes'
         ),
 
-        # Electroclean Operations
+        # Electroclean Operations (current density was "4-10 Amp/dm²")
         Operation.new(
           id: 'ELECTROCLEAN_METEX_EMPHAX_4_10_AMP_2_3_MIN',
           process_type: 'enp_pretreatment',
-          operation_text: 'Electroclean in Metex Emphax at 4-10 Amp/dm² at 60-95°C for 2-3 minutes'
+          operation_text: 'Electroclean in Metex Emphax at 60-95°C for 2-3 minutes'
         ),
 
         # Activation Operations
@@ -271,10 +271,14 @@ module OperationLibrary
           'ZINCATE_BONDAL_HALF_2_MIN_18_30C'
         ],
 
-        CAST_ALUMINIUM_WILLIAM_COPE: [
+        COPE_ROLLED_ALUMINIUM: [
           'ALUMINIUM_CLEAN_KEYCOTE_245_30_60SEC',
+          'DESMUT_MICROETCH_66_1_2_MIN_18_25C',
           'ALUMON_70_1_2_MIN_18_25C',
-          'DESMUT_MICROETCH_66_1_2_MIN_18_25C'
+          'DESMUT_MICROETCH_66_1_2_MIN_18_25C',
+          'ZINCATE_BONDAL_HALF_2_MIN_18_30C',
+          # 'ETCH_AWAY_ZINCATE_MICROETCH_66_20_40SEC_18_25C', - STRUCK OUT for COPE
+          'ZINCATE_BONDAL_HALF_2_MIN_18_30C'
         ],
 
         THREE_ONE_SIX_STAINLESS_STEEL: [

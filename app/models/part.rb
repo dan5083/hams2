@@ -680,7 +680,7 @@ class Part < ApplicationRecord
       '2000_series_alloys' => 'TWO_THOUSAND_SERIES_ALLOYS',
       'stainless_steel_with_oxides' => 'STAINLESS_STEEL_WITH_OXIDES',
       'copper_sans_electrical_contact' => 'COPPER_SANS_ELECTRICAL_CONTACT',
-      'cast_aluminium_william_cope' => 'CAST_ALUMINIUM_WILLIAM_COPE',
+      'cope_rolled_aluminium' => 'COPE_ROLLED_ALUMINIUM',
       'mclaren_sta142_procedure_d' => 'MCLAREN_STA142_PROCEDURE_D'
     }
 
