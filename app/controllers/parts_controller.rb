@@ -321,23 +321,34 @@ class PartsController < ApplicationController
     # Start with all operations - pass thickness to ENP operations
     operations = Operation.all_operations(target_thickness)
 
-    # Filter by anodising types - exclude auto-inserted operations
+    # Filter by anodising types - include stripping_only and exclude auto-inserted operations
     if criteria[:anodising_types].present?
-      operations = operations.select { |op| criteria[:anodising_types].include?(op.process_type) }
+      # Handle stripping_only as a special case
+      if criteria[:anodising_types].include?('stripping_only')
+        # For strip-only treatments, get stripping operations
+        stripping_operations = Operation.stripping_operations
+        operations = operations.select { |op|
+          criteria[:anodising_types].include?(op.process_type) || op.process_type == 'stripping'
+        } + stripping_operations
+      else
+        operations = operations.select { |op| criteria[:anodising_types].include?(op.process_type) }
+      end
     end
 
     # Exclude auto-inserted operations from manual selection
     operations = operations.reject { |op| op.auto_inserted? }
 
-    # Filter by alloys
+    # Filter by alloys (skip for stripping_only)
     if criteria[:alloys].present?
-      operations = operations.select { |op| (op.alloys & criteria[:alloys]).any? }
+      operations = operations.select { |op|
+        op.process_type == 'stripping' || (op.alloys & criteria[:alloys]).any?
+      }
     end
 
-    # Filter by anodic classes (skip for chromic anodising)
+    # Filter by anodic classes (skip for chromic anodising and stripping)
     if criteria[:anodic_classes].present?
       operations = operations.select { |op|
-        if op.process_type == 'chromic_anodising'
+        if op.process_type == 'chromic_anodising' || op.process_type == 'stripping'
           true
         else
           (op.anodic_classes & criteria[:anodic_classes]).any?
@@ -350,10 +361,10 @@ class PartsController < ApplicationController
       operations = operations.select { |op| op.enp_type.present? && criteria[:enp_types].include?(op.enp_type) }
     end
 
-    # Filter by target thickness (with tolerance) - skip for chromic anodising
+    # Filter by target thickness (with tolerance) - skip for chromic anodising, stripping, and other non-thickness operations
     if criteria[:target_thicknesses].present?
       operations = operations.select do |op|
-        if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'chromic_anodising', 'enp_heat_treatment', 'enp_post_heat_treatment', 'enp_baking', 'local_treatment'])
+        if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'chromic_anodising', 'enp_heat_treatment', 'enp_post_heat_treatment', 'enp_baking', 'local_treatment', 'stripping'])
           true
         else
           criteria[:target_thicknesses].any? do |target|
@@ -366,7 +377,7 @@ class PartsController < ApplicationController
       if criteria[:target_thicknesses].length == 1
         target = criteria[:target_thicknesses].first
         operations = operations.sort_by do |op|
-          if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'chromic_anodising', 'enp_heat_treatment', 'enp_post_heat_treatment', 'enp_baking', 'local_treatment'])
+          if op.process_type.in?(['chemical_conversion', 'electroless_nickel_plating', 'chromic_anodising', 'enp_heat_treatment', 'enp_post_heat_treatment', 'enp_baking', 'local_treatment', 'stripping'])
             0
           else
             (op.target_thickness - target).abs
@@ -434,7 +445,7 @@ class PartsController < ApplicationController
 
     Rails.logger.info "Preview params: treatments=#{treatments_data.length}, pre_heat_treatment=#{selected_enp_pre_heat_treatment}, post_heat_treatment=#{selected_enp_heat_treatment}, aerospace=#{aerospace_defense}"
 
-    # Get operations using the treatment cycle system - includes OCV and foil verification insertion
+    # Get operations using the treatment cycle system - includes OCV, foil verification, and strip-only support
     operations_with_auto_ops = Part.simulate_operations_with_auto_ops(
       treatments_data,
       nil,  # selected_jig_type no longer used globally
@@ -446,7 +457,7 @@ class PartsController < ApplicationController
       selected_enp_pre_heat_treatment
     )
 
-    Rails.logger.info "Generated operations: #{operations_with_auto_ops.length} operations (includes water break, foil verification, and OCV if aerospace_defense=#{aerospace_defense})"
+    Rails.logger.info "Generated operations: #{operations_with_auto_ops.length} operations (includes water break, foil verification, OCV, and strip-only if aerospace_defense=#{aerospace_defense})"
 
     render json: { operations: operations_with_auto_ops }
   end
@@ -496,7 +507,19 @@ class PartsController < ApplicationController
     return 'anodising' if treatments.empty?
 
     first_treatment = treatments.first
-    first_treatment&.dig("type") || 'anodising'
+    treatment_type = first_treatment&.dig("type")
+
+    # Map treatment types to process types
+    case treatment_type
+    when 'stripping_only'
+      'stripping'
+    when 'electroless_nickel_plating'
+      'electroless_nickel_plating'
+    when 'chemical_conversion'
+      'chemical_conversion'
+    else
+      'anodising'
+    end
   end
 
   def update_locked_operations_text

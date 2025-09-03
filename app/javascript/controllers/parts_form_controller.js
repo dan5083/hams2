@@ -53,7 +53,8 @@ export default class extends Controller {
       hard_anodising: 0,
       chromic_anodising: 0,
       chemical_conversion: 0,
-      electroless_nickel_plating: 0
+      electroless_nickel_plating: 0,
+      stripping_only: 0
     }
     this.maxTreatments = 5
     this.enpStripType = 'nitric'
@@ -93,6 +94,23 @@ export default class extends Controller {
       'Monobloc Jig',
       'Hytorque Jig'
     ]
+
+    // Available stripping types and methods
+    this.availableStrippingTypes = [
+      { value: 'anodising_stripping', label: 'Anodising Stripping' },
+      { value: 'enp_stripping', label: 'ENP Stripping' }
+    ]
+
+    this.availableStrippingMethods = {
+      anodising_stripping: [
+        { value: 'chromic_phosphoric', label: 'Chromic-Phosphoric Acid' },
+        { value: 'sulphuric_sodium_hydroxide', label: 'Sulphuric Acid + Sodium Hydroxide' }
+      ],
+      enp_stripping: [
+        { value: 'nitric', label: 'Nitric Acid' },
+        { value: 'metex_dekote', label: 'Metex Dekote' }
+      ]
+    }
 
     // Available local treatments for anodising
     this.availableLocalTreatments = [
@@ -261,8 +279,12 @@ export default class extends Controller {
       selected_alloy: null,
       target_thickness: null,
       selected_jig_type: null,
+      stripping_type: treatmentType === 'stripping_only' ? 'anodising_stripping' : null,
+      stripping_method: treatmentType === 'stripping_only' ? 'chromic_phosphoric' : null,
       masking_methods: {},
-      stripping_method: 'none',
+      stripping_enabled: false,
+      stripping_type_secondary: 'none',
+      stripping_method_secondary: 'none',
       sealing_method: 'none',
       dye_color: 'none',
       ptfe_enabled: false,
@@ -297,7 +319,8 @@ export default class extends Controller {
       'hard_anodising': ['border-purple-500', 'bg-purple-50', 'bg-purple-500'],
       'chromic_anodising': ['border-green-500', 'bg-green-50', 'bg-green-500'],
       'chemical_conversion': ['border-orange-500', 'bg-orange-50', 'bg-orange-500'],
-      'electroless_nickel_plating': ['border-indigo-500', 'bg-indigo-50', 'bg-indigo-500']
+      'electroless_nickel_plating': ['border-indigo-500', 'bg-indigo-50', 'bg-indigo-500'],
+      'stripping_only': ['border-red-500', 'bg-red-50', 'bg-red-500']
     }
 
     const [borderColor, bgColor, badgeColor] = colors[treatmentType]
@@ -357,6 +380,7 @@ export default class extends Controller {
 
     const treatmentName = this.formatTreatmentName(treatment.type)
     const isENP = treatment.type === 'electroless_nickel_plating'
+    const isStripOnly = treatment.type === 'stripping_only'
 
     return `
       <div class="border border-gray-200 rounded-lg p-4 bg-gray-50" data-treatment-id="${treatment.id}">
@@ -377,21 +401,132 @@ export default class extends Controller {
           <p class="mt-1 text-xs text-gray-500">Required for jigging operations in this treatment</p>
         </div>
 
-        <!-- Operation Selection -->
-        <div class="mb-4">
-          <label class="block text-sm font-medium text-gray-700 mb-2">Select Operation</label>
-          <div class="operations-list space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded p-3 bg-white">
-            <p class="text-gray-500 text-xs">Configure criteria below to see operations</p>
+        ${isStripOnly ? this.generateStripOnlySelectionHTML(treatment) : this.generateOperationSelectionHTML(treatment)}
+
+        <!-- Criteria Selection -->
+        ${isStripOnly ? '' : this.generateCriteriaHTML(treatment)}
+
+        <!-- Treatment Modifiers -->
+        ${isENP || isStripOnly ? '' : this.generateTreatmentModifiersHTML(treatment)}
+
+        ${isStripOnly ? this.generateStripOnlyModifiersHTML(treatment) : ''}
+      </div>
+    `
+  }
+
+  // Generate strip-only selection HTML
+  generateStripOnlySelectionHTML(treatment) {
+    return `
+      <div class="mb-4">
+        <h5 class="text-sm font-medium text-gray-700 mb-3">Strip Configuration</h5>
+
+        <!-- Strip Type Selection -->
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 mb-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Strip Type</label>
+            <select class="strip-type-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm" data-treatment-id="${treatment.id}">
+              ${this.availableStrippingTypes.map(type =>
+                `<option value="${type.value}" ${treatment.stripping_type === type.value ? 'selected' : ''}>${type.label}</option>`
+              ).join('')}
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Strip Method</label>
+            <select class="strip-method-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm" data-treatment-id="${treatment.id}">
+              ${this.getStrippingMethodsForType(treatment.stripping_type).map(method =>
+                `<option value="${method.value}" ${treatment.stripping_method === method.value ? 'selected' : ''}>${method.label}</option>`
+              ).join('')}
+            </select>
           </div>
         </div>
 
-        <!-- Criteria Selection -->
-        ${this.generateCriteriaHTML(treatment)}
-
-        <!-- Treatment Modifiers -->
-        ${isENP ? '' : this.generateTreatmentModifiersHTML(treatment)}
+        <div class="strip-operation-preview bg-white border border-gray-200 rounded p-3 mt-4">
+          <h6 class="text-sm font-medium text-gray-700 mb-2">Strip Operation Preview:</h6>
+          <p class="text-sm text-gray-600" data-strip-preview="${treatment.id}">
+            ${this.getStrippingPreviewText(treatment.stripping_type, treatment.stripping_method)}
+          </p>
+        </div>
       </div>
     `
+  }
+
+  // Generate operation selection HTML for non-strip-only treatments
+  generateOperationSelectionHTML(treatment) {
+    return `
+      <!-- Operation Selection -->
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Select Operation</label>
+        <div class="operations-list space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded p-3 bg-white">
+          <p class="text-gray-500 text-xs">Configure criteria below to see operations</p>
+        </div>
+      </div>
+    `
+  }
+
+  // Generate strip-only modifiers HTML
+  generateStripOnlyModifiersHTML(treatment) {
+    return `
+      <div class="border-t border-gray-200 pt-4 mt-4">
+        <h5 class="text-sm font-medium text-gray-700 mb-3">Strip Modifiers</h5>
+
+        <div class="space-y-4">
+          <!-- Multiple Masking Methods with Individual Locations -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Masking Methods</label>
+            <div class="space-y-2">
+              <div class="flex items-center space-x-3">
+                <label class="flex items-center">
+                  <input type="checkbox" class="masking-checkbox rounded border-gray-300 text-teal-600" data-treatment-id="${treatment.id}" data-method="bungs" ${treatment.masking_methods?.bungs !== undefined ? 'checked' : ''}>
+                  <span class="ml-2 text-sm text-gray-700">Bungs</span>
+                </label>
+                <input type="text" class="masking-location flex-1 border border-gray-300 rounded-md px-2 py-1 text-sm" data-treatment-id="${treatment.id}" data-method="bungs" placeholder="Location/notes for bungs..." value="${treatment.masking_methods?.bungs || ''}" ${treatment.masking_methods?.bungs !== undefined ? '' : 'style="display: none;"'}>
+              </div>
+
+              <div class="flex items-center space-x-3">
+                <label class="flex items-center">
+                  <input type="checkbox" class="masking-checkbox rounded border-gray-300 text-teal-600" data-treatment-id="${treatment.id}" data-method="pc21_polyester_tape" ${treatment.masking_methods?.pc21_polyester_tape !== undefined ? 'checked' : ''}>
+                  <span class="ml-2 text-sm text-gray-700">PC21 - Polyester Tape</span>
+                </label>
+                <input type="text" class="masking-location flex-1 border border-gray-300 rounded-md px-2 py-1 text-sm" data-treatment-id="${treatment.id}" data-method="pc21_polyester_tape" placeholder="Location/notes for tape..." value="${treatment.masking_methods?.pc21_polyester_tape || ''}" ${treatment.masking_methods?.pc21_polyester_tape !== undefined ? '' : 'style="display: none;"'}>
+              </div>
+
+              <div class="flex items-center space-x-3">
+                <label class="flex items-center">
+                  <input type="checkbox" class="masking-checkbox rounded border-gray-300 text-teal-600" data-treatment-id="${treatment.id}" data-method="45_stopping_off_lacquer" ${treatment.masking_methods?.['45_stopping_off_lacquer'] !== undefined ? 'checked' : ''}>
+                  <span class="ml-2 text-sm text-gray-700">45 Stopping Off Lacquer</span>
+                </label>
+                <input type="text" class="masking-location flex-1 border border-gray-300 rounded-md px-2 py-1 text-sm" data-treatment-id="${treatment.id}" data-method="45_stopping_off_lacquer" placeholder="Location/notes for lacquer..." value="${treatment.masking_methods?.['45_stopping_off_lacquer'] || ''}" ${treatment.masking_methods?.['45_stopping_off_lacquer'] !== undefined ? '' : 'style="display: none;"'}>
+              </div>
+            </div>
+            <p class="mt-2 text-xs text-gray-500">Masking protects areas that should not be stripped</p>
+          </div>
+        </div>
+      </div>
+    `
+  }
+
+  // Get stripping methods for a given type
+  getStrippingMethodsForType(strippingType) {
+    return this.availableStrippingMethods[strippingType] || []
+  }
+
+  // Get preview text for stripping operation
+  getStrippingPreviewText(strippingType, strippingMethod) {
+    if (!strippingType || !strippingMethod) return 'Select strip type and method to see preview'
+
+    const methodMap = {
+      'anodising_stripping': {
+        'chromic_phosphoric': 'Strip anodising in chromic-phosphoric acid solution',
+        'sulphuric_sodium_hydroxide': 'Soak in sulphuric acid solution then strip in sodium hydroxide solution'
+      },
+      'enp_stripping': {
+        'nitric': 'Strip ENP in nitric acid solution 30 to 40 minutes per 25 microns [or until black smut dissolves]',
+        'metex_dekote': 'Strip ENP in Metex Dekote at 80 to 90°C, for approximately 20 microns per hour strip rate'
+      }
+    }
+
+    return methodMap[strippingType]?.[strippingMethod] || 'Strip as specified'
   }
 
   // Generate criteria selection HTML (unlocked mode only)
@@ -570,11 +705,11 @@ export default class extends Controller {
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Stripping</label>
               <select class="stripping-method-select w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm" data-treatment-id="${treatment.id}">
-                <option value="none" ${treatment.stripping_method === 'none' ? 'selected' : ''}>No Stripping</option>
-                <option value="chromic_phosphoric" ${treatment.stripping_method === 'chromic_phosphoric' ? 'selected' : ''}>Chromic-Phosphoric Acid</option>
-                <option value="sulphuric_sodium_hydroxide" ${treatment.stripping_method === 'sulphuric_sodium_hydroxide' ? 'selected' : ''}>Sulphuric Acid + Sodium Hydroxide</option>
-                <option value="nitric" ${treatment.stripping_method === 'nitric' ? 'selected' : ''}>Nitric Acid</option>
-                <option value="metex_dekote" ${treatment.stripping_method === 'metex_dekote' ? 'selected' : ''}>Metex Dekote</option>
+                <option value="none" ${treatment.stripping_method_secondary === 'none' ? 'selected' : ''}>No Stripping</option>
+                <option value="chromic_phosphoric" ${treatment.stripping_method_secondary === 'chromic_phosphoric' ? 'selected' : ''}>Chromic-Phosphoric Acid</option>
+                <option value="sulphuric_sodium_hydroxide" ${treatment.stripping_method_secondary === 'sulphuric_sodium_hydroxide' ? 'selected' : ''}>Sulphuric Acid + Sodium Hydroxide</option>
+                <option value="nitric" ${treatment.stripping_method_secondary === 'nitric' ? 'selected' : ''}>Nitric Acid</option>
+                <option value="metex_dekote" ${treatment.stripping_method_secondary === 'metex_dekote' ? 'selected' : ''}>Metex Dekote</option>
               </select>
             </div>
 
@@ -649,9 +784,11 @@ export default class extends Controller {
       }
     })
 
-    // Load operations for each treatment
+    // Load operations for each non-strip-only treatment
     this.treatments.forEach(treatment => {
-      this.loadOperationsForTreatment(treatment.id)
+      if (treatment.type !== 'stripping_only') {
+        this.loadOperationsForTreatment(treatment.id)
+      }
     })
   }
 
@@ -668,6 +805,21 @@ export default class extends Controller {
     // Handle jig selection changes
     if (event.target.classList.contains('jig-type-select')) {
       treatment.selected_jig_type = event.target.value
+    }
+
+    // Handle strip-only specific changes
+    if (event.target.classList.contains('strip-type-select')) {
+      treatment.stripping_type = event.target.value
+      // Update the strip method dropdown
+      this.updateStripMethodDropdown(treatmentId, treatment.stripping_type)
+      // Update the preview
+      this.updateStripPreview(treatmentId, treatment.stripping_type, treatment.stripping_method)
+    }
+
+    if (event.target.classList.contains('strip-method-select')) {
+      treatment.stripping_method = event.target.value
+      // Update the preview
+      this.updateStripPreview(treatmentId, treatment.stripping_type, treatment.stripping_method)
     }
 
     // Store alloy selection for ENP treatments
@@ -715,7 +867,7 @@ export default class extends Controller {
 
     // Handle other modifier changes
     if (event.target.classList.contains('stripping-method-select')) {
-      treatment.stripping_method = event.target.value
+      treatment.stripping_method_secondary = event.target.value
     }
 
     if (event.target.classList.contains('sealing-method-select')) {
@@ -748,12 +900,40 @@ export default class extends Controller {
     this.updatePreview()
   }
 
+  // Update strip method dropdown based on selected strip type
+  updateStripMethodDropdown(treatmentId, stripType) {
+    const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
+    const methodSelect = card?.querySelector('.strip-method-select')
+
+    if (methodSelect) {
+      const methods = this.getStrippingMethodsForType(stripType)
+      methodSelect.innerHTML = methods.map(method =>
+        `<option value="${method.value}">${method.label}</option>`
+      ).join('')
+
+      // Update the treatment data
+      const treatment = this.treatments.find(t => t.id === treatmentId)
+      if (treatment && methods.length > 0) {
+        treatment.stripping_method = methods[0].value
+        methodSelect.value = methods[0].value
+      }
+    }
+  }
+
+  // Update strip preview text
+  updateStripPreview(treatmentId, stripType, stripMethod) {
+    const previewElement = this.treatmentsContainerTarget.querySelector(`[data-strip-preview="${treatmentId}"]`)
+    if (previewElement) {
+      previewElement.textContent = this.getStrippingPreviewText(stripType, stripMethod)
+    }
+  }
+
   // Load operations for a treatment (unlocked mode only)
   async loadOperationsForTreatment(treatmentId) {
     if (this.isLockedMode || !this.hasTreatmentsContainerTarget) return
 
     const treatment = this.treatments.find(t => t.id === treatmentId)
-    if (!treatment) return
+    if (!treatment || treatment.type === 'stripping_only') return
 
     const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
     if (!card) return
@@ -943,14 +1123,15 @@ export default class extends Controller {
       'border-purple-500', 'bg-purple-50', 'bg-purple-500',
       'border-green-500', 'bg-green-50', 'bg-green-500',
       'border-orange-500', 'bg-orange-50', 'bg-orange-500',
-      'border-indigo-500', 'bg-indigo-50', 'bg-indigo-500'
+      'border-indigo-500', 'bg-indigo-50', 'bg-indigo-500',
+      'border-red-500', 'bg-red-50', 'bg-red-500'
     ]
 
     button.classList.remove(...colorClasses)
     button.classList.add('border-gray-300')
 
     if (countBadge) {
-      countBadge.classList.remove('bg-blue-500', 'bg-purple-500', 'bg-green-500', 'bg-orange-500', 'bg-indigo-500', 'text-white')
+      countBadge.classList.remove('bg-blue-500', 'bg-purple-500', 'bg-green-500', 'bg-orange-500', 'bg-indigo-500', 'bg-red-500', 'text-white')
       countBadge.classList.add('bg-gray-100')
       countBadge.textContent = '0'
     }
@@ -997,8 +1178,8 @@ export default class extends Controller {
       return
     }
 
-    // Filter treatments that have operations selected
-    const treatmentsWithOperations = this.treatments.filter(t => t.operation_id)
+    // Filter treatments that have operations selected OR are strip-only
+    const treatmentsWithOperations = this.treatments.filter(t => t.operation_id || t.type === 'stripping_only')
 
     if (treatmentsWithOperations.length === 0) {
       this.selectedContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">Select operations for treatments to see preview</p>'
@@ -1023,15 +1204,17 @@ export default class extends Controller {
         selected_alloy: treatment.selected_alloy,
         target_thickness: treatment.target_thickness,
         selected_jig_type: treatment.selected_jig_type,
+        stripping_type: treatment.stripping_type,
+        stripping_method: treatment.stripping_method,
         masking: {
           enabled: Object.keys(treatment.masking_methods || {}).length > 0,
           methods: treatment.masking_methods || {}
         },
         stripping: {
-          enabled: treatment.stripping_method !== 'none',
-          type: treatment.stripping_method !== 'none' ?
-            (treatment.stripping_method === 'nitric' || treatment.stripping_method === 'metex_dekote' ? 'enp_stripping' : 'anodising_stripping') : null,
-          method: treatment.stripping_method !== 'none' ? treatment.stripping_method : null
+          enabled: treatment.stripping_method_secondary !== 'none',
+          type: treatment.stripping_method_secondary !== 'none' ?
+            (treatment.stripping_method_secondary === 'nitric' || treatment.stripping_method_secondary === 'metex_dekote' ? 'enp_stripping' : 'anodising_stripping') : null,
+          method: treatment.stripping_method_secondary !== 'none' ? treatment.stripping_method_secondary : null
         },
         sealing: {
           enabled: treatment.sealing_method !== 'none',
@@ -1094,6 +1277,7 @@ export default class extends Controller {
         const isPreHeatTreatment = op.id && op.id.startsWith('PRE_ENP_HEAT_TREAT')
         const isPostHeatTreatment = op.id && (op.id.startsWith('POST_ENP_HEAT_TREAT') || op.id.includes('ENP_POST_HEAT_TREAT') || op.id.includes('ENP_BAKE'))
         const isLocalTreatment = op.id && op.id.startsWith('LOCAL_')
+        const isStripping = op.id === 'STRIPPING' || op.display_name?.includes('Strip')
 
         let bgColor = 'bg-blue-100 border border-blue-300'
         let textColor = 'text-gray-900'
@@ -1147,6 +1331,12 @@ export default class extends Controller {
           autoLabel = '<span class="text-xs text-teal-600 ml-2">(local treatment)</span>'
         }
 
+        if (isStripping) {
+          bgColor = 'bg-red-100 border border-red-300'
+          textColor = 'text-red-900'
+          autoLabel = '<span class="text-xs text-red-600 ml-2">(strip-only treatment)</span>'
+        }
+
         return `
           <div class="${bgColor} rounded px-3 py-2">
             <span class="text-sm ${textColor}">
@@ -1188,7 +1378,16 @@ export default class extends Controller {
   formatTreatmentName(treatmentType) {
     if (this.isLockedMode) return ''
 
-    return treatmentType
+    const nameMap = {
+      'stripping_only': 'Strip Only',
+      'standard_anodising': 'Standard Anodising',
+      'hard_anodising': 'Hard Anodising',
+      'chromic_anodising': 'Chromic Anodising',
+      'chemical_conversion': 'Chemical Conversion',
+      'electroless_nickel_plating': 'Electroless Nickel Plating'
+    }
+
+    return nameMap[treatmentType] || treatmentType
       .replace('_anodising', '')
       .replace('_conversion', '')
       .replace('_nickel_plating', '')
