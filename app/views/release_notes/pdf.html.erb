@@ -230,12 +230,6 @@
             <th>Our Works Order Number</th>
             <td>WO<%= @release_note.works_order.number %></td>
           </tr>
-          <% if @release_note.respond_to?(:remarks) && @release_note.remarks.present? %>
-            <tr>
-              <th>Remarks</th>
-              <td><%= simple_format(@release_note.remarks) %></td>
-            </tr>
-          <% end %>
         </tbody>
       </table>
 
@@ -396,12 +390,6 @@
             <th>Our Works Order Number</th>
             <td>WO<%= @release_note.works_order.number %></td>
           </tr>
-          <% if @release_note.respond_to?(:remarks) && @release_note.remarks.present? %>
-            <tr>
-              <th>Remarks</th>
-              <td><%= simple_format(@release_note.remarks) %></td>
-            </tr>
-          <% end %>
         </tbody>
       </table>
 
