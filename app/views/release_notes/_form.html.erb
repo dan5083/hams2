@@ -60,24 +60,35 @@
               </h3>
 
               <div class="grid grid-cols-1 gap-y-4 gap-x-4 sm:grid-cols-2">
-                <% @release_note.get_required_thickness_types.each do |process_type| %>
+                <% @release_note.get_required_treatments.each do |treatment| %>
                   <%
-                    process_name = process_type.humanize.gsub('_', ' ').titleize
-                    field_name = "thickness_#{process_type}"
-                    current_value = @release_note.get_thickness(process_type)
+                    treatment_id = treatment[:treatment_id]
+                    display_name = treatment[:display_name]
+                    target_thickness = treatment[:target_thickness]
+                    current_value = @release_note.get_thickness_measurement(treatment_id)
+                    field_name = "thickness_measurement_#{treatment_id}"
                   %>
                   <div>
                     <label for="<%= field_name %>" class="block text-sm font-medium text-gray-700">
-                      <%= process_name %> Thickness
+                      <%= display_name %> Thickness
                       <span class="text-red-500">*</span>
+                      <% if target_thickness && target_thickness > 0 %>
+                        <span class="text-sm text-gray-500">(Target: <%= target_thickness %>μm)</span>
+                      <% end %>
                     </label>
                     <div class="mt-1 relative rounded-md shadow-sm">
                       <%= text_field_tag field_name, current_value,
                             id: field_name,
                             pattern: "[0-9]+(\.[0-9]+)?",
-                            placeholder: "e.g. 25.4",
+                            placeholder: target_thickness && target_thickness > 0 ? "e.g. #{target_thickness}" : "e.g. 25.4",
                             class: "block w-full pr-12 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
-                            required: true %>
+                            required: true,
+                            data: {
+                              treatment_id: treatment_id,
+                              process_type: treatment[:process_type],
+                              target_thickness: target_thickness,
+                              display_name: display_name
+                            } %>
                       <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                         <span class="text-gray-500 sm:text-sm">µm</span>
                       </div>
@@ -100,7 +111,7 @@
                     <p class="text-sm text-blue-700">
                       <strong>Measurement Requirements:</strong>
                       Thickness measurements are required for aerospace/defense parts with anodising or electroless nickel plating.
-                      Enter measurements to 3 significant figures (e.g., 25.4 µm, not 25.40 µm).
+                      Enter measurements to 3 significant figures. Multiple treatments of the same type may require separate measurements.
                     </p>
                   </div>
                 </div>
@@ -137,34 +148,65 @@
     <div class="px-4 py-3 bg-gray-50 text-right sm:px-6">
       <%= link_to 'Cancel', @works_order,
                   class: "bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 mr-3" %>
-      <%= form.submit "Create Release Note",
+      <%= form.submit (@release_note.persisted? ? "Update Release Note" : "Create Release Note"),
                       class: "inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" %>
     </div>
   </div>
 
-  <!-- Hidden fields for thickness measurements processing -->
+  <!-- JavaScript for handling thickness measurements -->
   <% if @release_note.requires_thickness_measurements? %>
     <script>
       document.addEventListener('DOMContentLoaded', function() {
         const form = document.querySelector('form');
+        const thicknessFields = document.querySelectorAll('[data-treatment-id]');
 
         form.addEventListener('submit', function(e) {
           // Collect thickness measurements and prepare them for submission
-          const thicknessData = Array(4).fill(null); // Initialize array with nulls
+          const measurements = [];
 
-          <% @release_note.get_required_thickness_types.each do |process_type| %>
-            const <%= process_type %>Field = document.getElementById('thickness_<%= process_type %>');
-            if (<%= process_type %>Field && <%= process_type %>Field.value) {
-              thicknessData[<%= ReleaseNote::THICKNESS_POSITIONS[process_type] %>] = parseFloat(<%= process_type %>Field.value);
+          thicknessFields.forEach(function(field) {
+            const treatmentId = field.dataset.treatmentId;
+            const processType = field.dataset.processType;
+            const targetThickness = field.dataset.targetThickness;
+            const displayName = field.dataset.displayName;
+            const value = field.value.trim();
+
+            if (value) {
+              measurements.push({
+                treatment_id: treatmentId,
+                process_type: processType,
+                target_thickness: parseFloat(targetThickness) || 0,
+                display_name: displayName,
+                measured_thickness: parseFloat(value)
+              });
             }
-          <% end %>
+          });
 
           // Add hidden field with JSON data
           const hiddenField = document.createElement('input');
           hiddenField.type = 'hidden';
           hiddenField.name = 'release_note[measured_thicknesses]';
-          hiddenField.value = JSON.stringify(thicknessData);
+          hiddenField.value = JSON.stringify({ measurements: measurements });
           form.appendChild(hiddenField);
+        });
+
+        // Optional: Add real-time validation
+        thicknessFields.forEach(function(field) {
+          field.addEventListener('input', function(e) {
+            const value = parseFloat(e.target.value);
+            const targetThickness = parseFloat(e.target.dataset.targetThickness);
+
+            // Remove any existing validation styling
+            e.target.classList.remove('border-red-300', 'border-yellow-300');
+
+            if (isNaN(value) || value <= 0) {
+              // Invalid value
+              e.target.classList.add('border-red-300');
+            } else if (targetThickness && Math.abs(value - targetThickness) > (targetThickness * 0.2)) {
+              // More than 20% deviation from target - show warning
+              e.target.classList.add('border-yellow-300');
+            }
+          });
         });
       });
     </script>

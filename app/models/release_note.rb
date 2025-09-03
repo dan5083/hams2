@@ -1,4 +1,6 @@
-# app/models/release_note.rb - Verified and enhanced for invoicing and thickness measurements
+# app/models/release_note.rb - Updated for multiple thickness measurements per treatment type
+require 'digest/sha2'
+
 class ReleaseNote < ApplicationRecord
   belongs_to :works_order
   belongs_to :issued_by, class_name: 'User'
@@ -34,15 +36,13 @@ class ReleaseNote < ApplicationRecord
   after_save :update_works_order_quantity_released
   after_destroy :update_works_order_quantity_released
 
-  # Thickness measurement constants - array positions
-  THICKNESS_POSITIONS = {
-    'chromic_anodising' => 0,
-    'electroless_nickel_plating' => 1,
-    'hard_anodising' => 2,
-    'standard_anodising' => 3
-  }.freeze
-
-  MEASURABLE_PROCESS_TYPES = THICKNESS_POSITIONS.keys.freeze
+  # Process types that can have thickness measurements
+  MEASURABLE_PROCESS_TYPES = %w[
+    chromic_anodising
+    electroless_nickel_plating
+    hard_anodising
+    standard_anodising
+  ].freeze
 
   def display_name
     "RN#{number}"
@@ -141,52 +141,70 @@ class ReleaseNote < ApplicationRecord
     end
   end
 
-  # THICKNESS MEASUREMENT METHODS
+  # NEW THICKNESS MEASUREMENT METHODS - Support multiple measurements per treatment type
 
   def requires_thickness_measurements?
     return false unless works_order.part&.aerospace_defense?
-    get_required_thickness_types.any?
+    get_required_treatments.any?
   end
 
-  def get_required_thickness_types
+  def get_required_treatments
     return [] unless works_order.part
 
     begin
-      # Get treatments from the part's customisation data
-      treatments_data = works_order.part.send(:parse_treatments_data)
-      process_types = treatments_data.map { |treatment| treatment["type"] }.compact.uniq
+      # Get all treatments that require thickness measurements from the part's operations
+      operations = works_order.part.get_operations_with_auto_ops
+      measurable_operations = operations.select do |operation|
+        MEASURABLE_PROCESS_TYPES.include?(operation.process_type)
+      end
 
-      # Return intersection with measurable types
-      process_types & MEASURABLE_PROCESS_TYPES
+      # Return treatment info with unique identifiers
+      measurable_operations.map.with_index do |operation, index|
+        {
+          treatment_id: generate_treatment_id(operation, index),
+          process_type: operation.process_type,
+          target_thickness: operation.target_thickness || 0,
+          display_name: operation.display_name
+        }
+      end
     rescue => e
-      Rails.logger.error "Error getting process types for thickness measurement: #{e.message}"
+      Rails.logger.error "Error getting required treatments for thickness measurement: #{e.message}"
       []
     end
   end
 
-  def get_thickness(process_type)
-    return nil unless self.measured_thicknesses.is_a?(Array)
-    position = THICKNESS_POSITIONS[process_type]
-    return nil unless position
-    self.measured_thicknesses[position]
+  def get_thickness_measurement(treatment_id)
+    return nil unless measured_thicknesses.is_a?(Hash)
+    measurement = measured_thicknesses['measurements']&.find { |m| m['treatment_id'] == treatment_id }
+    measurement&.dig('measured_thickness')
   end
 
-  def set_thickness(process_type, value)
-    position = THICKNESS_POSITIONS[process_type]
-    return false unless position
+  def set_thickness_measurement(treatment_id, value, treatment_info = {})
+    # Initialize the structure if needed
+    self.measured_thicknesses = { 'measurements' => [] } unless measured_thicknesses.is_a?(Hash)
+    self.measured_thicknesses['measurements'] ||= []
 
-    # Initialize array if nil - ensure it's a proper array, not a string
-    if self.measured_thicknesses.nil? || !self.measured_thicknesses.is_a?(Array)
-      self.measured_thicknesses = Array.new(THICKNESS_POSITIONS.size, nil)
-    end
+    # Find existing measurement or create new one
+    measurement = self.measured_thicknesses['measurements'].find { |m| m['treatment_id'] == treatment_id }
 
-    # Set value at position (convert to float if valid number)
-    if value.blank?
-      self.measured_thicknesses[position] = nil
-    else
-      # Validate and round to 3 significant figures
-      float_value = Float(value.to_s)
-      self.measured_thicknesses[position] = round_to_n_significant_figures(float_value, 3)
+    if measurement
+      # Update existing measurement
+      if value.blank?
+        # Remove measurement if value is blank
+        self.measured_thicknesses['measurements'].reject! { |m| m['treatment_id'] == treatment_id }
+      else
+        measurement['measured_thickness'] = process_thickness_value(value)
+      end
+    elsif value.present?
+      # Add new measurement
+      new_measurement = {
+        'treatment_id' => treatment_id,
+        'process_type' => treatment_info[:process_type],
+        'target_thickness' => treatment_info[:target_thickness] || 0,
+        'display_name' => treatment_info[:display_name],
+        'measured_thickness' => process_thickness_value(value)
+      }
+      self.measured_thicknesses['measurements'] << new_measurement
     end
 
     true
@@ -195,22 +213,54 @@ class ReleaseNote < ApplicationRecord
   end
 
   def has_thickness_measurements?
-    self.measured_thicknesses.present? && self.measured_thicknesses.compact.any?
+    return false unless measured_thicknesses.is_a?(Hash)
+    measurements = measured_thicknesses['measurements']
+    measurements.present? && measurements.any? { |m| m['measured_thickness'].present? }
   end
 
   def thickness_measurements_summary
     return nil unless has_thickness_measurements?
 
-    measurements = []
-    THICKNESS_POSITIONS.each do |process_type, position|
-      thickness = self.measured_thicknesses[position]
-      next unless thickness
+    measurements = measured_thicknesses['measurements'] || []
+    summary_parts = measurements.filter_map do |measurement|
+      thickness = measurement['measured_thickness']
+      next unless thickness.present?
 
-      process_name = process_type.humanize.gsub('_', ' ').titleize
-      measurements << "#{process_name}: #{thickness} µm"
+      display_name = measurement['display_name'] || measurement['process_type'].humanize.titleize
+      "#{display_name}: #{thickness} µm"
     end
 
-    measurements.join(', ')
+    summary_parts.join(', ')
+  end
+
+  # Get all measurements grouped by process type for display
+  def thickness_measurements_by_type
+    return {} unless has_thickness_measurements?
+
+    measurements = measured_thicknesses['measurements'] || []
+    measurements.group_by { |m| m['process_type'] }
+  end
+
+  # Check if all required thickness measurements are present
+  def all_required_thickness_measurements_present?
+    return true unless requires_thickness_measurements?
+
+    required_treatments = get_required_treatments
+    required_treatments.all? do |treatment|
+      get_thickness_measurement(treatment[:treatment_id]).present?
+    end
+  end
+
+  # Get missing thickness measurements
+  def missing_thickness_measurements
+    return [] unless requires_thickness_measurements?
+
+    required_treatments = get_required_treatments
+    required_treatments.filter_map do |treatment|
+      if get_thickness_measurement(treatment[:treatment_id]).blank?
+        treatment
+      end
+    end
   end
 
   def self.next_number
@@ -263,42 +313,64 @@ class ReleaseNote < ApplicationRecord
   end
 
   def validate_thickness_measurements
-    return unless self.measured_thicknesses.present?
-    return unless self.measured_thicknesses.is_a?(Array)
+    return unless requires_thickness_measurements?
 
-    # Only validate if this release note requires thickness measurements
-    if requires_thickness_measurements?
-      required_types = get_required_thickness_types
+    required_treatments = get_required_treatments
 
-      required_types.each do |process_type|
-        thickness = get_thickness(process_type)
-        if thickness.blank?
-          process_name = process_type.humanize.gsub('_', ' ').titleize
-          errors.add(:measured_thicknesses, "#{process_name} thickness is required for aerospace/defense parts")
-        elsif thickness <= 0
-          process_name = process_type.humanize.gsub('_', ' ').titleize
-          errors.add(:measured_thicknesses, "#{process_name} thickness must be greater than 0")
-        elsif thickness > 1000 # Sanity check - no coating should be > 1mm
-          process_name = process_type.humanize.gsub('_', ' ').titleize
-          errors.add(:measured_thicknesses, "#{process_name} thickness seems unrealistically high (>1000µm)")
-        end
-      end
-    else
-      # If thickness measurements aren't required but are provided, just validate format
-      self.measured_thicknesses.each_with_index do |thickness, index|
-        next if thickness.nil?
+    required_treatments.each do |treatment|
+      thickness = get_thickness_measurement(treatment[:treatment_id])
 
-        if !thickness.is_a?(Numeric) || thickness <= 0
-          errors.add(:measured_thicknesses, "Invalid thickness measurement at position #{index}")
-        elsif thickness > 1000
-          errors.add(:measured_thicknesses, "Thickness measurement at position #{index} seems unrealistically high (>1000µm)")
-        end
+      if thickness.blank?
+        display_name = treatment[:display_name] || treatment[:process_type].humanize.titleize
+        errors.add(:measured_thicknesses, "#{display_name} thickness measurement is required for aerospace/defense parts")
+      elsif thickness <= 0
+        display_name = treatment[:display_name] || treatment[:process_type].humanize.titleize
+        errors.add(:measured_thicknesses, "#{display_name} thickness must be greater than 0")
+      elsif thickness > 1000 # Sanity check - no coating should be > 1mm
+        display_name = treatment[:display_name] || treatment[:process_type].humanize.titleize
+        errors.add(:measured_thicknesses, "#{display_name} thickness seems unrealistically high (>1000µm)")
       end
     end
   end
 
   def update_works_order_quantity_released
     works_order&.calculate_quantity_released!
+  end
+
+  # Generate a unique treatment ID based on treatment characteristics
+  def generate_treatment_id(treatment, index)
+    # Create a deterministic ID based on treatment properties
+    id_components = [
+      treatment["type"],
+      treatment["target_thickness"],
+      treatment["selected_jig_type"],
+      index
+    ].compact
+
+    # Use a hash of the components for consistency
+    Digest::SHA256.hexdigest(id_components.join('|'))[0, 12]
+  end
+
+  # Generate a display name for a treatment
+  def generate_display_name(treatment)
+    process_name = treatment["type"].humanize.gsub('_', ' ').titleize
+    target_thickness = treatment["target_thickness"]
+
+    if target_thickness.present? && target_thickness > 0
+      "#{process_name} #{target_thickness}μm"
+    else
+      process_name
+    end
+  end
+
+  # Process and validate thickness value, rounding to 3 significant figures
+  def process_thickness_value(value)
+    return nil if value.blank?
+
+    float_value = Float(value.to_s)
+    return nil if float_value <= 0
+
+    round_to_n_significant_figures(float_value, 3)
   end
 
   # Helper method to round to n significant figures

@@ -151,54 +151,61 @@ class ReleaseNotesController < ApplicationController
   end
 
   def thickness_measurements_provided?
-    # Check if individual thickness fields were provided
-    thickness_field_names = ReleaseNote::MEASURABLE_PROCESS_TYPES.map { |type| "thickness_#{type}" }
-    thickness_field_names.any? { |field| params[field].present? }
+    # Check if measurements were provided via JSON (from new form structure)
+    params[:release_note][:measured_thicknesses].present? ||
+    # Check if individual thickness fields were provided (legacy support)
+    params.any? { |key, _| key.to_s.start_with?('thickness_measurement_') }
   end
 
   def process_thickness_measurements
-    # Process individual thickness fields and convert to JSONB array
     Rails.logger.info "Processing thickness measurements for release note"
 
-    # Check if measurements were sent as JSON string (from JavaScript)
+    # First, try to process JSON data from the new form structure
     if release_note_params[:measured_thicknesses].present?
       begin
         json_data = JSON.parse(release_note_params[:measured_thicknesses])
-        if json_data.is_a?(Array)
-          Rails.logger.info "Found JSON thickness data: #{json_data}"
+        if json_data.is_a?(Hash) && json_data['measurements'].is_a?(Array)
+          Rails.logger.info "Found JSON thickness data with #{json_data['measurements'].length} measurements"
           @release_note.measured_thicknesses = json_data
           return
         end
       rescue JSON::ParserError => e
         Rails.logger.warn "Failed to parse JSON thickness data: #{e.message}"
+        # Fall through to individual field processing
       end
     end
 
-    # Fall back to processing individual fields
-    required_types = @release_note.get_required_thickness_types
-    Rails.logger.info "Required thickness types: #{required_types}"
+    # Fall back to processing individual thickness measurement fields (for backward compatibility)
+    required_treatments = @release_note.get_required_treatments
+    Rails.logger.info "Required treatments for thickness: #{required_treatments.length}"
 
-    # Initialize the measurements array if needed
-    @release_note.measured_thicknesses = Array.new(ReleaseNote::THICKNESS_POSITIONS.size, nil) if @release_note.measured_thicknesses.nil?
+    # Initialize the measurements structure
+    @release_note.measured_thicknesses = { 'measurements' => [] }
 
-    # Process each required thickness type
-    required_types.each do |process_type|
-      field_name = "thickness_#{process_type}"
-      field_value = params[field_name]
+    # Process each thickness measurement field
+    params.each do |param_name, param_value|
+      next unless param_name.to_s.start_with?('thickness_measurement_')
 
-      Rails.logger.info "Processing #{field_name}: #{field_value}"
+      # Extract treatment_id from field name (thickness_measurement_abc123def456)
+      treatment_id = param_name.to_s.sub('thickness_measurement_', '')
 
-      if field_value.present?
-        success = @release_note.set_thickness(process_type, field_value)
-        Rails.logger.info "Set thickness for #{process_type}: #{success}"
+      # Find the corresponding treatment info
+      treatment_info = required_treatments.find { |t| t[:treatment_id] == treatment_id }
+      next unless treatment_info
+
+      Rails.logger.info "Processing thickness measurement: #{treatment_id} = #{param_value}"
+
+      if param_value.present?
+        success = @release_note.set_thickness_measurement(treatment_id, param_value, treatment_info)
+        Rails.logger.info "Set thickness measurement for #{treatment_id}: #{success}"
 
         unless success
           @release_note.errors.add(:measured_thicknesses,
-            "Invalid thickness value for #{process_type.humanize.gsub('_', ' ').titleize}")
+            "Invalid thickness value for #{treatment_info[:display_name]}")
         end
       elsif @release_note.requires_thickness_measurements?
         # If thickness is required but not provided, the model validation will catch this
-        Rails.logger.warn "Missing required thickness for #{process_type}"
+        Rails.logger.warn "Missing required thickness for treatment: #{treatment_id}"
       end
     end
 

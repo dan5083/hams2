@@ -121,15 +121,35 @@
         text-align: center;
       }
 
+      .thickness-table {
+        margin-top: 1rem;
+        margin-bottom: 1rem;
+      }
+
+      .thickness-table th {
+        width: 25%;
+      }
+
+      .thickness-group {
+        margin-bottom: 1rem;
+      }
+
+      .thickness-group-header {
+        background-color: #e9ecef;
+        font-weight: bold;
+        padding: 0.25rem 0.5rem;
+        border-bottom: 2pt solid #ccc;
+      }
+
       p {
         margin: 0.5rem 0;
       }
     </style>
   </head>
   <body>
-    <!-- Page 1: Collection/Delivery Note -->
+    <!-- Page 1: Advice Note -->
     <div class="page">
-      <h1>Release Note</h1>
+      <h1>Advice Note</h1>
 
       <!-- Header Information -->
       <table class="header-table">
@@ -216,21 +236,58 @@
               <td><%= simple_format(@release_note.remarks) %></td>
             </tr>
           <% end %>
-          <% if @release_note.has_thickness_measurements? %>
-            <tr>
-              <th>Measured Thicknesses</th>
-              <td>
-                <% ReleaseNote::THICKNESS_POSITIONS.each do |process_type, position| %>
-                  <% thickness = @release_note.get_thickness(process_type) %>
-                  <% if thickness.present? %>
-                    <%= process_type.humanize.gsub('_', ' ').titleize %>: <strong><%= thickness %> µm</strong><br/>
-                  <% end %>
-                <% end %>
-              </td>
-            </tr>
-          <% end %>
         </tbody>
       </table>
+
+      <!-- Thickness Measurements (if present) -->
+      <% if @release_note.has_thickness_measurements? %>
+        <h2>Thickness Measurements</h2>
+        <% measurements_by_type = @release_note.thickness_measurements_by_type %>
+        <% measurements_by_type.each do |process_type, measurements| %>
+          <div class="thickness-group">
+            <div class="thickness-group-header">
+              <%= process_type.humanize.gsub('_', ' ').titleize %>
+            </div>
+            <table class="thickness-table">
+              <thead>
+                <tr>
+                  <th>Treatment</th>
+                  <th>Target (μm)</th>
+                  <th>Measured (μm)</th>
+                  <th>Deviation</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% measurements.each do |measurement| %>
+                  <tr>
+                    <td><%= measurement['display_name'] || measurement['process_type'].humanize.titleize %></td>
+                    <td>
+                      <% if measurement['target_thickness'] && measurement['target_thickness'] > 0 %>
+                        <%= measurement['target_thickness'] %>
+                      <% else %>
+                        -
+                      <% end %>
+                    </td>
+                    <td><%= measurement['measured_thickness'] %></td>
+                    <td>
+                      <% if measurement['target_thickness'] && measurement['target_thickness'] > 0 %>
+                        <%
+                          target = measurement['target_thickness'].to_f
+                          measured = measurement['measured_thickness'].to_f
+                          deviation_pct = ((measured - target) / target * 100).round(1)
+                        %>
+                        <%= deviation_pct > 0 ? '+' : '' %><%= deviation_pct %>%
+                      <% else %>
+                        -
+                      <% end %>
+                    </td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        <% end %>
+      <% end %>
 
       <!-- Proof of Collection/Delivery -->
       <h2>Proof of Collection/Delivery</h2>
@@ -252,9 +309,9 @@
       </table>
     </div>
 
-    <!-- Page 2: Certificate/Statement -->
+    <!-- Page 2: Certificate of Conformity -->
     <div class="page">
-      <h1>Release Note</h1>
+      <h1>Certificate of Conformity</h1>
 
       <!-- Header Information (repeated) -->
       <table class="header-table">
@@ -347,6 +404,56 @@
           <% end %>
         </tbody>
       </table>
+
+      <!-- Detailed Thickness Measurements for Certificate (if present) -->
+      <% if @release_note.has_thickness_measurements? %>
+        <h2>Certified Thickness Measurements</h2>
+        <% measurements_by_type = @release_note.thickness_measurements_by_type %>
+        <% measurements_by_type.each do |process_type, measurements| %>
+          <div class="thickness-group">
+            <div class="thickness-group-header">
+              <%= process_type.humanize.gsub('_', ' ').titleize %>
+            </div>
+            <table class="thickness-table">
+              <thead>
+                <tr>
+                  <th>Treatment Description</th>
+                  <th>Target Thickness</th>
+                  <th>Measured Thickness</th>
+                  <th>Conformance</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% measurements.each do |measurement| %>
+                  <tr>
+                    <td><%= measurement['display_name'] || measurement['process_type'].humanize.titleize %></td>
+                    <td>
+                      <% if measurement['target_thickness'] && measurement['target_thickness'] > 0 %>
+                        <%= measurement['target_thickness'] %> μm
+                      <% else %>
+                        As specified
+                      <% end %>
+                    </td>
+                    <td><%= measurement['measured_thickness'] %> μm</td>
+                    <td>
+                      <% if measurement['target_thickness'] && measurement['target_thickness'] > 0 %>
+                        <%
+                          target = measurement['target_thickness'].to_f
+                          measured = measurement['measured_thickness'].to_f
+                          deviation_pct = ((measured - target) / target * 100).abs
+                        %>
+                        <%= deviation_pct <= 20 ? 'PASS' : 'REVIEW' %>
+                      <% else %>
+                        MEASURED
+                      <% end %>
+                    </td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        <% end %>
+      <% end %>
 
       <!-- Release Statement -->
       <div class="statement">
