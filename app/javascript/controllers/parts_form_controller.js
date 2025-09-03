@@ -104,7 +104,8 @@ export default class extends Controller {
     this.availableStrippingMethods = {
       anodising_stripping: [
         { value: 'chromic_phosphoric', label: 'Chromic-Phosphoric Acid' },
-        { value: 'sulphuric_sodium_hydroxide', label: 'Sulphuric Acid + Sodium Hydroxide' }
+        { value: 'sulphuric_sodium_hydroxide', label: 'Sulphuric Acid + Sodium Hydroxide' },
+        { value: 'sodium_hydroxide', label: 'Sodium Hydroxide' }
       ],
       enp_stripping: [
         { value: 'nitric', label: 'Nitric Acid' },
@@ -518,7 +519,8 @@ export default class extends Controller {
     const methodMap = {
       'anodising_stripping': {
         'chromic_phosphoric': 'Strip anodising in chromic-phosphoric acid solution',
-        'sulphuric_sodium_hydroxide': 'Soak in sulphuric acid solution then strip in sodium hydroxide solution'
+        'sulphuric_sodium_hydroxide': 'Soak in sulphuric acid solution then strip in sodium hydroxide solution',
+        'sodium_hydroxide': 'Strip in sodium hydroxide solution - wait till fizzing starts and hold for 30 seconds'
       },
       'enp_stripping': {
         'nitric': 'Strip ENP in nitric acid solution 30 to 40 minutes per 25 microns [or until black smut dissolves]',

@@ -570,7 +570,7 @@ class Part < ApplicationRecord
     end
   end
 
-  # Strip-only cycle - simplified workflow: mask -> jig -> degrease -> strip -> unjig -> unmask
+  # Strip-only cycle - simplified workflow: mask -> jig -> degrease -> strip -> rinse -> unjig -> unmask
   def add_strip_only_cycle(sequence, strip_op, treatment_data, treatment_jig_type, masking)
     # 1. Masking (if configured)
     if masking["enabled"] && masking["methods"].present?
@@ -586,7 +586,7 @@ class Part < ApplicationRecord
     safe_add_to_sequence(sequence, degrease, "Strip Degrease")
     safe_add_to_sequence(sequence, get_rinse(degrease, false, masking), "Rinse after Strip Degrease")
 
-    # 4. Strip operation + rinse
+    # 4. Strip operation + rinse (FIXED: Added missing rinse after strip)
     safe_add_to_sequence(sequence, strip_op, "Strip Operation")
     safe_add_to_sequence(sequence, get_rinse(strip_op, false, masking), "Rinse after Strip")
 
