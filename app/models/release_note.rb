@@ -152,19 +152,21 @@ class ReleaseNote < ApplicationRecord
     return [] unless works_order.part
 
     begin
-      # Get all treatments that require thickness measurements from the part's operations
-      operations = works_order.part.get_operations_with_auto_ops
-      measurable_operations = operations.select do |operation|
-        MEASURABLE_PROCESS_TYPES.include?(operation.process_type)
+      # Get treatments directly from the part's stored customisation data
+      treatments_data = works_order.part.send(:parse_treatments_data)
+
+      # Filter for treatments that require thickness measurements
+      measurable_treatments = treatments_data.select do |treatment|
+        MEASURABLE_PROCESS_TYPES.include?(treatment["type"])
       end
 
       # Return treatment info with unique identifiers
-      measurable_operations.map.with_index do |operation, index|
+      measurable_treatments.map.with_index do |treatment, index|
         {
-          treatment_id: generate_treatment_id(operation, index),
-          process_type: operation.process_type,
-          target_thickness: operation.target_thickness || 0,
-          display_name: operation.display_name
+          treatment_id: generate_treatment_id(treatment, index),
+          process_type: treatment["type"],
+          target_thickness: treatment["target_thickness"] || 0,
+          display_name: generate_display_name(treatment)
         }
       end
     rescue => e
