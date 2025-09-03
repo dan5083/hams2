@@ -1,4 +1,4 @@
-<%= form_with(model: [@works_order, @release_note], local: true) do |form| %>
+<%= form_with(model: @release_note.persisted? ? @release_note : [@works_order, @release_note], local: true) do |form| %>
   <% if @release_note.errors.any? %>
     <div class="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
       <div class="flex">

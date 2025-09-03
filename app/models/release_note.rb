@@ -74,8 +74,8 @@ class ReleaseNote < ApplicationRecord
   end
 
   def release_statement
-    return '' unless works_order.release_level&.statement && specification
-    works_order.release_level.statement.gsub('[SPECIFICATION]', specification)
+    # Always use the remarks field as the release statement
+    remarks || ''
   end
 
   def total_quantity

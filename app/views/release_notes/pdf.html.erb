@@ -127,7 +127,7 @@
       }
 
       .thickness-table th {
-        width: 25%;
+        width: 50%;
       }
 
       .thickness-group {
@@ -457,7 +457,7 @@
 
       <!-- Release Statement -->
       <div class="statement">
-        <p><%= simple_format(@release_note.release_statement) if @release_note.release_statement.present? %></p>
+        <p><%= simple_format(@release_note.remarks) if @release_note.remarks.present? %></p>
       </div>
 
       <!-- Signature Block -->
