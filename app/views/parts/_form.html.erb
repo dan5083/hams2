@@ -1,4 +1,4 @@
-<%# app/views/parts/_form.html.erb - Consolidated Parts/PPI Form with Simplified Lock-in-and-Edit %>
+<%# app/views/parts/_form.html.erb - Consolidated Parts/PPI Form with Strip-Only Support %>
 <%= form_with model: part, local: true, class: "space-y-6",
     data: {
       controller: "parts-form",
@@ -173,8 +173,8 @@
       <h3 class="text-lg font-medium text-gray-900 mb-4">Processing Instructions</h3>
       <p class="text-sm text-gray-600 mb-4">Configure the manufacturing processes for this part. Select up to 5 treatments, each with its own jig type and modifiers.</p>
 
-      <!-- Treatment Type Buttons -->
-      <div class="grid grid-cols-2 gap-3 mb-6 sm:grid-cols-5">
+      <!-- Treatment Type Buttons - Updated to include Strip Only -->
+      <div class="grid grid-cols-2 gap-3 mb-6 sm:grid-cols-3 lg:grid-cols-6">
         <button type="button" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-blue-500 transition-colors text-sm" data-treatment="standard_anodising">
           <span>Standard</span>
           <span class="count-badge ml-2 min-w-[20px] h-5 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">0</span>
@@ -197,6 +197,11 @@
 
         <button type="button" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-indigo-500 transition-colors text-sm" data-treatment="electroless_nickel_plating">
           <span>ENP</span>
+          <span class="count-badge ml-2 min-w-[20px] h-5 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">0</span>
+        </button>
+
+        <button type="button" class="treatment-btn flex items-center justify-between px-3 py-2 border-2 border-gray-300 rounded-md hover:border-red-500 transition-colors text-sm" data-treatment="stripping_only">
+          <span>Strip Only</span>
           <span class="count-badge ml-2 min-w-[20px] h-5 bg-gray-100 rounded-full flex items-center justify-center text-xs font-medium">0</span>
         </button>
       </div>
@@ -302,18 +307,21 @@
                 <% is_dye = operation.respond_to?(:dye?) && operation.dye? %>
                 <% is_heat_treatment = operation.respond_to?(:enp_heat_treatment?) && operation.enp_heat_treatment? %>
                 <% is_local_treatment = operation.respond_to?(:local_treatment?) && operation.local_treatment? %>
+                <% is_stripping = operation.respond_to?(:stripping?) && operation.stripping? %>
                 <% bg_color_class = is_auto_inserted ? 'bg-gray-100 border border-gray-300' : 'bg-blue-100 border border-blue-300' %>
                 <% bg_color_class = 'bg-red-50 border border-red-200' if is_water_break_test %>
                 <% bg_color_class = 'bg-yellow-50 border border-yellow-200' if is_foil_verification %>
                 <% bg_color_class = 'bg-purple-50 border border-purple-200' if is_dye %>
                 <% bg_color_class = 'bg-orange-50 border border-orange-200' if is_heat_treatment %>
                 <% bg_color_class = 'bg-teal-50 border border-teal-200' if is_local_treatment %>
+                <% bg_color_class = 'bg-red-100 border border-red-300' if is_stripping %>
                 <% text_color_class = is_auto_inserted ? 'italic text-gray-600' : 'text-gray-900' %>
                 <% text_color_class = 'text-red-800' if is_water_break_test %>
                 <% text_color_class = 'text-yellow-800' if is_foil_verification %>
                 <% text_color_class = 'text-purple-800' if is_dye %>
                 <% text_color_class = 'text-orange-800' if is_heat_treatment %>
                 <% text_color_class = 'text-teal-800' if is_local_treatment %>
+                <% text_color_class = 'text-red-900' if is_stripping %>
 
                 <div class="<%= bg_color_class %> rounded px-3 py-2 flex justify-between items-center">
                   <span class="text-sm <%= text_color_class %>">
@@ -336,6 +344,9 @@
                     <% end %>
                     <% if is_local_treatment %>
                       <span class="text-xs text-teal-600 ml-2">(local treatment)</span>
+                    <% end %>
+                    <% if is_stripping %>
+                      <span class="text-xs text-red-600 ml-2">(strip-only treatment)</span>
                     <% end %>
                   </span>
                 </div>
@@ -396,7 +407,7 @@
           <% if part.locked_for_editing? %>
             <p>Operations are in manual editing mode. You can customize the text for each operation above. This mode is permanent for this part - you cannot return to automatic treatment configuration.</p>
           <% else %>
-            <p>This integrated form creates a part with complete processing instructions. Select treatments in the order you want them processed. Each treatment can have its own jig type, masking, stripping, dye, sealing, and local treatment options. ENP treatments include optional pre-heat treatment (before jigging), post-heat treatment (after unjig), and ENP Strip/Mask systems. Local treatments are available for anodising processes and are applied after masking removal. Auto-operations (inspections, rinses, etc.) are automatically inserted in the correct sequence.</p>
+            <p>This integrated form creates a part with complete processing instructions. Select treatments in the order you want them processed. Each treatment can have its own jig type, masking, stripping, dye, sealing, and local treatment options. ENP treatments include optional pre-heat treatment (before jigging), post-heat treatment (after unjig), and ENP Strip/Mask systems. Strip-Only treatments provide a simplified workflow for parts that only require coating removal. Local treatments are available for anodising processes and are applied after masking removal. Auto-operations (inspections, rinses, etc.) are automatically inserted in the correct sequence.</p>
           <% end %>
         </div>
       </div>
@@ -435,8 +446,8 @@
         return;
       }
 
-      // Check if treatments have operations selected
-      const hasOperations = treatments.some(t => t.operation_id);
+      // Check if treatments have operations selected or are strip-only
+      const hasOperations = treatments.some(t => t.operation_id || t.type === 'stripping_only');
       if (!hasOperations) {
         alert('Please select operations for your treatments before switching to manual mode.');
         return;

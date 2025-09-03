@@ -19,7 +19,6 @@ class Part < ApplicationRecord
   scope :for_customer, ->(customer) { where(customer: customer) }
 
   before_validation :normalize_part_details
-  # REMOVED: before_validation :build_specification_from_operations, if: :treatments_changed?
   after_initialize :set_defaults, if: :new_record?
   after_create :disable_replaced_part
 
@@ -174,15 +173,16 @@ class Part < ApplicationRecord
     sequence = []
     has_enp = treatments.any? { |t| t[:operation].process_type == 'electroless_nickel_plating' }
     has_anodising = treatments.any? { |t| ['standard_anodising', 'hard_anodising', 'chromic_anodising'].include?(t[:operation].process_type) }
+    has_strip_only = treatments.any? { |t| t[:operation].process_type == 'stripping_only' }
 
     # Beginning ops (always first)
     safe_add_to_sequence(sequence, OperationLibrary::ContractReviewOperations.get_contract_review_operation, "Contract Review")
 
     # Foil verification (for aerospace/defense anodising applications, after contract review but before any other operations)
-    if defined?(OperationLibrary::FoilVerification) && has_anodising
+    if defined?(OperationLibrary::FoilVerification) && (has_anodising || has_strip_only)
       sequence = OperationLibrary::FoilVerification.insert_foil_verification_if_required(
         sequence,
-        has_anodising_treatments: has_anodising,
+        has_anodising_treatments: has_anodising || has_strip_only,
         aerospace_defense: aerospace_defense?
       )
     end
@@ -240,19 +240,38 @@ class Part < ApplicationRecord
     all_operations = Operation.all_operations(target_thickness)
 
     treatments_data.map do |data|
-      operation = all_operations.find { |op| op.id == data["operation_id"] }
-      next unless operation
+      # Handle strip-only treatments
+      if data["type"] == "stripping_only"
+        # Create a mock stripping operation
+        stripping_op = create_strip_only_operation(data)
+        next unless stripping_op
 
-      {
-        operation: operation,
-        treatment_data: data,
-        masking: data["masking"] || {},
-        stripping: data["stripping"] || {},
-        sealing: data["sealing"] || {},
-        dye: data["dye"] || {},
-        ptfe: data["ptfe"] || {},
-        local_treatment: data["local_treatment"] || {}
-      }
+        {
+          operation: stripping_op,
+          treatment_data: data,
+          masking: data["masking"] || {},
+          stripping: data["stripping"] || {},
+          sealing: data["sealing"] || {},
+          dye: data["dye"] || {},
+          ptfe: data["ptfe"] || {},
+          local_treatment: data["local_treatment"] || {}
+        }
+      else
+        # Handle regular treatments
+        operation = all_operations.find { |op| op.id == data["operation_id"] }
+        next unless operation
+
+        {
+          operation: operation,
+          treatment_data: data,
+          masking: data["masking"] || {},
+          stripping: data["stripping"] || {},
+          sealing: data["sealing"] || {},
+          dye: data["dye"] || {},
+          ptfe: data["ptfe"] || {},
+          local_treatment: data["local_treatment"] || {}
+        }
+      end
     end.compact
   end
 
@@ -332,6 +351,30 @@ class Part < ApplicationRecord
   end
 
   private
+
+  # Create a mock stripping operation for strip-only treatments
+  def create_strip_only_operation(treatment_data)
+    return nil unless defined?(OperationLibrary::Stripping)
+
+    stripping_type = treatment_data["stripping_type"] || "general_stripping"
+    stripping_method = treatment_data["stripping_method"] || "sodium_hydroxide"
+
+    # Get the stripping operation text
+    stripping_operation = OperationLibrary::Stripping.get_stripping_operation(stripping_type, stripping_method)
+    return nil unless stripping_operation
+
+    # Create a mock operation for strip-only treatments
+    Operation.new(
+      id: 'STRIPPING',
+      process_type: 'stripping_only',
+      operation_text: stripping_operation.operation_text,
+      specifications: stripping_operation.specifications,
+      alloys: [],
+      anodic_classes: [],
+      target_thickness: 0,
+      vat_numbers: []
+    )
+  end
 
   # Parse treatments data safely
   def parse_treatments_data
@@ -430,6 +473,12 @@ class Part < ApplicationRecord
     # Get jig type for this specific treatment
     treatment_jig_type = treatment_data["selected_jig_type"]
 
+    # Handle strip-only treatments
+    if op.process_type == 'stripping_only'
+      add_strip_only_cycle(sequence, op, treatment_data, treatment_jig_type, masking)
+      return
+    end
+
     # ENP has special workflow - no masking/stripping/dye/PTFE modifiers
     if op.process_type == 'electroless_nickel_plating'
       add_enp_cycle(sequence, op, treatment_data, treatment_jig_type)
@@ -521,6 +570,39 @@ class Part < ApplicationRecord
     end
   end
 
+  # Strip-only cycle - simplified workflow: mask -> jig -> degrease -> strip -> unjig -> unmask
+  def add_strip_only_cycle(sequence, strip_op, treatment_data, treatment_jig_type, masking)
+    # 1. Masking (if configured)
+    if masking["enabled"] && masking["methods"].present?
+      safe_add_to_sequence(sequence, OperationLibrary::Masking.get_masking_operation(masking["methods"]), "Strip Masking")
+      safe_add_to_sequence(sequence, OperationLibrary::Masking.get_masking_inspection_operation, "Strip Masking Inspection")
+    end
+
+    # 2. Jig - USE TREATMENT-SPECIFIC JIG TYPE
+    safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_jig_operation(treatment_jig_type), "Strip Jig")
+
+    # 3. Degrease + rinse
+    degrease = OperationLibrary::DegreaseOperations.get_degrease_operation
+    safe_add_to_sequence(sequence, degrease, "Strip Degrease")
+    safe_add_to_sequence(sequence, get_rinse(degrease, false, masking), "Rinse after Strip Degrease")
+
+    # 4. Strip operation + rinse
+    safe_add_to_sequence(sequence, strip_op, "Strip Operation")
+    safe_add_to_sequence(sequence, get_rinse(strip_op, false, masking), "Rinse after Strip")
+
+    # 5. Unjig
+    safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_unjig_operation, "Strip Unjig")
+
+    # 6. Masking removal (if masking was applied)
+    if masking["enabled"] && masking["methods"].present?
+      if OperationLibrary::Masking.masking_removal_required?(masking["methods"])
+        OperationLibrary::Masking.get_masking_removal_operations.each do |removal_op|
+          safe_add_to_sequence(sequence, removal_op, "Strip Masking Removal")
+        end
+      end
+    end
+  end
+
   # ENP cycle - USE TREATMENT-SPECIFIC JIG TYPE
   def add_enp_cycle(sequence, enp_op, treatment_data, treatment_jig_type)
     # 1. Jig - USE TREATMENT-SPECIFIC JIG TYPE
@@ -553,11 +635,11 @@ class Part < ApplicationRecord
   end
 
   def needs_degrease?(op)
-    ['standard_anodising', 'hard_anodising', 'chromic_anodising', 'chemical_conversion', 'electroless_nickel_plating'].include?(op.process_type)
+    ['standard_anodising', 'hard_anodising', 'chromic_anodising', 'chemical_conversion', 'electroless_nickel_plating', 'stripping_only'].include?(op.process_type)
   end
 
   def needs_pretreatment?(op)
-    defined?(OperationLibrary::Pretreatments) && needs_degrease?(op)
+    defined?(OperationLibrary::Pretreatments) && ['standard_anodising', 'hard_anodising', 'chromic_anodising', 'chemical_conversion', 'electroless_nickel_plating'].include?(op.process_type)
   end
 
   def is_anodising?(op)
