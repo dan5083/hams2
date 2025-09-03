@@ -154,7 +154,7 @@ class ReleaseNotesController < ApplicationController
     # Check if measurements were provided via JSON (from new form structure)
     params[:release_note][:measured_thicknesses].present? ||
     # Check if individual thickness fields were provided (legacy support)
-    params.any? { |key, _| key.to_s.start_with?('thickness_measurement_') }
+    params.keys.any? { |key| key.to_s.start_with?('thickness_measurement_') }
   end
 
   def process_thickness_measurements
