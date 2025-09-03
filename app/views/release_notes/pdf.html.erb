@@ -406,7 +406,6 @@
               <thead>
                 <tr>
                   <th>Treatment Description</th>
-                  <th>Target Thickness</th>
                   <th>Measured Thickness</th>
                   <th>Conformance</th>
                 </tr>
@@ -415,13 +414,6 @@
                 <% measurements.each do |measurement| %>
                   <tr>
                     <td><%= measurement['display_name'] || measurement['process_type'].humanize.titleize %></td>
-                    <td>
-                      <% if measurement['target_thickness'] && measurement['target_thickness'] > 0 %>
-                        <%= measurement['target_thickness'] %> μm
-                      <% else %>
-                        As specified
-                      <% end %>
-                    </td>
                     <td><%= measurement['measured_thickness'] %> μm</td>
                     <td>
                       <% if measurement['target_thickness'] && measurement['target_thickness'] > 0 %>
