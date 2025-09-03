@@ -989,36 +989,40 @@ export default class extends Controller {
     return criteria
   }
 
-  // Display operations in card (unlocked mode only)
-  displayOperationsInCard(operations, container, treatmentId) {
-    if (this.isLockedMode) return
+// Update the displayOperationsInCard method in parts_form_controller.js
 
-    if (operations.length === 0) {
-      container.innerHTML = '<p class="text-gray-500 text-xs">No matching operations found</p>'
-      return
-    }
+displayOperationsInCard(operations, container, treatmentId) {
+  if (this.isLockedMode) return
 
-    container.innerHTML = operations.map(op => `
-      <div class="bg-white border border-gray-200 rounded px-2 py-1 cursor-pointer hover:bg-blue-50 text-xs" data-operation-id="${op.id}" data-treatment-id="${treatmentId}">
-        <div class="flex justify-between items-center">
-          <span class="font-medium">${op.display_name || op.id.replace(/_/g, ' ')}</span>
-          <button type="button" class="select-operation-btn text-blue-600 hover:text-blue-800" data-operation-id="${op.id}" data-treatment-id="${treatmentId}">Select</button>
-        </div>
-        <p class="text-gray-600 mt-1">${op.operation_text}</p>
-        ${op.specifications ? `<p class="text-purple-600 text-xs mt-1">${op.specifications}</p>` : ''}
-      </div>
-    `).join('')
-
-    // Add click handlers for operation selection
-    container.querySelectorAll('.select-operation-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation()
-        this.selectOperationForTreatment(e.target.dataset.operationId, e.target.dataset.treatmentId)
-      })
-    })
+  if (operations.length === 0) {
+    container.innerHTML = '<p class="text-gray-500 text-xs">No matching operations found</p>'
+    return
   }
 
-  // Select operation for treatment (unlocked mode only)
+  container.innerHTML = operations.map(op => `
+    <div class="bg-white border border-gray-200 rounded px-2 py-1 cursor-pointer hover:bg-blue-50 text-xs operation-card"
+         data-operation-id="${op.id}"
+         data-treatment-id="${treatmentId}">
+      <div class="flex justify-between items-center">
+        <span class="font-medium">${op.display_name || op.id.replace(/_/g, ' ')}</span>
+        <span class="select-operation-indicator text-blue-600 text-xs font-medium">Select</span>
+      </div>
+      <p class="text-gray-600 mt-1">${op.operation_text}</p>
+      ${op.specifications ? `<p class="text-purple-600 text-xs mt-1">${op.specifications}</p>` : ''}
+    </div>
+  `).join('')
+
+  // Add click handlers for the entire operation card
+  container.querySelectorAll('.operation-card').forEach(card => {
+    card.addEventListener('click', (e) => {
+      const operationId = card.dataset.operationId
+      const treatmentId = card.dataset.treatmentId
+      this.selectOperationForTreatment(operationId, treatmentId)
+    })
+  })
+}
+
+  // Also update the selectOperationForTreatment method to handle the new indicator
   selectOperationForTreatment(operationId, treatmentId) {
     if (this.isLockedMode) return
 
@@ -1056,23 +1060,35 @@ export default class extends Controller {
       }
     }
 
-    // Update visual feedback
+    // Update visual feedback - now targeting the new structure
     if (this.hasTreatmentsContainerTarget) {
       const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
       const operationsList = card?.querySelector('.operations-list')
 
       if (operationsList) {
-        operationsList.querySelectorAll('[data-operation-id]').forEach(div => {
-          div.classList.remove('bg-blue-100')
-          const btn = div.querySelector('.select-operation-btn')
-          if (btn) btn.textContent = 'Select'
+        // Reset all cards
+        operationsList.querySelectorAll('.operation-card').forEach(div => {
+          div.classList.remove('bg-blue-100', 'border-blue-400')
+          div.classList.add('bg-white', 'border-gray-200')
+          const indicator = div.querySelector('.select-operation-indicator')
+          if (indicator) {
+            indicator.textContent = 'Select'
+            indicator.classList.remove('text-green-600', 'font-bold')
+            indicator.classList.add('text-blue-600')
+          }
         })
 
+        // Highlight selected card
         const selectedDiv = operationsList.querySelector(`[data-operation-id="${operationId}"]`)
         if (selectedDiv) {
-          selectedDiv.classList.add('bg-blue-100')
-          const btn = selectedDiv.querySelector('.select-operation-btn')
-          if (btn) btn.textContent = 'Selected'
+          selectedDiv.classList.remove('bg-white', 'border-gray-200')
+          selectedDiv.classList.add('bg-blue-100', 'border-blue-400')
+          const indicator = selectedDiv.querySelector('.select-operation-indicator')
+          if (indicator) {
+            indicator.textContent = '✓ Selected'
+            indicator.classList.remove('text-blue-600')
+            indicator.classList.add('text-green-600', 'font-bold')
+          }
         }
       }
     }

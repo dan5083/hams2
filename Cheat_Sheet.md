@@ -56,7 +56,6 @@ echo "=== app/operation_library/operations/hard_anodising.rb ==="
 cat "app/operation_library/operations/hard_anodising.rb"
 echo
 
-
 # Show operations i-p
 for file in app/operation_library/operations/[i-p]*.rb; do
   echo "=== $file ==="
