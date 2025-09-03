@@ -67,6 +67,8 @@ export default class extends Controller {
     // Available jig types
     this.availableJigTypes = [
       'a secure titanium-to-part assy',
+      'Wire (aluminium)',
+      'Wire (steel)',
       'Expanding Jig',
       'Large Aluminum Expanding Jig',
       'Rotor Jig',

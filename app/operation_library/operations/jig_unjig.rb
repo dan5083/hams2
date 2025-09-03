@@ -4,6 +4,8 @@ module OperationLibrary
     # Actual jig types used in the shop
   JIG_TYPES = [
     'a secure titanium-to-part assy',
+    'Wire (aluminium)',
+    'Wire (steel)',
     'Expanding Jig',
     'Large Aluminum Expanding Jig',
     'Rotor Jig',
