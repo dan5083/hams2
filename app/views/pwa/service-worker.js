@@ -1,14 +1,23 @@
-const CACHE_NAME = 'hams-v1';
+const CACHE_NAME = 'hams-v2';
 const STATIC_CACHE_URLS = [
   '/',
+  '/assets/icons/icon-192x192.png',
+  '/assets/icons/icon-512x512.png',
+  '/assets/icons/icon.ico'
+];
+
+// Pages that should NEVER be cached (dynamic business data)
+const NEVER_CACHE_PATHS = [
   '/customer_orders',
   '/works_orders',
   '/release_notes',
   '/parts',
-  '/artifacts'
+  '/artifacts',
+  '/dashboard',
+  '/invoices'
 ];
 
-// Install event - cache static resources
+// Install event - cache only truly static resources
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -40,7 +49,13 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch event - serve from cache when offline, network when online
+// Helper function to check if a URL should never be cached
+function shouldNeverCache(url) {
+  const pathname = new URL(url).pathname;
+  return NEVER_CACHE_PATHS.some(path => pathname.startsWith(path));
+}
+
+// Fetch event - smart caching strategy
 self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (event.request.method !== 'GET') {
@@ -53,6 +68,22 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Never cache dynamic business data - always fetch fresh
+  if (shouldNeverCache(event.request.url)) {
+    event.respondWith(
+      fetch(event.request)
+        .catch(() => {
+          // If network fails, show a meaningful offline message
+          return new Response(
+            `<html><body><h1>Offline</h1><p>This page requires a network connection.</p></body></html>`,
+            { headers: { 'Content-Type': 'text/html' } }
+          );
+        })
+    );
+    return;
+  }
+
+  // For other requests, try cache first, then network
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
@@ -90,8 +121,8 @@ self.addEventListener('push', async (event) => {
     const data = event.data.json();
     const options = {
       body: data.body,
-      icon: '/icons/icon-192x192.png',
-      badge: '/icons/icon-192x192.png',
+      icon: '/assets/icons/icon-192x192.png',
+      badge: '/assets/icons/icon-192x192.png',
       data: data.data || {}
     };
 

@@ -32,13 +32,29 @@
     <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
 
-    <!-- Service Worker Registration -->
+    <!-- Service Worker Registration with cache busting -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('<%= pwa_service_worker_path %>')
+          // Add cache busting parameter to force service worker updates
+          const swUrl = '<%= pwa_service_worker_path %>?v=<%= Rails.application.config.assets.version || Time.current.to_i %>';
+
+          navigator.serviceWorker.register(swUrl)
             .then((registration) => {
               console.log('ServiceWorker registration successful');
+
+              // Check for service worker updates
+              registration.addEventListener('updatefound', () => {
+                const newWorker = registration.installing;
+                newWorker.addEventListener('statechange', () => {
+                  if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    // New service worker is available, prompt user to refresh
+                    if (confirm('App update available. Refresh to get the latest version?')) {
+                      window.location.reload();
+                    }
+                  }
+                });
+              });
             })
             .catch((error) => {
               console.log('ServiceWorker registration failed: ', error);
