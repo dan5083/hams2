@@ -872,6 +872,7 @@ export default class extends Controller {
     // Handle other modifier changes
     if (event.target.classList.contains('stripping-method-select')) {
       treatment.stripping_method_secondary = event.target.value
+      treatment.stripping_enabled = (event.target.value !== 'none')  // ADD THIS LINE
     }
 
     if (event.target.classList.contains('sealing-method-select')) {
