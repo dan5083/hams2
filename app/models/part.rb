@@ -560,8 +560,8 @@ class Part < ApplicationRecord
     end
 
     # 4. Stripping + rinse (MOVED BEFORE PRETREATMENTS for anodising cycles)
-    if stripping["enabled"] && stripping["type"].present? && stripping["method"].present? && is_anodising?(op)
-      strip_op = OperationLibrary::Stripping.get_stripping_operation(stripping["type"], stripping["method"])
+    if stripping[:enabled] && stripping[:type].present? && stripping[:method].present? && is_anodising?(op)
+      strip_op = OperationLibrary::Stripping.get_stripping_operation(stripping[:type], stripping[:method])
       safe_add_to_sequence(sequence, strip_op, "Stripping")
       safe_add_to_sequence(sequence, get_rinse(strip_op, has_enp, masking), "Rinse after Stripping")
     end
