@@ -317,7 +317,12 @@ class Part < ApplicationRecord
           operation: operation,
           treatment_data: data,
           masking: data["masking"] || {},
-          stripping: data["stripping"] || {},
+          stripping: {
+            enabled: data["stripping_enabled"] || false,
+            type: data["stripping_method_secondary"] && data["stripping_method_secondary"] != 'none' ?
+              (['nitric', 'metex_dekote'].include?(data["stripping_method_secondary"]) ? 'enp_stripping' : 'anodising_stripping') : nil,
+            method: data["stripping_method_secondary"] && data["stripping_method_secondary"] != 'none' ? data["stripping_method_secondary"] : nil
+          },
           sealing: data["sealing"] || {},
           dye: data["dye"] || {},
           ptfe: data["ptfe"] || {},
