@@ -353,9 +353,63 @@ class Part < ApplicationRecord
     return [] if treatments_data.blank?
 
     mock_part = new
+
+    # Convert the JavaScript treatment data to the format expected by get_treatments
+    formatted_treatments = treatments_data.map do |treatment|
+      formatted_treatment = {
+        "id" => treatment["id"] || treatment[:id],
+        "type" => treatment["type"] || treatment[:type],
+        "operation_id" => treatment["operation_id"] || treatment[:operation_id],
+        "selected_alloy" => treatment["selected_alloy"] || treatment[:selected_alloy],
+        "target_thickness" => treatment["target_thickness"] || treatment[:target_thickness],
+        "selected_jig_type" => treatment["selected_jig_type"] || treatment[:selected_jig_type],
+        "masking_methods" => treatment.dig("masking", "methods") || treatment["masking_methods"] || {},
+        "stripping_type" => treatment["stripping_type"] || treatment[:stripping_type],
+        "stripping_method" => treatment["stripping_method"] || treatment[:stripping_method]
+      }
+
+      # Handle the stripping data conversion - this is the key fix
+      if treatment["stripping"] && treatment["stripping"]["enabled"]
+        # Data coming from JavaScript preview (nested stripping hash)
+        formatted_treatment["stripping_enabled"] = treatment["stripping"]["enabled"]
+        formatted_treatment["stripping_method_secondary"] = treatment["stripping"]["method"]
+      else
+        # Data coming from form submission (flat structure)
+        formatted_treatment["stripping_enabled"] = treatment["stripping_enabled"] || treatment[:stripping_enabled] || false
+        formatted_treatment["stripping_method_secondary"] = treatment["stripping_method_secondary"] || treatment[:stripping_method_secondary] || 'none'
+      end
+
+      # Handle other modifiers
+      if treatment["sealing"] && treatment["sealing"]["enabled"]
+        formatted_treatment["sealing_method"] = treatment["sealing"]["type"]
+      else
+        formatted_treatment["sealing_method"] = treatment["sealing_method"] || treatment[:sealing_method] || 'none'
+      end
+
+      if treatment["dye"] && treatment["dye"]["enabled"]
+        formatted_treatment["dye_color"] = treatment["dye"]["color"]
+      else
+        formatted_treatment["dye_color"] = treatment["dye_color"] || treatment[:dye_color] || 'none'
+      end
+
+      if treatment["ptfe"]
+        formatted_treatment["ptfe_enabled"] = treatment["ptfe"]["enabled"] || false
+      else
+        formatted_treatment["ptfe_enabled"] = treatment["ptfe_enabled"] || treatment[:ptfe_enabled] || false
+      end
+
+      if treatment["local_treatment"] && treatment["local_treatment"]["enabled"]
+        formatted_treatment["local_treatment_type"] = treatment["local_treatment"]["type"]
+      else
+        formatted_treatment["local_treatment_type"] = treatment["local_treatment_type"] || treatment[:local_treatment_type] || 'none'
+      end
+
+      formatted_treatment
+    end
+
     mock_part.customisation_data = {
       "operation_selection" => {
-        "treatments" => treatments_data.is_a?(String) ? treatments_data : treatments_data.to_json,
+        "treatments" => formatted_treatments.to_json,
         "selected_operations" => selected_operations || [],
         "enp_strip_type" => enp_strip_type,
         "aerospace_defense" => aerospace_defense,
@@ -364,7 +418,7 @@ class Part < ApplicationRecord
       }
     }
 
-    # Use the ordering from the instance method
+    # Use the ordering from the instance method - this will now use the fixed symbol key logic
     mock_part.get_operations_with_auto_ops.map do |operation|
       {
         id: operation.id,
