@@ -468,7 +468,7 @@ class Part < ApplicationRecord
     return nil unless defined?(OperationLibrary::Stripping)
 
     stripping_type = treatment_data["stripping_type"] || "general_stripping"
-    stripping_method = treatment_data["stripping_method"] || "sodium_hydroxide"
+    stripping_method = treatment_data["stripping_method"] || "E28"
 
     # Get the stripping operation text
     stripping_operation = OperationLibrary::Stripping.get_stripping_operation(stripping_type, stripping_method)

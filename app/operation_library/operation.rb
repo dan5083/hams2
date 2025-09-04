@@ -1,4 +1,4 @@
-# app/operation_library/operation.rb - Updated to handle stripping operations
+# app/operation_library/operation.rb - Updated to handle stripping operations with E28
 class Operation
   attr_accessor :id, :alloys, :process_type, :anodic_classes, :target_thickness, :vat_numbers,
                 :operation_text, :specifications, :enp_type, :deposition_rate_range, :time
@@ -68,16 +68,14 @@ class Operation
       operations += OperationLibrary::EnpStripMask.operations('metex_dekote')
     end
 
-    # Add stripping operations (all types and methods)
+    # Add stripping operations (updated for E28) - all types and methods
     if defined?(OperationLibrary::Stripping)
-      operations += OperationLibrary::Stripping.operations('general_stripping', 'sodium_hydroxide')
+      operations += OperationLibrary::Stripping.operations('general_stripping', 'E28')
       operations += OperationLibrary::Stripping.operations('general_stripping', 'chromic_phosphoric')
-      operations += OperationLibrary::Stripping.operations('general_stripping', 'sulphuric_sodium_hydroxide')
       operations += OperationLibrary::Stripping.operations('general_stripping', 'nitric')
       operations += OperationLibrary::Stripping.operations('general_stripping', 'metex_dekote')
       operations += OperationLibrary::Stripping.operations('anodising_stripping', 'chromic_phosphoric')
-      operations += OperationLibrary::Stripping.operations('anodising_stripping', 'sulphuric_sodium_hydroxide')
-      operations += OperationLibrary::Stripping.operations('anodising_stripping', 'sodium_hydroxide')
+      operations += OperationLibrary::Stripping.operations('anodising_stripping', 'E28')
       operations += OperationLibrary::Stripping.operations('enp_stripping', 'nitric')
       operations += OperationLibrary::Stripping.operations('enp_stripping', 'metex_dekote')
     end

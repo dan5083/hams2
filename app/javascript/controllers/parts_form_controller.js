@@ -97,7 +97,7 @@ export default class extends Controller {
       'Hytorque Jig'
     ]
 
-    // Available stripping types and methods
+    // Available stripping types and methods - UPDATED FOR E28
     this.availableStrippingTypes = [
       { value: 'anodising_stripping', label: 'Anodising Stripping' },
       { value: 'enp_stripping', label: 'ENP Stripping' }
@@ -106,8 +106,7 @@ export default class extends Controller {
     this.availableStrippingMethods = {
       anodising_stripping: [
         { value: 'chromic_phosphoric', label: 'Chromic-Phosphoric Acid' },
-        { value: 'sulphuric_sodium_hydroxide', label: 'Sulphuric Acid + Sodium Hydroxide' },
-        { value: 'sodium_hydroxide', label: 'Sodium Hydroxide' }
+        { value: 'E28', label: 'Oxidite E28' }
       ],
       enp_stripping: [
         { value: 'nitric', label: 'Nitric Acid' },
@@ -514,15 +513,14 @@ export default class extends Controller {
     return this.availableStrippingMethods[strippingType] || []
   }
 
-  // Get preview text for stripping operation
+  // Get preview text for stripping operation - UPDATED FOR E28
   getStrippingPreviewText(strippingType, strippingMethod) {
     if (!strippingType || !strippingMethod) return 'Select strip type and method to see preview'
 
     const methodMap = {
       'anodising_stripping': {
         'chromic_phosphoric': 'Strip anodising in chromic-phosphoric acid solution',
-        'sulphuric_sodium_hydroxide': 'Soak in sulphuric acid solution then strip in sodium hydroxide solution',
-        'sodium_hydroxide': 'Strip in sodium hydroxide solution - wait till fizzing starts and hold for 30 seconds'
+        'E28': 'Strip in Oxidite E28 - wait till fizzing starts and hold for 30 seconds'
       },
       'enp_stripping': {
         'nitric': 'Strip ENP in nitric acid solution 30 to 40 minutes per 25 microns [or until black smut dissolves]',
@@ -660,7 +658,7 @@ export default class extends Controller {
     `
   }
 
-  // Generate treatment modifiers HTML (unlocked mode only)
+  // Generate treatment modifiers HTML (unlocked mode only) - UPDATED FOR E28
   generateTreatmentModifiersHTML(treatment) {
     if (this.isLockedMode) return ''
 
@@ -705,13 +703,13 @@ export default class extends Controller {
           </div>
 
           <div class="grid grid-cols-1 gap-4 ${showSealing && showDye ? 'sm:grid-cols-3' : (showSealing || showDye ? 'sm:grid-cols-2' : 'sm:grid-cols-1')}">
-            <!-- Stripping Method -->
+            <!-- Stripping Method - UPDATED FOR E28 -->
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Stripping</label>
               <select class="stripping-method-select w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm" data-treatment-id="${treatment.id}">
                 <option value="none" ${treatment.stripping_method_secondary === 'none' ? 'selected' : ''}>No Stripping</option>
                 <option value="chromic_phosphoric" ${treatment.stripping_method_secondary === 'chromic_phosphoric' ? 'selected' : ''}>Chromic-Phosphoric Acid</option>
-                <option value="sulphuric_sodium_hydroxide" ${treatment.stripping_method_secondary === 'sulphuric_sodium_hydroxide' ? 'selected' : ''}>Sulphuric Acid + Sodium Hydroxide</option>
+                <option value="E28" ${treatment.stripping_method_secondary === 'E28' ? 'selected' : ''}>Oxidite E28</option>
                 <option value="nitric" ${treatment.stripping_method_secondary === 'nitric' ? 'selected' : ''}>Nitric Acid</option>
                 <option value="metex_dekote" ${treatment.stripping_method_secondary === 'metex_dekote' ? 'selected' : ''}>Metex Dekote</option>
               </select>

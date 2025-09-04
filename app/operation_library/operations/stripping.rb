@@ -10,8 +10,7 @@ module OperationLibrary
 
     ANODISING_STRIPPING_METHODS = [
       { value: 'chromic_phosphoric', label: 'Chromic-Phosphoric Acid' },
-      { value: 'sulphuric_sodium_hydroxide', label: 'Sulphuric Acid + Sodium Hydroxide' },
-      { value: 'sodium_hydroxide', label: 'Sodium Hydroxide' }
+      { value: 'E28', label: 'Oxidite E28' }
     ].freeze
 
     ENP_STRIPPING_METHODS = [
@@ -20,9 +19,8 @@ module OperationLibrary
     ].freeze
 
     GENERAL_STRIPPING_METHODS = [
-      { value: 'sodium_hydroxide', label: 'Sodium Hydroxide' },
+      { value: 'E28', label: 'Oxidite E28' },
       { value: 'chromic_phosphoric', label: 'Chromic-Phosphoric Acid' },
-      { value: 'sulphuric_sodium_hydroxide', label: 'Sulphuric Acid + Sodium Hydroxide' },
       { value: 'nitric', label: 'Nitric Acid' },
       { value: 'metex_dekote', label: 'Metex Dekote' }
     ].freeze
@@ -91,10 +89,8 @@ module OperationLibrary
       case method
       when 'chromic_phosphoric'
         'Strip anodising in chromic-phosphoric acid solution'
-      when 'sulphuric_sodium_hydroxide'
-        'Soak in sulphuric acid solution then strip in sodium hydroxide solution'
-      when 'sodium_hydroxide'
-        'Strip in sodium hydroxide solution - wait till fizzing starts and hold for 30 seconds'
+      when 'E28'
+        'Strip in E28 - wait till fizzing starts and hold for 30 seconds'
       else
         'Strip anodising as specified'
       end
@@ -113,12 +109,10 @@ module OperationLibrary
 
     def self.build_general_stripping_text(method)
       case method
-      when 'sodium_hydroxide'
-        'Strip in sodium hydroxide solution - wait till fizzing starts and hold for 30 seconds'
+      when 'E28'
+        'Strip in Oxidite E28 - wait till fizzing starts and hold for 30 seconds'
       when 'chromic_phosphoric'
         'Strip in chromic-phosphoric acid solution'
-      when 'sulphuric_sodium_hydroxide'
-        'Soak in sulphuric acid solution then strip in sodium hydroxide solution'
       when 'nitric'
         'Strip in nitric acid solution'
       when 'metex_dekote'
