@@ -15,20 +15,31 @@
 
       @page {
         size: A4 portrait;
-        margin: 2cm 1.5cm;
+        margin: 1.5cm 1.5cm;
       }
 
       .page {
         page-break-after: always;
+        min-height: calc(100vh - 3cm);
       }
 
       .page:last-child {
         page-break-after: avoid;
       }
 
+      .logo-header {
+        text-align: center;
+        margin-bottom: 1.5rem;
+      }
+
+      .logo-header img {
+        max-width: 300px;
+        height: auto;
+      }
+
       h1 {
         text-align: center;
-        margin-bottom: 1rem;
+        margin: 1rem 0;
         font-size: 1.5em;
       }
 
@@ -60,7 +71,7 @@
 
       .addresses {
         table-layout: fixed;
-        margin-bottom: 2rem;
+        margin-bottom: 1.5rem;
       }
 
       .address {
@@ -81,17 +92,17 @@
       }
 
       .header-table {
-        margin-bottom: 2rem;
+        margin-bottom: 1.5rem;
       }
 
       .detail-table {
         margin-top: 1rem;
-        margin-bottom: 2rem;
+        margin-bottom: 1.5rem;
       }
 
       .signature-table {
         table-layout: fixed;
-        margin-top: 2rem;
+        margin-top: 1.5rem;
       }
 
       .signature-table th {
@@ -110,14 +121,14 @@
       }
 
       .statement {
-        margin: 2rem 0;
+        margin: 1.5rem 0;
         padding: 1rem;
         border: 1pt solid #ccc;
         background-color: #f8f9fa;
       }
 
       .signature-block {
-        margin-top: 3rem;
+        margin-top: 2rem;
         text-align: center;
       }
 
@@ -144,15 +155,25 @@
       p {
         margin: 0.5rem 0;
       }
+
+      /* Compact spacing for single page */
+      .compact {
+        margin-bottom: 0.75rem;
+      }
     </style>
   </head>
   <body>
     <!-- Page 1: Advice Note -->
     <div class="page">
+      <!-- Logo Header -->
+      <div class="logo-header">
+        <%= image_tag("logo-with-company-name.png", alt: "Hard Anodising Surface Treatments Ltd") %>
+      </div>
+
       <h1>Advice Note</h1>
 
       <!-- Header Information -->
-      <table class="header-table">
+      <table class="header-table compact">
         <tbody>
           <tr>
             <th>Release Note Number</th>
@@ -166,16 +187,9 @@
       </table>
 
       <!-- Addresses -->
-      <table class="addresses">
+      <table class="addresses compact">
         <tbody>
           <tr>
-            <td class="address">
-              <h2>From</h2>
-              <p>
-                <%= @company_name || "Hard Anodising Surface Treatments Ltd" %><br/>
-                <%= simple_format(@trading_address || "Your trading address here") %>
-              </p>
-            </td>
             <td class="address">
               <h2>Invoice To</h2>
               <p>
@@ -190,12 +204,15 @@
                 <%= simple_format(@release_note.delivery_address) if @release_note.delivery_address %>
               </p>
             </td>
+            <td class="address">
+              <!-- Empty third column for layout -->
+            </td>
           </tr>
         </tbody>
       </table>
 
       <!-- Release Note Details -->
-      <table class="detail-table">
+      <table class="detail-table compact">
         <tbody>
           <tr>
             <th>Customer Order</th>
@@ -233,7 +250,7 @@
         </tbody>
       </table>
 
-      <!-- Thickness Measurements (if present) -->
+      <!-- Thickness Measurements (if present) - Simplified -->
       <% if @release_note.has_thickness_measurements? %>
         <h2>Thickness Measurements</h2>
         <% measurements_by_type = @release_note.thickness_measurements_by_type %>
@@ -246,35 +263,14 @@
               <thead>
                 <tr>
                   <th>Treatment</th>
-                  <th>Target (μm)</th>
                   <th>Measured (μm)</th>
-                  <th>Deviation</th>
                 </tr>
               </thead>
               <tbody>
                 <% measurements.each do |measurement| %>
                   <tr>
                     <td><%= measurement['display_name'] || measurement['process_type'].humanize.titleize %></td>
-                    <td>
-                      <% if measurement['target_thickness'] && measurement['target_thickness'] > 0 %>
-                        <%= measurement['target_thickness'] %>
-                      <% else %>
-                        -
-                      <% end %>
-                    </td>
                     <td><%= measurement['measured_thickness'] %></td>
-                    <td>
-                      <% if measurement['target_thickness'] && measurement['target_thickness'] > 0 %>
-                        <%
-                          target = measurement['target_thickness'].to_f
-                          measured = measurement['measured_thickness'].to_f
-                          deviation_pct = ((measured - target) / target * 100).round(1)
-                        %>
-                        <%= deviation_pct > 0 ? '+' : '' %><%= deviation_pct %>%
-                      <% else %>
-                        -
-                      <% end %>
-                    </td>
                   </tr>
                 <% end %>
               </tbody>
@@ -305,10 +301,15 @@
 
     <!-- Page 2: Certificate of Conformity -->
     <div class="page">
+      <!-- Logo Header -->
+      <div class="logo-header">
+        <%= image_tag("logo-with-company-name.png", alt: "Hard Anodising Surface Treatments Ltd") %>
+      </div>
+
       <h1>Certificate of Conformity</h1>
 
-      <!-- Header Information (repeated) -->
-      <table class="header-table">
+      <!-- Header Information -->
+      <table class="header-table compact">
         <tbody>
           <tr>
             <th>Release Note Number</th>
@@ -321,17 +322,10 @@
         </tbody>
       </table>
 
-      <!-- Addresses (repeated) -->
-      <table class="addresses">
+      <!-- Addresses -->
+      <table class="addresses compact">
         <tbody>
           <tr>
-            <td class="address">
-              <h2>From</h2>
-              <p>
-                <%= @company_name || "Hard Anodising Surface Treatments Ltd" %><br/>
-                <%= simple_format(@trading_address || "Your trading address here") %>
-              </p>
-            </td>
             <td class="address">
               <h2>Invoice To</h2>
               <p>
@@ -346,12 +340,15 @@
                 <%= simple_format(@release_note.delivery_address) if @release_note.delivery_address %>
               </p>
             </td>
+            <td class="address">
+              <!-- Empty third column for layout -->
+            </td>
           </tr>
         </tbody>
       </table>
 
-      <!-- Release Note Details (repeated) -->
-      <table class="detail-table">
+      <!-- Release Note Details -->
+      <table class="detail-table compact">
         <tbody>
           <tr>
             <th>Customer Order</th>
@@ -393,7 +390,7 @@
         </tbody>
       </table>
 
-      <!-- Detailed Thickness Measurements for Certificate (if present) -->
+      <!-- Simplified Thickness Measurements for Certificate -->
       <% if @release_note.has_thickness_measurements? %>
         <h2>Certified Thickness Measurements</h2>
         <% measurements_by_type = @release_note.thickness_measurements_by_type %>
@@ -406,27 +403,14 @@
               <thead>
                 <tr>
                   <th>Treatment Description</th>
-                  <th>Measured Thickness</th>
-                  <th>Conformance</th>
+                  <th>Measured Thickness (μm)</th>
                 </tr>
               </thead>
               <tbody>
                 <% measurements.each do |measurement| %>
                   <tr>
                     <td><%= measurement['display_name'] || measurement['process_type'].humanize.titleize %></td>
-                    <td><%= measurement['measured_thickness'] %> μm</td>
-                    <td>
-                      <% if measurement['target_thickness'] && measurement['target_thickness'] > 0 %>
-                        <%
-                          target = measurement['target_thickness'].to_f
-                          measured = measurement['measured_thickness'].to_f
-                          deviation_pct = ((measured - target) / target * 100).abs
-                        %>
-                        <%= deviation_pct <= 20 ? 'PASS' : 'REVIEW' %>
-                      <% else %>
-                        MEASURED
-                      <% end %>
-                    </td>
+                    <td><%= measurement['measured_thickness'] %></td>
                   </tr>
                 <% end %>
               </tbody>
@@ -445,7 +429,7 @@
       <div class="signature-block">
         <p>
           <span class="signature-name"><%= @release_note.issued_by.display_name %></span><br/>
-          For and on behalf of <%= @company_name || "Hard Anodising Surface Treatments Ltd" %>
+          For and on behalf of Hard Anodising Surface Treatments Ltd
         </p>
       </div>
     </div>
