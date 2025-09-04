@@ -76,18 +76,15 @@
       <div>
         <%= form.label :material, class: "block text-sm font-medium text-gray-700 mb-1" %>
         <%= form.text_field :material,
-            placeholder: "e.g., 6061-T6, 7075-T651, 316 Stainless Steel",
             class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
-        <p class="mt-1 text-xs text-gray-500">Material specification or alloy type</p>
       </div>
 
       <!-- Specified Thicknesses -->
       <div>
         <%= form.label :specified_thicknesses, "Specified thickness(es) and tolerance(s)", class: "block text-sm font-medium text-gray-700 mb-1" %>
         <%= form.text_field :specified_thicknesses,
-            placeholder: "e.g., 25±5μm, 10-15μm, 20μm nominal",
             class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
-        <p class="mt-1 text-xs text-gray-500">Target thickness ranges for all processes (can include multiple values)</p>
+        <p class="mt-1 text-xs text-gray-500">e.g., 25±5μm, 10-15μm, 20μm nominal</p>
       </div>
 
       <div>
@@ -98,7 +95,6 @@
             {
               class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
             } %>
-        <p class="mt-1 text-xs text-gray-500">Select a standard specification for this part</p>
       </div>
 
       <!-- Aerospace/Defense Application (only for unlocked parts) -->
@@ -114,7 +110,7 @@
                   data: { parts_form_target: "aerospaceDefenseCheckbox" }
                 } %>
             <%= label_tag "part[customisation_data][operation_selection][aerospace_defense]",
-                "Aerospace/Defense (requires foil verification, water break test and OCV)",
+                "Aerospace/Defence",
                 class: "ml-2 text-sm text-gray-900" %>
           </div>
           <p class="mt-1 text-xs text-gray-500">Auto-inserts foil verification, water break test, and OCV operations</p>
@@ -131,6 +127,16 @@
           </div>
         </div>
       <% end %>
+    </div>
+
+    <!-- Special Instructions (moved inside Part Details) -->
+    <div class="mt-6">
+      <h4 class="text-md font-medium text-gray-900 mb-3">Special Instructions</h4>
+      <%= form.text_area :special_instructions,
+          placeholder: "Any special handling or processing instructions...",
+          rows: 3,
+          class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
+      <p class="mt-1 text-xs text-gray-500">Optional special instructions or notes</p>
     </div>
   </div>
 
@@ -188,7 +194,7 @@
     <!-- Treatment Selection Section (Unlocked Mode) -->
     <div class="bg-white shadow rounded-lg p-6">
       <h3 class="text-lg font-medium text-gray-900 mb-4">Processing Instructions</h3>
-      <p class="text-sm text-gray-600 mb-4">Configure the manufacturing processes for this part. Select up to 5 treatments, each with its own jig type and modifiers.</p>
+      <p class="text-sm text-gray-600 mb-4">Please select main treatments in chronological order.</p>
 
       <!-- Treatment Type Buttons - Updated to include Strip Only -->
       <div class="grid grid-cols-2 gap-3 mb-6 sm:grid-cols-3 lg:grid-cols-6">
@@ -306,7 +312,6 @@
 
       <!-- Treatment Cards Container -->
       <div data-parts-form-target="treatmentsContainer" class="space-y-4 mb-6">
-        <p class="text-gray-500 text-sm">Select treatments above to configure them</p>
       </div>
 
       <!-- Operations Preview -->
@@ -401,35 +406,6 @@
           data: { parts_form_target: "aerospaceDefenseField" } %>
     </div>
   <% end %>
-
-  <!-- Special Instructions Section -->
-  <div class="bg-white shadow rounded-lg p-6">
-    <h3 class="text-lg font-medium text-gray-900 mb-4">Special Instructions</h3>
-
-    <%= form.text_area :special_instructions,
-        placeholder: "Any special handling or processing instructions...",
-        rows: 3,
-        class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
-    <p class="mt-1 text-xs text-gray-500">Optional special instructions or notes</p>
-  </div>
-
-  <!-- Information Box -->
-  <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
-    <div class="flex">
-      <div class="ml-3">
-        <h3 class="text-sm font-medium text-blue-800">
-          <%= part.locked_for_editing? ? "Manual Operations Mode" : "Manufacturing Process Configuration" %>
-        </h3>
-        <div class="mt-2 text-sm text-blue-700">
-          <% if part.locked_for_editing? %>
-            <p>Operations are in manual editing mode. You can customize the text for each operation above. This mode is permanent for this part - you cannot return to automatic treatment configuration.</p>
-          <% else %>
-            <p>This integrated form creates a part with complete processing instructions. Select treatments in the order you want them processed. Each treatment can have its own jig type, masking, stripping, dye, sealing, and local treatment options. ENP treatments include optional pre-heat treatment (before jigging), post-heat treatment (after unjig), and ENP Strip/Mask systems. Strip-Only treatments provide a simplified workflow for parts that only require coating removal. Local treatments are available for anodising processes and are applied after masking removal. Auto-operations (inspections, rinses, etc.) are automatically inserted in the correct sequence.</p>
-          <% end %>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- Form Actions -->
   <div class="flex justify-end space-x-3">
