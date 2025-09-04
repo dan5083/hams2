@@ -452,7 +452,10 @@ class PartsController < ApplicationController
 
     Rails.logger.info "Preview params: treatments=#{treatments_data.length}, pre_heat_treatment=#{selected_enp_pre_heat_treatment}, post_heat_treatment=#{selected_enp_heat_treatment}, aerospace=#{aerospace_defense}"
 
-    # Get operations using the treatment cycle system - includes OCV, foil verification, and strip-only support
+    # Get operations using the updated treatment cycle system - includes correct stripping sequence:
+    # For anodising cycles: Degrease → Strip → DeOx → Main Operation
+    # For strip-only: Degrease → Strip → DeOx
+    # Also includes OCV, foil verification, water break, and ENP heat treatments
     operations_with_auto_ops = Part.simulate_operations_with_auto_ops(
       treatments_data,
       nil,  # selected_jig_type no longer used globally
@@ -464,7 +467,7 @@ class PartsController < ApplicationController
       selected_enp_pre_heat_treatment
     )
 
-    Rails.logger.info "Generated operations: #{operations_with_auto_ops.length} operations (includes water break, foil verification, OCV, and strip-only if aerospace_defense=#{aerospace_defense})"
+    Rails.logger.info "Generated operations: #{operations_with_auto_ops.length} operations (includes corrected stripping sequence, water break, foil verification, OCV, and ENP heat treatments if aerospace_defense=#{aerospace_defense})"
 
     render json: { operations: operations_with_auto_ops }
   end
