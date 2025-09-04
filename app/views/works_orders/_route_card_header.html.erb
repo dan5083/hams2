@@ -47,10 +47,10 @@
         <div class="header-row-inner2">
           <!-- Left column -->
           <div class="header-field-label">Material</div>
-          <div class="header-field-value"><%= works_order.material if works_order.respond_to?(:material) %></div>
+          <div class="header-field-value"><%= works_order.part&.material.presence || "Not specified" %></div>
           <!-- Right column -->
-          <div class="header-field-label">Thickness</div>
-          <div class="header-field-value"></div>
+          <div class="header-field-label">Specified Thickness(es)</div>
+          <div class="header-field-value"><%= works_order.part&.specified_thicknesses.presence || "Not specified" %></div>
         </div>
       </div>
     </div>

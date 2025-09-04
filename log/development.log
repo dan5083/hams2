@@ -15765,3 +15765,17 @@ Migrating to AddMeasuredThicknessesToReleaseNotes (20250902180920)
   [1m[36mTRANSACTION (7.8ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
   [1m[35m (0.7ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
   [1m[36mActiveRecord::SchemaMigration Load (0.5ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+[dotenv] Set [36mXERO_CLIENT_ID[0m, [36mXERO_CLIENT_SECRET[0m, and [36mXERO_REDIRECT_URI[0m
+[dotenv] Loaded [33m.env[0m
+  [1m[35m (2.1ms)[0m  [1m[34mSELECT pg_try_advisory_lock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (7.1ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::InternalMetadata Load (3.7ms)[0m  [1m[34mSELECT * FROM "ar_internal_metadata" WHERE "ar_internal_metadata"."key" = 'environment' ORDER BY "ar_internal_metadata"."key" ASC LIMIT 1 /*application='Hams2'*/[0m
+Migrating to AddSpecifiedThicknessesToParts (20250904074724)
+  [1m[36mTRANSACTION (0.3ms)[0m  [1m[35mBEGIN /*application='Hams2'*/[0m
+  [1m[35m (20.6ms)[0m  [1m[35mALTER TABLE "parts" ADD "specified_thicknesses" text /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Create (0.6ms)[0m  [1m[32mINSERT INTO "schema_migrations" ("version") VALUES ('20250904074724') RETURNING "version" /*application='Hams2'*/[0m
+  [1m[36mTRANSACTION (6.4ms)[0m  [1m[35mCOMMIT /*application='Hams2'*/[0m
+  [1m[35m (0.4ms)[0m  [1m[34mSELECT pg_advisory_unlock(3362018253973245825) /*application='Hams2'*/[0m
+  [1m[36mActiveRecord::SchemaMigration Load (0.3ms)[0m  [1m[34mSELECT "schema_migrations"."version" FROM "schema_migrations" ORDER BY "schema_migrations"."version" ASC /*application='Hams2'*/[0m

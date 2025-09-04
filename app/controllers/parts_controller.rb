@@ -217,6 +217,8 @@ class PartsController < ApplicationController
         new_part.update!(
           specification: part_params[:specification],
           special_instructions: part_params[:special_instructions],
+          material: part_params[:material],
+          specified_thicknesses: part_params[:specified_thicknesses],
           process_type: part_params[:process_type],
           customisation_data: part_params[:customisation_data] || {},
           enabled: part_params[:enabled]
@@ -476,7 +478,7 @@ class PartsController < ApplicationController
   def part_params
     params.require(:part).permit(
       :customer_id, :uniform_part_number, :uniform_part_issue, :enabled,
-      :specification, :special_instructions, :process_type,
+      :specification, :special_instructions, :material, :specified_thicknesses, :process_type,
       customisation_data: {}
     )
   end
