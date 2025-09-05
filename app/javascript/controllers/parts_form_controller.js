@@ -482,7 +482,7 @@ export default class extends Controller {
                   <input type="checkbox" class="masking-checkbox rounded border-gray-300 text-teal-600" data-treatment-id="${treatment.id}" data-method="bungs" ${treatment.masking_methods?.bungs !== undefined ? 'checked' : ''}>
                   <span class="ml-2 text-sm text-gray-700">Bungs</span>
                 </label>
-                <input type="text" class="masking-location flex-1 border border-gray-300 rounded-md px-2 py-1 text-sm" data-treatment-id="${treatment.id}" data-method="bungs" placeholder="Location/notes for bungs..." value="${treatment.masking_methods?.bungs || ''}" ${treatment.masking_methods?.bungs !== undefined ? '' : 'style="display: none;"'}>
+                <input type="text" class="masking-location flex-1 border border-gray-300 rounded-md px-2 py-1 text-sm" data-treatment-id="${treatment.id}" data-method="bungs" placeholder="Location/notes for bungs (optional)..." value="${treatment.masking_methods?.bungs || ''}" ${treatment.masking_methods?.bungs !== undefined ? '' : 'style="display: none;"'}>
               </div>
 
               <div class="flex items-center space-x-3">
@@ -490,7 +490,7 @@ export default class extends Controller {
                   <input type="checkbox" class="masking-checkbox rounded border-gray-300 text-teal-600" data-treatment-id="${treatment.id}" data-method="pc21_polyester_tape" ${treatment.masking_methods?.pc21_polyester_tape !== undefined ? 'checked' : ''}>
                   <span class="ml-2 text-sm text-gray-700">PC21 - Polyester Tape</span>
                 </label>
-                <input type="text" class="masking-location flex-1 border border-gray-300 rounded-md px-2 py-1 text-sm" data-treatment-id="${treatment.id}" data-method="pc21_polyester_tape" placeholder="Location/notes for tape..." value="${treatment.masking_methods?.pc21_polyester_tape || ''}" ${treatment.masking_methods?.pc21_polyester_tape !== undefined ? '' : 'style="display: none;"'}>
+                <input type="text" class="masking-location flex-1 border border-gray-300 rounded-md px-2 py-1 text-sm" data-treatment-id="${treatment.id}" data-method="pc21_polyester_tape" placeholder="Location/notes for tape (optional)..." value="${treatment.masking_methods?.pc21_polyester_tape || ''}" ${treatment.masking_methods?.pc21_polyester_tape !== undefined ? '' : 'style="display: none;"'}>
               </div>
 
               <div class="flex items-center space-x-3">
@@ -498,10 +498,10 @@ export default class extends Controller {
                   <input type="checkbox" class="masking-checkbox rounded border-gray-300 text-teal-600" data-treatment-id="${treatment.id}" data-method="45_stopping_off_lacquer" ${treatment.masking_methods?.['45_stopping_off_lacquer'] !== undefined ? 'checked' : ''}>
                   <span class="ml-2 text-sm text-gray-700">45 Stopping Off Lacquer</span>
                 </label>
-                <input type="text" class="masking-location flex-1 border border-gray-300 rounded-md px-2 py-1 text-sm" data-treatment-id="${treatment.id}" data-method="45_stopping_off_lacquer" placeholder="Location/notes for lacquer..." value="${treatment.masking_methods?.['45_stopping_off_lacquer'] || ''}" ${treatment.masking_methods?.['45_stopping_off_lacquer'] !== undefined ? '' : 'style="display: none;"'}>
+                <input type="text" class="masking-location flex-1 border border-gray-300 rounded-md px-2 py-1 text-sm" data-treatment-id="${treatment.id}" data-method="45_stopping_off_lacquer" placeholder="Location/notes for lacquer (optional)..." value="${treatment.masking_methods?.['45_stopping_off_lacquer'] || ''}" ${treatment.masking_methods?.['45_stopping_off_lacquer'] !== undefined ? '' : 'style="display: none;"'}>
               </div>
             </div>
-            <p class="mt-2 text-xs text-gray-500">Masking protects areas that should not be stripped</p>
+            <p class="mt-2 text-xs text-gray-500">Masking protects areas that should not be stripped. Location details are optional.</p>
           </div>
         </div>
       </div>

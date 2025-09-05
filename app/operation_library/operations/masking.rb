@@ -106,7 +106,10 @@ module OperationLibrary
         # Check if enabled flag is set and methods are present
         return false unless masking_data["enabled"] == true || masking_data["enabled"] == "true"
         methods = masking_data["methods"] || {}
-        methods.any? { |method, location| method.present? && !location.nil? }
+
+        # Allow methods with empty strings as locations - user may not need to specify exact location
+        # The key requirement is that a method checkbox was checked (method key exists)
+        methods.any? { |method, location| method.present? && location != nil }
       else
         false
       end

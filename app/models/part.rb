@@ -690,10 +690,20 @@ class Part < ApplicationRecord
 
   # Strip-only cycle - updated workflow: mask -> jig -> degrease -> strip -> deox -> rinse -> unjig -> unmask
   def add_strip_only_cycle(sequence, strip_op, treatment_data, treatment_jig_type, masking)
-    # 1. Masking (if configured)
-    if masking["enabled"] && masking["methods"].present?
-      safe_add_to_sequence(sequence, OperationLibrary::Masking.get_masking_operation(masking["methods"]), "Strip Masking")
-      safe_add_to_sequence(sequence, OperationLibrary::Masking.get_masking_inspection_operation, "Strip Masking Inspection")
+    Rails.logger.info "🔍 Strip-only cycle - masking data received: #{masking.inspect}"
+
+    # 1. Masking (if configured) - USE PROPER MASKING LIBRARY VALIDATION
+    if OperationLibrary::Masking.masking_selected?(masking)
+      Rails.logger.info "✅ Masking validation passed - adding masking operations"
+      masking_methods = masking["methods"] || {}
+
+      masking_operation = OperationLibrary::Masking.get_masking_operation(masking_methods)
+      safe_add_to_sequence(sequence, masking_operation, "Strip Masking")
+
+      masking_inspection = OperationLibrary::Masking.get_masking_inspection_operation
+      safe_add_to_sequence(sequence, masking_inspection, "Strip Masking Inspection")
+    else
+      Rails.logger.info "❌ Masking validation failed - masking enabled: #{masking['enabled']}, methods: #{masking['methods']}"
     end
 
     # 2. Jig - USE TREATMENT-SPECIFIC JIG TYPE
@@ -720,12 +730,17 @@ class Part < ApplicationRecord
     # 6. Unjig
     safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_unjig_operation, "Strip Unjig")
 
-    # 7. Masking removal (if masking was applied)
-    if masking["enabled"] && masking["methods"].present?
-      if OperationLibrary::Masking.masking_removal_required?(masking["methods"])
+    # 7. Masking removal (if masking was applied) - USE PROPER MASKING LIBRARY LOGIC
+    if OperationLibrary::Masking.masking_selected?(masking)
+      masking_methods = masking["methods"] || {}
+
+      if OperationLibrary::Masking.masking_removal_required?(masking_methods)
+        Rails.logger.info "✅ Masking removal required - adding removal operations"
         OperationLibrary::Masking.get_masking_removal_operations.each do |removal_op|
           safe_add_to_sequence(sequence, removal_op, "Strip Masking Removal")
         end
+      else
+        Rails.logger.info "ℹ️ Masking present but removal not required (bungs only)"
       end
     end
   end
