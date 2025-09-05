@@ -97,14 +97,34 @@
       </div>
 
       <div>
-        <%= form.label :specification, "Specification", class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.select :specification,
-            options_for_select([['Select Specification', '']] + @specification_presets.map { |preset| [preset.name, preset.content] }, part.specification),
-            {},
-            {
-              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            } %>
-      </div>
+              <%= form.label :specification, "Specifications", class: "block text-sm font-medium text-gray-700 mb-1" %>
+
+              <!-- Parse existing specifications back into array for pre-selection -->
+              <% existing_specs = part.specification.present? ? part.specification.scan(/\[([^\]]+)\]/).flatten : [] %>
+
+              <div class="mt-1 space-y-2 max-h-48 overflow-y-auto border border-gray-300 rounded-md p-3 bg-white">
+                <% @specification_presets.each do |preset| %>
+                  <label class="flex items-start">
+                    <%= check_box_tag "part[specification][]",
+                        "[#{preset.content}]",
+                        existing_specs.include?(preset.content),
+                        {
+                          class: "rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-offset-0 focus:ring-blue-200 focus:ring-opacity-50 mt-0.5 flex-shrink-0"
+                        } %>
+                    <span class="ml-2 text-sm text-gray-900 leading-tight">
+                      <strong><%= preset.name %></strong>
+                      <br>
+                      <span class="text-gray-600 text-xs"><%= preset.content %></span>
+                    </span>
+                  </label>
+                <% end %>
+              </div>
+
+              <!-- Hidden field to ensure empty array is sent when nothing is selected -->
+              <%= hidden_field_tag "part[specification][]", "", id: "specification_placeholder" %>
+
+              <p class="mt-1 text-xs text-gray-500">Select one or more specifications. They will be combined as [Spec 1][Spec 2][Spec 3]</p>
+            </div>
 
       <!-- Aerospace/Defense Application (only for unlocked parts) -->
       <% unless part.locked_for_editing? %>
