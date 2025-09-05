@@ -1,5 +1,6 @@
 # app/controllers/dashboard_controller.rb
 class DashboardController < ApplicationController
+  before_action :set_no_cache_headers
   def index
     # DEBUG: Log session information
     Rails.logger.info "=== XERO CONNECTION DEBUG ==="
@@ -26,6 +27,12 @@ class DashboardController < ApplicationController
   end
 
   private
+
+  def set_no_cache_headers
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+  end
 
   def xero_connected?
     token_present = session[:xero_token_set].present?
