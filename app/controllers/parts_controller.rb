@@ -481,7 +481,8 @@ class PartsController < ApplicationController
   def part_params
     params.require(:part).permit(
       :customer_id, :uniform_part_number, :uniform_part_issue, :enabled,
-      :specification, :special_instructions, :material, :specified_thicknesses, :process_type,
+      :specification, :special_instructions, :material, :specified_thicknesses,
+      :process_type, :description,
       customisation_data: {}
     )
   end

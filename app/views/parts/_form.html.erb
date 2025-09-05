@@ -61,6 +61,15 @@
         <p class="mt-1 text-xs text-gray-500">Will be automatically normalized to uppercase alphanumeric</p>
       </div>
 
+      <!-- Part Description -->
+      <div>
+        <%= form.label :description, "Part Description", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.text_field :description,
+            placeholder: "Enter part description",
+            class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
+        <p class="mt-1 text-xs text-gray-500">Optional description of the part or component</p>
+      </div>
+
       <!-- Part Issue -->
       <div>
         <%= form.label :uniform_part_issue, "Part Issue", class: "block text-sm font-medium text-gray-700 mb-1" %>
