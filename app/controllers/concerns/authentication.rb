@@ -18,6 +18,7 @@ module Authentication
     end
 
     def require_authentication
+      Rails.logger.info "=== AUTH: require_authentication called for #{request.path} ==="
       resume_session || request_authentication
     end
 
@@ -30,6 +31,7 @@ module Authentication
     end
 
     def request_authentication
+      Rails.logger.info "=== AUTH: request_authentication called - redirecting to login ==="
       session[:return_to_after_authenticating] = request.url
       redirect_to new_session_path
     end

@@ -2,6 +2,8 @@ class XeroAuthController < ApplicationController
   allow_unauthenticated_access only: [:authorize, :callback]
 
   def authorize
+    Rails.logger.info "=== XERO AUTH: Inside authorize method ==="
+    Rails.logger.info "=== XERO AUTH: Current.session = #{Current.session.inspect} ==="
     Rails.logger.info "=== STARTING XERO AUTH ==="
 
     creds = {
