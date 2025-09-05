@@ -292,12 +292,9 @@ class Part < ApplicationRecord
     all_operations = Operation.all_operations(target_thickness)
 
     treatments_data.map do |data|
-      Rails.logger.info "🔍 Processing treatment data: #{data.inspect}"
 
       # Handle strip-only treatments
       if data["type"] == "stripping_only"
-        Rails.logger.info "🔍 Strip-only treatment - raw masking data: #{data['masking'].inspect}"
-        Rails.logger.info "🔍 Strip-only treatment - masking_methods data: #{data['masking_methods'].inspect}"
 
         # Create a mock stripping operation
         stripping_op = create_strip_only_operation(data)
@@ -314,8 +311,6 @@ class Part < ApplicationRecord
           data["masking"] || {}
         end
 
-        Rails.logger.info "🔍 Strip-only treatment - processed masking data: #{masking_data.inspect}"
-
         result = {
           operation: stripping_op,
           treatment_data: data,
@@ -327,17 +322,13 @@ class Part < ApplicationRecord
           local_treatment: data["local_treatment"] || {}
         }
 
-        Rails.logger.info "🔍 Strip-only treatment - final result masking: #{result[:masking].inspect}"
         result
       else
         # Handle regular treatments
         operation = all_operations.find { |op| op.id == data["operation_id"] }
         next unless operation
 
-        Rails.logger.info "🔍 Regular treatment - raw masking data: #{data['masking'].inspect}"
-
         masking_data = data["masking"].present? ? data["masking"] : (data["masking_methods"].present? ? { "enabled" => true, "methods" => data["masking_methods"] } : {})
-        Rails.logger.info "🔍 Regular treatment - processed masking data: #{masking_data.inspect}"
 
         {
           operation: operation,
