@@ -297,12 +297,23 @@ class Part < ApplicationRecord
       # Handle strip-only treatments
       if data["type"] == "stripping_only"
         Rails.logger.info "🔍 Strip-only treatment - raw masking data: #{data['masking'].inspect}"
+        Rails.logger.info "🔍 Strip-only treatment - masking_methods data: #{data['masking_methods'].inspect}"
 
         # Create a mock stripping operation
         stripping_op = create_strip_only_operation(data)
         next unless stripping_op
 
-        masking_data = data["masking"] || {}
+        # Reconstruct masking data from masking_methods (due to data transformation in simulate_operations_with_auto_ops)
+        masking_methods = data["masking_methods"] || {}
+        masking_data = if masking_methods.any?
+          {
+            "enabled" => true,
+            "methods" => masking_methods
+          }
+        else
+          data["masking"] || {}
+        end
+
         Rails.logger.info "🔍 Strip-only treatment - processed masking data: #{masking_data.inspect}"
 
         result = {
