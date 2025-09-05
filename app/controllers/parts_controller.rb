@@ -546,8 +546,8 @@ class PartsController < ApplicationController
     end
 
     if success
-      # Regenerate specification from updated operations
-      @part.update!(specification: @part.operations_text)
+      # Don't overwrite the user-selected specification preset
+      # The specification should remain what the user selected from the dropdown
     end
 
     success
