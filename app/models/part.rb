@@ -316,17 +316,17 @@ class Part < ApplicationRecord
         {
           operation: operation,
           treatment_data: data,
-          masking: data["masking"] || {},
+          masking: data["masking"].present? ? data["masking"] : (data["masking_methods"].present? ? { "enabled" => true, "methods" => data["masking_methods"] } : {}),
           stripping: {
             enabled: data["stripping_enabled"] || false,
             type: data["stripping_method_secondary"] && data["stripping_method_secondary"] != 'none' ?
               (['nitric', 'metex_dekote'].include?(data["stripping_method_secondary"]) ? 'enp_stripping' : 'anodising_stripping') : nil,
             method: data["stripping_method_secondary"] && data["stripping_method_secondary"] != 'none' ? data["stripping_method_secondary"] : nil
           },
-          sealing: data["sealing"] || {},
-          dye: data["dye"] || {},
-          ptfe: data["ptfe"] || {},
-          local_treatment: data["local_treatment"] || {}
+          sealing: data["sealing"].present? ? data["sealing"] : (data["sealing_method"] && data["sealing_method"] != 'none' ? { "enabled" => true, "type" => data["sealing_method"] } : {}),
+          dye: data["dye"].present? ? data["dye"] : (data["dye_color"] && data["dye_color"] != 'none' ? { "enabled" => true, "color" => data["dye_color"] } : {}),
+          ptfe: data["ptfe"].present? ? data["ptfe"] : { "enabled" => data["ptfe_enabled"] || false },
+          local_treatment: data["local_treatment"].present? ? data["local_treatment"] : (data["local_treatment_type"] && data["local_treatment_type"] != 'none' ? { "enabled" => true, "type" => data["local_treatment_type"] } : {})
         }
       end
     end.compact
