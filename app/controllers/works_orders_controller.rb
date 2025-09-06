@@ -200,9 +200,10 @@ class WorksOrdersController < ApplicationController
   end
 
   private
-  # Add additional charges to an existing invoice
+
+
   def add_additional_charges_to_invoice(invoice, charge_ids, custom_amounts)
-    charge_ids.each do |charge_id|
+    charge_ids.reject(&:blank?).each do |charge_id|
       charge = AdditionalChargePreset.find(charge_id)
       custom_amount = custom_amounts[charge_id]
 
