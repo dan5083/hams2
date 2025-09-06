@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_09_04_074724) do
+ActiveRecord::Schema[8.0].define(version: 2025_09_06_123327) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -224,6 +224,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_04_074724) do
     t.jsonb "customised_process_data", default: {}
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.jsonb "additional_charge_data", default: {}
+    t.index ["additional_charge_data"], name: "index_works_orders_on_additional_charge_data", using: :gin
     t.index ["customer_order_id"], name: "index_works_orders_on_customer_order_id"
     t.index ["is_open"], name: "index_works_orders_on_is_open"
     t.index ["number"], name: "index_works_orders_on_number", unique: true

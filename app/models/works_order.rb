@@ -9,6 +9,8 @@ class WorksOrder < ApplicationRecord
   has_many :release_notes, dependent: :restrict_with_error
   has_one :customer, through: :customer_order
 
+  store_accessor :additional_charge_data, :selected_charge_ids, :custom_amounts
+
   validates :number, presence: true, uniqueness: true
   validates :part_number, presence: true
   validates :part_issue, presence: true
@@ -34,6 +36,7 @@ class WorksOrder < ApplicationRecord
   before_validation :set_works_order_number, if: :new_record?
   after_initialize :set_defaults, if: :new_record?
   after_update :update_open_status
+
 
   def display_name
     "WO#{number}"
@@ -319,6 +322,15 @@ class WorksOrder < ApplicationRecord
 
   def delivery_address
     customer&.contact_address
+  end
+
+  def get_selected_additional_charges
+    return [] if selected_charge_ids.blank?
+    AdditionalChargePreset.where(id: selected_charge_ids)
+  end
+
+  def get_custom_amount(charge_id)
+    custom_amounts&.dig(charge_id.to_s)
   end
 
   # Add this method to the WorksOrder model (app/models/works_order.rb)

@@ -139,67 +139,63 @@ class WorksOrdersController < ApplicationController
     end
   end
 
-# Add these methods to WorksOrdersController (app/controllers/works_orders_controller.rb)
+  def create_invoice
+    Rails.logger.info "🚀 STAGE_INVOICE: Starting for WO#{@works_order.number}"
 
-# Updated create_invoice method to handle additional charges
-def create_invoice
-  Rails.logger.info "🚀 STAGE_INVOICE: Starting for WO#{@works_order.number}"
-
-  if @works_order.quantity_released <= 0
-    Rails.logger.info "❌ STAGE_INVOICE: No quantity released (#{@works_order.quantity_released})"
-    redirect_to @works_order, alert: 'No items available to invoice - no quantity has been released yet.'
-    return
-  end
-
-  begin
-    # Get all uninvoiced release notes for this works order
-    uninvoiced_release_notes = @works_order.release_notes.requires_invoicing
-    Rails.logger.info "🔍 STAGE_INVOICE: Found #{uninvoiced_release_notes.count} uninvoiced release notes"
-
-    if uninvoiced_release_notes.empty?
-      Rails.logger.info "❌ STAGE_INVOICE: No uninvoiced release notes found"
-      redirect_to @works_order, alert: 'No release notes available for invoicing.'
+    if @works_order.quantity_released <= 0
+      Rails.logger.info "❌ STAGE_INVOICE: No quantity released (#{@works_order.quantity_released})"
+      redirect_to @works_order, alert: 'No items available to invoice - no quantity has been released yet.'
       return
     end
 
-    # Create local invoice from release notes
-    customer = @works_order.customer
-    Rails.logger.info "🔍 STAGE_INVOICE: Customer: #{customer.name} (ID: #{customer.id})"
+    begin
+      # Get all uninvoiced release notes for this works order
+      uninvoiced_release_notes = @works_order.release_notes.requires_invoicing
+      Rails.logger.info "🔍 STAGE_INVOICE: Found #{uninvoiced_release_notes.count} uninvoiced release notes"
 
-    Rails.logger.info "🔍 STAGE_INVOICE: Calling Invoice.create_from_release_notes..."
-    invoice = Invoice.create_from_release_notes(uninvoiced_release_notes, customer, Current.user)
+      if uninvoiced_release_notes.empty?
+        Rails.logger.info "❌ STAGE_INVOICE: No uninvoiced release notes found"
+        redirect_to @works_order, alert: 'No release notes available for invoicing.'
+        return
+      end
 
-    if invoice.nil?
-      Rails.logger.error "❌ STAGE_INVOICE: Invoice.create_from_release_notes returned nil"
-      redirect_to @works_order, alert: 'Failed to create local invoice from release notes. Check logs for details.'
-      return
+      # Create local invoice from release notes
+      customer = @works_order.customer
+      Rails.logger.info "🔍 STAGE_INVOICE: Customer: #{customer.name} (ID: #{customer.id})"
+
+      Rails.logger.info "🔍 STAGE_INVOICE: Calling Invoice.create_from_release_notes..."
+      invoice = Invoice.create_from_release_notes(uninvoiced_release_notes, customer, Current.user)
+
+      if invoice.nil?
+        Rails.logger.error "❌ STAGE_INVOICE: Invoice.create_from_release_notes returned nil"
+        redirect_to @works_order, alert: 'Failed to create local invoice from release notes. Check logs for details.'
+        return
+      end
+
+      Rails.logger.info "✅ STAGE_INVOICE: Local invoice INV#{invoice.number} created successfully"
+
+      # Add additional charges from works order data (not parameters)
+      if @works_order.selected_charge_ids.present?
+        Rails.logger.info "🔍 STAGE_INVOICE: Adding #{@works_order.selected_charge_ids.length} additional charges from works order"
+        add_additional_charges_to_invoice(invoice, @works_order.selected_charge_ids, @works_order.custom_amounts || {})
+
+        # Recalculate totals after adding charges
+        invoice.calculate_totals!
+        Rails.logger.info "✅ STAGE_INVOICE: Added additional charges and recalculated totals"
+      end
+
+      redirect_to @works_order,
+                  notice: "✅ Invoice INV#{invoice.number} staged successfully! " \
+                          "#{build_invoice_summary(uninvoiced_release_notes, @works_order.selected_charge_ids)}"
+
+    rescue StandardError => e
+      Rails.logger.error "💥 STAGE_INVOICE: Exception occurred: #{e.message}"
+      Rails.logger.error "💥 STAGE_INVOICE: Backtrace: #{e.backtrace.first(10).join("\n")}"
+
+      redirect_to @works_order,
+                  alert: "❌ Failed to stage invoice: #{e.message}. Please try again or contact support."
     end
-
-    Rails.logger.info "✅ STAGE_INVOICE: Local invoice INV#{invoice.number} created successfully"
-
-    # Add additional charges if any were selected
-    if params[:additional_charge_ids].present?
-      Rails.logger.info "🔍 STAGE_INVOICE: Adding #{params[:additional_charge_ids].length} additional charges"
-      add_additional_charges_to_invoice(invoice, params[:additional_charge_ids], params[:custom_amounts] || {})
-
-      # Recalculate totals after adding charges
-      invoice.calculate_totals!
-      Rails.logger.info "✅ STAGE_INVOICE: Added additional charges and recalculated totals"
-    end
-
-    redirect_to @works_order,
-                notice: "✅ Invoice INV#{invoice.number} staged successfully! " \
-                        "#{build_invoice_summary(uninvoiced_release_notes, params[:additional_charge_ids])}"
-
-  rescue StandardError => e
-    Rails.logger.error "💥 STAGE_INVOICE: Exception occurred: #{e.message}"
-    Rails.logger.error "💥 STAGE_INVOICE: Backtrace: #{e.backtrace.first(10).join("\n")}"
-
-    redirect_to @works_order,
-                alert: "❌ Failed to stage invoice: #{e.message}. Please try again or contact support."
   end
-end
-
 
   private
   # Add additional charges to an existing invoice
@@ -234,13 +230,19 @@ end
     @works_order = WorksOrder.find(params[:id])
   end
 
-  # UPDATED: Smart parameter filtering based on price_type
+  # UPDATED: Smart parameter filtering based on price_type and additional charges
   def works_order_params
     # Always allow these core parameters
     permitted_params = [
       :customer_order_id, :part_id, :quantity, :price_type,
       :part_number, :part_issue, :part_description,
       :release_level_id, :transport_method_id
+    ]
+
+    # Add additional charges parameters
+    permitted_params += [
+      { selected_charge_ids: [] },
+      { custom_amounts: {} }
     ]
 
     # Only permit the relevant price field based on price_type
