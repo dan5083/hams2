@@ -44,6 +44,8 @@ class WorksOrdersController < ApplicationController
   end
 
   def create
+    Rails.logger.info "🔍 RAW PARAMS: #{params.inspect}"
+    Rails.logger.info "🔍 WORKS ORDER PARAMS: #{works_order_params.inspect}"
     @works_order = WorksOrder.new(works_order_params)
 
     # If customer_order_id is missing, try to get it from the route
