@@ -201,7 +201,7 @@
 
   <!-- Additional Charges Section -->
   <div class="bg-white shadow rounded-lg p-6">
-    <h3 class="text-lg font-medium text-gray-900 mb-4">Additional Charges</h3>
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Additional Charges (for invoicing)</h3>
 
     <div class="grid grid-cols-1 gap-6">
       <!-- Additional Charges Checkboxes -->
@@ -404,7 +404,7 @@ function togglePriceFields(priceType) {
 
 // Handle additional charge selection with checkboxes
 function handleAdditionalChargeSelection() {
-  const checkboxes = document.querySelectorAll('input[name="additional_charge_ids[]"]:checked');
+  const checkboxes = document.querySelectorAll('input[name="works_order[selected_charge_ids][]"]:checked');
   const variableSection = document.getElementById('variable_charges_section');
   const variableInputs = document.getElementById('variable_charge_inputs');
 
@@ -438,7 +438,7 @@ function handleAdditionalChargeSelection() {
             <span class="text-gray-500 sm:text-sm">£</span>
           </div>
           <input type="number"
-                 name="custom_amounts[${chargeId}]"
+                 name="works_order[custom_amounts][${chargeId}]"
                  id="custom_amount_${chargeId}"
                  step="0.01"
                  min="0"
