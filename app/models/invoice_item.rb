@@ -1,8 +1,7 @@
-# app/models/invoice_item.rb
+# app/models/invoice_item.rb - No additional columns needed
 class InvoiceItem < ApplicationRecord
   belongs_to :invoice
   belongs_to :release_note, optional: true
-  belongs_to :additional_charge_preset, optional: true
 
   # Match Mike's kind values exactly
   validates :kind, inclusion: { in: %w[main additional] }
@@ -12,10 +11,8 @@ class InvoiceItem < ApplicationRecord
             presence: true, numericality: { greater_than_or_equal_to: 0 }
   validates :position, presence: true, numericality: { greater_than_or_equal_to: 0 }
 
-  # Ensure either release_note OR additional_charge_preset is present, not both
+  # Ensure release_note is present for main items
   validates :release_note_id, presence: true, if: -> { kind == 'main' }
-  validates :additional_charge_preset_id, presence: true, if: -> { kind == 'additional' }
-  validate :cannot_have_both_release_note_and_additional_charge
 
   before_validation :calculate_tax_amounts, if: :line_amount_ex_tax_changed?
   before_validation :set_position, if: :new_record?
@@ -67,7 +64,7 @@ class InvoiceItem < ApplicationRecord
     item
   end
 
-  # Create invoice item from additional charge preset
+  # Create invoice item from additional charge preset (no additional column needed)
   def self.create_from_additional_charge(additional_charge_preset, invoice, custom_amount = nil)
     # Use custom amount for variable charges, preset amount for fixed charges
     amount = if additional_charge_preset.is_variable?
@@ -76,12 +73,17 @@ class InvoiceItem < ApplicationRecord
                additional_charge_preset.amount || 0.0
              end
 
+    # Store charge info in description - we don't need a separate column
+    description = additional_charge_preset.description.present? ?
+                   "#{additional_charge_preset.name} - #{additional_charge_preset.description}" :
+                   additional_charge_preset.name
+
     item = new(
       invoice: invoice,
-      additional_charge_preset: additional_charge_preset,
+      release_note: nil, # Additional charges don't have release notes
       kind: 'additional',
       quantity: 1,
-      description: additional_charge_preset.display_name,
+      description: description,
       line_amount_ex_tax: amount
     )
 
@@ -98,12 +100,6 @@ class InvoiceItem < ApplicationRecord
   def update_invoice_totals
     invoice.calculate_totals
     invoice.save! if invoice.persisted?
-  end
-
-  def cannot_have_both_release_note_and_additional_charge
-    if release_note_id.present? && additional_charge_preset_id.present?
-      errors.add(:base, "Cannot have both release note and additional charge preset")
-    end
   end
 
   # Generate description for release note items
