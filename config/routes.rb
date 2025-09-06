@@ -1,14 +1,16 @@
 Rails.application.routes.draw do
   # Authentication routes
   resource :session
-  get '/auth/:token', to: 'sessions#magic_link', as: :magic_link
   resources :passwords, param: :token
   resources :registrations, only: [:new, :create]
 
-  # Xero OAuth routes
+  # Xero OAuth routes - BEFORE magic link to prevent route conflicts
   get '/auth/xero', to: 'xero_auth#authorize'
   get '/auth/xero/callback', to: 'xero_auth#callback'
   get '/test_xero_api', to: 'xero_auth#test_api'
+
+  # Magic link route - AFTER Xero routes
+  get '/auth/:token', to: 'sessions#magic_link', as: :magic_link
 
   # 1. Parts management - Now includes integrated processing instructions
   resources :parts do
