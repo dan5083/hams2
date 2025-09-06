@@ -1,4 +1,4 @@
-<%# app/views/works_orders/_form.html.erb - Fixed pricing calculation %>
+<%# app/views/works_orders/_form.html.erb - Complete form with additional charges %>
 <%= form_with model: works_order, local: true, class: "space-y-6" do |form| %>
   <% if works_order.errors.any? %>
     <div class="bg-red-50 border border-red-200 rounded-md p-4">
@@ -200,74 +200,62 @@
   </div>
 
   <!-- Additional Charges Section -->
-  <% if @additional_charge_presets&.any? %>
-    <div class="bg-white shadow rounded-lg p-6">
-      <h3 class="text-lg font-medium text-gray-900 mb-4">Additional Charges</h3>
+  <div class="bg-white shadow rounded-lg p-6">
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Additional Charges</h3>
 
-      <div class="grid grid-cols-1 gap-6">
-        <!-- Additional Charges Multi-Select -->
-        <div>
-          <%= label_tag :additional_charge_ids, "Select Additional Charges", class: "block text-sm font-medium text-gray-700 mb-1" %>
-          <select name="additional_charge_ids[]"
-                  id="additional_charge_ids"
-                  multiple="multiple"
-                  size="8"
-                  class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  onchange="handleAdditionalChargeSelection()">
+    <div class="grid grid-cols-1 gap-6">
+      <!-- Additional Charges Checkboxes -->
+      <div>
+        <%= label_tag :additional_charge_ids, "Select Additional Charges", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <% if defined?(@additional_charge_presets) && @additional_charge_presets.any? %>
+          <div class="mt-1 space-y-2 max-h-64 overflow-y-auto border border-gray-300 rounded-md p-3 bg-white">
             <% @additional_charge_presets.each do |preset| %>
-              <option value="<%= preset.id %>"><%= preset.display_name %></option>
+              <label class="flex items-start">
+                <%= check_box_tag "additional_charge_ids[]",
+                    preset.id,
+                    false,
+                    {
+                      class: "rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-offset-0 focus:ring-blue-200 focus:ring-opacity-50 mt-0.5 flex-shrink-0",
+                      onchange: "handleAdditionalChargeSelection()"
+                    } %>
+                <span class="ml-2 text-sm text-gray-900 leading-tight">
+                  <strong><%= preset.name %></strong>
+                  <% if preset.is_variable? %>
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800 ml-2">
+                      Variable
+                    </span>
+                  <% else %>
+                    <span class="text-green-600 font-semibold ml-2">£<%= sprintf("%.2f", preset.amount) %></span>
+                  <% end %>
+                  <% if preset.description.present? %>
+                    <br>
+                    <span class="text-gray-600 text-xs"><%= preset.description %></span>
+                  <% end %>
+                </span>
+              </label>
             <% end %>
-          </select>
-          <p class="mt-1 text-xs text-gray-500">
-            Hold Ctrl/Cmd to select multiple charges. These will be added when creating invoices from this works order.
-          </p>
-        </div>
-
-        <!-- Variable Charge Amount Inputs (hidden by default) -->
-        <div id="variable_charges_section" class="hidden">
-          <h4 class="text-sm font-medium text-gray-700 mb-2">Variable Charge Amounts</h4>
-          <div id="variable_charge_inputs">
-            <!-- Dynamic inputs will be added here by JavaScript -->
           </div>
+          <!-- Hidden field to ensure empty array is sent when nothing is selected -->
+          <%= hidden_field_tag "additional_charge_ids[]", "", id: "additional_charge_placeholder" %>
+          <p class="mt-1 text-xs text-gray-500">
+            Select charges to include when creating invoices from this works order. Variable charges will allow custom amounts.
+          </p>
+        <% else %>
+          <div class="mt-1 border border-gray-300 rounded-md p-3 bg-gray-50 text-gray-500 text-sm">
+            No additional charges available. Check that additional charge presets have been created and are enabled.
+          </div>
+        <% end %>
+      </div>
+
+      <!-- Variable Charge Amount Inputs (hidden by default) -->
+      <div id="variable_charges_section" class="hidden">
+        <h4 class="text-sm font-medium text-gray-700 mb-2">Variable Charge Amounts</h4>
+        <div id="variable_charge_inputs">
+          <!-- Dynamic inputs will be added here by JavaScript -->
         </div>
       </div>
     </div>
-  <% end %>
-
-  <!-- DEBUG: Parts count in template -->
-  <% Rails.logger.info "TEMPLATE DEBUG: @parts.count = #{@parts.count}" %>
-  <% Rails.logger.info "TEMPLATE DEBUG: @parts IDs = #{@parts.pluck(:id)}" %>
-  <% if @customer_order %>
-    <% Rails.logger.info "TEMPLATE DEBUG: Customer = #{@customer_order.customer.name} (#{@customer_order.customer.id})" %>
-  <% end %>
-
-  <!-- Parts data for JavaScript -->
-  <script>
-    window.partsData = {
-      <% @parts.each do |part| %>
-        "<%= part.id %>": {
-          "uniform_part_number": "<%= j part.uniform_part_number %>",
-          "uniform_part_issue": "<%= j part.uniform_part_issue %>",
-          "description": "<%= j (part.description || "#{part.uniform_part_number} component") %>"
-        },
-      <% end %>
-    };
-    console.log("Parts loaded in JavaScript:", Object.keys(window.partsData).length);
-
-    // Additional charges data for JavaScript
-    window.additionalChargesData = {
-      <% if @additional_charge_presets %>
-        <% @additional_charge_presets.each do |preset| %>
-          "<%= preset.id %>": {
-            "name": "<%= j preset.name %>",
-            "is_variable": <%= preset.is_variable? %>,
-            "amount": <%= preset.amount || 0 %>,
-            "display_name": "<%= j preset.display_name %>"
-          },
-        <% end %>
-      <% end %>
-    };
-  </script>
+  </div>
 
   <!-- Form Actions -->
   <div class="flex justify-end space-x-3">
@@ -278,7 +266,35 @@
   </div>
 <% end %>
 
+<!-- JavaScript -->
 <script>
+// Parts data for JavaScript
+window.partsData = {
+  <% if defined?(@parts) && @parts %>
+    <% @parts.each do |part| %>
+      "<%= part.id %>": {
+        "uniform_part_number": "<%= j part.uniform_part_number %>",
+        "uniform_part_issue": "<%= j part.uniform_part_issue %>",
+        "description": "<%= j (part.description || "#{part.uniform_part_number} component") %>"
+      },
+    <% end %>
+  <% end %>
+};
+
+// Additional charges data for JavaScript
+window.additionalChargesData = {
+  <% if defined?(@additional_charge_presets) && @additional_charge_presets %>
+    <% @additional_charge_presets.each do |preset| %>
+      "<%= preset.id %>": {
+        "name": "<%= j preset.name %>",
+        "is_variable": <%= preset.is_variable? %>,
+        "amount": <%= preset.amount || 0 %>,
+        "display_name": "<%= j preset.display_name %>"
+      },
+    <% end %>
+  <% end %>
+};
+
 // Currency formatting function
 function formatCurrency(input) {
   let value = input.value;
@@ -334,7 +350,7 @@ function updatePartDetails(selectElement) {
   }
 }
 
-// NEW: Calculate total price for 'each' pricing
+// Calculate total price for 'each' pricing
 function recalculateTotalPrice() {
   const priceType = document.getElementById('works_order_price_type').value;
 
@@ -350,7 +366,7 @@ function recalculateTotalPrice() {
   }
 }
 
-// UPDATED: Pricing field toggle - no longer clears lot_price
+// Pricing field toggle
 function togglePriceFields(priceType) {
   const eachPriceField = document.getElementById('each_price_field');
   const totalPriceDisplay = document.getElementById('total_price_display');
@@ -386,18 +402,24 @@ function togglePriceFields(priceType) {
   }
 }
 
+// Handle additional charge selection with checkboxes
 function handleAdditionalChargeSelection() {
   const checkboxes = document.querySelectorAll('input[name="additional_charge_ids[]"]:checked');
   const variableSection = document.getElementById('variable_charges_section');
   const variableInputs = document.getElementById('variable_charge_inputs');
 
   // Clear existing variable inputs
-  variableInputs.innerHTML = '';
+  if (variableInputs) {
+    variableInputs.innerHTML = '';
+  }
 
   let hasVariableCharges = false;
 
   // Check selected checkboxes for variable charges
   checkboxes.forEach(checkbox => {
+    // Skip the hidden placeholder field
+    if (checkbox.value === '') return;
+
     const chargeId = checkbox.value;
     const chargeData = window.additionalChargesData[chargeId];
 
@@ -428,15 +450,19 @@ function handleAdditionalChargeSelection() {
         </p>
       `;
 
-      variableInputs.appendChild(inputDiv);
+      if (variableInputs) {
+        variableInputs.appendChild(inputDiv);
+      }
     }
   });
 
   // Show/hide variable charges section
-  if (hasVariableCharges) {
-    variableSection.classList.remove('hidden');
-  } else {
-    variableSection.classList.add('hidden');
+  if (variableSection) {
+    if (hasVariableCharges) {
+      variableSection.classList.remove('hidden');
+    } else {
+      variableSection.classList.add('hidden');
+    }
   }
 }
 
