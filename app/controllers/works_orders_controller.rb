@@ -139,110 +139,69 @@ class WorksOrdersController < ApplicationController
     end
   end
 
-  def create_invoice
-    Rails.logger.info "🚀 STAGE_INVOICE: Starting for WO#{@works_order.number}"
+# Add these methods to WorksOrdersController (app/controllers/works_orders_controller.rb)
 
-    if @works_order.quantity_released <= 0
-      Rails.logger.info "❌ STAGE_INVOICE: No quantity released (#{@works_order.quantity_released})"
-      redirect_to @works_order, alert: 'No items available to invoice - no quantity has been released yet.'
-      return
-    end
+# Updated create_invoice method to handle additional charges
+def create_invoice
+  Rails.logger.info "🚀 STAGE_INVOICE: Starting for WO#{@works_order.number}"
 
-    begin
-      # Get all uninvoiced release notes for this works order
-      uninvoiced_release_notes = @works_order.release_notes.requires_invoicing
-      Rails.logger.info "🔍 STAGE_INVOICE: Found #{uninvoiced_release_notes.count} uninvoiced release notes"
-
-      uninvoiced_release_notes.each do |rn|
-        Rails.logger.info "  - RN#{rn.number}: #{rn.quantity_accepted} accepted, can_be_invoiced=#{rn.can_be_invoiced?}"
-      end
-
-      if uninvoiced_release_notes.empty?
-        Rails.logger.info "❌ STAGE_INVOICE: No uninvoiced release notes found"
-        redirect_to @works_order, alert: 'No release notes available for invoicing.'
-        return
-      end
-
-      # Create local invoice from release notes (no Xero sync)
-      customer = @works_order.customer
-      Rails.logger.info "🔍 STAGE_INVOICE: Customer: #{customer.name} (ID: #{customer.id})"
-
-      Rails.logger.info "🔍 STAGE_INVOICE: Calling Invoice.create_from_release_notes..."
-      invoice = Invoice.create_from_release_notes(uninvoiced_release_notes, customer, Current.user)
-
-      if invoice.nil?
-        Rails.logger.error "❌ STAGE_INVOICE: Invoice.create_from_release_notes returned nil"
-        redirect_to @works_order, alert: 'Failed to create local invoice from release notes. Check logs for details.'
-        return
-      end
-
-      Rails.logger.info "✅ STAGE_INVOICE: Local invoice INV#{invoice.number} created successfully"
-
-      redirect_to @works_order,
-                  notice: "✅ Invoice INV#{invoice.number} staged successfully! " \
-                          "Staged #{uninvoiced_release_notes.count} release note(s) " \
-                          "for #{uninvoiced_release_notes.sum(:quantity_accepted)} parts. " \
-                          "Go to the dashboard to push invoices to Xero."
-
-    rescue StandardError => e
-      Rails.logger.error "💥 STAGE_INVOICE: Exception occurred: #{e.message}"
-      Rails.logger.error "💥 STAGE_INVOICE: Backtrace: #{e.backtrace.first(10).join("\n")}"
-
-      redirect_to @works_order,
-                  alert: "❌ Failed to stage invoice: #{e.message}. Please try again or contact support."
-    end
+  if @works_order.quantity_released <= 0
+    Rails.logger.info "❌ STAGE_INVOICE: No quantity released (#{@works_order.quantity_released})"
+    redirect_to @works_order, alert: 'No items available to invoice - no quantity has been released yet.'
+    return
   end
 
-  # Add these methods to WorksOrdersController (app/controllers/works_orders_controller.rb)
-
-  # NEW: Enhanced invoice creation with additional charges
-  def create_invoice_with_charges
-    Rails.logger.info "🚀 STAGE_INVOICE_WITH_CHARGES: Starting for WO#{@works_order.number}"
-
-    if @works_order.quantity_released <= 0
-      redirect_to @works_order, alert: 'No items available to invoice - no quantity has been released yet.'
-      return
-    end
-
-    # Get uninvoiced release notes
+  begin
+    # Get all uninvoiced release notes for this works order
     uninvoiced_release_notes = @works_order.release_notes.requires_invoicing
+    Rails.logger.info "🔍 STAGE_INVOICE: Found #{uninvoiced_release_notes.count} uninvoiced release notes"
+
     if uninvoiced_release_notes.empty?
+      Rails.logger.info "❌ STAGE_INVOICE: No uninvoiced release notes found"
       redirect_to @works_order, alert: 'No release notes available for invoicing.'
       return
     end
 
-    begin
-      customer = @works_order.customer
+    # Create local invoice from release notes
+    customer = @works_order.customer
+    Rails.logger.info "🔍 STAGE_INVOICE: Customer: #{customer.name} (ID: #{customer.id})"
 
-      # Create invoice from release notes
-      invoice = Invoice.create_from_release_notes(uninvoiced_release_notes, customer, Current.user)
+    Rails.logger.info "🔍 STAGE_INVOICE: Calling Invoice.create_from_release_notes..."
+    invoice = Invoice.create_from_release_notes(uninvoiced_release_notes, customer, Current.user)
 
-      if invoice.nil?
-        redirect_to @works_order, alert: 'Failed to create invoice from release notes.'
-        return
-      end
+    if invoice.nil?
+      Rails.logger.error "❌ STAGE_INVOICE: Invoice.create_from_release_notes returned nil"
+      redirect_to @works_order, alert: 'Failed to create local invoice from release notes. Check logs for details.'
+      return
+    end
 
-      # Add additional charges if any were selected
-      if params[:additional_charge_ids].present?
-        add_additional_charges_to_invoice(invoice, params[:additional_charge_ids], params[:custom_amounts] || {})
-      end
+    Rails.logger.info "✅ STAGE_INVOICE: Local invoice INV#{invoice.number} created successfully"
+
+    # Add additional charges if any were selected
+    if params[:additional_charge_ids].present?
+      Rails.logger.info "🔍 STAGE_INVOICE: Adding #{params[:additional_charge_ids].length} additional charges"
+      add_additional_charges_to_invoice(invoice, params[:additional_charge_ids], params[:custom_amounts] || {})
 
       # Recalculate totals after adding charges
       invoice.calculate_totals!
-
-      redirect_to @works_order,
-                  notice: "Invoice INV#{invoice.number} created successfully! " \
-                          "#{build_invoice_summary(uninvoiced_release_notes, params[:additional_charge_ids])}"
-
-    rescue StandardError => e
-      Rails.logger.error "💥 STAGE_INVOICE_WITH_CHARGES: Exception: #{e.message}"
-      redirect_to @works_order, alert: "Failed to create invoice: #{e.message}"
+      Rails.logger.info "✅ STAGE_INVOICE: Added additional charges and recalculated totals"
     end
+
+    redirect_to @works_order,
+                notice: "✅ Invoice INV#{invoice.number} staged successfully! " \
+                        "#{build_invoice_summary(uninvoiced_release_notes, params[:additional_charge_ids])}"
+
+  rescue StandardError => e
+    Rails.logger.error "💥 STAGE_INVOICE: Exception occurred: #{e.message}"
+    Rails.logger.error "💥 STAGE_INVOICE: Backtrace: #{e.backtrace.first(10).join("\n")}"
+
+    redirect_to @works_order,
+                alert: "❌ Failed to stage invoice: #{e.message}. Please try again or contact support."
   end
+end
 
 
   private
-
   # Add additional charges to an existing invoice
   def add_additional_charges_to_invoice(invoice, charge_ids, custom_amounts)
     charge_ids.each do |charge_id|
@@ -310,6 +269,7 @@ class WorksOrdersController < ApplicationController
   def load_reference_data
     @release_levels = ReleaseLevel.enabled.ordered
     @transport_methods = TransportMethod.enabled.ordered
+    @additional_charge_presets = AdditionalChargePreset.enabled.ordered
 
     if @customer_order.present?
       Rails.logger.info "🔍 Loading parts for customer: #{@customer_order.customer.name} (ID: #{@customer_order.customer.id})"

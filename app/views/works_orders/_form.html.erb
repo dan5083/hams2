@@ -199,6 +199,37 @@
     </div>
   </div>
 
+    <!-- Additional Charges Section -->
+  <div class="bg-white shadow rounded-lg p-6">
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Additional Charges (for invoicing)</h3>
+
+    <div class="grid grid-cols-1 gap-6">
+      <!-- Additional Charges Multi-Select -->
+      <div>
+        <%= label_tag :additional_charge_ids, "Select Additional Charges", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= select_tag :additional_charge_ids,
+            options_from_collection_for_select(@additional_charge_presets, :id, :display_name),
+            {
+              multiple: true,
+              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+              size: 8,
+              onchange: "handleAdditionalChargeSelection()"
+            } %>
+        <p class="mt-1 text-xs text-gray-500">
+          Hold Ctrl/Cmd to select multiple charges. These will be added when creating invoices from this works order.
+        </p>
+      </div>
+
+      <!-- Variable Charge Amount Inputs (hidden by default) -->
+      <div id="variable_charges_section" class="hidden">
+        <h4 class="text-sm font-medium text-gray-700 mb-2">Variable Charge Amounts</h4>
+        <div id="variable_charge_inputs">
+          <!-- Dynamic inputs will be added here by JavaScript -->
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- DEBUG: Parts count in template -->
   <% Rails.logger.info "TEMPLATE DEBUG: @parts.count = #{@parts.count}" %>
   <% Rails.logger.info "TEMPLATE DEBUG: @parts IDs = #{@parts.pluck(:id)}" %>
@@ -359,4 +390,75 @@ document.addEventListener('DOMContentLoaded', function() {
   // Calculate initial total price if in 'each' mode
   recalculateTotalPrice();
 });
+
+// Additional charges data for JavaScript
+window.additionalChargesData = {
+  <% @additional_charge_presets.each do |preset| %>
+    "<%= preset.id %>": {
+      "name": "<%= j preset.name %>",
+      "is_variable": <%= preset.is_variable? %>,
+      "amount": <%= preset.amount || 0 %>,
+      "display_name": "<%= j preset.display_name %>"
+    },
+  <% end %>
+};
+
+  function handleAdditionalChargeSelection() {
+    const select = document.getElementById('additional_charge_ids');
+    const variableSection = document.getElementById('variable_charges_section');
+    const variableInputs = document.getElementById('variable_charge_inputs');
+
+    // Clear existing variable inputs
+    variableInputs.innerHTML = '';
+
+    let hasVariableCharges = false;
+
+    // Check selected options for variable charges
+    Array.from(select.selectedOptions).forEach(option => {
+      const chargeId = option.value;
+      const chargeData = window.additionalChargesData[chargeId];
+
+      if (chargeData && chargeData.is_variable) {
+        hasVariableCharges = true;
+
+        // Create input for variable charge
+        const inputDiv = document.createElement('div');
+        inputDiv.className = 'mb-3';
+        inputDiv.innerHTML = `
+          <label for="custom_amount_${chargeId}" class="block text-sm font-medium text-gray-700 mb-1">
+            ${chargeData.name} - Custom Amount (£)
+          </label>
+          <div class="mt-1 relative rounded-md shadow-sm">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <span class="text-gray-500 sm:text-sm">£</span>
+            </div>
+            <input type="number"
+                  name="custom_amounts[${chargeId}]"
+                  id="custom_amount_${chargeId}"
+                  step="0.01"
+                  min="0"
+                  placeholder="${chargeData.amount}"
+                  class="block w-full pl-7 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+          </div>
+          <p class="mt-1 text-xs text-gray-500">
+            Default: £${chargeData.amount} (leave blank to use default)
+          </p>
+        `;
+
+        variableInputs.appendChild(inputDiv);
+      }
+    });
+
+    // Show/hide variable charges section
+    if (hasVariableCharges) {
+      variableSection.classList.remove('hidden');
+    } else {
+      variableSection.classList.add('hidden');
+    }
+  }
+
+  // Initialize on page load
+  document.addEventListener('DOMContentLoaded', function() {
+    handleAdditionalChargeSelection();
+  });
 </script>
