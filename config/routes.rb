@@ -4,12 +4,12 @@ Rails.application.routes.draw do
   resources :passwords, param: :token
   resources :registrations, only: [:new, :create]
 
-  # Xero OAuth routes - MOVED BEFORE magic link route
+  # Xero OAuth routes - MOVED BEFORE magic_link route
   get '/auth/xero', to: 'xero_auth#authorize'
   get '/auth/xero/callback', to: 'xero_auth#callback'
   get '/test_xero_api', to: 'xero_auth#test_api'
 
-  # Magic link route - MOVED AFTER Xero routes
+  # Magic link route - AFTER Xero routes
   get '/auth/:token', to: 'sessions#magic_link', as: :magic_link
 
   # 1. Parts management - Now includes integrated processing instructions
@@ -56,6 +56,7 @@ Rails.application.routes.draw do
       get :route_card       # Shop floor manufacturing instructions (HTML + PDF)
       patch :void
       patch :create_invoice # Create invoice from works order
+      patch :create_invoice_with_charges
     end
 
     # 5. Release Notes nested under works orders
