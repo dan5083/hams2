@@ -2,7 +2,7 @@
 class InvoiceItem < ApplicationRecord
   belongs_to :invoice
   belongs_to :release_note, optional: true
-  # belongs_to :additional_charge, optional: true # For future use - Mike had wo_additional_charges
+  belongs_to :additional_charge_preset, optional: true
 
   # Match Mike's kind values exactly
   validates :kind, inclusion: { in: %w[main additional] }
@@ -11,6 +11,11 @@ class InvoiceItem < ApplicationRecord
   validates :line_amount_ex_tax, :line_amount_tax, :line_amount_inc_tax,
             presence: true, numericality: { greater_than_or_equal_to: 0 }
   validates :position, presence: true, numericality: { greater_than_or_equal_to: 0 }
+
+  # Ensure either release_note OR additional_charge_preset is present, not both
+  validates :release_note_id, presence: true, if: -> { kind == 'main' }
+  validates :additional_charge_preset_id, presence: true, if: -> { kind == 'additional' }
+  validate :cannot_have_both_release_note_and_additional_charge
 
   before_validation :calculate_tax_amounts, if: :line_amount_ex_tax_changed?
   before_validation :set_position, if: :new_record?
@@ -45,11 +50,10 @@ class InvoiceItem < ApplicationRecord
     }
   end
 
-  # Create invoice item from release note - simplified version of Mike's logic
+  # Create invoice item from release note
   def self.create_from_release_note(release_note, invoice)
     return unless release_note.can_be_invoiced?
 
-    # Create the main item
     item = new(
       invoice: invoice,
       release_note: release_note,
@@ -59,7 +63,28 @@ class InvoiceItem < ApplicationRecord
       line_amount_ex_tax: release_note.invoice_value
     )
 
-    # Tax will be calculated automatically
+    item.save!
+    item
+  end
+
+  # Create invoice item from additional charge preset
+  def self.create_from_additional_charge(additional_charge_preset, invoice, custom_amount = nil)
+    # Use custom amount for variable charges, preset amount for fixed charges
+    amount = if additional_charge_preset.is_variable?
+               custom_amount&.to_f || additional_charge_preset.amount || 0.0
+             else
+               additional_charge_preset.amount || 0.0
+             end
+
+    item = new(
+      invoice: invoice,
+      additional_charge_preset: additional_charge_preset,
+      kind: 'additional',
+      quantity: 1,
+      description: additional_charge_preset.display_name,
+      line_amount_ex_tax: amount
+    )
+
     item.save!
     item
   end
@@ -75,7 +100,13 @@ class InvoiceItem < ApplicationRecord
     invoice.save! if invoice.persisted?
   end
 
-  # Match Mike's description generation
+  def cannot_have_both_release_note_and_additional_charge
+    if release_note_id.present? && additional_charge_preset_id.present?
+      errors.add(:base, "Cannot have both release note and additional charge preset")
+    end
+  end
+
+  # Generate description for release note items
   def self.description_for_release_note(release_note)
     works_order = release_note.works_order
     customer_order = works_order.customer_order

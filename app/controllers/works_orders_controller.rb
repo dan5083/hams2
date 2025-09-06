@@ -193,7 +193,83 @@ class WorksOrdersController < ApplicationController
     end
   end
 
+  # Add these methods to WorksOrdersController (app/controllers/works_orders_controller.rb)
+
+  # NEW: Enhanced invoice creation with additional charges
+  def create_invoice_with_charges
+    Rails.logger.info "🚀 STAGE_INVOICE_WITH_CHARGES: Starting for WO#{@works_order.number}"
+
+    if @works_order.quantity_released <= 0
+      redirect_to @works_order, alert: 'No items available to invoice - no quantity has been released yet.'
+      return
+    end
+
+    # Get uninvoiced release notes
+    uninvoiced_release_notes = @works_order.release_notes.requires_invoicing
+    if uninvoiced_release_notes.empty?
+      redirect_to @works_order, alert: 'No release notes available for invoicing.'
+      return
+    end
+
+    begin
+      customer = @works_order.customer
+
+      # Create invoice from release notes
+      invoice = Invoice.create_from_release_notes(uninvoiced_release_notes, customer, Current.user)
+
+      if invoice.nil?
+        redirect_to @works_order, alert: 'Failed to create invoice from release notes.'
+        return
+      end
+
+      # Add additional charges if any were selected
+      if params[:additional_charge_ids].present?
+        add_additional_charges_to_invoice(invoice, params[:additional_charge_ids], params[:custom_amounts] || {})
+      end
+
+      # Recalculate totals after adding charges
+      invoice.calculate_totals!
+
+      redirect_to @works_order,
+                  notice: "Invoice INV#{invoice.number} created successfully! " \
+                          "#{build_invoice_summary(uninvoiced_release_notes, params[:additional_charge_ids])}"
+
+    rescue StandardError => e
+      Rails.logger.error "💥 STAGE_INVOICE_WITH_CHARGES: Exception: #{e.message}"
+      redirect_to @works_order, alert: "Failed to create invoice: #{e.message}"
+    end
+  end
+
+
   private
+
+  # Add additional charges to an existing invoice
+  def add_additional_charges_to_invoice(invoice, charge_ids, custom_amounts)
+    charge_ids.each do |charge_id|
+      charge = AdditionalChargePreset.find(charge_id)
+      custom_amount = custom_amounts[charge_id]
+
+      InvoiceItem.create_from_additional_charge(charge, invoice, custom_amount)
+      Rails.logger.info "✅ Added additional charge: #{charge.name}"
+    end
+  end
+
+  # Build summary message for invoice creation
+  def build_invoice_summary(release_notes, additional_charge_ids)
+    summary = "Invoiced #{release_notes.count} release note(s) for #{release_notes.sum(:quantity_accepted)} parts"
+
+    if additional_charge_ids.present?
+      charge_count = additional_charge_ids.length
+      summary += " with #{charge_count} additional charge(s)"
+    end
+
+    summary + ". Go to dashboard to push to Xero."
+  end
+
+  # Load additional charge presets for forms
+  def load_additional_charges
+    @additional_charge_presets = AdditionalChargePreset.enabled.ordered
+  end
 
   def set_works_order
     @works_order = WorksOrder.find(params[:id])

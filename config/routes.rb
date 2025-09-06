@@ -54,6 +54,7 @@ Rails.application.routes.draw do
       get :route_card       # Shop floor manufacturing instructions (HTML + PDF)
       patch :void
       patch :create_invoice # Create invoice from works order
+      patch :create_invoice_with_charges
     end
 
     # 5. Release Notes nested under works orders

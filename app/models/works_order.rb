@@ -321,6 +321,38 @@ class WorksOrder < ApplicationRecord
     customer&.contact_address
   end
 
+  # Add this method to the WorksOrder model (app/models/works_order.rb)
+
+  # Get available additional charges for this works order
+  def available_additional_charges
+    AdditionalChargePreset.enabled.ordered
+  end
+
+  # Helper method to determine if this works order requires shipping
+  def requires_shipping?
+    !transport_method.name.downcase.include?('collect')
+  end
+
+  # Calculate total additional charges amount for a given set of charge IDs
+  def calculate_additional_charges_total(charge_ids, custom_amounts = {})
+    return 0.0 if charge_ids.blank?
+
+    charges = AdditionalChargePreset.where(id: charge_ids)
+    total = 0.0
+
+    charges.each do |charge|
+      if charge.is_variable?
+        amount = custom_amounts[charge.id.to_s]&.to_f || charge.amount || 0.0
+      else
+        amount = charge.amount || 0.0
+      end
+
+      total += amount
+    end
+
+    total.round(2)
+  end
+
   private
 
   def set_defaults
