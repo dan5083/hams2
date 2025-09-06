@@ -44,8 +44,6 @@ class WorksOrdersController < ApplicationController
   end
 
   def create
-    Rails.logger.info "🔍 RAW PARAMS: #{params.inspect}"
-    Rails.logger.info "🔍 WORKS ORDER PARAMS: #{works_order_params.inspect}"
     @works_order = WorksOrder.new(works_order_params)
 
     # If customer_order_id is missing, try to get it from the route
@@ -115,8 +113,6 @@ class WorksOrdersController < ApplicationController
       }
     end.compact
 
-    Rails.logger.info "Route Card: Generated #{@operations.length} operations for WO#{@works_order.number}"
-
     respond_to do |format|
       format.html { render layout: false }
       format.pdf do
@@ -142,10 +138,8 @@ class WorksOrdersController < ApplicationController
   end
 
   def create_invoice
-    Rails.logger.info "🚀 STAGE_INVOICE: Starting for WO#{@works_order.number}"
 
     if @works_order.quantity_released <= 0
-      Rails.logger.info "❌ STAGE_INVOICE: No quantity released (#{@works_order.quantity_released})"
       redirect_to @works_order, alert: 'No items available to invoice - no quantity has been released yet.'
       return
     end
@@ -153,37 +147,29 @@ class WorksOrdersController < ApplicationController
     begin
       # Get all uninvoiced release notes for this works order
       uninvoiced_release_notes = @works_order.release_notes.requires_invoicing
-      Rails.logger.info "🔍 STAGE_INVOICE: Found #{uninvoiced_release_notes.count} uninvoiced release notes"
 
       if uninvoiced_release_notes.empty?
-        Rails.logger.info "❌ STAGE_INVOICE: No uninvoiced release notes found"
         redirect_to @works_order, alert: 'No release notes available for invoicing.'
         return
       end
 
       # Create local invoice from release notes
       customer = @works_order.customer
-      Rails.logger.info "🔍 STAGE_INVOICE: Customer: #{customer.name} (ID: #{customer.id})"
 
-      Rails.logger.info "🔍 STAGE_INVOICE: Calling Invoice.create_from_release_notes..."
       invoice = Invoice.create_from_release_notes(uninvoiced_release_notes, customer, Current.user)
 
       if invoice.nil?
-        Rails.logger.error "❌ STAGE_INVOICE: Invoice.create_from_release_notes returned nil"
         redirect_to @works_order, alert: 'Failed to create local invoice from release notes. Check logs for details.'
         return
       end
 
-      Rails.logger.info "✅ STAGE_INVOICE: Local invoice INV#{invoice.number} created successfully"
 
       # Add additional charges from works order data (not parameters)
       if @works_order.selected_charge_ids.present?
-        Rails.logger.info "🔍 STAGE_INVOICE: Adding #{@works_order.selected_charge_ids.length} additional charges from works order"
         add_additional_charges_to_invoice(invoice, @works_order.selected_charge_ids, @works_order.custom_amounts || {})
 
         # Recalculate totals after adding charges
         invoice.calculate_totals!
-        Rails.logger.info "✅ STAGE_INVOICE: Added additional charges and recalculated totals"
       end
 
       redirect_to @works_order,
@@ -191,8 +177,6 @@ class WorksOrdersController < ApplicationController
                           "#{build_invoice_summary(uninvoiced_release_notes, @works_order.selected_charge_ids)}"
 
     rescue StandardError => e
-      Rails.logger.error "💥 STAGE_INVOICE: Exception occurred: #{e.message}"
-      Rails.logger.error "💥 STAGE_INVOICE: Backtrace: #{e.backtrace.first(10).join("\n")}"
 
       redirect_to @works_order,
                   alert: "❌ Failed to stage invoice: #{e.message}. Please try again or contact support."
@@ -208,20 +192,11 @@ class WorksOrdersController < ApplicationController
       custom_amount = custom_amounts[charge_id]
 
       InvoiceItem.create_from_additional_charge(charge, invoice, custom_amount)
-      Rails.logger.info "✅ Added additional charge: #{charge.name}"
     end
   end
 
-  # Build summary message for invoice creation
   def build_invoice_summary(release_notes, additional_charge_ids)
-    summary = "Invoiced #{release_notes.count} release note(s) for #{release_notes.sum(:quantity_accepted)} parts"
-
-    if additional_charge_ids.present?
-      charge_count = additional_charge_ids.length
-      summary += " with #{charge_count} additional charge(s)"
-    end
-
-    summary + ". Go to dashboard to push to Xero."
+    "Invoice created successfully. Go to dashboard to push to Xero."
   end
 
   # Load additional charge presets for forms
@@ -250,23 +225,18 @@ class WorksOrdersController < ApplicationController
 
     # Only permit the relevant price field based on price_type
     price_type = params[:works_order][:price_type]
-    Rails.logger.info "🔢 PRICING PARAMS: price_type = #{price_type}"
 
     case price_type
     when 'each'
       permitted_params << :each_price
-      Rails.logger.info "🔢 PRICING PARAMS: Permitting each_price only"
     when 'lot'
       permitted_params << :lot_price
-      Rails.logger.info "🔢 PRICING PARAMS: Permitting lot_price only"
     else
       # Default case - allow both for backward compatibility, but log warning
-      Rails.logger.warn "🔢 PRICING PARAMS: Unknown price_type '#{price_type}', allowing both price fields"
       permitted_params += [:each_price, :lot_price]
     end
 
     filtered_params = params.require(:works_order).permit(*permitted_params)
-    Rails.logger.info "🔢 PRICING PARAMS: Filtered params = #{filtered_params.to_h}"
 
     filtered_params
   end
@@ -277,19 +247,14 @@ class WorksOrdersController < ApplicationController
     @additional_charge_presets = AdditionalChargePreset.enabled.ordered
 
     if @customer_order.present?
-      Rails.logger.info "🔍 Loading parts for customer: #{@customer_order.customer.name} (ID: #{@customer_order.customer.id})"
 
       @parts = Part.enabled
                   .for_customer(@customer_order.customer)
                   .includes(:customer)
                   .order(:uniform_part_number)
 
-      Rails.logger.info "🔍 Found #{@parts.count} parts in controller"
-      Rails.logger.info "🔍 Part IDs: #{@parts.pluck(:id)}"
-
       # Force query execution and count from database
       db_count = Part.enabled.for_customer(@customer_order.customer).count
-      Rails.logger.info "🔍 Direct DB count: #{db_count}"
     else
       @parts = Part.enabled
                   .includes(:customer)
