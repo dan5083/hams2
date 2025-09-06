@@ -202,7 +202,7 @@
   <!-- Additional Charges Section -->
   <% if @additional_charge_presets&.any? %>
     <div class="bg-white shadow rounded-lg p-6">
-      <h3 class="text-lg font-medium text-gray-900 mb-4">Additional Charges (for invoicing)</h3>
+      <h3 class="text-lg font-medium text-gray-900 mb-4">Additional Charges</h3>
 
       <div class="grid grid-cols-1 gap-6">
         <!-- Additional Charges Multi-Select -->
@@ -387,7 +387,7 @@ function togglePriceFields(priceType) {
 }
 
 function handleAdditionalChargeSelection() {
-  const select = document.getElementById('additional_charge_ids');
+  const checkboxes = document.querySelectorAll('input[name="additional_charge_ids[]"]:checked');
   const variableSection = document.getElementById('variable_charges_section');
   const variableInputs = document.getElementById('variable_charge_inputs');
 
@@ -396,9 +396,9 @@ function handleAdditionalChargeSelection() {
 
   let hasVariableCharges = false;
 
-  // Check selected options for variable charges
-  Array.from(select.selectedOptions).forEach(option => {
-    const chargeId = option.value;
+  // Check selected checkboxes for variable charges
+  checkboxes.forEach(checkbox => {
+    const chargeId = checkbox.value;
     const chargeData = window.additionalChargesData[chargeId];
 
     if (chargeData && chargeData.is_variable) {
