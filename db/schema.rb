@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_09_06_123327) do
+ActiveRecord::Schema[8.0].define(version: 2025_09_07_133752) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -93,8 +93,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_06_123327) do
 
   create_table "parts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "customer_id", null: false
-    t.string "uniform_part_number", null: false
-    t.string "uniform_part_issue", default: "A", null: false
+    t.string "part_number", null: false
+    t.string "part_issue", default: "A", null: false
     t.string "description"
     t.string "material"
     t.text "specification"
@@ -108,13 +108,13 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_06_123327) do
     t.uuid "replaces_id"
     t.text "specified_thicknesses"
     t.index ["customer_id", "enabled"], name: "index_parts_on_customer_id_and_enabled"
-    t.index ["customer_id", "uniform_part_number", "uniform_part_issue"], name: "index_parts_on_customer_and_part_number_and_issue", unique: true
+    t.index ["customer_id", "part_number", "part_issue"], name: "index_parts_on_customer_and_part_number_and_issue", unique: true
     t.index ["customer_id"], name: "index_parts_on_customer_id"
     t.index ["customisation_data"], name: "index_parts_on_customisation_data", using: :gin
     t.index ["enabled"], name: "index_parts_on_enabled"
+    t.index ["part_number"], name: "index_parts_on_part_number"
     t.index ["process_type"], name: "index_parts_on_process_type"
     t.index ["replaces_id"], name: "index_parts_on_replaces_id"
-    t.index ["uniform_part_number"], name: "index_parts_on_uniform_part_number"
   end
 
   create_table "release_levels", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|

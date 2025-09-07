@@ -251,14 +251,14 @@ class WorksOrdersController < ApplicationController
       @parts = Part.enabled
                   .for_customer(@customer_order.customer)
                   .includes(:customer)
-                  .order(:uniform_part_number)
+                  .order(:part_number)
 
       # Force query execution and count from database
       db_count = Part.enabled.for_customer(@customer_order.customer).count
     else
       @parts = Part.enabled
                   .includes(:customer)
-                  .order(:uniform_part_number)
+                  .order(:part_number)
     end
   end
 
@@ -285,9 +285,9 @@ class WorksOrdersController < ApplicationController
       # Get the selected part
       part = Part.find(works_order.part_id)
       works_order.part = part
-      works_order.part_number = part.uniform_part_number
-      works_order.part_issue = part.uniform_part_issue
-      works_order.part_description = part.description || "#{part.uniform_part_number} component"
+      works_order.part_number = part.part_number
+      works_order.part_issue = part.part_issue
+      works_order.part_description = part.description || "#{part.part_number} component"
 
       # Check if part has processing instructions configured
       if part.customisation_data.blank? || part.customisation_data.dig("operation_selection", "treatments").blank?

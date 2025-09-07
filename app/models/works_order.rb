@@ -384,8 +384,8 @@ class WorksOrder < ApplicationRecord
   def set_part_details
     return unless part
 
-    self.part_number = part.uniform_part_number
-    self.part_issue = part.uniform_part_issue
+    self.part_number = part.part_number
+    self.part_issue = part.part_issue
     self.part_description = part.display_name if part_description.blank?
   end
 
@@ -410,11 +410,11 @@ class WorksOrder < ApplicationRecord
   def validate_part_matches
     return unless part && part_number && part_issue
 
-    if part.uniform_part_number != part_number.upcase.gsub(/[^A-Z0-9]/, '')
+    if part.part_number != part_number.upcase.strip
       errors.add(:part, "number does not match selected part")
     end
 
-    if part.uniform_part_issue != part_issue.upcase.gsub(/[^A-Z0-9]/, '')
+    if part.part_issue != part_issue.upcase.strip
       errors.add(:part, "issue does not match selected part")
     end
   end

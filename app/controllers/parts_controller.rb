@@ -3,7 +3,7 @@ class PartsController < ApplicationController
 
   def index
     @parts = Part.includes(:customer, :works_orders)
-                 .order(:uniform_part_number, :uniform_part_issue)
+                 .order(:part_number, :part_issue)
 
     # Filter by customer if provided
     if params[:customer_id].present?
@@ -20,9 +20,9 @@ class PartsController < ApplicationController
 
     # Search by part number or issue
     if params[:search].present?
-      search_term = Part.make_uniform(params[:search])
+      search_term = params[:search].upcase.strip
       @parts = @parts.where(
-        "uniform_part_number ILIKE ? OR uniform_part_issue ILIKE ?",
+        "UPPER(part_number) ILIKE ? OR UPPER(part_issue) ILIKE ?",
         "%#{search_term}%", "%#{search_term}%"
       )
     end
@@ -59,8 +59,7 @@ class PartsController < ApplicationController
 
     @part = Part.new(part_params)
 
-    Rails.logger.info "🔍 Part before save: customer_id=#{@part.customer_id}, part_number=#{@part.uniform_part_number}, part_issue=#{@part.uniform_part_issue}"
-
+    Rails.logger.info "🔍 Part before save: customer_id=#{@part.customer_id}, part_number=#{@part.part_number}, part_issue=#{@part.part_issue}"
     # Set defaults for new parts with processing instructions
     @part.process_type = determine_process_type if @part.process_type.blank?
 
@@ -208,8 +207,8 @@ class PartsController < ApplicationController
     if part_details_changed?
       new_part = Part.ensure(
         customer_id: part_params[:customer_id],
-        part_number: part_params[:uniform_part_number],
-        part_issue: part_params[:uniform_part_issue]
+        part_number: part_params[:part_number],
+        part_issue: part_params[:part_issue]
       )
 
       # Copy over the processing data to new part
@@ -284,14 +283,14 @@ class PartsController < ApplicationController
   def search
     # AJAX endpoint for autocomplete/search functionality
     if params[:q].present?
-      search_term = Part.make_uniform(params[:q])
+      search_term = params[:q].upcase.strip
       @parts = Part.enabled
-                   .includes(:customer)
-                   .where(
-                     "uniform_part_number ILIKE ? OR uniform_part_issue ILIKE ?",
-                     "%#{search_term}%", "%#{search_term}%"
-                   )
-                   .limit(20)
+                  .includes(:customer)
+                  .where(
+                    "UPPER(part_number) ILIKE ? OR UPPER(part_issue) ILIKE ?",
+                    "%#{search_term}%", "%#{search_term}%"
+                  )
+                  .limit(20)
 
       # Filter by customer if provided
       if params[:customer_id].present?
@@ -480,7 +479,7 @@ class PartsController < ApplicationController
 
   def part_params
     params.require(:part).permit(
-      :customer_id, :uniform_part_number, :uniform_part_issue, :enabled,
+      :customer_id, :part_number, :part_issue, :enabled,
       :special_instructions, :material, :specified_thicknesses,
       :process_type, :description,
       specification: [],
@@ -506,8 +505,8 @@ class PartsController < ApplicationController
   def part_details_changed?
     return false unless @part.persisted?
 
-    params[:part][:uniform_part_number] != @part.uniform_part_number ||
-    params[:part][:uniform_part_issue] != @part.uniform_part_issue ||
+    params[:part][:part_number] != @part.part_number ||
+    params[:part][:part_issue] != @part.part_issue ||
     params[:part][:customer_id] != @part.customer_id.to_s
   end
 

@@ -53,12 +53,12 @@
 
       <!-- Part Number -->
       <div>
-        <%= form.label :uniform_part_number, "Part Number", class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.text_field :uniform_part_number,
+        <%= form.label :part_number, "Part Number", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.text_field :part_number,
             placeholder: "Enter part number",
             class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm font-mono",
             required: true %>
-        <p class="mt-1 text-xs text-gray-500">Will be automatically normalized to uppercase alphanumeric</p>
+        <p class="mt-1 text-xs text-gray-500">Will be automatically converted to uppercase</p>
       </div>
 
       <!-- Part Description -->
@@ -72,9 +72,9 @@
 
       <!-- Part Issue -->
       <div>
-        <%= form.label :uniform_part_issue, "Part Issue", class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.text_field :uniform_part_issue,
-            value: part.uniform_part_issue.presence || 'A',
+        <%= form.label :part_issue, "Part Issue", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.text_field :part_issue,
+            value: part.part_issue.presence || 'A',
             placeholder: "A",
             class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm font-mono",
             required: true %>

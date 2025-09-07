@@ -6,10 +6,10 @@ class Part < ApplicationRecord
   has_many :release_notes, through: :works_orders
   has_many :replaced_by, class_name: 'Part', foreign_key: :replaces_id, dependent: :nullify
 
-  validates :uniform_part_number, presence: true
-  validates :uniform_part_issue, presence: true
-  validates :uniform_part_number, uniqueness: {
-    scope: [:customer_id, :uniform_part_issue],
+  validates :part_number, presence: true
+  validates :part_issue, presence: true
+  validates :part_number, uniqueness: {
+    scope: [:customer_id, :part_issue],
     message: "and issue must be unique per customer"
   }
   validate :validate_treatments
@@ -22,38 +22,24 @@ class Part < ApplicationRecord
   after_initialize :set_defaults, if: :new_record?
   after_create :disable_replaced_part
 
-  # Make text uniform (uppercase, alphanumeric only)
-  def self.make_uniform(text)
-    return "" if text.nil?
-    # Remove accents and convert to ASCII
-    text = text.unicode_normalize(:nfd).encode('ASCII', undef: :replace, replace: '').upcase
-    # Keep only alphanumeric characters
-    text.gsub(/[^A-Z0-9]/, '')
-  end
-
-  # Find or create a part
   def self.ensure(customer_id:, part_number:, part_issue:)
-    uniform_number = make_uniform(part_number)
-    uniform_issue = make_uniform(part_issue)
-
     find_or_create_by(
       customer_id: customer_id,
-      uniform_part_number: uniform_number,
-      uniform_part_issue: uniform_issue
+      part_number: part_number.upcase.strip,
+      part_issue: part_issue.upcase.strip
     )
   end
 
-  # Query helper for matching parts
   def self.matching(customer_id: nil, part_number: nil, part_issue: nil)
     scope = all
     scope = scope.where(customer_id: customer_id) if customer_id
-    scope = scope.where(uniform_part_number: make_uniform(part_number)) if part_number
-    scope = scope.where(uniform_part_issue: make_uniform(part_issue)) if part_issue
+    scope = scope.where("UPPER(part_number) = ?", part_number.upcase.strip) if part_number
+    scope = scope.where("UPPER(part_issue) = ?", part_issue.upcase.strip) if part_issue
     scope
   end
 
   def display_name
-    "#{uniform_part_number}-#{uniform_part_issue}"
+    "#{part_number}-#{part_issue}"
   end
 
   def can_be_deleted?
@@ -876,15 +862,15 @@ class Part < ApplicationRecord
     end
   end
 
+  def normalize_part_details
+    self.part_number = part_number&.upcase&.strip
+    self.part_issue = part_issue&.upcase&.strip
+  end
+
   def set_defaults
     self.enabled = true if enabled.nil?
     self.customisation_data = {} if customisation_data.blank?
-    self.uniform_part_issue = 'A' if uniform_part_issue.blank?
-  end
-
-  def normalize_part_details
-    self.uniform_part_number = self.class.make_uniform(uniform_part_number)
-    self.uniform_part_issue = self.class.make_uniform(uniform_part_issue)
+    self.part_issue = 'A' if part_issue.blank?
   end
 
   def disable_replaced_part

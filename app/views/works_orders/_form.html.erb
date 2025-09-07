@@ -274,9 +274,9 @@ window.partsData = {
   <% if defined?(@parts) && @parts %>
     <% @parts.each do |part| %>
       "<%= part.id %>": {
-        "uniform_part_number": "<%= j part.uniform_part_number %>",
-        "uniform_part_issue": "<%= j part.uniform_part_issue %>",
-        "description": "<%= j (part.description || "#{part.uniform_part_number} component") %>"
+        "part_number": "<%= j part.part_number %>",
+        "part_issue": "<%= j part.part_issue %>",
+        "description": "<%= j (part.description || "#{part.part_number} component") %>"
       },
     <% end %>
   <% end %>
@@ -339,9 +339,9 @@ function updatePartDetails(selectElement) {
   if (partId && window.partsData) {
     const part = window.partsData[partId];
     if (part) {
-      partNumberField.value = part.uniform_part_number;
-      partIssueField.value = part.uniform_part_issue;
-      partDescriptionField.value = part.description || `${part.uniform_part_number} component`;
+      partNumberField.value = part.part_number;
+      partIssueField.value = part.part_issue;
+      partDescriptionField.value = part.description || `${part.part_number} component`;
     }
   } else {
     // Clear fields if no part selected
