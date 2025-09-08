@@ -48,8 +48,8 @@ Batch 1: Meter no:___ Foil value 1:___ Measured foil thickness:___ Foil value 2:
 Batch 2: Meter no:___ Foil value 1:___ Measured foil thickness:___ Foil value 2:___ Measured foil thickness:___
 Batch 3: Meter no:___ Foil value 1:___ Measured foil thickness:___ Foil value 2:___ Measured foil thickness:___
 
-**Measured Film Thickness:**
-Min _____ Max _____ Avg _____"
+**Measured Film Thickness (on work):**
+Min:_____ Max:_____ Avg:_____"
     end
   end
 end
