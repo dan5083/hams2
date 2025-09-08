@@ -43,7 +43,7 @@ class InvoiceItem < ApplicationRecord
       "UnitAmount" => unit_price_ex_tax.to_f,
       "TaxType" => invoice.xero_tax_type,
       "LineAmount" => line_amount_ex_tax.to_f,
-      "AccountCode" => "400" # Standard sales/revenue account code
+      "AccountCode" => "200" # Standard sales/revenue account code
     }
   end
 
