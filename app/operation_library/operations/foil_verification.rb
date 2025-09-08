@@ -3,65 +3,53 @@ module OperationLibrary
   class FoilVerification
     def self.operations
       [
-        # Foil verification operation for aerospace/defense applications
         Operation.new(
           id: 'FOIL_VERIFICATION',
           process_type: 'verification',
-          operation_text: build_foil_verification_text
+          operation_text: operation_text
         )
       ]
     end
 
-    # Check if foil verification is required (aerospace/defense + anodising treatments)
-    def self.foil_verification_required?(has_anodising_treatments, aerospace_defense: false)
+    # Check if foil verification is required for a specific treatment (aerospace/defense + anodising)
+    def self.foil_verification_required_for_treatment?(treatment_type, aerospace_defense: false)
       return false unless aerospace_defense
-      has_anodising_treatments
+      anodising_treatments = ['standard_anodising', 'hard_anodising', 'chromic_anodising']
+      anodising_treatments.include?(treatment_type)
     end
 
-    # Get the foil verification operation
-    def self.get_foil_verification_operation
+    # Get a foil verification operation for a specific treatment
+    def self.get_foil_verification_operation_for_treatment(treatment_type, treatment_index = nil)
       Operation.new(
-        id: 'FOIL_VERIFICATION',
+        id: "FOIL_VERIFICATION_#{treatment_type.upcase}#{treatment_index ? "_#{treatment_index}" : ""}",
         process_type: 'verification',
-        operation_text: build_foil_verification_text
+        operation_text: operation_text
       )
     end
 
-    # Insert foil verification at the beginning of the sequence (after contract review)
-    def self.insert_foil_verification_if_required(operations_sequence, has_anodising_treatments: false, aerospace_defense: false)
-      return operations_sequence unless foil_verification_required?(has_anodising_treatments, aerospace_defense: aerospace_defense)
+    # Insert foil verification for a specific treatment at the beginning of that treatment cycle
+    def self.insert_foil_verification_for_treatment(operations_sequence, treatment_type, treatment_index = nil, aerospace_defense: false)
+      return operations_sequence unless foil_verification_required_for_treatment?(treatment_type, aerospace_defense: aerospace_defense)
 
-      # Check if foil verification is already present
-      has_foil_verification = operations_sequence.any? { |op| op.process_type == 'verification' }
-      return operations_sequence if has_foil_verification
+      # Get the treatment-specific foil verification operation
+      foil_verification_op = get_foil_verification_operation_for_treatment(treatment_type, treatment_index)
 
-      # Insert foil verification at the very beginning (after contract review but before any other operations)
-      contract_review_index = operations_sequence.find_index { |op| op.process_type == 'contract_review' }
-
-      if contract_review_index
-        # Insert after contract review
-        operations_sequence.dup.tap do |seq|
-          seq.insert(contract_review_index + 1, get_foil_verification_operation)
-        end
-      else
-        # Insert at the very beginning if no contract review found
-        [get_foil_verification_operation] + operations_sequence
-      end
+      # Insert at the beginning of the operations sequence (this will be called per-treatment)
+      [foil_verification_op] + operations_sequence
     end
 
     private
 
-    # Build the multi-batch foil verification text (matching OCV format exactly)
-    def self.build_foil_verification_text
-      batch_template = "Meter no:_ Foil value 1:___ Measured foil thickness:___ Foil value 2:___ Measured foil thickness:___"
+    # Standard foil verification operation text
+    def self.operation_text
+      "**Elcometer foil verification** (Aerospace/Defense requirement)
 
-      text_lines = []
-      text_lines << "**Elcometer foil verification** (Aerospace/Defense requirement)"
-      (1..3).each do |batch|
-        text_lines << "Batch #{batch}: #{batch_template}"
-      end
+Batch 1: Meter no:___ Foil value 1:___ Measured foil thickness:___ Foil value 2:___ Measured foil thickness:___
+Batch 2: Meter no:___ Foil value 1:___ Measured foil thickness:___ Foil value 2:___ Measured foil thickness:___
+Batch 3: Meter no:___ Foil value 1:___ Measured foil thickness:___ Foil value 2:___ Measured foil thickness:___
 
-      text_lines.join("\n")
+**Measured Film Thickness:**
+Min _____ Max _____ Avg _____"
     end
   end
 end

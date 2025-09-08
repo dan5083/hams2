@@ -218,15 +218,6 @@ class Part < ApplicationRecord
     # Beginning ops (always first)
     safe_add_to_sequence(sequence, OperationLibrary::ContractReviewOperations.get_contract_review_operation, "Contract Review")
 
-    # Foil verification (for aerospace/defense anodising applications, after contract review but before any other operations)
-    if defined?(OperationLibrary::FoilVerification) && (has_anodising || has_strip_only)
-      sequence = OperationLibrary::FoilVerification.insert_foil_verification_if_required(
-        sequence,
-        has_anodising_treatments: has_anodising || has_strip_only,
-        aerospace_defense: aerospace_defense?
-      )
-    end
-
     safe_add_to_sequence(sequence, OperationLibrary::InspectFinalInspectVatInspect.get_incoming_inspection_operation, "Incoming Inspection")
     safe_add_to_sequence(sequence, OperationLibrary::InspectFinalInspectVatInspect.get_vat_inspection_operation, "VAT Inspection")
 
@@ -234,7 +225,7 @@ class Part < ApplicationRecord
     add_enp_pre_heat_treatment_if_selected(sequence) if has_enp
 
     # Treatment cycles (main processing) - each with their own jig
-    treatments.each { |treatment| add_treatment_cycle(sequence, treatment, has_enp) }
+    treatments.each { |treatment| add_treatment_cycle(sequence, treatment, has_enp, aerospace_defense?) }
 
     # Post-treatment operations in correct order
 
@@ -576,7 +567,7 @@ class Part < ApplicationRecord
   end
 
   # Standard treatment cycle with per-treatment jig support and corrected stripping sequence
-  def add_treatment_cycle(sequence, treatment, has_enp)
+  def add_treatment_cycle(sequence, treatment, has_enp, aerospace_defense = false)
     op = treatment[:operation]
     treatment_data = treatment[:treatment_data]
     masking = treatment[:masking]
@@ -644,6 +635,12 @@ class Part < ApplicationRecord
     # 7. Main operation + rinse
     safe_add_to_sequence(sequence, op, "Main Operation")
     safe_add_to_sequence(sequence, get_rinse(op, has_enp, masking), "Rinse after Main Operation")
+
+    # 7.5. Foil verification (for anodising treatments if aerospace/defense)
+    if is_anodising?(op) && aerospace_defense?
+      foil_verification_op = OperationLibrary::FoilVerification.get_foil_verification_operation_for_treatment(op.process_type)
+      safe_add_to_sequence(sequence, foil_verification_op, "Foil Verification")
+    end
 
     # 8. Dye + rinse (for anodising operations only)
     if dye["enabled"] && dye["color"].present? && is_anodising?(op)

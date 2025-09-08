@@ -383,6 +383,7 @@ export default class extends Controller {
     const treatmentName = this.formatTreatmentName(treatment.type)
     const isENP = treatment.type === 'electroless_nickel_plating'
     const isStripOnly = treatment.type === 'stripping_only'
+    const isAnodising = ['standard_anodising', 'hard_anodising', 'chromic_anodising'].includes(treatment.type)
 
     return `
       <div class="border border-gray-200 rounded-lg p-4 bg-gray-50" data-treatment-id="${treatment.id}">
@@ -390,6 +391,12 @@ export default class extends Controller {
           <h4 class="font-medium text-gray-900">${treatmentName} Treatment ${index + 1}</h4>
           <button type="button" class="text-red-600 hover:text-red-800 text-xl font-bold" data-action="click->parts-form#removeTreatment" data-parts-form-treatment-id-param="${treatment.id}">×</button>
         </div>
+
+        ${isAnodising && this.aerospaceDefense ? `
+        <div class="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+          <strong>Aerospace/Defense:</strong> Foil verification will be included for this anodising treatment
+        </div>
+        ` : ''}
 
         <!-- Jig Selection (Per-treatment) -->
         <div class="mb-4">
@@ -1185,7 +1192,7 @@ displayOperationsInCard(operations, container, treatmentId) {
     this.treatmentsFieldTarget.value = JSON.stringify(this.treatments)
   }
 
-  // Update preview (unlocked mode only)
+    // Update preview (unlocked mode only)
   async updatePreview() {
     if (this.isLockedMode || !this.hasSelectedContainerTarget) return
 
@@ -1290,7 +1297,7 @@ displayOperationsInCard(operations, container, treatmentId) {
       this.selectedContainerTarget.innerHTML = operations.map((op, index) => {
         const isAutoInserted = op.auto_inserted
         const isWaterBreakTest = op.id === 'WATER_BREAK_TEST'
-        const isFoilVerification = op.id === 'FOIL_VERIFICATION'
+        const isFoilVerification = op.id && (op.id === 'FOIL_VERIFICATION' || op.id.startsWith('FOIL_VERIFICATION_'))
         const isOcvCheck = op.id === 'OCV_CHECK'
         const isDye = op.id && (op.id.includes('_DYE') || op.display_name?.includes('Dye'))
         const isPreHeatTreatment = op.id && op.id.startsWith('PRE_ENP_HEAT_TREAT')
@@ -1317,7 +1324,7 @@ displayOperationsInCard(operations, container, treatmentId) {
         if (isFoilVerification) {
           bgColor = 'bg-yellow-50 border border-yellow-200'
           textColor = 'text-yellow-800'
-          autoLabel = '<span class="text-xs text-yellow-600 ml-2">(aerospace/defense verification)</span>'
+          autoLabel = '<span class="text-xs text-yellow-600 ml-2">(per-treatment verification)</span>'
         }
 
         if (isOcvCheck) {
