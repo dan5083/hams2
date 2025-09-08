@@ -1,5 +1,5 @@
 class CustomerOrdersController < ApplicationController
-  before_action :set_customer_order, only: [:show, :edit, :update, :destroy, :void]
+  before_action :set_customer_order, only: [:show, :edit, :update, :destroy, :void, :create_invoice]
 
   def index
     @customer_orders = CustomerOrder.includes(:customer, :works_orders)
@@ -147,19 +147,20 @@ end
     end
   end
 
-  private
+private
 
   def set_customer_order
     @customer_order = CustomerOrder.find(params[:id])
   end
 
   def add_additional_charges_to_invoice(invoice, charge_ids, custom_amounts)
-  charge_ids.reject(&:blank?).each do |charge_id|
-    charge = AdditionalChargePreset.find(charge_id)
-    custom_amount = custom_amounts[charge_id]
+    charge_ids.reject(&:blank?).each do |charge_id|
+      charge = AdditionalChargePreset.find(charge_id)
+      custom_amount = custom_amounts[charge_id]
 
-    InvoiceItem.create_from_additional_charge(charge, invoice, custom_amount)
-  end
+      InvoiceItem.create_from_additional_charge(charge, invoice, custom_amount)
+    end
+  end  # <-- This end was missing
 
   def customer_order_params
     params.require(:customer_order).permit(
@@ -168,4 +169,3 @@ end
       :date_received
     )
   end
-end
