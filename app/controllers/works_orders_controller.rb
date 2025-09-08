@@ -137,7 +137,7 @@ class WorksOrdersController < ApplicationController
     end
   end
 
- def create_invoice
+  def create_invoice
     # Check if any quantity has been released across the entire customer order
     customer_order = @works_order.customer_order
     total_released = customer_order.works_orders.active.sum(:quantity_released)
@@ -178,18 +178,8 @@ class WorksOrdersController < ApplicationController
       # Recalculate totals after adding all charges
       invoice.calculate_totals!
 
-      # Build summary message showing what was invoiced
-      works_order_count = uninvoiced_release_notes.joins(:works_order).select('works_orders.id').distinct.count
-      release_note_count = uninvoiced_release_notes.count
-
-      summary = if works_order_count > 1
-                  "Invoice created for entire customer order #{customer_order.number} (#{works_order_count} works orders, #{release_note_count} release notes)"
-                else
-                  "Invoice created for works order #{@works_order.display_name} (#{release_note_count} release notes)"
-                end
-
       redirect_to @works_order,
-                  notice: "✅ Invoice INV#{invoice.number} staged successfully! #{summary}. Go to dashboard to push to Xero."
+                  notice: "Invoice INV#{invoice.number} staged successfully! Go to dashboard to push to Xero."
 
     rescue StandardError => e
       Rails.logger.error "Failed to create invoice: #{e.message}"
