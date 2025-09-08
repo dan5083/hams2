@@ -44,6 +44,7 @@ Rails.application.routes.draw do
   resources :customer_orders do
     member do
       patch :void
+      patch :create_invoice
     end
 
     # 3. Works Orders nested under customer orders for creation flow

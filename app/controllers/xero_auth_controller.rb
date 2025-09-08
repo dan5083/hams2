@@ -63,11 +63,11 @@ class XeroAuthController < ApplicationController
 
         Rails.logger.info "Processing organization: #{tenant_name}"
 
-        # Skip Demo Company - we only want real business contacts
-        if tenant_name.downcase.include?('demo company')
-          Rails.logger.info "Skipping Demo Company: #{tenant_name}"
-          next
-        end
+        # # Skip Demo Company - we only want real business contacts
+        # if tenant_name.downcase.include?('demo company')
+        #   Rails.logger.info "Skipping Demo Company: #{tenant_name}"
+        #   next
+        # end
 
         # Store the main organization (prioritize Hard Anodising)
         if tenant_name.downcase.include?('hard anodising') || session[:xero_tenant_id].nil?

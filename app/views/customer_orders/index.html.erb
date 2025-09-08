@@ -65,6 +65,9 @@
             Total Value
           </th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Invoice Status
+          </th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
             Status
           </th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -74,6 +77,15 @@
       </thead>
       <tbody class="bg-white divide-y divide-gray-200">
         <% @customer_orders.each do |customer_order| %>
+          <%
+            # Calculate invoicing status for this customer order
+            uninvoiced_release_notes = ReleaseNote.joins(:works_order)
+                                                 .where(works_orders: { customer_order_id: customer_order.id })
+                                                 .requires_invoicing
+
+            uninvoiced_count = uninvoiced_release_notes.sum(:quantity_accepted)
+            has_uninvoiced = uninvoiced_count > 0
+          %>
           <tr class="hover:bg-gray-50">
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
               <%= link_to customer_order.number, customer_order, class: "text-blue-600 hover:text-blue-900" %>
@@ -92,6 +104,21 @@
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
               £<%= sprintf("%.2f", customer_order.total_value) %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <% if has_uninvoiced %>
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+                  <%= uninvoiced_count %> parts ready
+                </span>
+              <% elsif customer_order.works_orders.active.sum(:quantity_released) > 0 %>
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                  Fully invoiced
+                </span>
+              <% else %>
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                  No releases yet
+                </span>
+              <% end %>
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
               <% if customer_order.voided %>
@@ -114,6 +141,14 @@
                 <% unless customer_order.voided %>
                   <%= link_to "Edit", edit_customer_order_path(customer_order), class: "text-yellow-600 hover:text-yellow-900" %>
                   <%= link_to "Add WO", new_customer_order_works_order_path(customer_order), class: "text-green-600 hover:text-green-900" %>
+
+                  <% if has_uninvoiced %>
+                    <%= button_to "Create Invoice", create_invoice_customer_order_path(customer_order),
+                        method: :patch,
+                        class: "text-orange-600 hover:text-orange-900 bg-transparent border-0 underline cursor-pointer text-sm",
+                        data: { confirm: "Create invoice for customer order #{customer_order.number} (#{uninvoiced_count} parts)?" } %>
+                  <% end %>
+
                   <% if customer_order.can_be_voided? %>
                     <%= link_to "Void", void_customer_order_path(customer_order),
                         method: :patch,

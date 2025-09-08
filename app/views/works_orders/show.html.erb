@@ -7,13 +7,33 @@
       <%= link_to "Route Card", route_card_works_order_path(@works_order),
           class: "bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded",
           target: "_blank" %>
-      <% if @works_order.quantity_released > 0 && @works_order.release_notes.requires_invoicing.any? %>
-        <%= button_to "Stage Invoice", create_invoice_works_order_path(@works_order),
-            method: :patch,
-            class: "bg-orange-500 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded",
-            data: { confirm: "Create local invoice for all uninvoiced release notes?" } %>
+
+      <%
+        # Check for uninvoiced release notes across the entire customer order
+        customer_order_uninvoiced = ReleaseNote.joins(:works_order)
+                                              .where(works_orders: { customer_order_id: @works_order.customer_order_id })
+                                              .requires_invoicing
+
+        uninvoiced_works_orders = @works_order.customer_order.works_orders
+                                            .joins(:release_notes)
+                                            .merge(ReleaseNote.requires_invoicing)
+                                            .distinct.count
+      %>
+
+      <% if customer_order_uninvoiced.any? %>
+        <% if uninvoiced_works_orders > 1 %>
+          <%= button_to "Invoice Customer Order", create_invoice_works_order_path(@works_order),
+              method: :patch,
+              class: "bg-orange-500 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded",
+              data: { confirm: "This will create one invoice for the entire customer order #{@works_order.customer_order.number} (#{uninvoiced_works_orders} works orders with uninvoiced items). Continue?" } %>
+        <% else %>
+          <%= button_to "Stage Invoice", create_invoice_works_order_path(@works_order),
+              method: :patch,
+              class: "bg-orange-500 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded",
+              data: { confirm: "Create invoice for this works order?" } %>
+        <% end %>
       <% end %>
-      <!-- REMOVED: Complete button - works orders now auto-complete when all parts are released -->
+
       <%= link_to "Back to Works Orders", works_orders_path,
           class: "bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" %>
     </div>
@@ -32,7 +52,10 @@
 
         <div>
           <dt class="text-sm font-medium text-gray-500">Customer Order</dt>
-          <dd class="text-sm text-gray-900"><%= @works_order.customer_order.number %></dd>
+          <dd class="text-sm text-gray-900">
+            <%= link_to @works_order.customer_order.number, @works_order.customer_order,
+                class: "text-blue-600 hover:text-blue-900" %>
+          </dd>
         </div>
 
         <div>
@@ -118,7 +141,6 @@
           </dd>
         </div>
 
-        <!-- NEW: Manufacturing Status Indicator -->
         <div>
           <dt class="text-sm font-medium text-gray-500">Manufacturing Status</dt>
           <dd class="text-sm">
@@ -150,44 +172,77 @@
       </dl>
     </div>
 
-    <!-- Invoicing Status -->
+    <!-- Customer Order Invoicing Status -->
     <div class="bg-white shadow rounded-lg p-6">
-      <h2 class="text-xl font-semibold text-gray-900 mb-4">Invoicing Status</h2>
+      <h2 class="text-xl font-semibold text-gray-900 mb-4">Customer Order Invoicing</h2>
 
       <dl class="space-y-3">
-        <% uninvoiced_release_notes = @works_order.release_notes.requires_invoicing %>
-        <% invoiced_release_notes = @works_order.release_notes.joins(:invoice_item) %>
+        <%
+          # Get invoicing status across the entire customer order
+          all_customer_order_release_notes = ReleaseNote.joins(:works_order)
+                                                        .where(works_orders: { customer_order_id: @works_order.customer_order_id })
+
+          uninvoiced_across_order = all_customer_order_release_notes.requires_invoicing
+          invoiced_across_order = all_customer_order_release_notes.joins(:invoice_item)
+
+          # Count works orders with uninvoiced items
+          uninvoiced_wo_count = @works_order.customer_order.works_orders
+                                          .joins(:release_notes)
+                                          .merge(ReleaseNote.requires_invoicing)
+                                          .distinct.count
+        %>
 
         <div>
-          <dt class="text-sm font-medium text-gray-500">Uninvoiced Release Notes</dt>
-          <dd class="text-sm text-gray-900 font-semibold <%= uninvoiced_release_notes.any? ? 'text-orange-600' : 'text-green-600' %>">
-            <%= uninvoiced_release_notes.count %>
-            <% if uninvoiced_release_notes.any? %>
-              (<%= uninvoiced_release_notes.sum(:quantity_accepted) %> parts)
+          <dt class="text-sm font-medium text-gray-500">Customer Order</dt>
+          <dd class="text-sm text-gray-900">
+            <%= link_to @works_order.customer_order.number, @works_order.customer_order,
+                class: "text-blue-600 hover:text-blue-900" %>
+          </dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Works Orders with Uninvoiced Items</dt>
+          <dd class="text-sm text-gray-900 font-semibold <%= uninvoiced_wo_count > 0 ? 'text-orange-600' : 'text-green-600' %>">
+            <%= uninvoiced_wo_count %> of <%= @works_order.customer_order.works_orders.active.count %>
+          </dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Total Uninvoiced Parts</dt>
+          <dd class="text-sm text-gray-900 font-semibold <%= uninvoiced_across_order.any? ? 'text-orange-600' : 'text-green-600' %>">
+            <%= uninvoiced_across_order.sum(:quantity_accepted) %> parts
+            <% if uninvoiced_across_order.any? %>
+              (<%= uninvoiced_across_order.count %> release notes)
             <% end %>
           </dd>
         </div>
 
         <div>
-          <dt class="text-sm font-medium text-gray-500">Invoiced Release Notes</dt>
+          <dt class="text-sm font-medium text-gray-500">Total Invoiced Parts</dt>
           <dd class="text-sm text-gray-900 font-semibold text-blue-600">
-            <%= invoiced_release_notes.count %>
-            <% if invoiced_release_notes.any? %>
-              (<%= invoiced_release_notes.sum(:quantity_accepted) %> parts)
+            <%= invoiced_across_order.sum(:quantity_accepted) %> parts
+            <% if invoiced_across_order.any? %>
+              (<%= invoiced_across_order.count %> release notes)
             <% end %>
           </dd>
         </div>
 
-        <% if uninvoiced_release_notes.any? %>
+        <% if uninvoiced_across_order.any? %>
           <div class="pt-2">
-            <span class="text-sm text-orange-600 font-medium">
-              ⚠️ Ready to stage <%= uninvoiced_release_notes.sum(:quantity_accepted) %> parts for invoicing
-            </span>
+            <% if uninvoiced_wo_count > 1 %>
+              <span class="text-sm text-orange-600 font-medium">
+                ⚠️ Ready to invoice entire customer order (<%= uninvoiced_wo_count %> works orders)
+              </span>
+            <% else %>
+              <span class="text-sm text-orange-600 font-medium">
+                ⚠️ Ready to invoice <%= uninvoiced_across_order.sum(:quantity_accepted) %> parts
+              </span>
+            <% end %>
           </div>
-        <% elsif @works_order.quantity_released > 0 %>
+        <% elsif @works_order.customer_order.works_orders.active.sum(:quantity_released) > 0 %>
           <div class="pt-2">
             <span class="text-sm text-green-600 font-medium">
-              ✅ All released parts have been invoiced
+              ✅ Customer order fully invoiced
             </span>
           </div>
         <% end %>
@@ -206,7 +261,7 @@
   <!-- Release Notes -->
   <div class="bg-white shadow rounded-lg p-6 mt-6">
     <div class="flex justify-between items-center mb-4">
-      <h2 class="text-xl font-semibold text-gray-900">Release Notes</h2>
+      <h2 class="text-xl font-semibold text-gray-900">Release Notes (This Works Order)</h2>
       <%= link_to "New Release Note", new_works_order_release_note_path(@works_order),
           class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm" %>
     </div>

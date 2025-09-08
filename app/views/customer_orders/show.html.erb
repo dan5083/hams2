@@ -19,6 +19,71 @@
     </div>
   </div>
 
+  <%
+    # Calculate invoicing status for this customer order
+    uninvoiced_release_notes = ReleaseNote.joins(:works_order)
+                                         .where(works_orders: { customer_order_id: @customer_order.id })
+                                         .requires_invoicing
+
+    invoiced_release_notes = ReleaseNote.joins(:works_order)
+                                       .where(works_orders: { customer_order_id: @customer_order.id })
+                                       .joins(:invoice_item)
+
+    uninvoiced_count = uninvoiced_release_notes.sum(:quantity_accepted)
+    invoiced_count = invoiced_release_notes.sum(:quantity_accepted)
+    total_released = @customer_order.works_orders.active.sum(:quantity_released)
+
+    uninvoiced_works_orders = @customer_order.works_orders
+                                            .joins(:release_notes)
+                                            .merge(ReleaseNote.requires_invoicing)
+                                            .distinct.count
+  %>
+
+  <!-- Invoicing Status Card (Prominent) -->
+  <% if total_released > 0 %>
+    <div class="bg-white border-l-4 <%= uninvoiced_count > 0 ? 'border-orange-400 bg-orange-50' : 'border-green-400 bg-green-50' %> p-6 mb-6 rounded-lg shadow">
+      <div class="flex justify-between items-start">
+        <div>
+          <h2 class="text-xl font-semibold <%= uninvoiced_count > 0 ? 'text-orange-800' : 'text-green-800' %> mb-2">
+            Invoicing Status
+          </h2>
+
+          <% if uninvoiced_count > 0 %>
+            <p class="text-orange-700 mb-3">
+              <span class="font-bold"><%= uninvoiced_count %> parts</span> across
+              <span class="font-bold"><%= uninvoiced_works_orders %> works order<%= uninvoiced_works_orders == 1 ? '' : 's' %></span>
+              are ready to be invoiced.
+            </p>
+
+            <div class="text-sm text-orange-600 space-y-1">
+              <div>• Uninvoiced release notes: <%= uninvoiced_release_notes.count %></div>
+              <% if invoiced_count > 0 %>
+                <div>• Previously invoiced: <%= invoiced_count %> parts</div>
+              <% end %>
+            </div>
+          <% else %>
+            <p class="text-green-700 mb-3">
+              All <span class="font-bold"><%= total_released %> released parts</span> have been invoiced.
+            </p>
+
+            <div class="text-sm text-green-600">
+              • Total invoiced release notes: <%= invoiced_release_notes.count %>
+            </div>
+          <% end %>
+        </div>
+
+        <% if uninvoiced_count > 0 && !@customer_order.voided %>
+          <div class="ml-4">
+            <%= button_to "Create Invoice", create_invoice_customer_order_path(@customer_order),
+                method: :patch,
+                class: "bg-orange-500 hover:bg-orange-700 text-white font-bold py-3 px-6 rounded-lg text-lg",
+                data: { confirm: "Create invoice for customer order #{@customer_order.number}?\n\nThis will invoice:\n• #{uninvoiced_count} parts\n• #{uninvoiced_release_notes.count} release notes\n• #{uninvoiced_works_orders} works order#{ uninvoiced_works_orders == 1 ? '' : 's'}" } %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
     <!-- Order Details -->
     <div class="bg-white shadow rounded-lg p-6">
@@ -89,6 +154,13 @@
         </div>
 
         <div>
+          <dt class="text-sm font-medium text-gray-500">Total Released</dt>
+          <dd class="text-sm text-gray-900 font-semibold <%= total_released > 0 ? 'text-green-600' : 'text-gray-500' %>">
+            <%= total_released %>
+          </dd>
+        </div>
+
+        <div>
           <dt class="text-sm font-medium text-gray-500">Total Value</dt>
           <dd class="text-sm text-gray-900 font-semibold text-lg">£<%= sprintf("%.2f", @customer_order.total_value) %></dd>
         </div>
@@ -124,6 +196,9 @@
                 Progress
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Invoice Status
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Status
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -133,6 +208,10 @@
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
             <% @works_orders.each do |works_order| %>
+              <%
+                wo_uninvoiced = works_order.release_notes.requires_invoicing.sum(:quantity_accepted)
+                wo_invoiced = works_order.release_notes.joins(:invoice_item).sum(:quantity_accepted)
+              %>
               <tr class="hover:bg-gray-50">
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                   <%= link_to "WO#{works_order.number}", works_order, class: "text-blue-600 hover:text-blue-900" %>
@@ -157,6 +236,21 @@
                     <span class="text-gray-500">Not started</span>
                   <% end %>
                 </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                  <% if wo_uninvoiced > 0 %>
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+                      <%= wo_uninvoiced %> ready
+                    </span>
+                  <% elsif wo_invoiced > 0 %>
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                      <%= wo_invoiced %> invoiced
+                    </span>
+                  <% else %>
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                      None yet
+                    </span>
+                  <% end %>
+                </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                   <% if works_order.voided %>
                     <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
@@ -179,7 +273,6 @@
                       <%= link_to "Edit", edit_works_order_path(works_order), class: "text-yellow-600 hover:text-yellow-900" %>
                       <%= link_to "Route Card", route_card_works_order_path(works_order),
                           class: "text-green-600 hover:text-green-900", target: "_blank" %>
-                      <!-- REMOVED: Complete button - works orders now auto-complete -->
                     <% end %>
                   </div>
                 </td>
