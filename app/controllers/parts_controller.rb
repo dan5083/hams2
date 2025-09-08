@@ -191,11 +191,26 @@ class PartsController < ApplicationController
       end
     end
 
-    # Handle locked operations update differently
-    if @part.locked_for_editing? && params[:locked_operations].present?
+  if @part.locked_for_editing? && params[:locked_operations].present?
+      # ADD DEBUGGING HERE - temporarily add these lines:
+      Rails.logger.info "🔍 DEBUGGING LOCKED OPERATIONS UPDATE"
+      Rails.logger.info "Part: #{@part.part_number}-#{@part.part_issue}"
+      Rails.logger.info "Locked operations params received: #{params[:locked_operations].inspect}"
+      Rails.logger.info "Number of operations to update: #{params[:locked_operations].keys.length}"
+
+      # Check if the MASKING operation is in the params
+      masking_text = params[:locked_operations]['MASKING']
+      Rails.logger.info "MASKING operation text from form: #{masking_text.inspect}"
+
+      # Check current state before update
+      current_masking = @part.locked_operations.find { |op| op['id'] == 'MASKING' }
+      Rails.logger.info "Current MASKING text in DB: #{current_masking&.dig('operation_text').inspect}"
+
       if update_locked_operations_text
+        Rails.logger.info "✅ update_locked_operations_text returned true"
         redirect_to @part, notice: 'Operations were successfully updated.'
       else
+        Rails.logger.error "❌ update_locked_operations_text returned false"
         @customers = [@part.customer]
         @specification_presets = SpecificationPreset.enabled.ordered
         render :edit, status: :unprocessable_entity
@@ -537,18 +552,28 @@ class PartsController < ApplicationController
     return false unless @part.locked_for_editing?
 
     locked_operations_params = params[:locked_operations] || {}
+    Rails.logger.info "🔧 Processing #{locked_operations_params.keys.length} locked operations"
+
     success = true
 
     locked_operations_params.each do |operation_id, operation_text|
-      unless @part.update_locked_operation!(operation_id, operation_text)
+      Rails.logger.info "Updating operation #{operation_id}: #{operation_text.inspect}"
+
+      result = @part.update_locked_operation!(operation_id, operation_text)
+      Rails.logger.info "Update result for #{operation_id}: #{result}"
+
+      unless result
         success = false
         Rails.logger.error "Failed to update operation #{operation_id} with text: #{operation_text}"
       end
     end
 
     if success
+      Rails.logger.info "✅ All operations updated successfully"
       # Don't overwrite the user-selected specification preset
       # The specification should remain what the user selected from the dropdown
+    else
+      Rails.logger.error "❌ Some operations failed to update"
     end
 
     success
