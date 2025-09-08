@@ -50,21 +50,46 @@ class XeroAuthController < ApplicationController
         return
       end
 
-      connection = connections.first
-      tenant_id = connection['tenantId']
-      tenant_name = connection['tenantName']
-
-      # Store in session (cache doesn't work reliably on Heroku)
+      # Store the token set first
       session[:xero_token_set] = token_set
-      session[:xero_tenant_id] = tenant_id
-      session[:xero_tenant_name] = tenant_name
 
-      Rails.logger.info "✅ Connected to #{tenant_name}, syncing contacts..."
+      total_contacts = 0
+      org_names = []
 
-      # Sync all contacts immediately
-      contact_count = sync_contacts_from_xero(token_set, tenant_id)
+      # Process ALL connections, prioritizing Hard Anodising Surface Treatments
+      connections.each do |connection|
+        tenant_id = connection['tenantId']
+        tenant_name = connection['tenantName']
 
-      redirect_to root_path, notice: "✅ Connected to #{tenant_name} and synced #{contact_count} contacts!"
+        Rails.logger.info "Processing organization: #{tenant_name}"
+
+        # Skip Demo Company - we only want real business contacts
+        if tenant_name.downcase.include?('demo company')
+          Rails.logger.info "Skipping Demo Company: #{tenant_name}"
+          next
+        end
+
+        # Store the main organization (prioritize Hard Anodising)
+        if tenant_name.downcase.include?('hard anodising') || session[:xero_tenant_id].nil?
+          session[:xero_tenant_id] = tenant_id
+          session[:xero_tenant_name] = tenant_name
+          Rails.logger.info "Set primary organization: #{tenant_name}"
+        end
+
+        org_names << tenant_name
+
+        # Sync contacts from this organization
+        contact_count = sync_contacts_from_xero(token_set, tenant_id)
+        total_contacts += contact_count
+
+        Rails.logger.info "✅ Synced #{contact_count} contacts from #{tenant_name}"
+      end
+
+      if total_contacts > 0
+        redirect_to root_path, notice: "✅ Connected to #{org_names.join(', ')} and synced #{total_contacts} total contacts!"
+      else
+        redirect_to root_path, alert: "Connected but no contacts were synced"
+      end
 
     rescue => e
       Rails.logger.error "Xero OAuth error: #{e.message}"
