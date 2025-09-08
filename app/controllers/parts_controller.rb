@@ -552,28 +552,30 @@ class PartsController < ApplicationController
     return false unless @part.locked_for_editing?
 
     locked_operations_params = params[:locked_operations] || {}
-    Rails.logger.info "🔧 Processing #{locked_operations_params.keys.length} locked operations"
-
     success = true
+
+    # Get all locked operations to map operation_id to position
+    all_ops = @part.locked_operations
 
     locked_operations_params.each do |operation_id, operation_text|
       Rails.logger.info "Updating operation #{operation_id}: #{operation_text.inspect}"
 
-      result = @part.update_locked_operation!(operation_id, operation_text)
-      Rails.logger.info "Update result for #{operation_id}: #{result}"
+      # Find the operation position
+      operation = all_ops.find { |op| op['id'] == operation_id }
 
-      unless result
+      if operation
+        position = operation['position']
+        result = @part.update_locked_operation!(position, operation_text)
+        Rails.logger.info "Update result for position #{position} (#{operation_id}): #{result}"
+
+        unless result
+          success = false
+          Rails.logger.error "Failed to update operation at position #{position} (#{operation_id})"
+        end
+      else
         success = false
-        Rails.logger.error "Failed to update operation #{operation_id} with text: #{operation_text}"
+        Rails.logger.error "Operation not found: #{operation_id}"
       end
-    end
-
-    if success
-      Rails.logger.info "✅ All operations updated successfully"
-      # Don't overwrite the user-selected specification preset
-      # The specification should remain what the user selected from the dropdown
-    else
-      Rails.logger.error "❌ Some operations failed to update"
     end
 
     success

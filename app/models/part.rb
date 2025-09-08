@@ -145,17 +145,19 @@ class Part < ApplicationRecord
     save!
   end
 
-  def update_locked_operation!(operation_id, new_text)
+  def update_locked_operation!(position, new_text)
     return false unless locked_for_editing?
 
-    operations_data = customisation_data.dig("operation_selection", "locked_operations") || []
-    operation = operations_data.find { |op| op["id"] == operation_id }
+    locked_ops = customisation_data.dig('operation_selection', 'locked_operations') || []
+    operation = locked_ops.find { |op| op['position'] == position }
 
     if operation
-      operation["operation_text"] = new_text
+      operation['operation_text'] = new_text
       self.customisation_data = customisation_data.dup
       save!
+      true
     else
+      Rails.logger.error "No operation found at position #{position}"
       false
     end
   end
