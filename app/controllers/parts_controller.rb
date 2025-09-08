@@ -554,44 +554,11 @@ class PartsController < ApplicationController
     locked_operations_params = params[:locked_operations] || {}
     success = true
 
-    Rails.logger.info "=== POSITION-BASED OPERATIONS UPDATE ==="
-    Rails.logger.info "Part: #{@part.part_number}-#{@part.part_issue}"
-    Rails.logger.info "Form submitted #{locked_operations_params.keys.length} operations"
-
-    # Log all operations being submitted
     locked_operations_params.each do |position, operation_text|
-      Rails.logger.info "Position #{position}: #{operation_text[0..100]}..." # Truncate long text for readability
-    end
-
-    # Process each operation by position
-    locked_operations_params.each do |position, operation_text|
-      position_int = position.to_i
-      Rails.logger.info "Updating operation at position #{position_int}"
-
-      # Find the operation at this position for context
-      all_ops = @part.locked_operations
-      operation = all_ops.find { |op| op['position'] == position_int }
-
-      if operation
-        Rails.logger.info "Found operation: #{operation['id']} - #{operation['display_name']}"
-      else
-        Rails.logger.warn "No operation found at position #{position_int}"
-      end
-
-      # Update using position-based method
-      result = @part.update_locked_operation!(position_int, operation_text)
-      Rails.logger.info "Update result for position #{position_int}: #{result}"
-
+      result = @part.update_locked_operation!(position.to_i, operation_text)
       unless result
         success = false
-        Rails.logger.error "Failed to update operation at position #{position_int}"
       end
-    end
-
-    if success
-      Rails.logger.info "All operations updated successfully"
-    else
-      Rails.logger.error "Some operations failed to update"
     end
 
     success
@@ -604,7 +571,6 @@ class PartsController < ApplicationController
 
     JSON.parse(param)
   rescue JSON::ParserError => e
-    Rails.logger.error "JSON Parse Error: #{e.message} for param: #{param}"
     []
   end
 
@@ -615,7 +581,6 @@ class PartsController < ApplicationController
 
     JSON.parse(param)
   rescue JSON::ParserError => e
-    Rails.logger.error "Treatments JSON Parse Error: #{e.message} for param: #{param}"
     []
   end
 end
