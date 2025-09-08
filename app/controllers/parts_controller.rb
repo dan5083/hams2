@@ -554,28 +554,44 @@ class PartsController < ApplicationController
     locked_operations_params = params[:locked_operations] || {}
     success = true
 
-    # Get all locked operations to map operation_id to position
-    all_ops = @part.locked_operations
+    Rails.logger.info "=== POSITION-BASED OPERATIONS UPDATE ==="
+    Rails.logger.info "Part: #{@part.part_number}-#{@part.part_issue}"
+    Rails.logger.info "Form submitted #{locked_operations_params.keys.length} operations"
 
-    locked_operations_params.each do |operation_id, operation_text|
-      Rails.logger.info "Updating operation #{operation_id}: #{operation_text.inspect}"
+    # Log all operations being submitted
+    locked_operations_params.each do |position, operation_text|
+      Rails.logger.info "Position #{position}: #{operation_text[0..100]}..." # Truncate long text for readability
+    end
 
-      # Find the operation position
-      operation = all_ops.find { |op| op['id'] == operation_id }
+    # Process each operation by position
+    locked_operations_params.each do |position, operation_text|
+      position_int = position.to_i
+      Rails.logger.info "Updating operation at position #{position_int}"
+
+      # Find the operation at this position for context
+      all_ops = @part.locked_operations
+      operation = all_ops.find { |op| op['position'] == position_int }
 
       if operation
-        position = operation['position']
-        result = @part.update_locked_operation!(position, operation_text)
-        Rails.logger.info "Update result for position #{position} (#{operation_id}): #{result}"
-
-        unless result
-          success = false
-          Rails.logger.error "Failed to update operation at position #{position} (#{operation_id})"
-        end
+        Rails.logger.info "Found operation: #{operation['id']} - #{operation['display_name']}"
       else
-        success = false
-        Rails.logger.error "Operation not found: #{operation_id}"
+        Rails.logger.warn "No operation found at position #{position_int}"
       end
+
+      # Update using position-based method
+      result = @part.update_locked_operation!(position_int, operation_text)
+      Rails.logger.info "Update result for position #{position_int}: #{result}"
+
+      unless result
+        success = false
+        Rails.logger.error "Failed to update operation at position #{position_int}"
+      end
+    end
+
+    if success
+      Rails.logger.info "All operations updated successfully"
+    else
+      Rails.logger.error "Some operations failed to update"
     end
 
     success
