@@ -6,7 +6,7 @@
     <style>
       body {
         counter-reset: page 1;
-        font-size: 10pt;
+        font-size: 12pt;
         font-family: Arial, sans-serif;
         padding: 0;
         margin: 0;
@@ -14,11 +14,12 @@
         --standard-border-color: #000;
         --standard-border-style: solid;
         --standard-padding: 0.25rem;
+        position: relative;
       }
 
       @page {
         size: A4 portrait;
-        margin: 1cm 0.5cm 0.5cm;
+        margin: 1.5cm 1cm 1cm;
         counter-increment: page;
       }
 
@@ -41,10 +42,28 @@
         color: #666;
       }
 
+      /* Aerospace/Defence Certification Overlay */
+      .aerospace-certification-overlay {
+        position: absolute;
+        top: 0.5cm;
+        left: 0.5cm;
+        width: 2.7in;
+        height: 2.1in;
+        background-image: url('/assets/aerospace-defence-certification.png');
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+        transform: rotate(-15deg);
+        transform-origin: top left;
+        z-index: 10;
+        pointer-events: none;
+      }
+
       header {
         display: block;
         width: 100%;
         margin-bottom: 1rem;
+        position: relative;
       }
 
       .header-details {
@@ -165,10 +184,19 @@
           -webkit-print-color-adjust: exact;
           color-adjust: exact;
         }
+
+        .aerospace-certification-overlay {
+          background-image: url('<%= asset_path("aerospace-defence-certification.png") %>');
+        }
       }
     </style>
   </head>
   <body>
+    <!-- Aerospace/Defence Certification Overlay -->
+    <% if @works_order&.aerospace_defense? %>
+      <div class="aerospace-certification-overlay"></div>
+    <% end %>
+
     <% if @works_order %>
       <%= render 'route_card_header', works_order: @works_order %>
     <% end %>
