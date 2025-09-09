@@ -191,20 +191,12 @@ class PartsController < ApplicationController
       end
     end
 
-  if @part.locked_for_editing? && params[:locked_operations].present?
-      # ADD DEBUGGING HERE - temporarily add these lines:
+    # Handle locked operations updates
+    if @part.locked_for_editing? && params[:locked_operations].present?
       Rails.logger.info "🔍 DEBUGGING LOCKED OPERATIONS UPDATE"
       Rails.logger.info "Part: #{@part.part_number}-#{@part.part_issue}"
       Rails.logger.info "Locked operations params received: #{params[:locked_operations].inspect}"
       Rails.logger.info "Number of operations to update: #{params[:locked_operations].keys.length}"
-
-      # Check if the MASKING operation is in the params
-      masking_text = params[:locked_operations]['MASKING']
-      Rails.logger.info "MASKING operation text from form: #{masking_text.inspect}"
-
-      # Check current state before update
-      current_masking = @part.locked_operations.find { |op| op['id'] == 'MASKING' }
-      Rails.logger.info "Current MASKING text in DB: #{current_masking&.dig('operation_text').inspect}"
 
       if update_locked_operations_text
         Rails.logger.info "✅ update_locked_operations_text returned true"
@@ -218,30 +210,7 @@ class PartsController < ApplicationController
       return
     end
 
-    # For parts, changing customer/part_number/issue creates a new part
-    if part_details_changed?
-      new_part = Part.ensure(
-        customer_id: part_params[:customer_id],
-        part_number: part_params[:part_number],
-        part_issue: part_params[:part_issue]
-      )
-
-      # Copy over the processing data to new part
-      if new_part != @part
-        new_part.update!(
-          specification: part_params[:specification],
-          special_instructions: part_params[:special_instructions],
-          material: part_params[:material],
-          specified_thicknesses: part_params[:specified_thicknesses],
-          process_type: part_params[:process_type],
-          customisation_data: part_params[:customisation_data] || {},
-          enabled: part_params[:enabled]
-        )
-        redirect_to new_part, notice: 'Part details updated - redirected to the correct part record.'
-        return
-      end
-    end
-
+    # Standard update - just update the part directly
     if @part.update(part_params)
       redirect_to @part, notice: 'Part was successfully updated.'
     else
@@ -515,14 +484,6 @@ class PartsController < ApplicationController
   def load_form_data_for_errors
     @customers = Organization.enabled.order(:name)
     @specification_presets = SpecificationPreset.enabled.ordered
-  end
-
-  def part_details_changed?
-    return false unless @part.persisted?
-
-    params[:part][:part_number] != @part.part_number ||
-    params[:part][:part_issue] != @part.part_issue ||
-    params[:part][:customer_id] != @part.customer_id.to_s
   end
 
   def determine_process_type
