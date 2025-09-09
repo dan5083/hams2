@@ -45,16 +45,16 @@
       /* Aerospace/Defence Certification Overlay */
       .aerospace-certification-overlay {
         position: absolute;
-        top: 0.5cm;
-        left: 0.5cm;
+        top: 1cm;
+        left: 50%;
+        transform: translateX(-50%) rotate(-15deg);
         width: 2.7in;
         height: 2.1in;
         background-image: url('/assets/aerospace-defence-certification.png');
         background-size: contain;
         background-repeat: no-repeat;
         background-position: center;
-        transform: rotate(-15deg);
-        transform-origin: top left;
+        transform-origin: center;
         z-index: 10;
         pointer-events: none;
       }
@@ -186,7 +186,7 @@
         }
 
         .aerospace-certification-overlay {
-          background-image: url('<%= asset_path("aerospace-defence-certification.png") %>');
+          background-image: url('/assets/aerospace-defence-certification.png');
         }
       }
     </style>
