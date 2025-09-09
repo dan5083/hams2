@@ -1,4 +1,4 @@
-<%# Customer Order Form Partial %>
+<%# Customer Order Form with Autocomplete - app/views/customer_orders/_form.html.erb %>
 <%= form_with model: customer_order, local: true, class: "space-y-6" do |form| %>
   <% if customer_order.errors.any? %>
     <div class="bg-red-50 border border-red-200 rounded-md p-4">
@@ -23,16 +23,37 @@
     <h3 class="text-lg font-medium text-gray-900 mb-4">Customer Order Details</h3>
 
     <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-      <!-- Customer Selection -->
+      <!-- Customer Selection with Autocomplete -->
       <div>
-        <%= form.label :customer_id, class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.select :customer_id,
-            options_for_select([['Select Customer', '']] + @customers.map { |c| [c.name, c.id] }, customer_order.customer_id),
-            {},
-            {
-              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
-              required: true
-            } %>
+        <%= form.label :customer_id, "Customer", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <div class="relative">
+          <!-- Hidden field to store the selected customer ID -->
+          <%= form.hidden_field :customer_id, id: "customer_id_hidden" %>
+
+          <!-- Autocomplete input field -->
+          <input type="text"
+                 id="customer_autocomplete"
+                 placeholder="Start typing customer name..."
+                 autocomplete="off"
+                 value="<%= customer_order.customer&.name %>"
+                 class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                 required>
+
+          <!-- Dropdown for autocomplete results -->
+          <div id="customer_dropdown"
+               class="absolute z-50 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto hidden">
+            <!-- Results will be populated here by JavaScript -->
+          </div>
+
+          <!-- Loading indicator -->
+          <div id="customer_loading"
+               class="absolute right-3 top-3 hidden">
+            <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+          </div>
+        </div>
+        <p class="mt-1 text-xs text-gray-500">
+          Start typing to search for customers synced from Xero
+        </p>
       </div>
 
       <!-- Order Number -->
@@ -53,8 +74,6 @@
             required: true %>
       </div>
     </div>
-
-
   </div>
 
   <!-- Form Actions -->
@@ -65,3 +84,267 @@
         class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" %>
   </div>
 <% end %>
+
+<!-- JavaScript for Autocomplete -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const autocompleteInput = document.getElementById('customer_autocomplete');
+  const customerIdHidden = document.getElementById('customer_id_hidden');
+  const dropdown = document.getElementById('customer_dropdown');
+  const loadingIndicator = document.getElementById('customer_loading');
+
+  let searchTimeout;
+  let currentRequest;
+
+  // Handle input changes
+  autocompleteInput.addEventListener('input', function() {
+    const query = this.value.trim();
+
+    // Clear previous timeout
+    clearTimeout(searchTimeout);
+
+    // Cancel previous request if still pending
+    if (currentRequest) {
+      currentRequest.abort();
+    }
+
+    if (query.length < 2) {
+      hideDropdown();
+      clearSelection();
+      return;
+    }
+
+    // Debounce the search
+    searchTimeout = setTimeout(() => {
+      searchCustomers(query);
+    }, 300);
+  });
+
+  // Handle focus - show dropdown if we have results
+  autocompleteInput.addEventListener('focus', function() {
+    if (dropdown.children.length > 0) {
+      showDropdown();
+    }
+  });
+
+  // Handle click outside to close dropdown
+  document.addEventListener('click', function(event) {
+    if (!event.target.closest('#customer_autocomplete') && !event.target.closest('#customer_dropdown')) {
+      hideDropdown();
+    }
+  });
+
+  // Handle keyboard navigation
+  autocompleteInput.addEventListener('keydown', function(event) {
+    const items = dropdown.querySelectorAll('.dropdown-item');
+    const activeItem = dropdown.querySelector('.dropdown-item.active');
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      if (activeItem) {
+        activeItem.classList.remove('active');
+        const next = activeItem.nextElementSibling;
+        if (next) {
+          next.classList.add('active');
+        } else {
+          items[0]?.classList.add('active');
+        }
+      } else {
+        items[0]?.classList.add('active');
+      }
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      if (activeItem) {
+        activeItem.classList.remove('active');
+        const prev = activeItem.previousElementSibling;
+        if (prev) {
+          prev.classList.add('active');
+        } else {
+          items[items.length - 1]?.classList.add('active');
+        }
+      } else {
+        items[items.length - 1]?.classList.add('active');
+      }
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      if (activeItem) {
+        selectCustomer(
+          activeItem.dataset.customerId,
+          activeItem.dataset.customerName
+        );
+      }
+    } else if (event.key === 'Escape') {
+      hideDropdown();
+    }
+  });
+
+  function searchCustomers(query) {
+    showLoading();
+
+    // Create new request
+    currentRequest = new AbortController();
+
+    fetch(`/customer_orders/search_customers?q=${encodeURIComponent(query)}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      signal: currentRequest.signal
+    })
+    .then(response => response.json())
+    .then(data => {
+      hideLoading();
+      displayResults(data);
+    })
+    .catch(error => {
+      hideLoading();
+      if (error.name !== 'AbortError') {
+        console.error('Search error:', error);
+        showError();
+      }
+    });
+  }
+
+  function displayResults(customers) {
+    dropdown.innerHTML = '';
+
+    if (customers.length === 0) {
+      dropdown.innerHTML = `
+        <div class="px-4 py-3 text-sm text-gray-500">
+          No customers found matching your search.
+        </div>
+      `;
+    } else {
+      customers.forEach(customer => {
+        const item = document.createElement('div');
+        item.className = 'dropdown-item px-4 py-3 cursor-pointer hover:bg-blue-50 text-sm border-b border-gray-100 last:border-b-0';
+        item.dataset.customerId = customer.id;
+        item.dataset.customerName = customer.name;
+        item.innerHTML = `
+          <div class="font-medium text-gray-900">${escapeHtml(customer.name)}</div>
+        `;
+
+        item.addEventListener('click', function() {
+          selectCustomer(customer.id, customer.name);
+        });
+
+        // Handle hover for keyboard navigation
+        item.addEventListener('mouseenter', function() {
+          dropdown.querySelectorAll('.dropdown-item').forEach(el => el.classList.remove('active'));
+          this.classList.add('active');
+        });
+
+        dropdown.appendChild(item);
+      });
+    }
+
+    showDropdown();
+  }
+
+  function selectCustomer(customerId, customerName) {
+    customerIdHidden.value = customerId;
+    autocompleteInput.value = customerName;
+    hideDropdown();
+
+    // Visual feedback
+    autocompleteInput.classList.add('border-green-500');
+    setTimeout(() => {
+      autocompleteInput.classList.remove('border-green-500');
+    }, 1000);
+  }
+
+  function clearSelection() {
+    customerIdHidden.value = '';
+  }
+
+  function showDropdown() {
+    dropdown.classList.remove('hidden');
+  }
+
+  function hideDropdown() {
+    dropdown.classList.add('hidden');
+    // Clear active states
+    dropdown.querySelectorAll('.dropdown-item').forEach(el => el.classList.remove('active'));
+  }
+
+  function showLoading() {
+    loadingIndicator.classList.remove('hidden');
+  }
+
+  function hideLoading() {
+    loadingIndicator.classList.add('hidden');
+  }
+
+  function showError() {
+    dropdown.innerHTML = `
+      <div class="px-4 py-3 text-sm text-red-500">
+        Error searching customers. Please try again.
+      </div>
+    `;
+    showDropdown();
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // Form validation
+  const form = autocompleteInput.closest('form');
+  form.addEventListener('submit', function(event) {
+    if (!customerIdHidden.value) {
+      event.preventDefault();
+      autocompleteInput.focus();
+      autocompleteInput.classList.add('border-red-500');
+
+      // Show error message
+      let errorMsg = autocompleteInput.parentNode.querySelector('.error-message');
+      if (!errorMsg) {
+        errorMsg = document.createElement('p');
+        errorMsg.className = 'error-message mt-1 text-xs text-red-500';
+        autocompleteInput.parentNode.appendChild(errorMsg);
+      }
+      errorMsg.textContent = 'Please select a customer from the dropdown.';
+
+      setTimeout(() => {
+        autocompleteInput.classList.remove('border-red-500');
+      }, 3000);
+
+      return false;
+    }
+  });
+
+  // Clear error on input
+  autocompleteInput.addEventListener('input', function() {
+    this.classList.remove('border-red-500');
+    const errorMsg = this.parentNode.querySelector('.error-message');
+    if (errorMsg) {
+      errorMsg.remove();
+    }
+  });
+});
+</script>
+
+<style>
+.dropdown-item.active {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+#customer_loading {
+  pointer-events: none;
+}
+
+.border-green-500 {
+  border-color: #10b981 !important;
+  box-shadow: 0 0 0 1px #10b981 !important;
+}
+
+.border-red-500 {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 1px #ef4444 !important;
+}
+</style>

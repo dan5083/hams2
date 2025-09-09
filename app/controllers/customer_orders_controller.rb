@@ -146,6 +146,31 @@ class CustomerOrdersController < ApplicationController
     end
   end
 
+  def search_customers
+    if params[:q].present?
+      search_term = params[:q].strip
+      @customers = Organization.enabled
+                            .where(is_customer: true)
+                            .where("name ILIKE ?", "%#{search_term}%")
+                            .order(:name)
+                            .limit(10)
+    else
+      @customers = Organization.none
+    end
+
+    respond_to do |format|
+      format.json do
+        render json: @customers.map { |customer|
+          {
+            id: customer.id,
+            name: customer.name,
+            display_text: customer.name
+          }
+        }
+      end
+    end
+  end
+
   private
 
   def set_customer_order

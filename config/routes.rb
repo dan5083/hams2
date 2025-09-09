@@ -46,6 +46,9 @@ Rails.application.routes.draw do
       patch :void
       patch :create_invoice
     end
+    collection do
+      get :search_customers
+    end
 
     # 3. Works Orders nested under customer orders for creation flow
     resources :works_orders, only: [:new, :create], shallow: true
