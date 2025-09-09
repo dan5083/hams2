@@ -19,14 +19,23 @@
         margin: 1cm;
       }
 
-      .page {
+      /* Force Advice Note to print on right side (odd page) and single sided */
+      .advice-note {
+        page-break-before: right;
         page-break-after: always;
         max-height: calc(100vh - 2cm);
         overflow: hidden;
       }
 
-      .page:last-child {
-        page-break-after: avoid;
+      /* Certificate starts on next sheet, can use both sides */
+      .certificate-page {
+        page-break-before: right;
+      }
+
+      /* Allow certificate content to flow across pages */
+      .certificate-content {
+        max-height: none;
+        overflow: visible;
       }
 
       .logo-header {
@@ -159,28 +168,151 @@
         line-height: 1.3;
       }
 
-      /* Compact spacing for single page fit */
+      /* Compact spacing */
       .compact {
         margin-bottom: 0.5rem;
-      }
-
-      /* Ensure content fits on page */
-      .page-content {
-        max-height: calc(100vh - 4cm);
-        overflow: hidden;
       }
     </style>
   </head>
   <body>
-    <!-- Page 1: Advice Note -->
-    <div class="page">
-      <div class="page-content">
+    <!-- Page 1: Advice Note (Single sided) -->
+    <div class="advice-note">
+      <!-- Logo Header -->
+      <div class="logo-header">
+        <%= image_tag(asset_path("logo-with-company-name.png"), alt: "Hard Anodising Surface Treatments Ltd") %>
+      </div>
+
+      <h1>Advice Note</h1>
+
+      <!-- Header Information -->
+      <table class="header-table compact">
+        <tbody>
+          <tr>
+            <th>Release Note Number</th>
+            <td>RN<%= @release_note.number %></td>
+          </tr>
+          <tr>
+            <th>Date</th>
+            <td><%= @release_note.date.strftime("%d/%m/%Y") %></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Invoice Address Only (removed deliver to) -->
+      <table class="addresses compact">
+        <tbody>
+          <tr>
+            <td class="address">
+              <h2>Invoice To</h2>
+              <p>
+                <%= @release_note.invoice_customer_name %><br/>
+                <%= simple_format(@release_note.invoice_address) if @release_note.invoice_address %>
+              </p>
+            </td>
+            <td class="address">
+              <!-- Empty space for balance -->
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Release Note Details -->
+      <table class="detail-table compact">
+        <tbody>
+          <tr>
+            <th>Customer Order</th>
+            <td>
+              <%= @release_note.works_order.customer_order.number %>
+              <% if @release_note.works_order.respond_to?(:customer_order_line) && @release_note.works_order.customer_order_line.present? %>
+                (line <%= @release_note.works_order.customer_order_line %>)
+              <% end %>
+            </td>
+          </tr>
+          <tr>
+            <th>Part Number</th>
+            <td><%= @release_note.works_order.part_number %></td>
+          </tr>
+          <tr>
+            <th>Issue</th>
+            <td><%= @release_note.works_order.part_issue %></td>
+          </tr>
+          <tr>
+            <th>Description</th>
+            <td><%= @release_note.works_order.part_description %></td>
+          </tr>
+          <tr>
+            <th>Quantity Accepted</th>
+            <td><%= @release_note.quantity_accepted %></td>
+          </tr>
+          <tr>
+            <th>Quantity Rejected</th>
+            <td><%= @release_note.quantity_rejected %></td>
+          </tr>
+          <tr>
+            <th>Our Works Order Number</th>
+            <td>WO<%= @release_note.works_order.number %></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Thickness Measurements (if present) - Simplified -->
+      <% if @release_note.has_thickness_measurements? %>
+        <h2>Thickness Measurements</h2>
+        <% measurements_by_type = @release_note.thickness_measurements_by_type %>
+        <% measurements_by_type.each do |process_type, measurements| %>
+          <div class="thickness-group">
+            <div class="thickness-group-header">
+              <%= process_type.humanize.gsub('_', ' ').titleize %>
+            </div>
+            <table class="thickness-table">
+              <thead>
+                <tr>
+                  <th>Treatment</th>
+                  <th>Measured (μm)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% measurements.each do |measurement| %>
+                  <tr>
+                    <td><%= measurement['display_name'] || measurement['process_type'].humanize.titleize %></td>
+                    <td><%= measurement['measured_thickness'] %></td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        <% end %>
+      <% end %>
+
+      <!-- Proof of Collection/Delivery -->
+      <h2>Proof of Collection/Delivery</h2>
+      <table class="signature-table">
+        <tbody>
+          <tr>
+            <th>Signature</th>
+            <td></td>
+          </tr>
+          <tr>
+            <th>Name</th>
+            <td></td>
+          </tr>
+          <tr>
+            <th>Date/Time</th>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Page 2+: Certificate of Conformity (Can use multiple sides) -->
+    <div class="certificate-page">
+      <div class="certificate-content">
         <!-- Logo Header -->
         <div class="logo-header">
-          <%= image_tag(asset_path("logo-with-company-name.png"), alt: "Hard Anodising Surface Treatments Ltd") %>
+          <%= image_tag("logo-with-company-name.png", alt: "Hard Anodising Surface Treatments Ltd") %>
         </div>
 
-        <h1>Advice Note</h1>
+        <h1>Certificate of Conformity</h1>
 
         <!-- Header Information -->
         <table class="header-table compact">
@@ -196,7 +328,7 @@
           </tbody>
         </table>
 
-        <!-- Invoice Address Only -->
+        <!-- Invoice Address Only (removed deliver to) -->
         <table class="addresses compact">
           <tbody>
             <tr>
@@ -239,6 +371,10 @@
               <td><%= @release_note.works_order.part_description %></td>
             </tr>
             <tr>
+              <th>Specification</th>
+              <td><%= @release_note.specification %></td>
+            </tr>
+            <tr>
               <th>Quantity Accepted</th>
               <td><%= @release_note.quantity_accepted %></td>
             </tr>
@@ -253,9 +389,9 @@
           </tbody>
         </table>
 
-        <!-- Thickness Measurements (if present) - Compact -->
+        <!-- Simplified Thickness Measurements for Certificate -->
         <% if @release_note.has_thickness_measurements? %>
-          <h2>Thickness Measurements</h2>
+          <h2>Certified Thickness Measurements</h2>
           <% measurements_by_type = @release_note.thickness_measurements_by_type %>
           <% measurements_by_type.each do |process_type, measurements| %>
             <div class="thickness-group">
@@ -265,8 +401,8 @@
               <table class="thickness-table">
                 <thead>
                   <tr>
-                    <th>Treatment</th>
-                    <th>Measured (μm)</th>
+                    <th>Treatment Description</th>
+                    <th>Measured Thickness (μm)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -282,69 +418,20 @@
           <% end %>
         <% end %>
 
-        <!-- Proof of Collection/Delivery -->
-        <h2>Proof of Collection/Delivery</h2>
-        <table class="signature-table">
-          <tbody>
-            <tr>
-              <th>Signature</th>
-              <td></td>
-            </tr>
-            <tr>
-              <th>Name</th>
-              <td></td>
-            </tr>
-            <tr>
-              <th>Date/Time</th>
-              <td></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Page 2: Certificate of Conformity -->
-    <div class="page">
-      <div class="page-content">
-        <!-- Logo Header -->
-        <div class="logo-header">
-          <%= image_tag("logo-with-company-name.png", alt: "Hard Anodising Surface Treatments Ltd") %>
+        <!-- Statement -->
+        <h2>Statement</h2>
+        <div class="statement">
+          <p><%= simple_format(@release_note.remarks) if @release_note.remarks.present? %></p>
         </div>
 
-        <h1>Certificate of Conformity</h1>
-
-        <!-- Header Information -->
-        <table class="header-table compact">
-          <tbody>
-            <tr>
-              <th>Release Note Number</th>
-              <td>RN<%= @release_note.number %></td>
-            </tr>
-            <tr>
-              <th>Date</th>
-              <td><%= @release_note.date.strftime("%d/%m/%Y") %></td>
-            </tr>
-          </tbody>
-        </table>
-
-        <!-- Invoice Address Only -->
-        <table class="addresses compact">
-          <tbody>
-            <tr>
-              <td class="address">
-                <h2>Invoice To</h2>
-                <p>
-                  <%= @release_note.invoice_customer_name %><br/>
-                  <%= simple_format(@release_note.invoice_address) if @release_note.invoice_address %>
-                </p>
-              </td>
-              <td class="address">
-                <!-- Empty space for balance -->
-              </td>
-            </tr>
-          </tbody>
-        </table>
-
-        <!-- Release Note Details -->
-        <table class="detail-table compact">
-          <tbody>
+        <!-- Signature Block -->
+        <div class="signature-block">
+          <p>
+            <span class="signature-name"><%= @release_note.issued_by.display_name %></span><br/>
+            For and on behalf of Hard Anodising Surface Treatments Ltd
+          </p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
