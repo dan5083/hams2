@@ -36,6 +36,7 @@ class WorksOrder < ApplicationRecord
   before_validation :set_works_order_number, if: :new_record?
   after_initialize :set_defaults, if: :new_record?
   after_update :update_open_status
+  after_create :update_part_pricing, if: :should_update_part_pricing_on_create?
   after_update :update_part_pricing, if: :should_update_part_pricing?
 
 
@@ -459,5 +460,9 @@ class WorksOrder < ApplicationRecord
   def update_part_pricing
     Rails.logger.info "🔄 Updating part pricing: #{part.display_name} from #{part.each_price} to #{each_price}"
     part.update!(each_price: each_price)
+  end
+
+  def should_update_part_pricing_on_create?
+    price_type == 'each' && each_price.present? && each_price > 0
   end
 end
