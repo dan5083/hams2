@@ -1,4 +1,4 @@
-<%# app/views/works_orders/_form.html.erb - Complete form with additional charges %>
+<%# app/views/works_orders/_form.html.erb - Enhanced form with auto-pricing %>
 <%= form_with model: works_order, local: true, class: "space-y-6" do |form| %>
   <% if works_order.errors.any? %>
     <div class="bg-red-50 border border-red-200 rounded-md p-4">
@@ -155,7 +155,7 @@
               onchange: "recalculateTotalPrice()" %>
         </div>
         <p class="mt-1 text-xs text-gray-500">
-          Enter the price per individual part
+          Enter the price per individual part (auto-populated from part standard price)
         </p>
       </div>
 
@@ -193,14 +193,13 @@
               onblur: "formatCurrency(this)" %>
         </div>
         <p class="mt-1 text-xs text-gray-500">
-          Enter the total price for the entire job regardless of quantity
+          Enter the total price for the entire job regardless of quantity (includes minimum charges, setup fees, etc.)
         </p>
       </div>
     </div>
   </div>
 
-
-<!-- Additional Charges -->
+  <!-- Additional Charges -->
   <div class="bg-white shadow rounded-lg p-6">
     <h3 class="text-lg font-medium text-gray-900 mb-4">Additional Charges (for invoicing)</h3>
 
@@ -269,14 +268,15 @@
 
 <!-- JavaScript -->
 <script>
-// Parts data for JavaScript
+// Parts data for JavaScript - ENHANCED with pricing
 window.partsData = {
   <% if defined?(@parts) && @parts %>
     <% @parts.each do |part| %>
       "<%= part.id %>": {
         "part_number": "<%= j part.part_number %>",
         "part_issue": "<%= j part.part_issue %>",
-        "description": "<%= j (part.description || "#{part.part_number} component") %>"
+        "description": "<%= j (part.description || "#{part.part_number} component") %>",
+        "each_price": "<%= part.each_price || 0 %>"
       },
     <% end %>
   <% end %>
@@ -329,12 +329,13 @@ function formatCurrency(input) {
   }
 }
 
-// Part selection handler
+// ENHANCED Part selection handler - now includes auto-pricing
 function updatePartDetails(selectElement) {
   const partId = selectElement.value;
   const partNumberField = document.getElementById('works_order_part_number');
   const partIssueField = document.getElementById('works_order_part_issue');
   const partDescriptionField = document.getElementById('works_order_part_description');
+  const eachPriceField = document.getElementById('each_price_input');
 
   if (partId && window.partsData) {
     const part = window.partsData[partId];
@@ -342,13 +343,39 @@ function updatePartDetails(selectElement) {
       partNumberField.value = part.part_number;
       partIssueField.value = part.part_issue;
       partDescriptionField.value = part.description || `${part.part_number} component`;
+
+      // AUTO-POPULATE EACH PRICE from part standard pricing
+      if (part.each_price && parseFloat(part.each_price) > 0) {
+        eachPriceField.value = parseFloat(part.each_price).toFixed(2);
+        recalculateTotalPrice();
+
+        // Optional: Show a subtle notification that price was auto-populated
+        showPriceAutoPopulatedNotification(part.each_price);
+      }
     }
   } else {
     // Clear fields if no part selected
     partNumberField.value = '';
     partIssueField.value = '';
     partDescriptionField.value = '';
+    eachPriceField.value = '';
+    recalculateTotalPrice();
   }
+}
+
+// Optional: Show notification when price is auto-populated
+function showPriceAutoPopulatedNotification(price) {
+  const eachPriceField = document.getElementById('each_price_input');
+  const originalBorder = eachPriceField.style.borderColor;
+
+  // Briefly highlight the field to show it was auto-populated
+  eachPriceField.style.borderColor = '#10B981'; // Green border
+  eachPriceField.style.backgroundColor = '#F0FDF4'; // Light green background
+
+  setTimeout(() => {
+    eachPriceField.style.borderColor = originalBorder;
+    eachPriceField.style.backgroundColor = '';
+  }, 1500);
 }
 
 // Calculate total price for 'each' pricing

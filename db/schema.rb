@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_09_07_133752) do
+ActiveRecord::Schema[8.0].define(version: 2025_09_09_122055) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -107,6 +107,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_07_133752) do
     t.jsonb "customisation_data", default: {}
     t.uuid "replaces_id"
     t.text "specified_thicknesses"
+    t.decimal "each_price", precision: 10, scale: 2
     t.index ["customer_id", "enabled"], name: "index_parts_on_customer_id_and_enabled"
     t.index ["customer_id", "part_number", "part_issue"], name: "index_parts_on_customer_and_part_number_and_issue", unique: true
     t.index ["customer_id"], name: "index_parts_on_customer_id"

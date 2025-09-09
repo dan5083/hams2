@@ -8,6 +8,7 @@ class Part < ApplicationRecord
 
   validates :part_number, presence: true
   validates :part_issue, presence: true
+  validates :each_price, numericality: { greater_than_or_equal_to: 0 }, allow_nil: true
   validates :part_number, uniqueness: {
     scope: [:customer_id, :part_issue],
     message: "and issue must be unique per customer"
@@ -870,6 +871,7 @@ class Part < ApplicationRecord
     self.enabled = true if enabled.nil?
     self.customisation_data = {} if customisation_data.blank?
     self.part_issue = 'A' if part_issue.blank?
+    self.each_price = 0.0 if each_price.nil?
   end
 
   def disable_replaced_part

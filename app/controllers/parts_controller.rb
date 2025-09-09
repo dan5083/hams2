@@ -460,7 +460,7 @@ class PartsController < ApplicationController
     params.require(:part).permit(
       :customer_id, :part_number, :part_issue, :enabled,
       :special_instructions, :material, :specified_thicknesses,
-      :process_type, :description,
+      :process_type, :description, :each_price,
       specification: [],
       customisation_data: {}
     )
