@@ -1,48 +1,66 @@
 # app/operation_library/operations/sealing.rb
 module OperationLibrary
   class Sealing
-    def self.operations
+    def self.operations(aerospace_defense: false)
       [
         # Sodium Dichromate Sealing - high temperature process (extreme pH)
         Operation.new(
           id: 'SODIUM_DICHROMATE_SEAL',
           process_type: 'dichromate_sealing',
-          operation_text: 'Seal in **Sodium Dichromate** at 93°C - 99°C for 2 minutes per micron (with a maximum of 25 minutes)'
+          operation_text: build_operation_text(
+            'Seal in sodium dichromate at 93°C - 99°C for 2-3 minutes per μm of Measured Film Thickness (with a maximum of 25 minutes)',
+            aerospace_defense
+          )
         ),
 
         # Oxidite SE-CO Sealing - ambient temperature process
         Operation.new(
           id: 'OXIDITE_SECO_SEAL',
           process_type: 'sealing',
-          operation_text: 'Seal in *Oxidite SE-CO* at 25 – 32°C for 1/2 - 1 minute per micron'
+          operation_text: build_operation_text(
+            'Seal in Oxidite SE-CO at 25-32°C for 0.5-1 minute per μm of Measured Film Thickness',
+            aerospace_defense
+          )
         ),
 
         # Hot Water Dip - quick process
         Operation.new(
           id: 'HOT_WATER_DIP',
           process_type: 'sealing',
-          operation_text: '**Hot water dip 15-30 seconds'
+          operation_text: build_operation_text(
+            'Hot water dip for 15-30 seconds based on Measured Film Thickness',
+            aerospace_defense
+          )
         ),
 
         # Hot Seal - high temperature water sealing
         Operation.new(
           id: 'HOT_SEAL',
           process_type: 'sealing',
-          operation_text: '**Seal in **hot seal** at 96°C for 1/2 min per micron'
+          operation_text: build_operation_text(
+            'Seal in hot seal at 96°C for 2-3 minutes per μm of Measured Film Thickness (with a minimum of 10 minutes)',
+            aerospace_defense
+          )
         ),
 
         # SurTec 650V Sealing - mid temperature process
         Operation.new(
           id: 'SURTEC_650V_SEAL',
           process_type: 'sealing',
-          operation_text: '*Surtec 650V* at 28-32°C for 1/2 - 1 minute per micron'
+          operation_text: build_operation_text(
+            'Seal in SurTec 650V at 28-32°C for 0.5-1 minute per μm of Measured Film Thickness',
+            aerospace_defense
+          )
         ),
 
         # Laboratory Deionised Water Sealing
         Operation.new(
           id: 'DEIONISED_WATER_SEAL',
           process_type: 'sealing',
-          operation_text: '(in works laboratory) Seal in deionised water at 75 to 85°C for 4-5 mins'
+          operation_text: build_operation_text(
+            'Seal in deionised water at 75-85°C for 4-5 minutes per μm of Measured Film Thickness (in works laboratory)',
+            aerospace_defense
+          )
         )
       ]
     end
@@ -59,9 +77,20 @@ module OperationLibrary
       ]
     end
 
-    # Get specific sealing operation by ID
-    def self.get_sealing_operation(sealing_id)
-      operations.find { |op| op.id == sealing_id }
+    # Get specific sealing operation by ID with aerospace flag
+    def self.get_sealing_operation(sealing_id, aerospace_defense: false)
+      operations(aerospace_defense: aerospace_defense).find { |op| op.id == sealing_id }
+    end
+
+    private
+
+    # Build operation text with optional aerospace calculation prompt
+    def self.build_operation_text(base_text, aerospace_defense)
+      if aerospace_defense
+        "#{base_text}. Please calculate time range and record: _____m to _____m"
+      else
+        base_text
+      end
     end
   end
 end

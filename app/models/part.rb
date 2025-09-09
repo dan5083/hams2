@@ -653,7 +653,7 @@ class Part < ApplicationRecord
 
     # 9. Sealing + rinse
     if sealing["enabled"] && sealing["type"].present? && is_anodising?(op)
-      seal_op = OperationLibrary::Sealing.get_sealing_operation(sealing["type"])
+      seal_op = OperationLibrary::Sealing.get_sealing_operation(sealing["type"], aerospace_defense: aerospace_defense?)
       if seal_op
         safe_add_to_sequence(sequence, seal_op, "Sealing")
         safe_add_to_sequence(sequence, get_rinse(seal_op, has_enp, masking), "Rinse after Sealing")
