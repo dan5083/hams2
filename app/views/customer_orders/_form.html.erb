@@ -85,103 +85,53 @@
   </div>
 <% end %>
 
-<!-- JavaScript for Autocomplete -->
-<script data-cache-buster="<%= Time.current.to_i %>">
-document.addEventListener('DOMContentLoaded', function() {
+<!-- JavaScript for Autocomplete - Using same defensive pattern as parts form -->
+<script>
+// Wait and retry approach like parts form
+function initializeCustomerAutocomplete() {
   const autocompleteInput = document.getElementById('customer_autocomplete');
   const customerIdHidden = document.getElementById('customer_id_hidden');
   const dropdown = document.getElementById('customer_dropdown');
   const loadingIndicator = document.getElementById('customer_loading');
 
+  if (!autocompleteInput || !customerIdHidden || !dropdown) {
+    console.log('Customer elements not ready yet, retrying...');
+    setTimeout(initializeCustomerAutocomplete, 100);
+    return;
+  }
+
+  console.log('Customer autocomplete initialized');
+
   let searchTimeout;
   let currentRequest;
 
-  // Handle input changes
   autocompleteInput.addEventListener('input', function() {
-    const query = this.value.trim();
+    console.log('Input event triggered, value:', this.value);
 
-    // Clear previous timeout
+    const query = this.value.trim();
     clearTimeout(searchTimeout);
 
-    // Cancel previous request if still pending
     if (currentRequest) {
       currentRequest.abort();
     }
 
     if (query.length < 2) {
-      hideDropdown();
-      clearSelection();
+      dropdown.classList.add('hidden');
+      customerIdHidden.value = '';
       return;
     }
 
-    // Debounce the search
+    if (loadingIndicator) {
+      loadingIndicator.classList.remove('hidden');
+    }
+
     searchTimeout = setTimeout(() => {
+      console.log('Searching for:', query);
       searchCustomers(query);
     }, 300);
   });
 
-  // Handle focus - show dropdown if we have results
-  autocompleteInput.addEventListener('focus', function() {
-    if (dropdown.children.length > 0) {
-      showDropdown();
-    }
-  });
-
-  // Handle click outside to close dropdown
-  document.addEventListener('click', function(event) {
-    if (!event.target.closest('#customer_autocomplete') && !event.target.closest('#customer_dropdown')) {
-      hideDropdown();
-    }
-  });
-
-  // Handle keyboard navigation
-  autocompleteInput.addEventListener('keydown', function(event) {
-    const items = dropdown.querySelectorAll('.dropdown-item');
-    const activeItem = dropdown.querySelector('.dropdown-item.active');
-
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      if (activeItem) {
-        activeItem.classList.remove('active');
-        const next = activeItem.nextElementSibling;
-        if (next) {
-          next.classList.add('active');
-        } else {
-          items[0]?.classList.add('active');
-        }
-      } else {
-        items[0]?.classList.add('active');
-      }
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      if (activeItem) {
-        activeItem.classList.remove('active');
-        const prev = activeItem.previousElementSibling;
-        if (prev) {
-          prev.classList.add('active');
-        } else {
-          items[items.length - 1]?.classList.add('active');
-        }
-      } else {
-        items[items.length - 1]?.classList.add('active');
-      }
-    } else if (event.key === 'Enter') {
-      event.preventDefault();
-      if (activeItem) {
-        selectCustomer(
-          activeItem.dataset.customerId,
-          activeItem.dataset.customerName
-        );
-      }
-    } else if (event.key === 'Escape') {
-      hideDropdown();
-    }
-  });
-
   function searchCustomers(query) {
-    showLoading();
-
-    // Create new request
     currentRequest = new AbortController();
 
     fetch(`/customer_orders/search_customers?q=${encodeURIComponent(query)}`, {
@@ -192,16 +142,26 @@ document.addEventListener('DOMContentLoaded', function() {
       },
       signal: currentRequest.signal
     })
-    .then(response => response.json())
+    .then(response => {
+      console.log('Response received:', response.status);
+      return response.json();
+    })
     .then(data => {
-      hideLoading();
+      console.log('Search results:', data);
+
+      if (loadingIndicator) {
+        loadingIndicator.classList.add('hidden');
+      }
+
       displayResults(data);
     })
     .catch(error => {
-      hideLoading();
+      if (loadingIndicator) {
+        loadingIndicator.classList.add('hidden');
+      }
+
       if (error.name !== 'AbortError') {
         console.error('Search error:', error);
-        showError();
       }
     });
   }
@@ -210,140 +170,55 @@ document.addEventListener('DOMContentLoaded', function() {
     dropdown.innerHTML = '';
 
     if (customers.length === 0) {
-      dropdown.innerHTML = `
-        <div class="px-4 py-3 text-sm text-gray-500">
-          No customers found matching your search.
-        </div>
-      `;
+      dropdown.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500">No customers found.</div>';
     } else {
       customers.forEach(customer => {
         const item = document.createElement('div');
         item.className = 'dropdown-item px-4 py-3 cursor-pointer hover:bg-blue-50 text-sm border-b border-gray-100 last:border-b-0';
-        item.dataset.customerId = customer.id;
-        item.dataset.customerName = customer.name;
-        item.innerHTML = `
-          <div class="font-medium text-gray-900">${escapeHtml(customer.name)}</div>
-        `;
+        item.textContent = customer.name;
 
         item.addEventListener('click', function() {
-          selectCustomer(customer.id, customer.name);
-        });
+          console.log('Selected customer:', customer.name);
+          customerIdHidden.value = customer.id;
+          autocompleteInput.value = customer.name;
+          dropdown.classList.add('hidden');
 
-        // Handle hover for keyboard navigation
-        item.addEventListener('mouseenter', function() {
-          dropdown.querySelectorAll('.dropdown-item').forEach(el => el.classList.remove('active'));
-          this.classList.add('active');
+          // Visual feedback
+          autocompleteInput.style.borderColor = '#10b981';
+          setTimeout(() => {
+            autocompleteInput.style.borderColor = '';
+          }, 1000);
         });
 
         dropdown.appendChild(item);
       });
     }
 
-    showDropdown();
-  }
-
-  function selectCustomer(customerId, customerName) {
-    customerIdHidden.value = customerId;
-    autocompleteInput.value = customerName;
-    hideDropdown();
-
-    // Visual feedback
-    autocompleteInput.classList.add('border-green-500');
-    setTimeout(() => {
-      autocompleteInput.classList.remove('border-green-500');
-    }, 1000);
-  }
-
-  function clearSelection() {
-    customerIdHidden.value = '';
-  }
-
-  function showDropdown() {
     dropdown.classList.remove('hidden');
   }
 
-  function hideDropdown() {
-    dropdown.classList.add('hidden');
-    // Clear active states
-    dropdown.querySelectorAll('.dropdown-item').forEach(el => el.classList.remove('active'));
-  }
-
-  function showLoading() {
-    loadingIndicator.classList.remove('hidden');
-  }
-
-  function hideLoading() {
-    loadingIndicator.classList.add('hidden');
-  }
-
-  function showError() {
-    dropdown.innerHTML = `
-      <div class="px-4 py-3 text-sm text-red-500">
-        Error searching customers. Please try again.
-      </div>
-    `;
-    showDropdown();
-  }
-
-  function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
-
-  // Form validation
-  const form = autocompleteInput.closest('form');
-  form.addEventListener('submit', function(event) {
-    if (!customerIdHidden.value) {
-      event.preventDefault();
-      autocompleteInput.focus();
-      autocompleteInput.classList.add('border-red-500');
-
-      // Show error message
-      let errorMsg = autocompleteInput.parentNode.querySelector('.error-message');
-      if (!errorMsg) {
-        errorMsg = document.createElement('p');
-        errorMsg.className = 'error-message mt-1 text-xs text-red-500';
-        autocompleteInput.parentNode.appendChild(errorMsg);
-      }
-      errorMsg.textContent = 'Please select a customer from the dropdown.';
-
-      setTimeout(() => {
-        autocompleteInput.classList.remove('border-red-500');
-      }, 3000);
-
-      return false;
+  // Click outside to close
+  document.addEventListener('click', function(event) {
+    if (!autocompleteInput.contains(event.target) && !dropdown.contains(event.target)) {
+      dropdown.classList.add('hidden');
     }
   });
+}
 
-  // Clear error on input
-  autocompleteInput.addEventListener('input', function() {
-    this.classList.remove('border-red-500');
-    const errorMsg = this.parentNode.querySelector('.error-message');
-    if (errorMsg) {
-      errorMsg.remove();
-    }
-  });
-});
+// Start initialization with same pattern as parts form
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeCustomerAutocomplete);
+} else {
+  initializeCustomerAutocomplete();
+}
 </script>
 
 <style>
-.dropdown-item.active {
-  background-color: #dbeafe;
-  color: #1e40af;
+.dropdown-item:hover {
+  background-color: #dbeafe !important;
 }
 
 #customer_loading {
   pointer-events: none;
-}
-
-.border-green-500 {
-  border-color: #10b981 !important;
-  box-shadow: 0 0 0 1px #10b981 !important;
-}
-
-.border-red-500 {
-  border-color: #ef4444 !important;
-  box-shadow: 0 0 0 1px #ef4444 !important;
 }
 </style>

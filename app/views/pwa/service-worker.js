@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hams-v2.0';
+const CACHE_NAME = 'hams-v2';
 const STATIC_CACHE_URLS = [
   '/',
   '/assets/icons/icon-192x192.png',
