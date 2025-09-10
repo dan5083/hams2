@@ -84,7 +84,11 @@ Rails.application.configure do
   config.hosts = ["hams-2.co.uk", "hams-2-4d0b0c1dfab4.herokuapp.com"]
 
   # Enable DNS rebinding protection and other `Host` header attacks.
-  config.hosts = ["hams-2.co.uk", "hams-2-4d0b0c1dfab4.herokuapp.com"]
+  config.hosts = [
+  "hams-2.co.uk",
+  "www.hams-2.co.uk",
+  "hams-2-4d0b0c1dfab4.herokuapp.com"
+  ]
 
   # Redirect Heroku domain to custom domain to fix caching issues
   config.middleware.insert_before ActionDispatch::SSL, Rack::CanonicalHost, "hams-2.co.uk"
