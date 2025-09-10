@@ -81,11 +81,14 @@ Rails.application.configure do
   config.active_record.attributes_for_inspect = [ :id ]
 
   # Enable DNS rebinding protection and other `Host` header attacks.
-  # config.hosts = [
-  #   "example.com",     # Allow requests from example.com
-  #   /.*\.example\.com/ # Allow requests from subdomains like `www.example.com`
-  # ]
-  #
+  config.hosts = ["hams-2.co.uk", "hams-2-4d0b0c1dfab4.herokuapp.com"]
+
+  # Enable DNS rebinding protection and other `Host` header attacks.
+  config.hosts = ["hams-2.co.uk", "hams-2-4d0b0c1dfab4.herokuapp.com"]
+
+  # Redirect Heroku domain to custom domain to fix caching issues
+  config.middleware.insert_before ActionDispatch::SSL, Rack::CanonicalHost, "hams-2.co.uk"
+
   # Skip DNS rebinding protection for the default health check endpoint.
-  # config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
+  config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
 end

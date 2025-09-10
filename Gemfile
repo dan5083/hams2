@@ -78,3 +78,5 @@ gem 'jwt'
 gem "dotenv-rails", "~> 3.1"
 # PDF generation with Puppeteer (much smaller than wicked_pdf for Heroku)
 gem 'grover'
+
+gem 'rack-canonical-host'
