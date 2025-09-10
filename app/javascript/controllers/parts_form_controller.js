@@ -69,6 +69,8 @@ export default class extends Controller {
       'a secure titanium-to-part assy',
       'Wire (aluminium)',
       'Wire (steel)',
+      'aluminium hooks',
+      'steel hooks',
       'Expanding Jig',
       'Large Aluminum Expanding Jig',
       'Rotor Jig',
