@@ -485,276 +485,169 @@
 <% end %>
 
   <% if !part.locked_for_editing? %>
-  <script>
-  document.addEventListener('DOMContentLoaded', function() {
-    // Customer Autocomplete Setup
-    const autocompleteInput = document.getElementById('part_customer_autocomplete');
-    const customerIdHidden = document.getElementById('part_customer_id_hidden');
-    const dropdown = document.getElementById('part_customer_dropdown');
-    const loadingIndicator = document.getElementById('part_customer_loading');
+ <% unless part.persisted? %>
+<script>
+// Wait a bit longer and try multiple times to ensure DOM is ready
+function initializeCustomerAutocomplete() {
+  const autocompleteInput = document.getElementById('part_customer_autocomplete');
+  const customerIdHidden = document.getElementById('part_customer_id_hidden');
+  const dropdown = document.getElementById('part_customer_dropdown');
+  const loadingIndicator = document.getElementById('part_customer_loading');
 
-    if (autocompleteInput) { // Only setup if autocomplete elements exist
-      let searchTimeout;
-      let currentRequest;
+  if (!autocompleteInput || !customerIdHidden || !dropdown) {
+    console.log('Elements not ready yet, retrying...');
+    setTimeout(initializeCustomerAutocomplete, 100);
+    return;
+  }
 
-      // Handle input changes
-      autocompleteInput.addEventListener('input', function() {
-        const query = this.value.trim();
+  console.log('Customer autocomplete initialized');
 
-        // Clear previous timeout
-        clearTimeout(searchTimeout);
+  let searchTimeout;
+  let currentRequest;
 
-        // Cancel previous request if still pending
-        if (currentRequest) {
-          currentRequest.abort();
-        }
+  // Test that event listener is working
+  autocompleteInput.addEventListener('input', function() {
+    console.log('Input event triggered, value:', this.value);
 
-        if (query.length < 2) {
-          hideDropdown();
-          clearSelection();
-          return;
-        }
+    const query = this.value.trim();
 
-        // Debounce the search
-        searchTimeout = setTimeout(() => {
-          searchCustomers(query);
-        }, 300);
-      });
+    clearTimeout(searchTimeout);
 
-      // Handle focus - show dropdown if we have results
-      autocompleteInput.addEventListener('focus', function() {
-        if (dropdown.children.length > 0) {
-          showDropdown();
-        }
-      });
+    if (currentRequest) {
+      currentRequest.abort();
+    }
 
-      // Handle click outside to close dropdown
-      document.addEventListener('click', function(event) {
-        if (!event.target.closest('#part_customer_autocomplete') && !event.target.closest('#part_customer_dropdown')) {
-          hideDropdown();
-        }
-      });
+    if (query.length < 2) {
+      dropdown.classList.add('hidden');
+      customerIdHidden.value = '';
+      return;
+    }
 
-      // Handle keyboard navigation
-      autocompleteInput.addEventListener('keydown', function(event) {
-        const items = dropdown.querySelectorAll('.dropdown-item');
-        const activeItem = dropdown.querySelector('.dropdown-item.active');
+    // Show loading
+    if (loadingIndicator) {
+      loadingIndicator.classList.remove('hidden');
+    }
 
-        if (event.key === 'ArrowDown') {
-          event.preventDefault();
-          if (activeItem) {
-            activeItem.classList.remove('active');
-            const next = activeItem.nextElementSibling;
-            if (next) {
-              next.classList.add('active');
-            } else {
-              items[0]?.classList.add('active');
-            }
-          } else {
-            items[0]?.classList.add('active');
-          }
-        } else if (event.key === 'ArrowUp') {
-          event.preventDefault();
-          if (activeItem) {
-            activeItem.classList.remove('active');
-            const prev = activeItem.previousElementSibling;
-            if (prev) {
-              prev.classList.add('active');
-            } else {
-              items[items.length - 1]?.classList.add('active');
-            }
-          } else {
-            items[items.length - 1]?.classList.add('active');
-          }
-        } else if (event.key === 'Enter') {
-          event.preventDefault();
-          if (activeItem) {
-            selectCustomer(
-              activeItem.dataset.customerId,
-              activeItem.dataset.customerName
-            );
-          }
-        } else if (event.key === 'Escape') {
-          hideDropdown();
-        }
-      });
+    searchTimeout = setTimeout(() => {
+      console.log('Searching for:', query);
+      searchCustomers(query);
+    }, 300);
+  });
 
-      function searchCustomers(query) {
-        showLoading();
+  function searchCustomers(query) {
+    currentRequest = new AbortController();
 
-        // Create new request
-        currentRequest = new AbortController();
+    fetch(`/customer_orders/search_customers?q=${encodeURIComponent(query)}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      signal: currentRequest.signal
+    })
+    .then(response => {
+      console.log('Response received:', response.status);
+      return response.json();
+    })
+    .then(data => {
+      console.log('Search results:', data);
 
-        fetch(`/customer_orders/search_customers?q=${encodeURIComponent(query)}`, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
-          },
-          signal: currentRequest.signal
-        })
-        .then(response => response.json())
-        .then(data => {
-          hideLoading();
-          displayResults(data);
-        })
-        .catch(error => {
-          hideLoading();
-          if (error.name !== 'AbortError') {
-            console.error('Search error:', error);
-            showError();
-          }
-        });
-      }
-
-      function displayResults(customers) {
-        dropdown.innerHTML = '';
-
-        if (customers.length === 0) {
-          dropdown.innerHTML = `
-            <div class="px-4 py-3 text-sm text-gray-500">
-              No customers found matching your search.
-            </div>
-          `;
-        } else {
-          customers.forEach(customer => {
-            const item = document.createElement('div');
-            item.className = 'dropdown-item px-4 py-3 cursor-pointer hover:bg-blue-50 text-sm border-b border-gray-100 last:border-b-0';
-            item.dataset.customerId = customer.id;
-            item.dataset.customerName = customer.name;
-            item.innerHTML = `
-              <div class="font-medium text-gray-900">${escapeHtml(customer.name)}</div>
-            `;
-
-            item.addEventListener('click', function() {
-              selectCustomer(customer.id, customer.name);
-            });
-
-            // Handle hover for keyboard navigation
-            item.addEventListener('mouseenter', function() {
-              dropdown.querySelectorAll('.dropdown-item').forEach(el => el.classList.remove('active'));
-              this.classList.add('active');
-            });
-
-            dropdown.appendChild(item);
-          });
-        }
-
-        showDropdown();
-      }
-
-      function selectCustomer(customerId, customerName) {
-        customerIdHidden.value = customerId;
-        autocompleteInput.value = customerName;
-        hideDropdown();
-
-        // Visual feedback
-        autocompleteInput.classList.add('border-green-500');
-        setTimeout(() => {
-          autocompleteInput.classList.remove('border-green-500');
-        }, 1000);
-      }
-
-      function clearSelection() {
-        customerIdHidden.value = '';
-      }
-
-      function showDropdown() {
-        dropdown.classList.remove('hidden');
-      }
-
-      function hideDropdown() {
-        dropdown.classList.add('hidden');
-        // Clear active states
-        dropdown.querySelectorAll('.dropdown-item').forEach(el => el.classList.remove('active'));
-      }
-
-      function showLoading() {
-        loadingIndicator.classList.remove('hidden');
-      }
-
-      function hideLoading() {
+      if (loadingIndicator) {
         loadingIndicator.classList.add('hidden');
       }
 
-      function showError() {
-        dropdown.innerHTML = `
-          <div class="px-4 py-3 text-sm text-red-500">
-            Error searching customers. Please try again.
-          </div>
-        `;
-        showDropdown();
+      displayResults(data);
+    })
+    .catch(error => {
+      if (loadingIndicator) {
+        loadingIndicator.classList.add('hidden');
       }
 
-      function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+      if (error.name !== 'AbortError') {
+        console.error('Search error:', error);
       }
+    });
+  }
 
-      // Form validation for customer selection
-      const form = autocompleteInput.closest('form');
-      form.addEventListener('submit', function(event) {
-        if (!customerIdHidden.value) {
-          event.preventDefault();
-          autocompleteInput.focus();
-          autocompleteInput.classList.add('border-red-500');
+  function displayResults(customers) {
+    dropdown.innerHTML = '';
 
-          // Show error message
-          let errorMsg = autocompleteInput.parentNode.querySelector('.error-message');
-          if (!errorMsg) {
-            errorMsg = document.createElement('p');
-            errorMsg.className = 'error-message mt-1 text-xs text-red-500';
-            autocompleteInput.parentNode.appendChild(errorMsg);
-          }
-          errorMsg.textContent = 'Please select a customer from the dropdown.';
+    if (customers.length === 0) {
+      dropdown.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500">No customers found.</div>';
+    } else {
+      customers.forEach(customer => {
+        const item = document.createElement('div');
+        item.className = 'dropdown-item px-4 py-3 cursor-pointer hover:bg-blue-50 text-sm border-b border-gray-100 last:border-b-0';
+        item.textContent = customer.name;
 
+        item.addEventListener('click', function() {
+          console.log('Selected customer:', customer.name);
+          customerIdHidden.value = customer.id;
+          autocompleteInput.value = customer.name;
+          dropdown.classList.add('hidden');
+
+          // Visual feedback
+          autocompleteInput.style.borderColor = '#10b981';
           setTimeout(() => {
-            autocompleteInput.classList.remove('border-red-500');
-          }, 3000);
+            autocompleteInput.style.borderColor = '';
+          }, 1000);
+        });
 
-          return false;
-        }
-      });
-
-      // Clear error on input
-      autocompleteInput.addEventListener('input', function() {
-        this.classList.remove('border-red-500');
-        const errorMsg = this.parentNode.querySelector('.error-message');
-        if (errorMsg) {
-          errorMsg.remove();
-        }
+        dropdown.appendChild(item);
       });
     }
 
-    // Manual Mode Switch Function (Global scope)
-    window.switchToManualMode = function() {
-      // Check if user has configured any treatments
-      const treatmentsField = document.querySelector('[data-parts-form-target="treatmentsField"]');
-      const treatments = treatmentsField ? JSON.parse(treatmentsField.value || '[]') : [];
+    dropdown.classList.remove('hidden');
+  }
 
-      if (treatments.length === 0) {
-        alert('Please configure some treatments first before switching to manual mode.');
-        return;
-      }
-
-      // Check if treatments have operations selected or are strip-only
-      const hasOperations = treatments.some(t => t.operation_id || t.type === 'stripping_only');
-      if (!hasOperations) {
-        alert('Please select operations for your treatments before switching to manual mode.');
-        return;
-      }
-
-      if (confirm('Switch to manual editing mode? This will save your current configuration and allow you to customize each operation individually. You cannot return to automatic mode after this change.')) {
-        // Set the manual mode flag
-        document.getElementById('switch_to_manual_field').value = 'true';
-
-        // Submit the form
-        document.querySelector('form').submit();
-      }
-    };
+  // Click outside to close
+  document.addEventListener('click', function(event) {
+    if (!autocompleteInput.contains(event.target) && !dropdown.contains(event.target)) {
+      dropdown.classList.add('hidden');
+    }
   });
-  </script>
+}
+
+// Manual Mode Function
+window.switchToManualMode = function() {
+  const treatmentsField = document.querySelector('[data-parts-form-target="treatmentsField"]');
+  const treatments = treatmentsField ? JSON.parse(treatmentsField.value || '[]') : [];
+
+  if (treatments.length === 0) {
+    alert('Please configure some treatments first before switching to manual mode.');
+    return;
+  }
+
+  const hasOperations = treatments.some(t => t.operation_id || t.type === 'stripping_only');
+  if (!hasOperations) {
+    alert('Please select operations for your treatments before switching to manual mode.');
+    return;
+  }
+
+  if (confirm('Switch to manual editing mode? This will save your current configuration and allow you to customize each operation individually. You cannot return to automatic mode after this change.')) {
+    document.getElementById('switch_to_manual_field').value = 'true';
+    document.querySelector('form').submit();
+  }
+};
+
+// Start initialization
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeCustomerAutocomplete);
+} else {
+  initializeCustomerAutocomplete();
+}
+</script>
+
+<style>
+.dropdown-item:hover {
+  background-color: #dbeafe !important;
+}
+
+#part_customer_loading {
+  pointer-events: none;
+}
+</style>
+<% end %>
 
   <!-- Styles for autocomplete -->
   <style>
