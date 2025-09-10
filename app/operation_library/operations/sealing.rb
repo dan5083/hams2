@@ -8,7 +8,7 @@ module OperationLibrary
           id: 'SODIUM_DICHROMATE_SEAL',
           process_type: 'dichromate_sealing',
           operation_text: build_operation_text(
-            'Seal in sodium dichromate at 93°C - 99°C for 2-3 minutes per μm of Measured Film Thickness (with a maximum of 25 minutes)',
+            'Seal in sodium dichromate at 93°C - 99°C for 2-3 minutes per μm of Measured Film Thickness (with a maximum of 30 minutes)',
             aerospace_defense
           )
         ),
@@ -18,7 +18,7 @@ module OperationLibrary
           id: 'OXIDITE_SECO_SEAL',
           process_type: 'sealing',
           operation_text: build_operation_text(
-            'Seal in Oxidite SE-CO at 25-32°C for 0.5-1 minute per μm of Measured Film Thickness',
+            'Seal in Oxidite SE-CO at 25-32°C for 0.5-1 minute per μm of Measured Film Thickness (with a maximum of 20 minutes)',
             aerospace_defense
           )
         ),
@@ -28,7 +28,7 @@ module OperationLibrary
           id: 'HOT_WATER_DIP',
           process_type: 'sealing',
           operation_text: build_operation_text(
-            'Hot water dip for 15-30 seconds based on Measured Film Thickness',
+            'Hot water dip for 15-30 seconds.',
             aerospace_defense
           )
         ),
@@ -38,7 +38,7 @@ module OperationLibrary
           id: 'HOT_SEAL',
           process_type: 'sealing',
           operation_text: build_operation_text(
-            'Seal in hot seal at 96°C for 2-3 minutes per μm of Measured Film Thickness (with a minimum of 10 minutes)',
+            'Seal in hot seal at 96°C for 2-3 minutes per μm of Measured Film Thickness (with a minimum of 10 mins, and a maximum of 40 mins)',
             aerospace_defense
           )
         ),
@@ -48,7 +48,7 @@ module OperationLibrary
           id: 'SURTEC_650V_SEAL',
           process_type: 'sealing',
           operation_text: build_operation_text(
-            'Seal in SurTec 650V at 28-32°C for 0.5-1 minute per μm of Measured Film Thickness',
+            'Seal in SurTec 650V at 28-32°C for 0.5-1 minute per μm of Measured Film Thickness (with a maximum of 20 minutes)',
             aerospace_defense
           )
         ),
