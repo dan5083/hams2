@@ -1,7 +1,3 @@
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
-
 <%# Customer Order Form with Autocomplete - app/views/customer_orders/_form.html.erb %>
 <%= form_with model: customer_order, local: true, class: "space-y-6" do |form| %>
   <% if customer_order.errors.any? %>
@@ -90,7 +86,7 @@
 <% end %>
 
 <!-- JavaScript for Autocomplete -->
-<script>
+<script data-cache-buster="<%= Time.current.to_i %>">
 document.addEventListener('DOMContentLoaded', function() {
   const autocompleteInput = document.getElementById('customer_autocomplete');
   const customerIdHidden = document.getElementById('customer_id_hidden');
