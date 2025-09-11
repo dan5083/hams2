@@ -665,7 +665,7 @@
 <script>
 // Change Process Function - available for all parts (locked and unlocked, new and existing)
 window.changeProcess = function() {
-  if (confirm('Change process configuration? This will unlock the operations and allow you to reconfigure treatments, but you will lose your current manual operation text customizations. Continue?')) {
+  if (confirm('Reset process configuration? This will completely clear all treatments and operations, returning the part to a clean state where you can configure processing from scratch. Continue?')) {
     document.getElementById('change_process_field').value = 'true';
     document.querySelector('form').submit();
   }
