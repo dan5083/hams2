@@ -140,9 +140,6 @@ class PartsController < ApplicationController
   def update
     # Handle change process request for locked parts - completely reset configuration
     if params[:change_process] == 'true' && @part.locked_for_editing?
-      Rails.logger.info "🔄 CHANGE PROCESS: Starting process reset for part #{@part.id}"
-      Rails.logger.info "🔄 CHANGE PROCESS: Part locked status before: #{@part.locked_for_editing?}"
-      Rails.logger.info "🔄 CHANGE PROCESS: Current customisation_data: #{@part.customisation_data.inspect}"
 
       begin
         # Completely wipe the process configuration - reset to clean state
@@ -160,21 +157,16 @@ class PartsController < ApplicationController
 
         # Save the part to persist the unlocked state
         if @part.save
-          Rails.logger.info "🔄 CHANGE PROCESS: Part saved successfully"
-          Rails.logger.info "🔄 CHANGE PROCESS: Part locked status after save: #{@part.locked_for_editing?}"
-          Rails.logger.info "🔄 CHANGE PROCESS: Has locked operations data: #{@part.has_locked_operations_data?}"
 
           redirect_to edit_part_path(@part), notice: 'Process configuration reset. You can now configure treatments from scratch.'
           return
         else
-          Rails.logger.error "🔄 CHANGE PROCESS: Failed to save part: #{@part.errors.full_messages}"
           @customers = [@part.customer]
           @specification_presets = SpecificationPreset.enabled.ordered
           render :edit, status: :unprocessable_entity
           return
         end
       rescue => e
-        Rails.logger.error "🔄 CHANGE PROCESS: Exception: #{e.message}"
         redirect_to edit_part_path(@part), alert: "Failed to reset process configuration: #{e.message}"
         return
       end
