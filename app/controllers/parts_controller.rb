@@ -126,12 +126,12 @@ class PartsController < ApplicationController
     @customers = [@part.customer] # Don't allow changing customer on existing part
     @specification_presets = SpecificationPreset.enabled.ordered
 
-    # Auto-lock existing parts that don't have the locked operations structure
-    if @part.persisted? && !@part.has_locked_operations_data?
-      @part.auto_lock_for_editing!
-    end
+    # REMOVE OR COMMENT OUT THIS SECTION:
+    # if @part.persisted? && !@part.has_locked_operations_data? && params[:change_process] != 'true'
+    #   @part.auto_lock_for_editing!
+    # end
 
-    # Ensure customisation_data structure exists for unlocked parts (shouldn't happen for persisted parts)
+    # Ensure customisation_data structure exists for unlocked parts
     if !@part.locked_for_editing?
       @part.customisation_data = { "operation_selection" => {} } if @part.customisation_data.blank?
     end
