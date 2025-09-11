@@ -61,8 +61,9 @@ class Part < ApplicationRecord
 
   # Lock-in-and-edit feature methods
   def locked_for_editing?
-    # Auto-lock existing parts (any persisted part) OR explicitly locked parts
-    persisted? || customisation_data.dig("operation_selection", "locked") == true
+    # Only consider explicitly locked parts with locked operations data
+    customisation_data.dig("operation_selection", "locked") == true &&
+    has_locked_operations_data?
   end
 
   def has_locked_operations_data?
