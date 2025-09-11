@@ -163,6 +163,132 @@ class Part < ApplicationRecord
     end
   end
 
+  # Insert a new operation at the specified position
+  def insert_operation_at(position, operation_text, display_name = nil)
+    return false unless locked_for_editing?
+
+    locked_ops = customisation_data.dig('operation_selection', 'locked_operations') || []
+
+    # Create new operation
+    new_operation = {
+      "id" => "CUSTOM_OP_#{Time.current.to_i}",
+      "display_name" => display_name || "Custom Operation",
+      "operation_text" => operation_text,
+      "position" => position,
+      "specifications" => "",
+      "vat_numbers" => [],
+      "process_type" => "manual",
+      "target_thickness" => 0,
+      "auto_inserted" => false
+    }
+
+    # Shift existing operations at or after this position
+    locked_ops.each do |op|
+      if op["position"] >= position
+        op["position"] += 1
+      end
+    end
+
+    # Add new operation
+    locked_ops << new_operation
+
+    # Update and save
+    self.customisation_data = customisation_data.dup
+    self.customisation_data["operation_selection"]["locked_operations"] = locked_ops
+    save!
+
+    renumber_operations
+    true
+  end
+
+  # Delete operation at specified position
+  def delete_operation_at(position)
+    return false unless locked_for_editing?
+
+    locked_ops = customisation_data.dig('operation_selection', 'locked_operations') || []
+
+    # Remove the operation at this position
+    locked_ops.reject! { |op| op["position"] == position }
+
+    # Shift down operations after this position
+    locked_ops.each do |op|
+      if op["position"] > position
+        op["position"] -= 1
+      end
+    end
+
+    # Update and save
+    self.customisation_data = customisation_data.dup
+    self.customisation_data["operation_selection"]["locked_operations"] = locked_ops
+    save!
+
+    renumber_operations
+    true
+  end
+
+  # Move operation from one position to another
+  def reorder_operation(from_position, to_position)
+    return false unless locked_for_editing?
+    return false if from_position == to_position
+
+    locked_ops = customisation_data.dig('operation_selection', 'locked_operations') || []
+
+    # Find the operation to move
+    moving_op = locked_ops.find { |op| op["position"] == from_position }
+    return false unless moving_op
+
+    # Remove it temporarily
+    locked_ops.delete(moving_op)
+
+    # Adjust positions of other operations
+    if from_position < to_position
+      # Moving down - shift operations between old and new position up
+      locked_ops.each do |op|
+        if op["position"] > from_position && op["position"] <= to_position
+          op["position"] -= 1
+        end
+      end
+    else
+      # Moving up - shift operations between new and old position down
+      locked_ops.each do |op|
+        if op["position"] >= to_position && op["position"] < from_position
+          op["position"] += 1
+        end
+      end
+    end
+
+    # Set new position and add back
+    moving_op["position"] = to_position
+    locked_ops << moving_op
+
+    # Update and save
+    self.customisation_data = customisation_data.dup
+    self.customisation_data["operation_selection"]["locked_operations"] = locked_ops
+    save!
+
+    renumber_operations
+    true
+  end
+
+  # Helper method to ensure sequential numbering
+  def renumber_operations
+    return false unless locked_for_editing?
+
+    locked_ops = customisation_data.dig('operation_selection', 'locked_operations') || []
+
+    # Sort by current position and renumber sequentially
+    locked_ops.sort_by! { |op| op["position"] || 0 }
+    locked_ops.each_with_index do |op, index|
+      op["position"] = index + 1
+    end
+
+    # Update and save
+    self.customisation_data = customisation_data.dup
+    self.customisation_data["operation_selection"]["locked_operations"] = locked_ops
+    save!
+    true
+  end
+
   # Get aerospace/defense flag from customisation data
   def aerospace_defense?
     operation_selection["aerospace_defense"] == true || operation_selection["aerospace_defense"] == "true"

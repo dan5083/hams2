@@ -18,6 +18,9 @@ Rails.application.routes.draw do
       patch :toggle_enabled
       patch :lock_operations
       patch :update_locked_operations
+      post :insert_operation
+      patch :reorder_operation
+      delete :delete_operation
     end
     collection do
       get :search

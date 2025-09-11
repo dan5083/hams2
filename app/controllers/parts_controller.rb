@@ -1,5 +1,5 @@
 class PartsController < ApplicationController
-  before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled, :lock_operations, :update_locked_operations]
+before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled, :lock_operations, :update_locked_operations, :insert_operation, :reorder_operation, :delete_operation]
 
   def index
     @parts = Part.includes(:customer, :works_orders)
@@ -450,7 +450,104 @@ class PartsController < ApplicationController
     render json: { operations: operations_with_auto_ops }
   end
 
+  def insert_operation
+    @part = Part.find(params[:id])
+
+    position = params[:position]&.to_i
+    operation_text = params[:operation_text]
+    display_name = params[:display_name]
+
+    if position.nil? || operation_text.blank?
+      render json: { success: false, error: 'Position and operation text are required' }, status: :unprocessable_entity
+      return
+    end
+
+    if @part.insert_operation_at(position, operation_text, display_name)
+      render json: {
+        success: true,
+        message: 'Operation inserted successfully',
+        operations: @part.locked_operations
+      }
+    else
+      render json: {
+        success: false,
+        error: 'Failed to insert operation'
+      }, status: :unprocessable_entity
+    end
+  rescue => e
+    Rails.logger.error "Error inserting operation: #{e.message}"
+    render json: {
+      success: false,
+      error: 'An error occurred while inserting the operation'
+    }, status: :internal_server_error
+  end
+
+  def reorder_operation
+    @part = Part.find(params[:id])
+
+    from_position = params[:from_position]&.to_i
+    to_position = params[:to_position]&.to_i
+
+    if from_position.nil? || to_position.nil?
+      render json: { success: false, error: 'Both from_position and to_position are required' }, status: :unprocessable_entity
+      return
+    end
+
+    if @part.reorder_operation(from_position, to_position)
+      render json: {
+        success: true,
+        message: 'Operation reordered successfully',
+        operations: @part.locked_operations
+      }
+    else
+      render json: {
+        success: false,
+        error: 'Failed to reorder operation'
+      }, status: :unprocessable_entity
+    end
+  rescue => e
+    Rails.logger.error "Error reordering operation: #{e.message}"
+    render json: {
+      success: false,
+      error: 'An error occurred while reordering the operation'
+    }, status: :internal_server_error
+  end
+
+  def delete_operation
+    @part = Part.find(params[:id])
+
+    position = params[:position]&.to_i
+
+    if position.nil?
+      render json: { success: false, error: 'Position is required' }, status: :unprocessable_entity
+      return
+    end
+
+    if @part.delete_operation_at(position)
+      render json: {
+        success: true,
+        message: 'Operation deleted successfully',
+        operations: @part.locked_operations
+      }
+    else
+      render json: {
+        success: false,
+        error: 'Failed to delete operation'
+      }, status: :unprocessable_entity
+    end
+  rescue => e
+    Rails.logger.error "Error deleting operation: #{e.message}"
+    render json: {
+      success: false,
+      error: 'An error occurred while deleting the operation'
+    }, status: :internal_server_error
+  end
+
   private
+
+  def operation_params
+    params.permit(:position, :operation_text, :display_name, :from_position, :to_position)
+  end
 
   def set_part
     @part = Part.find(params[:id])
