@@ -150,11 +150,18 @@ class PartsController < ApplicationController
           "selected_enp_pre_heat_treatment" => "none",
           "selected_enp_heat_treatment" => "none",
           "enp_strip_type" => "nitric"
+          # Explicitly NOT setting "locked" => true or "locked_operations" => []
+          # This ensures the part is in unlocked state
         }
 
-        # Update with any other part changes
-        if @part.update(part_params)
-          redirect_to edit_part_path(@part), notice: 'Process configuration reset. You can now configure treatments from scratch.'
+        # Save the part to persist the unlocked state
+        if @part.save
+          # Update with any other part changes
+          if part_params.present? && @part.update(part_params)
+            redirect_to edit_part_path(@part), notice: 'Process configuration reset. You can now configure treatments from scratch.'
+          else
+            redirect_to edit_part_path(@part), notice: 'Process configuration reset. You can now configure treatments from scratch.'
+          end
           return
         else
           @customers = [@part.customer]
