@@ -138,82 +138,107 @@ class PartsController < ApplicationController
   end
 
   def update
-    # Handle manual mode switch for existing parts
-    if params[:switch_to_manual] == 'true'
-      begin
-        # Generate operations from current configuration
-        current_ops = @part.get_operations_with_auto_ops
+  # Handle change process request for locked parts
+  if params[:change_process] == 'true' && @part.locked_for_editing?
+    begin
+      # Clear the locked operations data to unlock process configuration
+      @part.customisation_data = @part.customisation_data.dup || {}
+      @part.customisation_data["operation_selection"] ||= {}
+      @part.customisation_data["operation_selection"].delete("locked")
+      @part.customisation_data["operation_selection"].delete("locked_operations")
 
-        if current_ops.empty?
-          redirect_to edit_part_path(@part), alert: 'No operations found to switch to manual mode. Please configure treatments first.'
-          return
-        end
-
-        # Update with new data first, then lock operations
-        if @part.update(part_params)
-          # Now lock the operations
-          @part.customisation_data = @part.customisation_data.dup || {}
-          @part.customisation_data["operation_selection"] ||= {}
-          @part.customisation_data["operation_selection"]["locked"] = true
-          @part.customisation_data["operation_selection"]["locked_operations"] = current_ops.map.with_index do |op, index|
-            {
-              "id" => op.id,
-              "display_name" => op.display_name,
-              "operation_text" => op.operation_text,
-              "position" => index + 1,
-              "specifications" => op.specifications,
-              "vat_numbers" => op.vat_numbers,
-              "process_type" => op.process_type,
-              "target_thickness" => op.target_thickness,
-              "auto_inserted" => op.respond_to?(:auto_inserted?) ? op.auto_inserted? : false
-            }
-          end
-
-          @part.save!
-          redirect_to edit_part_path(@part), notice: 'Part updated and switched to manual editing mode. You can now customize each operation.'
-          return
-        else
-          @customers = [@part.customer]
-          @specification_presets = SpecificationPreset.enabled.ordered
-          render :edit, status: :unprocessable_entity
-          return
-        end
-
-      rescue => e
-        redirect_to edit_part_path(@part), alert: "Failed to switch to manual mode: #{e.message}"
+      # Update with any other part changes
+      if @part.update(part_params)
+        redirect_to edit_part_path(@part), notice: 'Process configuration unlocked. You can now reconfigure treatments and operations.'
+        return
+      else
+        @customers = [@part.customer]
+        @specification_presets = SpecificationPreset.enabled.ordered
+        render :edit, status: :unprocessable_entity
         return
       end
+    rescue => e
+      redirect_to edit_part_path(@part), alert: "Failed to unlock process configuration: #{e.message}"
+      return
     end
+  end
 
-    # Handle locked operations updates
-    if @part.locked_for_editing? && params[:locked_operations].present?
-      # FIRST update the part details
+  # Handle manual mode switch for existing parts
+  if params[:switch_to_manual] == 'true'
+    begin
+      # Generate operations from current configuration
+      current_ops = @part.get_operations_with_auto_ops
+
+      if current_ops.empty?
+        redirect_to edit_part_path(@part), alert: 'No operations found to switch to manual mode. Please configure treatments first.'
+        return
+      end
+
+      # Update with new data first, then lock operations
       if @part.update(part_params)
-        # THEN update the locked operations
-        if update_locked_operations_text
-          redirect_to @part, notice: 'Part and operations were successfully updated.'
-        else
-          @customers = [@part.customer]
-          @specification_presets = SpecificationPreset.enabled.ordered
-          render :edit, status: :unprocessable_entity
+        # Now lock the operations
+        @part.customisation_data = @part.customisation_data.dup || {}
+        @part.customisation_data["operation_selection"] ||= {}
+        @part.customisation_data["operation_selection"]["locked"] = true
+        @part.customisation_data["operation_selection"]["locked_operations"] = current_ops.map.with_index do |op, index|
+          {
+            "id" => op.id,
+            "display_name" => op.display_name,
+            "operation_text" => op.operation_text,
+            "position" => index + 1,
+            "specifications" => op.specifications,
+            "vat_numbers" => op.vat_numbers,
+            "process_type" => op.process_type,
+            "target_thickness" => op.target_thickness,
+            "auto_inserted" => op.respond_to?(:auto_inserted?) ? op.auto_inserted? : false
+          }
         end
+
+        @part.save!
+        redirect_to edit_part_path(@part), notice: 'Part updated and switched to manual editing mode. You can now customize each operation.'
+        return
+      else
+        @customers = [@part.customer]
+        @specification_presets = SpecificationPreset.enabled.ordered
+        render :edit, status: :unprocessable_entity
+        return
+      end
+
+    rescue => e
+      redirect_to edit_part_path(@part), alert: "Failed to switch to manual mode: #{e.message}"
+      return
+    end
+  end
+
+  # Handle locked operations updates
+  if @part.locked_for_editing? && params[:locked_operations].present?
+    # FIRST update the part details
+    if @part.update(part_params)
+      # THEN update the locked operations
+      if update_locked_operations_text
+        redirect_to @part, notice: 'Part and operations were successfully updated.'
       else
         @customers = [@part.customer]
         @specification_presets = SpecificationPreset.enabled.ordered
         render :edit, status: :unprocessable_entity
       end
-      return
-    end
-
-    # Standard update - just update the part directly
-    if @part.update(part_params)
-      redirect_to @part, notice: 'Part was successfully updated.'
     else
       @customers = [@part.customer]
       @specification_presets = SpecificationPreset.enabled.ordered
       render :edit, status: :unprocessable_entity
     end
+    return
   end
+
+  # Standard update - just update the part directly
+  if @part.update(part_params)
+    redirect_to @part, notice: 'Part was successfully updated.'
+  else
+    @customers = [@part.customer]
+    @specification_presets = SpecificationPreset.enabled.ordered
+    render :edit, status: :unprocessable_entity
+  end
+end
 
   def destroy
     if @part.can_be_deleted?

@@ -29,6 +29,7 @@
 
   <!-- Hidden field for manual mode switch -->
   <%= hidden_field_tag :switch_to_manual, false, id: "switch_to_manual_field" %>
+  <%= hidden_field_tag :change_process, false, id: "change_process_field" %>
 
   <!-- Part Details Section -->
   <div class="bg-white shadow rounded-lg p-6">
@@ -201,10 +202,19 @@
     <div class="bg-white shadow rounded-lg p-6">
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-lg font-medium text-gray-900">Manual Operations Mode</h3>
-        <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
-          Operations Locked for Editing
-        </span>
+        <div class="flex items-center space-x-3">
+          <!-- ADD THIS BUTTON -->
+          <%= button_tag "Change Process",
+              type: "button",
+              onclick: "changeProcess()",
+              class: "bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded",
+              title: "Unlock process configuration to make changes" %>
+          <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+            Operations Locked for Editing
+          </span>
+        </div>
       </div>
+
 
       <p class="text-sm text-gray-600 mb-6">Operations are now in manual editing mode. You can customize the text for each operation below.</p>
 
@@ -438,6 +448,7 @@
       </div>
 
       <!-- Hidden fields for form data -->
+
       <%= hidden_field_tag "part[customisation_data][operation_selection][treatments]",
           part.operation_selection["treatments"]&.to_json || '[]',
           data: { parts_form_target: "treatmentsField" } %>
@@ -464,7 +475,7 @@
     </div>
   <% end %>
 
-  <!-- Form Actions -->
+<!-- Form Actions -->
   <div class="flex justify-end space-x-3">
     <%= link_to "Cancel", part.persisted? ? part : parts_path,
         class: "bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded" %>
@@ -484,170 +495,148 @@
   </div>
 <% end %>
 
-  <% if !part.locked_for_editing? %>
- <% unless part.persisted? %>
-<script>
-// Wait a bit longer and try multiple times to ensure DOM is ready
-function initializeCustomerAutocomplete() {
-  const autocompleteInput = document.getElementById('part_customer_autocomplete');
-  const customerIdHidden = document.getElementById('part_customer_id_hidden');
-  const dropdown = document.getElementById('part_customer_dropdown');
-  const loadingIndicator = document.getElementById('part_customer_loading');
+<% if !part.locked_for_editing? %>
+  <% unless part.persisted? %>
+    <script>
+    // Wait a bit longer and try multiple times to ensure DOM is ready
+    function initializeCustomerAutocomplete() {
+      const autocompleteInput = document.getElementById('part_customer_autocomplete');
+      const customerIdHidden = document.getElementById('part_customer_id_hidden');
+      const dropdown = document.getElementById('part_customer_dropdown');
+      const loadingIndicator = document.getElementById('part_customer_loading');
 
-  if (!autocompleteInput || !customerIdHidden || !dropdown) {
-    console.log('Elements not ready yet, retrying...');
-    setTimeout(initializeCustomerAutocomplete, 100);
-    return;
-  }
-
-  console.log('Customer autocomplete initialized');
-
-  let searchTimeout;
-  let currentRequest;
-
-  // Test that event listener is working
-  autocompleteInput.addEventListener('input', function() {
-    console.log('Input event triggered, value:', this.value);
-
-    const query = this.value.trim();
-
-    clearTimeout(searchTimeout);
-
-    if (currentRequest) {
-      currentRequest.abort();
-    }
-
-    if (query.length < 2) {
-      dropdown.classList.add('hidden');
-      customerIdHidden.value = '';
-      return;
-    }
-
-    // Show loading
-    if (loadingIndicator) {
-      loadingIndicator.classList.remove('hidden');
-    }
-
-    searchTimeout = setTimeout(() => {
-      console.log('Searching for:', query);
-      searchCustomers(query);
-    }, 300);
-  });
-
-  function searchCustomers(query) {
-    currentRequest = new AbortController();
-
-    fetch(`/customer_orders/search_customers?q=${encodeURIComponent(query)}`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      signal: currentRequest.signal
-    })
-    .then(response => {
-      console.log('Response received:', response.status);
-      return response.json();
-    })
-    .then(data => {
-      console.log('Search results:', data);
-
-      if (loadingIndicator) {
-        loadingIndicator.classList.add('hidden');
+      if (!autocompleteInput || !customerIdHidden || !dropdown) {
+        console.log('Elements not ready yet, retrying...');
+        setTimeout(initializeCustomerAutocomplete, 100);
+        return;
       }
 
-      displayResults(data);
-    })
-    .catch(error => {
-      if (loadingIndicator) {
-        loadingIndicator.classList.add('hidden');
-      }
+      console.log('Customer autocomplete initialized');
 
-      if (error.name !== 'AbortError') {
-        console.error('Search error:', error);
-      }
-    });
-  }
+      let searchTimeout;
+      let currentRequest;
 
-  function displayResults(customers) {
-    dropdown.innerHTML = '';
+      // Test that event listener is working
+      autocompleteInput.addEventListener('input', function() {
+        console.log('Input event triggered, value:', this.value);
 
-    if (customers.length === 0) {
-      dropdown.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500">No customers found.</div>';
-    } else {
-      customers.forEach(customer => {
-        const item = document.createElement('div');
-        item.className = 'dropdown-item px-4 py-3 cursor-pointer hover:bg-blue-50 text-sm border-b border-gray-100 last:border-b-0';
-        item.textContent = customer.name;
+        const query = this.value.trim();
 
-        item.addEventListener('click', function() {
-          console.log('Selected customer:', customer.name);
-          customerIdHidden.value = customer.id;
-          autocompleteInput.value = customer.name;
+        clearTimeout(searchTimeout);
+
+        if (currentRequest) {
+          currentRequest.abort();
+        }
+
+        if (query.length < 2) {
           dropdown.classList.add('hidden');
+          customerIdHidden.value = '';
+          return;
+        }
 
-          // Visual feedback
-          autocompleteInput.style.borderColor = '#10b981';
-          setTimeout(() => {
-            autocompleteInput.style.borderColor = '';
-          }, 1000);
+        // Show loading
+        if (loadingIndicator) {
+          loadingIndicator.classList.remove('hidden');
+        }
+
+        searchTimeout = setTimeout(() => {
+          console.log('Searching for:', query);
+          searchCustomers(query);
+        }, 300);
+      });
+
+      function searchCustomers(query) {
+        currentRequest = new AbortController();
+
+        fetch(`/customer_orders/search_customers?q=${encodeURIComponent(query)}`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          signal: currentRequest.signal
+        })
+        .then(response => {
+          console.log('Response received:', response.status);
+          return response.json();
+        })
+        .then(data => {
+          console.log('Search results:', data);
+
+          if (loadingIndicator) {
+            loadingIndicator.classList.add('hidden');
+          }
+
+          displayResults(data);
+        })
+        .catch(error => {
+          if (loadingIndicator) {
+            loadingIndicator.classList.add('hidden');
+          }
+
+          if (error.name !== 'AbortError') {
+            console.error('Search error:', error);
+          }
         });
+      }
 
-        dropdown.appendChild(item);
+      function displayResults(customers) {
+        dropdown.innerHTML = '';
+
+        if (customers.length === 0) {
+          dropdown.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500">No customers found.</div>';
+        } else {
+          customers.forEach(customer => {
+            const item = document.createElement('div');
+            item.className = 'dropdown-item px-4 py-3 cursor-pointer hover:bg-blue-50 text-sm border-b border-gray-100 last:border-b-0';
+            item.textContent = customer.name;
+
+            item.addEventListener('click', function() {
+              console.log('Selected customer:', customer.name);
+              customerIdHidden.value = customer.id;
+              autocompleteInput.value = customer.name;
+              dropdown.classList.add('hidden');
+
+              // Visual feedback
+              autocompleteInput.style.borderColor = '#10b981';
+              setTimeout(() => {
+                autocompleteInput.style.borderColor = '';
+              }, 1000);
+            });
+
+            dropdown.appendChild(item);
+          });
+        }
+
+        dropdown.classList.remove('hidden');
+      }
+
+      // Click outside to close
+      document.addEventListener('click', function(event) {
+        if (!autocompleteInput.contains(event.target) && !dropdown.contains(event.target)) {
+          dropdown.classList.add('hidden');
+        }
       });
     }
 
-    dropdown.classList.remove('hidden');
-  }
-
-  // Click outside to close
-  document.addEventListener('click', function(event) {
-    if (!autocompleteInput.contains(event.target) && !dropdown.contains(event.target)) {
-      dropdown.classList.add('hidden');
+    // Start initialization
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initializeCustomerAutocomplete);
+    } else {
+      initializeCustomerAutocomplete();
     }
-  });
-}
+    </script>
 
-// Manual Mode Function
-window.switchToManualMode = function() {
-  const treatmentsField = document.querySelector('[data-parts-form-target="treatmentsField"]');
-  const treatments = treatmentsField ? JSON.parse(treatmentsField.value || '[]') : [];
+    <style>
+    .dropdown-item:hover {
+      background-color: #dbeafe !important;
+    }
 
-  if (treatments.length === 0) {
-    alert('Please configure some treatments first before switching to manual mode.');
-    return;
-  }
-
-  const hasOperations = treatments.some(t => t.operation_id || t.type === 'stripping_only');
-  if (!hasOperations) {
-    alert('Please select operations for your treatments before switching to manual mode.');
-    return;
-  }
-
-  if (confirm('Switch to manual editing mode? This will save your current configuration and allow you to customize each operation individually. You cannot return to automatic mode after this change.')) {
-    document.getElementById('switch_to_manual_field').value = 'true';
-    document.querySelector('form').submit();
-  }
-};
-
-// Start initialization
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializeCustomerAutocomplete);
-} else {
-  initializeCustomerAutocomplete();
-}
-</script>
-
-<style>
-.dropdown-item:hover {
-  background-color: #dbeafe !important;
-}
-
-#part_customer_loading {
-  pointer-events: none;
-}
-</style>
-<% end %>
+    #part_customer_loading {
+      pointer-events: none;
+    }
+    </style>
+  <% end %>
 
   <!-- Styles for autocomplete -->
   <style>
@@ -671,3 +660,36 @@ if (document.readyState === 'loading') {
   }
   </style>
 <% end %>
+
+<!-- JavaScript functions available for ALL parts -->
+<script>
+// Change Process Function - available for all parts (locked and unlocked, new and existing)
+window.changeProcess = function() {
+  if (confirm('Change process configuration? This will unlock the operations and allow you to reconfigure treatments, but you will lose your current manual operation text customizations. Continue?')) {
+    document.getElementById('change_process_field').value = 'true';
+    document.querySelector('form').submit();
+  }
+};
+
+// Manual Mode Function
+window.switchToManualMode = function() {
+  const treatmentsField = document.querySelector('[data-parts-form-target="treatmentsField"]');
+  const treatments = treatmentsField ? JSON.parse(treatmentsField.value || '[]') : [];
+
+  if (treatments.length === 0) {
+    alert('Please configure some treatments first before switching to manual mode.');
+    return;
+  }
+
+  const hasOperations = treatments.some(t => t.operation_id || t.type === 'stripping_only');
+  if (!hasOperations) {
+    alert('Please select operations for your treatments before switching to manual mode.');
+    return;
+  }
+
+  if (confirm('Switch to manual editing mode? This will save your current configuration and allow you to customize each operation individually. You cannot return to automatic mode after this change.')) {
+    document.getElementById('switch_to_manual_field').value = 'true';
+    document.querySelector('form').submit();
+  }
+};
+</script>
