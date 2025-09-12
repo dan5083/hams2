@@ -266,22 +266,28 @@ export default class extends Controller {
     const tempId = 'temp_' + Date.now()
     const newOperationHTML = this.createOperationHTML(position, displayName, operationText, tempId)
 
-    // Find the right place to insert (after the corresponding add button)
+    // Find the right place to insert based on position
     const operationsContainer = document.getElementById('operations-container')
-    const addButtons = operationsContainer.querySelectorAll('.add-operation-btn')
-    let insertAfter = null
 
-    addButtons.forEach(button => {
-      if (parseInt(button.dataset.insertPosition) === position) {
-        insertAfter = button.closest('div')
-      }
-    })
-
-    if (insertAfter) {
-      insertAfter.insertAdjacentHTML('afterend', newOperationHTML)
+    // If inserting at position 1, insert at the very beginning
+    if (position === 1) {
+      operationsContainer.insertAdjacentHTML('afterbegin', newOperationHTML)
     } else {
-      // Insert at end if no matching button found
-      operationsContainer.insertAdjacentHTML('beforeend', newOperationHTML)
+      // Find the operation that should come BEFORE this position
+      // We want to insert after the operation at position-1
+      const targetOperation = operationsContainer.querySelector(`.operation-item[data-position="${position - 1}"]`)
+
+      if (targetOperation) {
+        targetOperation.insertAdjacentHTML('afterend', newOperationHTML)
+      } else {
+        // If we can't find the previous operation, insert at the end
+        const lastOperation = operationsContainer.querySelector('.operation-item:last-of-type')
+        if (lastOperation) {
+          lastOperation.insertAdjacentHTML('afterend', newOperationHTML)
+        } else {
+          operationsContainer.insertAdjacentHTML('beforeend', newOperationHTML)
+        }
+      }
     }
 
     // Hide and clear the form
