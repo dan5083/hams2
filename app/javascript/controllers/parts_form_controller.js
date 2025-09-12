@@ -262,22 +262,31 @@ export default class extends Controller {
   }
 
   async insertOperationAtPosition(position, operationText, displayName, form) {
+     console.log('🔍 Inserting at position:', position)
     // Optimistic UI update - add operation immediately
     const tempId = 'temp_' + Date.now()
     const newOperationHTML = this.createOperationHTML(position, displayName, operationText, tempId)
 
     // Find the right place to insert based on position
     const operationsContainer = document.getElementById('operations-container')
+      console.log('🔍 Operations container:', operationsContainer)
+
 
     // If inserting at position 1, insert at the very beginning
     if (position === 1) {
+      console.log('🔍 Inserting at beginning')
+
       operationsContainer.insertAdjacentHTML('afterbegin', newOperationHTML)
     } else {
       // Find the operation that should come BEFORE this position
       // We want to insert after the operation at position-1
       const targetOperation = operationsContainer.querySelector(`.operation-item[data-position="${position - 1}"]`)
+          console.log('🔍 Looking for operation at position:', position - 1)
+    console.log('🔍 Found target operation:', targetOperation)
 
       if (targetOperation) {
+              console.log('🔍 Inserting after target operation')
+
         targetOperation.insertAdjacentHTML('afterend', newOperationHTML)
       } else {
         // If we can't find the previous operation, insert at the end
