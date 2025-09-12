@@ -1,4 +1,4 @@
-<%# app/views/parts/_form.html.erb - Complete form with manual operation management %>
+<%# app/views/parts/_form.html.erb - Complete form with inline manual operation management %>
 <%= form_with model: part, local: true, class: "space-y-6",
     data: {
       controller: "parts-form",
@@ -197,7 +197,7 @@
   </div>
 
   <% if part.locked_for_editing? %>
-    <!-- Locked Operations Editing Mode with Manual Management -->
+    <!-- Locked Operations Editing Mode with Inline Manual Management -->
     <div class="bg-white shadow rounded-lg p-6">
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-lg font-medium text-gray-900">Manual Operations Mode</h3>
@@ -206,10 +206,44 @@
         </span>
       </div>
 
-      <p class="text-sm text-gray-600 mb-6">Operations are now in manual editing mode. You can customize the text, insert new operations, reorder, or delete operations below.</p>
+      <p class="text-sm text-gray-600 mb-6">Operations are now in manual editing mode. You can customize the text, insert new operations between existing ones, reorder, or delete operations below.</p>
 
-      <div class="space-y-4" id="operations-container">
+      <div class="space-y-1" id="operations-container">
         <% part.locked_operations.each_with_index do |operation, index| %>
+          <!-- Insert strip before each operation (except first) -->
+          <% unless index == 0 %>
+            <div class="insert-strip group py-2 my-1 cursor-pointer" data-insert-position="<%= operation['position'] %>">
+              <div class="border-t border-dashed border-gray-300 group-hover:border-blue-400 transition-colors relative">
+                <div class="absolute inset-x-0 -top-3 flex justify-center">
+                  <span class="bg-white px-3 py-1 text-xs text-gray-400 group-hover:text-blue-600 group-hover:bg-blue-50 rounded-full border border-transparent group-hover:border-blue-200 transition-all">
+                    + Add operation here
+                  </span>
+                </div>
+              </div>
+
+              <!-- Inline form (hidden by default) -->
+              <div class="insert-form hidden bg-blue-50 border border-blue-200 rounded-lg p-4 mt-2 shadow-sm">
+                <div class="mb-3">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Operation Name (optional)</label>
+                  <input type="text" class="operation-name-input w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., Custom Inspection">
+                </div>
+                <div class="mb-4">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Operation Instructions</label>
+                  <textarea class="operation-text-input w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" rows="3" placeholder="Enter detailed operation instructions..."></textarea>
+                </div>
+                <div class="flex justify-end space-x-3">
+                  <button type="button" class="cancel-insert px-3 py-1 text-sm text-gray-600 hover:text-gray-800 transition-colors">
+                    Cancel
+                  </button>
+                  <button type="button" class="confirm-insert px-4 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors">
+                    Add Operation
+                  </button>
+                </div>
+              </div>
+            </div>
+          <% end %>
+
+          <!-- Existing operation item -->
           <div class="border border-gray-200 rounded-lg p-4 bg-gray-50 operation-item" data-position="<%= operation["position"] %>">
             <div class="flex justify-between items-start mb-3">
               <div class="flex items-center space-x-3">
@@ -236,13 +270,6 @@
                     ↓
                   </button>
                 <% end %>
-
-                <!-- Insert operation before button -->
-                <button type="button" class="insert-before-btn text-green-600 hover:text-green-800 text-sm font-medium"
-                        data-position="<%= operation["position"] %>"
-                        title="Insert operation before this one">
-                  + Before
-                </button>
 
                 <!-- Delete operation button -->
                 <button type="button" class="delete-operation-btn text-red-600 hover:text-red-800 text-xl font-bold"
@@ -280,39 +307,34 @@
           </div>
         <% end %>
 
-        <!-- Add operation at end button -->
-        <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-          <button type="button" class="insert-at-end-btn text-green-600 hover:text-green-800 font-medium"
-                  data-position="<%= part.locked_operations.length + 1 %>">
-            + Add Operation at End
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Insert Operation Modal -->
-    <div id="insert-operation-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-      <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-        <div class="mt-3">
-          <h3 class="text-lg font-medium text-gray-900 mb-4">Insert New Operation</h3>
-
-          <div class="mb-4">
-            <label for="new-operation-name" class="block text-sm font-medium text-gray-700 mb-1">Operation Name</label>
-            <input type="text" id="new-operation-name" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="e.g., Custom Inspection">
+        <!-- Insert strip after last operation -->
+        <div class="insert-strip group py-2 my-1 cursor-pointer" data-insert-position="<%= part.locked_operations.length + 1 %>">
+          <div class="border-t border-dashed border-gray-300 group-hover:border-blue-400 transition-colors relative">
+            <div class="absolute inset-x-0 -top-3 flex justify-center">
+              <span class="bg-white px-3 py-1 text-xs text-gray-400 group-hover:text-blue-600 group-hover:bg-blue-50 rounded-full border border-transparent group-hover:border-blue-200 transition-all">
+                + Add operation at end
+              </span>
+            </div>
           </div>
 
-          <div class="mb-4">
-            <label for="new-operation-text" class="block text-sm font-medium text-gray-700 mb-1">Operation Instructions</label>
-            <textarea id="new-operation-text" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Enter detailed operation instructions..."></textarea>
-          </div>
-
-          <div class="flex items-center justify-end space-x-3">
-            <button type="button" id="cancel-insert" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">
-              Cancel
-            </button>
-            <button type="button" id="confirm-insert" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
-              Insert Operation
-            </button>
+          <!-- Inline form (hidden by default) -->
+          <div class="insert-form hidden bg-blue-50 border border-blue-200 rounded-lg p-4 mt-2 shadow-sm">
+            <div class="mb-3">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Operation Name (optional)</label>
+              <input type="text" class="operation-name-input w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., Custom Inspection">
+            </div>
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Operation Instructions</label>
+              <textarea class="operation-text-input w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" rows="3" placeholder="Enter detailed operation instructions..."></textarea>
+            </div>
+            <div class="flex justify-end space-x-3">
+              <button type="button" class="cancel-insert px-3 py-1 text-sm text-gray-600 hover:text-gray-800 transition-colors">
+                Cancel
+              </button>
+              <button type="button" class="confirm-insert px-4 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors">
+                Add Operation
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -695,49 +717,76 @@
     document.addEventListener('DOMContentLoaded', function() {
       const partId = '<%= part.id %>';
       const csrfToken = '<%= form_authenticity_token %>';
-      const modal = document.getElementById('insert-operation-modal');
-      const newOperationName = document.getElementById('new-operation-name');
-      const newOperationText = document.getElementById('new-operation-text');
-      const cancelInsert = document.getElementById('cancel-insert');
-      const confirmInsert = document.getElementById('confirm-insert');
-      let insertPosition = null;
 
-      // Show modal for inserting operations
-      function showInsertModal(position) {
-        insertPosition = position;
-        newOperationName.value = '';
-        newOperationText.value = '';
-        modal.classList.remove('hidden');
-        newOperationName.focus();
-      }
+      // Handle insert strip clicks
+      document.querySelectorAll('.insert-strip').forEach(strip => {
+        strip.addEventListener('click', function(e) {
+          // Don't trigger if clicking inside the form
+          if (e.target.closest('.insert-form')) return;
 
-      // Hide modal
-      function hideInsertModal() {
-        modal.classList.add('hidden');
-        insertPosition = null;
-      }
+          const form = this.querySelector('.insert-form');
+          const isVisible = !form.classList.contains('hidden');
 
-      // Insert operation buttons
-      document.querySelectorAll('.insert-before-btn, .insert-at-end-btn').forEach(button => {
-        button.addEventListener('click', function() {
-          const position = parseInt(this.dataset.position);
-          showInsertModal(position);
+          // Hide all other forms first
+          document.querySelectorAll('.insert-form').forEach(f => {
+            f.classList.add('hidden');
+          });
+
+          // Toggle this form
+          if (!isVisible) {
+            form.classList.remove('hidden');
+            form.querySelector('.operation-name-input').focus();
+          }
         });
       });
 
-      // Cancel insert
-      cancelInsert.addEventListener('click', hideInsertModal);
+      // Handle cancel buttons
+      document.querySelectorAll('.cancel-insert').forEach(button => {
+        button.addEventListener('click', function() {
+          const form = this.closest('.insert-form');
+          form.classList.add('hidden');
+          // Clear the inputs
+          form.querySelector('.operation-name-input').value = '';
+          form.querySelector('.operation-text-input').value = '';
+        });
+      });
 
-      // Confirm insert
-      confirmInsert.addEventListener('click', function() {
-        const displayName = newOperationName.value.trim();
-        const operationText = newOperationText.value.trim();
+      // Handle confirm buttons
+      document.querySelectorAll('.confirm-insert').forEach(button => {
+        button.addEventListener('click', function() {
+          const form = this.closest('.insert-form');
+          const strip = this.closest('.insert-strip');
+          const position = parseInt(strip.dataset.insertPosition);
 
-        if (!operationText) {
-          alert('Please enter operation instructions');
-          return;
-        }
+          const operationName = form.querySelector('.operation-name-input').value.trim();
+          const operationText = form.querySelector('.operation-text-input').value.trim();
 
+          if (!operationText) {
+            alert('Please enter operation instructions');
+            return;
+          }
+
+          insertOperation(position, operationText, operationName || 'Custom Operation', form, strip);
+        });
+      });
+
+      function insertOperation(position, operationText, displayName, form, strip) {
+        // Optimistic UI update - add operation immediately
+        const tempId = 'temp_' + Date.now();
+        const newOperationHTML = createOperationHTML(position, displayName, operationText, tempId);
+
+        // Insert after the current strip
+        strip.insertAdjacentHTML('afterend', newOperationHTML);
+
+        // Hide and clear the form
+        form.classList.add('hidden');
+        form.querySelector('.operation-name-input').value = '';
+        form.querySelector('.operation-text-input').value = '';
+
+        // Update positions of subsequent operations
+        updateSubsequentPositions(position);
+
+        // Sync with server
         fetch(`/parts/${partId}/insert_operation`, {
           method: 'POST',
           headers: {
@@ -745,26 +794,101 @@
             'X-CSRF-Token': csrfToken
           },
           body: JSON.stringify({
-            position: insertPosition,
+            position: position,
             operation_text: operationText,
-            display_name: displayName || 'Custom Operation'
+            display_name: displayName
           })
         })
         .then(response => response.json())
         .then(data => {
           if (data.success) {
-            location.reload();
+            // Replace temp operation with real one
+            const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`);
+            if (tempOp) {
+              tempOp.removeAttribute('data-temp-id');
+              tempOp.classList.remove('bg-green-100');
+              tempOp.classList.add('bg-gray-50');
+            }
+            showSuccessMessage('Operation added successfully');
           } else {
+            // Remove the optimistic update
+            const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`);
+            if (tempOp) tempOp.remove();
+            revertPositionUpdates(position);
             alert('Error: ' + data.error);
           }
         })
         .catch(error => {
           console.error('Error:', error);
-          alert('An error occurred while inserting the operation');
+          // Remove the optimistic update
+          const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`);
+          if (tempOp) tempOp.remove();
+          revertPositionUpdates(position);
+          alert('An error occurred while adding the operation');
         });
+      }
 
-        hideInsertModal();
-      });
+      function createOperationHTML(position, displayName, operationText, tempId) {
+        return `
+          <div class="border border-gray-200 rounded-lg p-4 bg-green-100 operation-item transition-colors duration-1000" data-position="${position}" data-temp-id="${tempId}">
+            <div class="flex justify-between items-start mb-3">
+              <div class="flex items-center space-x-3">
+                <h4 class="font-medium text-gray-900">Operation ${position}: ${displayName}</h4>
+              </div>
+              <div class="flex items-center space-x-2">
+                <button type="button" class="reorder-up-btn text-blue-600 hover:text-blue-800 text-sm font-medium" data-position="${position}" title="Move up">↑</button>
+                <button type="button" class="reorder-down-btn text-blue-600 hover:text-blue-800 text-sm font-medium" data-position="${position}" title="Move down">↓</button>
+                <button type="button" class="delete-operation-btn text-red-600 hover:text-red-800 text-xl font-bold" data-position="${position}" title="Delete this operation">×</button>
+              </div>
+            </div>
+            <textarea name="locked_operations[${position}]" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">${operationText}</textarea>
+          </div>
+        `;
+      }
+
+      function updateSubsequentPositions(insertPosition) {
+        document.querySelectorAll('.operation-item').forEach(item => {
+          const currentPosition = parseInt(item.dataset.position);
+          if (currentPosition >= insertPosition && !item.dataset.tempId) {
+            const newPosition = currentPosition + 1;
+            item.dataset.position = newPosition;
+            const header = item.querySelector('h4');
+            if (header) {
+              header.textContent = header.textContent.replace(/Operation \d+:/, `Operation ${newPosition}:`);
+            }
+            const textarea = item.querySelector('textarea');
+            if (textarea) {
+              textarea.name = `locked_operations[${newPosition}]`;
+            }
+          }
+        });
+      }
+
+      function revertPositionUpdates(insertPosition) {
+        document.querySelectorAll('.operation-item').forEach(item => {
+          const currentPosition = parseInt(item.dataset.position);
+          if (currentPosition > insertPosition) {
+            const newPosition = currentPosition - 1;
+            item.dataset.position = newPosition;
+            const header = item.querySelector('h4');
+            if (header) {
+              header.textContent = header.textContent.replace(/Operation \d+:/, `Operation ${newPosition}:`);
+            }
+            const textarea = item.querySelector('textarea');
+            if (textarea) {
+              textarea.name = `locked_operations[${newPosition}]`;
+            }
+          }
+        });
+      }
+
+      function showSuccessMessage(message) {
+        const successDiv = document.createElement('div');
+        successDiv.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50';
+        successDiv.textContent = message;
+        document.body.appendChild(successDiv);
+        setTimeout(() => successDiv.remove(), 3000);
+      }
 
       // Delete operation buttons
       document.querySelectorAll('.delete-operation-btn').forEach(button => {
@@ -840,13 +964,6 @@
           alert('An error occurred while reordering the operation');
         });
       }
-
-      // Close modal when clicking outside
-      modal.addEventListener('click', function(e) {
-        if (e.target === modal) {
-          hideInsertModal();
-        }
-      });
     });
   </script>
 <% end %>
@@ -864,5 +981,9 @@
 .border-red-500 {
   border-color: #ef4444 !important;
   box-shadow: 0 0 0 1px #ef4444 !important;
+}
+
+.insert-strip:hover .insert-form {
+  display: block;
 }
 </style>

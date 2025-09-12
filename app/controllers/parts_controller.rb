@@ -1,5 +1,5 @@
 class PartsController < ApplicationController
-before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled, :lock_operations, :update_locked_operations, :insert_operation, :reorder_operation, :delete_operation]
+before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled, :insert_operation, :reorder_operation, :delete_operation]
 
   def index
     @parts = Part.includes(:customer, :works_orders)
@@ -151,26 +151,8 @@ before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled
 
         # Update with new data first, then lock operations
         if @part.update(part_params)
-          # Now lock the operations
-          @part.customisation_data = @part.customisation_data.dup || {}
-          @part.customisation_data["operation_selection"] ||= {}
-          @part.customisation_data["operation_selection"]["locked"] = true
-          @part.customisation_data["operation_selection"]["locked_operations"] = current_ops.map.with_index do |op, index|
-            {
-              "id" => op.id,
-              "display_name" => op.display_name,
-              "operation_text" => op.operation_text,
-              "position" => index + 1,
-              "specifications" => op.specifications,
-              "vat_numbers" => op.vat_numbers,
-              "process_type" => op.process_type,
-              "target_thickness" => op.target_thickness,
-              "auto_inserted" => op.respond_to?(:auto_inserted?) ? op.auto_inserted? : false
-            }
-          end
-
-          @part.save!
-          redirect_to edit_part_path(@part), notice: 'Part updated and switched to manual editing mode. You can now customize each operation.'
+          # Auto-lock will happen due to the callback
+          redirect_to edit_part_path(@part), notice: 'Part updated and switched to manual editing mode.'
           return
         else
           @customers = [@part.customer]
@@ -180,16 +162,17 @@ before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled
         end
 
       rescue => e
+        Rails.logger.error "Error switching to manual mode: #{e.message}"
         redirect_to edit_part_path(@part), alert: "Failed to switch to manual mode: #{e.message}"
         return
       end
     end
 
-    # Handle locked operations updates
+    # Handle locked operations updates (text changes only)
     if @part.locked_for_editing? && params[:locked_operations].present?
       # FIRST update the part details
       if @part.update(part_params)
-        # THEN update the locked operations
+        # THEN update the locked operations text
         if update_locked_operations_text
           redirect_to @part, notice: 'Part and operations were successfully updated.'
         else
@@ -228,35 +211,6 @@ before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled
     @part.update!(enabled: !@part.enabled)
     status = @part.enabled? ? 'enabled' : 'disabled'
     redirect_to @part, notice: "Part was successfully #{status}."
-  end
-
-  def lock_operations
-    if @part.locked_for_editing?
-      redirect_to edit_part_path(@part), alert: 'Part operations are already locked.'
-      return
-    end
-
-    # This method is now only for existing parts - new parts use the switch_to_manual approach
-    if !@part.persisted?
-      redirect_to edit_part_path(@part), alert: 'Cannot lock operations on unsaved parts. Use the manual mode switch instead.'
-      return
-    end
-
-    begin
-      @part.lock_operations!
-      redirect_to edit_part_path(@part), notice: 'Operations locked for editing. You can now customize the operation text.'
-    rescue => e
-      Rails.logger.error "Error locking operations: #{e.message}"
-      redirect_to edit_part_path(@part), alert: 'Failed to lock operations. Please ensure operations are configured first.'
-    end
-  end
-
-  def update_locked_operations
-    if update_locked_operations_text
-      redirect_to @part, notice: 'Operations were successfully updated.'
-    else
-      redirect_to edit_part_path(@part), alert: 'Failed to update operations.'
-    end
   end
 
   def search
@@ -463,10 +417,23 @@ before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled
     end
 
     if @part.insert_operation_at(position, operation_text, display_name)
+      # Return the updated operations list for optimistic UI sync
       render json: {
         success: true,
         message: 'Operation inserted successfully',
-        operations: @part.locked_operations
+        operations: @part.locked_operations.map { |op|
+          {
+            id: op["id"],
+            display_name: op["display_name"],
+            operation_text: op["operation_text"],
+            position: op["position"],
+            specifications: op["specifications"],
+            vat_numbers: op["vat_numbers"] || [],
+            process_type: op["process_type"],
+            target_thickness: op["target_thickness"] || 0,
+            auto_inserted: op["auto_inserted"] || false
+          }
+        }
       }
     else
       render json: {
@@ -497,7 +464,19 @@ before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled
       render json: {
         success: true,
         message: 'Operation reordered successfully',
-        operations: @part.locked_operations
+        operations: @part.locked_operations.map { |op|
+          {
+            id: op["id"],
+            display_name: op["display_name"],
+            operation_text: op["operation_text"],
+            position: op["position"],
+            specifications: op["specifications"],
+            vat_numbers: op["vat_numbers"] || [],
+            process_type: op["process_type"],
+            target_thickness: op["target_thickness"] || 0,
+            auto_inserted: op["auto_inserted"] || false
+          }
+        }
       }
     else
       render json: {
@@ -527,7 +506,19 @@ before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled
       render json: {
         success: true,
         message: 'Operation deleted successfully',
-        operations: @part.locked_operations
+        operations: @part.locked_operations.map { |op|
+          {
+            id: op["id"],
+            display_name: op["display_name"],
+            operation_text: op["operation_text"],
+            position: op["position"],
+            specifications: op["specifications"],
+            vat_numbers: op["vat_numbers"] || [],
+            process_type: op["process_type"],
+            target_thickness: op["target_thickness"] || 0,
+            auto_inserted: op["auto_inserted"] || false
+          }
+        }
       }
     else
       render json: {

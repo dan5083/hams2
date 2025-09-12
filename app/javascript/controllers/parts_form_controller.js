@@ -134,17 +134,279 @@ export default class extends Controller {
   }
 
   // Setup locked mode - minimal functionality for manual editing
-setupLockedMode() {
-  console.log("Setting up locked mode - operations are manually editable")
+  setupLockedMode() {
+    console.log("Setting up locked mode - operations are manually editable")
 
-  // Disable any treatment configuration elements that might still be present
-  this.element.querySelectorAll('.treatment-btn').forEach(button => {
-    button.disabled = true
-    button.classList.add('opacity-50', 'cursor-not-allowed')
-  })
+    // Disable any treatment configuration elements that might still be present
+    this.element.querySelectorAll('.treatment-btn').forEach(button => {
+      button.disabled = true
+      button.classList.add('opacity-50', 'cursor-not-allowed')
+    })
 
-  this.initializeManualOperationManagement()
-}
+    this.initializeInlineOperationManagement()
+  }
+
+  // Initialize inline operation management for locked mode
+  initializeInlineOperationManagement() {
+    if (!this.isLockedMode) return
+
+    const partId = this.getPartIdFromUrl()
+    if (!partId) {
+      console.error('Part ID not found for inline operation management')
+      return
+    }
+
+    this.partId = partId
+    this.setupInlineInsertStrips()
+  }
+
+  getPartIdFromUrl() {
+    const pathParts = window.location.pathname.split('/')
+    const partsIndex = pathParts.indexOf('parts')
+    return partsIndex !== -1 && pathParts[partsIndex + 1] ? pathParts[partsIndex + 1] : null
+  }
+
+  setupInlineInsertStrips() {
+    // Handle insert strip clicks
+    document.querySelectorAll('.insert-strip').forEach(strip => {
+      strip.addEventListener('click', (e) => {
+        // Don't trigger if clicking inside the form
+        if (e.target.closest('.insert-form')) return
+
+        const form = strip.querySelector('.insert-form')
+        const isVisible = !form.classList.contains('hidden')
+
+        // Hide all other forms first
+        document.querySelectorAll('.insert-form').forEach(f => {
+          f.classList.add('hidden')
+        })
+
+        // Toggle this form
+        if (!isVisible) {
+          form.classList.remove('hidden')
+          form.querySelector('.operation-name-input').focus()
+        }
+      })
+    })
+
+    // Single delegated event listener for all operation management buttons
+    document.addEventListener('click', (e) => {
+      // Cancel insert buttons
+      if (e.target.classList.contains('cancel-insert')) {
+        const form = e.target.closest('.insert-form')
+        form.classList.add('hidden')
+        form.querySelector('.operation-name-input').value = ''
+        form.querySelector('.operation-text-input').value = ''
+        return
+      }
+
+      // Confirm insert buttons
+      if (e.target.classList.contains('confirm-insert')) {
+        const form = e.target.closest('.insert-form')
+        const strip = e.target.closest('.insert-strip')
+        const position = parseInt(strip.dataset.insertPosition)
+
+        const operationName = form.querySelector('.operation-name-input').value.trim()
+        const operationText = form.querySelector('.operation-text-input').value.trim()
+
+        if (!operationText) {
+          alert('Please enter operation instructions')
+          return
+        }
+
+        this.insertOperationInline(position, operationText, operationName || 'Custom Operation', form, strip)
+        return
+      }
+
+      // Delete operation buttons (for dynamically added operations)
+      if (e.target.classList.contains('delete-operation-btn')) {
+        const position = parseInt(e.target.dataset.position)
+        if (confirm('Are you sure you want to delete this operation? This cannot be undone.')) {
+          this.deleteOperation(position)
+        }
+        return
+      }
+
+      // Reorder up buttons (for dynamically added operations)
+      if (e.target.classList.contains('reorder-up-btn')) {
+        const fromPosition = parseInt(e.target.dataset.position)
+        const toPosition = fromPosition - 1
+        this.reorderOperation(fromPosition, toPosition)
+        return
+      }
+
+      // Reorder down buttons (for dynamically added operations)
+      if (e.target.classList.contains('reorder-down-btn')) {
+        const fromPosition = parseInt(e.target.dataset.position)
+        const toPosition = fromPosition + 1
+        this.reorderOperation(fromPosition, toPosition)
+        return
+      }
+    })
+  }
+
+  async insertOperationInline(position, operationText, displayName, form, strip) {
+    // Optimistic UI update
+    const tempId = 'temp_' + Date.now()
+    const newOperationHTML = this.createOperationHTML(position, displayName, operationText, tempId)
+
+    strip.insertAdjacentHTML('afterend', newOperationHTML)
+
+    form.classList.add('hidden')
+    form.querySelector('.operation-name-input').value = ''
+    form.querySelector('.operation-text-input').value = ''
+
+    this.updateSubsequentPositions(position)
+
+    try {
+      const response = await fetch(`/parts/${this.partId}/insert_operation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': this.csrfTokenValue
+        },
+        body: JSON.stringify({
+          position: position,
+          operation_text: operationText,
+          display_name: displayName
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`)
+        if (tempOp) {
+          tempOp.removeAttribute('data-temp-id')
+          tempOp.classList.remove('bg-green-100')
+          tempOp.classList.add('bg-gray-50')
+        }
+        this.showSuccessMessage('Operation added successfully')
+      } else {
+        const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`)
+        if (tempOp) tempOp.remove()
+        this.revertPositionUpdates(position)
+        alert('Error: ' + data.error)
+      }
+    } catch (error) {
+      console.error('Error:', error)
+      const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`)
+      if (tempOp) tempOp.remove()
+      this.revertPositionUpdates(position)
+      alert('An error occurred while adding the operation')
+    }
+  }
+
+  async deleteOperation(position) {
+    try {
+      const response = await fetch(`/parts/${this.partId}/delete_operation`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': this.csrfTokenValue
+        },
+        body: JSON.stringify({ position: position })
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        location.reload() // Could implement optimistic UI update here too
+      } else {
+        alert('Error: ' + data.error)
+      }
+    } catch (error) {
+      console.error('Error:', error)
+      alert('An error occurred while deleting the operation')
+    }
+  }
+
+  async reorderOperation(fromPosition, toPosition) {
+    try {
+      const response = await fetch(`/parts/${this.partId}/reorder_operation`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': this.csrfTokenValue
+        },
+        body: JSON.stringify({
+          from_position: fromPosition,
+          to_position: toPosition
+        })
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        location.reload() // Could implement optimistic UI update here too
+      } else {
+        alert('Error: ' + data.error)
+      }
+    } catch (error) {
+      console.error('Error:', error)
+      alert('An error occurred while reordering the operation')
+    }
+  }
+
+  createOperationHTML(position, displayName, operationText, tempId) {
+    return `
+      <div class="border border-gray-200 rounded-lg p-4 bg-green-100 operation-item transition-colors duration-1000" data-position="${position}" data-temp-id="${tempId}">
+        <div class="flex justify-between items-start mb-3">
+          <div class="flex items-center space-x-3">
+            <h4 class="font-medium text-gray-900">Operation ${position}: ${displayName}</h4>
+          </div>
+          <div class="flex items-center space-x-2">
+            <button type="button" class="reorder-up-btn text-blue-600 hover:text-blue-800 text-sm font-medium" data-position="${position}" title="Move up">↑</button>
+            <button type="button" class="reorder-down-btn text-blue-600 hover:text-blue-800 text-sm font-medium" data-position="${position}" title="Move down">↓</button>
+            <button type="button" class="delete-operation-btn text-red-600 hover:text-red-800 text-xl font-bold" data-position="${position}" title="Delete this operation">×</button>
+          </div>
+        </div>
+        <textarea name="locked_operations[${position}]" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">${operationText}</textarea>
+      </div>
+    `
+  }
+
+  updateSubsequentPositions(insertPosition) {
+    document.querySelectorAll('.operation-item').forEach(item => {
+      const currentPosition = parseInt(item.dataset.position)
+      if (currentPosition >= insertPosition && !item.dataset.tempId) {
+        const newPosition = currentPosition + 1
+        item.dataset.position = newPosition
+        const header = item.querySelector('h4')
+        if (header) {
+          header.textContent = header.textContent.replace(/Operation \d+:/, `Operation ${newPosition}:`)
+        }
+        const textarea = item.querySelector('textarea')
+        if (textarea) {
+          textarea.name = `locked_operations[${newPosition}]`
+        }
+      }
+    })
+  }
+
+  revertPositionUpdates(insertPosition) {
+    document.querySelectorAll('.operation-item').forEach(item => {
+      const currentPosition = parseInt(item.dataset.position)
+      if (currentPosition > insertPosition) {
+        const newPosition = currentPosition - 1
+        item.dataset.position = newPosition
+        const header = item.querySelector('h4')
+        if (header) {
+          header.textContent = header.textContent.replace(/Operation \d+:/, `Operation ${newPosition}:`)
+        }
+        const textarea = item.querySelector('textarea')
+        if (textarea) {
+          textarea.name = `locked_operations[${newPosition}]`
+        }
+      }
+    })
+  }
+
+  showSuccessMessage(message) {
+    const successDiv = document.createElement('div')
+    successDiv.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50'
+    successDiv.textContent = message
+    document.body.appendChild(successDiv)
+    setTimeout(() => successDiv.remove(), 3000)
+  }
 
   // Initialize with existing treatment data (unlocked mode only)
   initializeExistingData() {
@@ -881,7 +1143,7 @@ setupLockedMode() {
     // Handle other modifier changes
     if (event.target.classList.contains('stripping-method-select')) {
       treatment.stripping_method_secondary = event.target.value
-      treatment.stripping_enabled = (event.target.value !== 'none')  // ADD THIS LINE
+      treatment.stripping_enabled = (event.target.value !== 'none')
     }
 
     if (event.target.classList.contains('sealing-method-select')) {
@@ -999,40 +1261,39 @@ setupLockedMode() {
     return criteria
   }
 
-// Update the displayOperationsInCard method in parts_form_controller.js
+  // Display operations in card with event delegation support
+  displayOperationsInCard(operations, container, treatmentId) {
+    if (this.isLockedMode) return
 
-displayOperationsInCard(operations, container, treatmentId) {
-  if (this.isLockedMode) return
+    if (operations.length === 0) {
+      container.innerHTML = '<p class="text-gray-500 text-xs">No matching operations found</p>'
+      return
+    }
 
-  if (operations.length === 0) {
-    container.innerHTML = '<p class="text-gray-500 text-xs">No matching operations found</p>'
-    return
+    container.innerHTML = operations.map(op => `
+      <div class="bg-white border border-gray-200 rounded px-2 py-1 cursor-pointer hover:bg-blue-50 text-xs operation-card"
+           data-operation-id="${op.id}"
+           data-treatment-id="${treatmentId}">
+        <div class="flex justify-between items-center">
+          <span class="font-medium">${op.display_name || op.id.replace(/_/g, ' ')}</span>
+          <span class="select-operation-indicator text-blue-600 text-xs font-medium">Select</span>
+        </div>
+        <p class="text-gray-600 mt-1">${op.operation_text}</p>
+        ${op.specifications ? `<p class="text-purple-600 text-xs mt-1">${op.specifications}</p>` : ''}
+      </div>
+    `).join('')
+
+    // Add click handlers for the entire operation card
+    container.querySelectorAll('.operation-card').forEach(card => {
+      card.addEventListener('click', (e) => {
+        const operationId = card.dataset.operationId
+        const treatmentId = card.dataset.treatmentId
+        this.selectOperationForTreatment(operationId, treatmentId)
+      })
+    })
   }
 
-  container.innerHTML = operations.map(op => `
-    <div class="bg-white border border-gray-200 rounded px-2 py-1 cursor-pointer hover:bg-blue-50 text-xs operation-card"
-         data-operation-id="${op.id}"
-         data-treatment-id="${treatmentId}">
-      <div class="flex justify-between items-center">
-        <span class="font-medium">${op.display_name || op.id.replace(/_/g, ' ')}</span>
-        <span class="select-operation-indicator text-blue-600 text-xs font-medium">Select</span>
-      </div>
-      <p class="text-gray-600 mt-1">${op.operation_text}</p>
-      ${op.specifications ? `<p class="text-purple-600 text-xs mt-1">${op.specifications}</p>` : ''}
-    </div>
-  `).join('')
-
-  // Add click handlers for the entire operation card
-  container.querySelectorAll('.operation-card').forEach(card => {
-    card.addEventListener('click', (e) => {
-      const operationId = card.dataset.operationId
-      const treatmentId = card.dataset.treatmentId
-      this.selectOperationForTreatment(operationId, treatmentId)
-    })
-  })
-}
-
-  // Also update the selectOperationForTreatment method to handle the new indicator
+  // Select operation for treatment
   selectOperationForTreatment(operationId, treatmentId) {
     if (this.isLockedMode) return
 
@@ -1070,7 +1331,7 @@ displayOperationsInCard(operations, container, treatmentId) {
       }
     }
 
-    // Update visual feedback - now targeting the new structure
+    // Update visual feedback
     if (this.hasTreatmentsContainerTarget) {
       const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
       const operationsList = card?.querySelector('.operations-list')
@@ -1196,7 +1457,7 @@ displayOperationsInCard(operations, container, treatmentId) {
     this.treatmentsFieldTarget.value = JSON.stringify(this.treatments)
   }
 
-    // Update preview (unlocked mode only)
+  // Update preview (unlocked mode only)
   async updatePreview() {
     if (this.isLockedMode || !this.hasSelectedContainerTarget) return
 
@@ -1384,206 +1645,6 @@ displayOperationsInCard(operations, container, treatmentId) {
     }
   }
 
-  // Initialize manual operation management (call this from your existing setupLockedMode method)
-initializeManualOperationManagement() {
-  if (!this.isLockedMode) return
-
-  const partId = this.element.dataset.partId || this.getPartIdFromUrl()
-  if (!partId) {
-    console.error('Part ID not found for manual operation management')
-    return
-  }
-
-  this.partId = partId
-  this.setupInsertOperationModal()
-  this.setupOperationButtons()
-}
-
-// Get part ID from current URL
-getPartIdFromUrl() {
-  const pathParts = window.location.pathname.split('/')
-  const partsIndex = pathParts.indexOf('parts')
-  return partsIndex !== -1 && pathParts[partsIndex + 1] ? pathParts[partsIndex + 1] : null
-}
-
-// Set up the insert operation modal
-setupInsertOperationModal() {
-  this.modal = document.getElementById('insert-operation-modal')
-  this.newOperationName = document.getElementById('new-operation-name')
-  this.newOperationText = document.getElementById('new-operation-text')
-  this.cancelInsert = document.getElementById('cancel-insert')
-  this.confirmInsert = document.getElementById('confirm-insert')
-  this.insertPosition = null
-
-  if (!this.modal || !this.newOperationName || !this.newOperationText || !this.cancelInsert || !this.confirmInsert) {
-    console.log('Modal elements not found - manual operations may not be available')
-    return
-  }
-
-  // Set up modal event listeners
-  this.cancelInsert.addEventListener('click', () => this.hideInsertModal())
-  this.confirmInsert.addEventListener('click', () => this.confirmInsertOperation())
-
-  // Close modal when clicking outside
-  this.modal.addEventListener('click', (e) => {
-    if (e.target === this.modal) {
-      this.hideInsertModal()
-    }
-  })
-}
-
-// Set up all operation management buttons
-setupOperationButtons() {
-  // Insert operation buttons
-  document.querySelectorAll('.insert-before-btn, .insert-at-end-btn').forEach(button => {
-    button.addEventListener('click', (e) => {
-      const position = parseInt(e.target.dataset.position)
-      this.showInsertModal(position)
-    })
-  })
-
-  // Delete operation buttons
-  document.querySelectorAll('.delete-operation-btn').forEach(button => {
-    button.addEventListener('click', (e) => {
-      const position = parseInt(e.target.dataset.position)
-      this.deleteOperation(position)
-    })
-  })
-
-  // Reorder operation buttons
-  document.querySelectorAll('.reorder-up-btn').forEach(button => {
-    button.addEventListener('click', (e) => {
-      const fromPosition = parseInt(e.target.dataset.position)
-      const toPosition = fromPosition - 1
-      this.reorderOperation(fromPosition, toPosition)
-    })
-  })
-
-  document.querySelectorAll('.reorder-down-btn').forEach(button => {
-    button.addEventListener('click', (e) => {
-      const fromPosition = parseInt(e.target.dataset.position)
-      const toPosition = fromPosition + 1
-      this.reorderOperation(fromPosition, toPosition)
-    })
-  })
-}
-
-// Show the insert operation modal
-showInsertModal(position) {
-  this.insertPosition = position
-  this.newOperationName.value = ''
-  this.newOperationText.value = ''
-  this.modal.classList.remove('hidden')
-  this.newOperationName.focus()
-}
-
-// Hide the insert operation modal
-hideInsertModal() {
-  this.modal.classList.add('hidden')
-  this.insertPosition = null
-}
-
-// Confirm and execute operation insertion
-confirmInsertOperation() {
-  const displayName = this.newOperationName.value.trim()
-  const operationText = this.newOperationText.value.trim()
-
-  if (!operationText) {
-    alert('Please enter operation instructions')
-    return
-  }
-
-  this.insertOperation(this.insertPosition, operationText, displayName || 'Custom Operation')
-  this.hideInsertModal()
-}
-
-// Insert operation via AJAX
-async insertOperation(position, operationText, displayName) {
-  try {
-    const response = await fetch(`/parts/${this.partId}/insert_operation`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-Token': this.csrfTokenValue
-      },
-      body: JSON.stringify({
-        position: position,
-        operation_text: operationText,
-        display_name: displayName
-      })
-    })
-
-    const data = await response.json()
-
-    if (data.success) {
-      location.reload() // Refresh to show updated operations
-    } else {
-      alert('Error: ' + data.error)
-    }
-  } catch (error) {
-    console.error('Error:', error)
-    alert('An error occurred while inserting the operation')
-  }
-}
-
-// Delete operation via AJAX
-async deleteOperation(position) {
-  if (!confirm('Are you sure you want to delete this operation? This cannot be undone.')) {
-    return
-  }
-
-  try {
-    const response = await fetch(`/parts/${this.partId}/delete_operation`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-Token': this.csrfTokenValue
-      },
-      body: JSON.stringify({
-        position: position
-      })
-    })
-
-    const data = await response.json()
-
-    if (data.success) {
-      location.reload() // Refresh to show updated operations
-    } else {
-      alert('Error: ' + data.error)
-    }
-  } catch (error) {
-    console.error('Error:', error)
-    alert('An error occurred while deleting the operation')
-  }
-}
-
-// Reorder operation via AJAX
-async reorderOperation(fromPosition, toPosition) {
-  try {
-    const response = await fetch(`/parts/${this.partId}/reorder_operation`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-Token': this.csrfTokenValue
-      },
-      body: JSON.stringify({
-        from_position: fromPosition,
-        to_position: toPosition
-      })
-    })
-
-    const data = await response.json()
-
-    if (data.success) {
-      location.reload() // Refresh to show updated operations
-    } else {
-      alert('Error: ' + data.error)
-    }
-  } catch (error) {
-    console.error('Error:', error)
-    alert('An error occurred while reordering the operation')
-  }
-}
   // Fetch operations from server (unlocked mode only)
   async fetchOperations(criteria) {
     if (this.isLockedMode) return []

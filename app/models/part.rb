@@ -22,6 +22,7 @@ class Part < ApplicationRecord
   before_validation :normalize_part_details
   after_initialize :set_defaults, if: :new_record?
   after_create :disable_replaced_part
+  after_save :validate_locked_operations_integrity, if: :locked_for_editing?
 
   def self.ensure(customer_id:, part_number:, part_issue:)
     find_or_create_by(
@@ -163,17 +164,17 @@ class Part < ApplicationRecord
     end
   end
 
-  # Insert a new operation at the specified position
   def insert_operation_at(position, operation_text, display_name = nil)
     return false unless locked_for_editing?
+    return false if operation_text.blank?
 
     locked_ops = customisation_data.dig('operation_selection', 'locked_operations') || []
 
-    # Create new operation
+    # Create new operation with validated position
     new_operation = {
-      "id" => "CUSTOM_OP_#{Time.current.to_i}",
-      "display_name" => display_name || "Custom Operation",
-      "operation_text" => operation_text,
+      "id" => "CUSTOM_OP_#{Time.current.to_i}_#{rand(1000)}",
+      "display_name" => display_name.presence || "Custom Operation",
+      "operation_text" => operation_text.strip,
       "position" => position,
       "specifications" => "",
       "vat_numbers" => [],
@@ -184,21 +185,25 @@ class Part < ApplicationRecord
 
     # Shift existing operations at or after this position
     locked_ops.each do |op|
-      if op["position"] >= position
-        op["position"] += 1
+      current_pos = op["position"].to_i
+      if current_pos >= position
+        op["position"] = current_pos + 1
       end
     end
 
     # Add new operation
     locked_ops << new_operation
 
-    # Update and save
+    # Update atomically
     self.customisation_data = customisation_data.dup
     self.customisation_data["operation_selection"]["locked_operations"] = locked_ops
-    save!
 
-    renumber_operations
+    save!
+    renumber_operations # Ensure sequential numbering
     true
+  rescue => e
+    Rails.logger.error "Failed to insert operation: #{e.message}"
+    false
   end
 
   # Delete operation at specified position
@@ -206,35 +211,42 @@ class Part < ApplicationRecord
     return false unless locked_for_editing?
 
     locked_ops = customisation_data.dig('operation_selection', 'locked_operations') || []
+    original_count = locked_ops.length
 
     # Remove the operation at this position
-    locked_ops.reject! { |op| op["position"] == position }
+    locked_ops.reject! { |op| op["position"].to_i == position }
+
+    # Check if operation was actually removed
+    return false if locked_ops.length == original_count
 
     # Shift down operations after this position
     locked_ops.each do |op|
-      if op["position"] > position
-        op["position"] -= 1
+      current_pos = op["position"].to_i
+      if current_pos > position
+        op["position"] = current_pos - 1
       end
     end
 
-    # Update and save
+    # Update atomically
     self.customisation_data = customisation_data.dup
     self.customisation_data["operation_selection"]["locked_operations"] = locked_ops
-    save!
 
-    renumber_operations
+    save!
+    renumber_operations # Ensure sequential numbering
     true
+  rescue => e
+    Rails.logger.error "Failed to delete operation: #{e.message}"
+    false
   end
 
-  # Move operation from one position to another
-  def reorder_operation(from_position, to_position)
+ def reorder_operation(from_position, to_position)
     return false unless locked_for_editing?
     return false if from_position == to_position
 
     locked_ops = customisation_data.dig('operation_selection', 'locked_operations') || []
 
     # Find the operation to move
-    moving_op = locked_ops.find { |op| op["position"] == from_position }
+    moving_op = locked_ops.find { |op| op["position"].to_i == from_position }
     return false unless moving_op
 
     # Remove it temporarily
@@ -244,15 +256,17 @@ class Part < ApplicationRecord
     if from_position < to_position
       # Moving down - shift operations between old and new position up
       locked_ops.each do |op|
-        if op["position"] > from_position && op["position"] <= to_position
-          op["position"] -= 1
+        current_pos = op["position"].to_i
+        if current_pos > from_position && current_pos <= to_position
+          op["position"] = current_pos - 1
         end
       end
     else
       # Moving up - shift operations between new and old position down
       locked_ops.each do |op|
-        if op["position"] >= to_position && op["position"] < from_position
-          op["position"] += 1
+        current_pos = op["position"].to_i
+        if current_pos >= to_position && current_pos < from_position
+          op["position"] = current_pos + 1
         end
       end
     end
@@ -261,32 +275,40 @@ class Part < ApplicationRecord
     moving_op["position"] = to_position
     locked_ops << moving_op
 
-    # Update and save
+    # Update atomically
     self.customisation_data = customisation_data.dup
     self.customisation_data["operation_selection"]["locked_operations"] = locked_ops
-    save!
 
-    renumber_operations
+    save!
+    renumber_operations # Ensure sequential numbering
     true
+  rescue => e
+    Rails.logger.error "Failed to reorder operation: #{e.message}"
+    false
   end
 
-  # Helper method to ensure sequential numbering
-  def renumber_operations
+ def renumber_operations
     return false unless locked_for_editing?
 
     locked_ops = customisation_data.dig('operation_selection', 'locked_operations') || []
 
-    # Sort by current position and renumber sequentially
-    locked_ops.sort_by! { |op| op["position"] || 0 }
-    locked_ops.each_with_index do |op, index|
+    # Sort by current position (handle both string and integer positions)
+    sorted_ops = locked_ops.sort_by { |op| op["position"].to_i }
+
+    # Renumber sequentially starting from 1
+    sorted_ops.each_with_index do |op, index|
       op["position"] = index + 1
     end
 
-    # Update and save
+    # Update customisation_data atomically
     self.customisation_data = customisation_data.dup
-    self.customisation_data["operation_selection"]["locked_operations"] = locked_ops
+    self.customisation_data["operation_selection"]["locked_operations"] = sorted_ops
+
     save!
     true
+  rescue => e
+    Rails.logger.error "Failed to renumber operations: #{e.message}"
+    false
   end
 
   # Get aerospace/defense flag from customisation data
@@ -1008,5 +1030,22 @@ class Part < ApplicationRecord
   def get_enp_target_thickness_from_treatments(treatments_data)
     enp_treatment = treatments_data.find { |t| t["type"] == "electroless_nickel_plating" && t["target_thickness"] }
     enp_treatment&.dig("target_thickness")&.to_f
+  end
+
+  def validate_locked_operations_integrity
+    return true unless locked_for_editing?
+
+    locked_ops = customisation_data.dig('operation_selection', 'locked_operations') || []
+    return true if locked_ops.empty?
+
+    positions = locked_ops.map { |op| op["position"].to_i }.sort
+    expected_positions = (1..positions.length).to_a
+
+    if positions != expected_positions
+      Rails.logger.warn "Operation positions out of sequence for part #{id}: #{positions}"
+      renumber_operations
+    end
+
+    true
   end
 end
