@@ -35,7 +35,7 @@ export default class extends Controller {
                        document.querySelector('[data-locked-mode="true"]') !== null
 
     if (this.isLockedMode) {
-      console.log("Parts form in locked editing mode - skipping treatment configuration")
+      console.log("Parts form in locked editing mode - setting up click-to-add operations")
       this.setupLockedMode()
       return
     }
@@ -133,9 +133,9 @@ export default class extends Controller {
     this.setupAerospaceDefenseListener()
   }
 
-  // Setup locked mode - minimal functionality for manual editing
+  // Setup locked mode - click-to-add operation management
   setupLockedMode() {
-    console.log("Setting up locked mode - operations are manually editable")
+    console.log("Setting up locked mode with click-to-add operations")
 
     // Disable any treatment configuration elements that might still be present
     this.element.querySelectorAll('.treatment-btn').forEach(button => {
@@ -143,21 +143,21 @@ export default class extends Controller {
       button.classList.add('opacity-50', 'cursor-not-allowed')
     })
 
-    this.initializeInlineOperationManagement()
+    this.initializeClickToAddOperations()
   }
 
-  // Initialize inline operation management for locked mode
-  initializeInlineOperationManagement() {
+  // Initialize click-to-add operation management for locked mode
+  initializeClickToAddOperations() {
     if (!this.isLockedMode) return
 
     const partId = this.getPartIdFromUrl()
     if (!partId) {
-      console.error('Part ID not found for inline operation management')
+      console.error('Part ID not found for operation management')
       return
     }
 
     this.partId = partId
-    this.setupInlineInsertStrips()
+    this.setupClickToAddHandlers()
   }
 
   getPartIdFromUrl() {
@@ -166,59 +166,31 @@ export default class extends Controller {
     return partsIndex !== -1 && pathParts[partsIndex + 1] ? pathParts[partsIndex + 1] : null
   }
 
-  setupInlineInsertStrips() {
-    // Handle insert strip clicks
-    document.querySelectorAll('.insert-strip').forEach(strip => {
-      strip.addEventListener('click', (e) => {
-        // Don't trigger if clicking inside the form
-        if (e.target.closest('.insert-form')) return
-
-        const form = strip.querySelector('.insert-form')
-        const isVisible = !form.classList.contains('hidden')
-
-        // Hide all other forms first
-        document.querySelectorAll('.insert-form').forEach(f => {
-          f.classList.add('hidden')
-        })
-
-        // Toggle this form
-        if (!isVisible) {
-          form.classList.remove('hidden')
-          form.querySelector('.operation-name-input').focus()
-        }
-      })
-    })
-
-    // Single delegated event listener for all operation management buttons
+  setupClickToAddHandlers() {
+    // Single delegated event listener for all operation management actions
     document.addEventListener('click', (e) => {
+      // Add operation button clicks
+      if (e.target.classList.contains('add-operation-btn')) {
+        const position = parseInt(e.target.dataset.insertPosition)
+        this.showInsertForm(position)
+        return
+      }
+
       // Cancel insert buttons
       if (e.target.classList.contains('cancel-insert')) {
-        const form = e.target.closest('.insert-form')
-        form.classList.add('hidden')
-        form.querySelector('.operation-name-input').value = ''
-        form.querySelector('.operation-text-input').value = ''
+        const position = e.target.dataset.position
+        this.hideInsertForm(position)
         return
       }
 
       // Confirm insert buttons
       if (e.target.classList.contains('confirm-insert')) {
-        const form = e.target.closest('.insert-form')
-        const strip = e.target.closest('.insert-strip')
-        const position = parseInt(strip.dataset.insertPosition)
-
-        const operationName = form.querySelector('.operation-name-input').value.trim()
-        const operationText = form.querySelector('.operation-text-input').value.trim()
-
-        if (!operationText) {
-          alert('Please enter operation instructions')
-          return
-        }
-
-        this.insertOperationInline(position, operationText, operationName || 'Custom Operation', form, strip)
+        const position = parseInt(e.target.dataset.position)
+        this.handleConfirmInsert(position)
         return
       }
 
-      // Delete operation buttons (for dynamically added operations)
+      // Delete operation buttons
       if (e.target.classList.contains('delete-operation-btn')) {
         const position = parseInt(e.target.dataset.position)
         if (confirm('Are you sure you want to delete this operation? This cannot be undone.')) {
@@ -227,7 +199,7 @@ export default class extends Controller {
         return
       }
 
-      // Reorder up buttons (for dynamically added operations)
+      // Reorder up buttons
       if (e.target.classList.contains('reorder-up-btn')) {
         const fromPosition = parseInt(e.target.dataset.position)
         const toPosition = fromPosition - 1
@@ -235,7 +207,7 @@ export default class extends Controller {
         return
       }
 
-      // Reorder down buttons (for dynamically added operations)
+      // Reorder down buttons
       if (e.target.classList.contains('reorder-down-btn')) {
         const fromPosition = parseInt(e.target.dataset.position)
         const toPosition = fromPosition + 1
@@ -245,17 +217,79 @@ export default class extends Controller {
     })
   }
 
-  async insertOperationInline(position, operationText, displayName, form, strip) {
-    // Optimistic UI update
+  showInsertForm(position) {
+    // Hide all forms first
+    document.querySelectorAll('.insert-form').forEach(form => {
+      form.style.display = 'none'
+    })
+
+    // Show the form for this position
+    const form = document.querySelector(`.insert-form[data-position="${position}"]`)
+    if (form) {
+      form.style.display = 'block'
+      const nameInput = form.querySelector('.operation-name-input')
+      if (nameInput) {
+        nameInput.focus()
+      }
+    }
+  }
+
+  hideInsertForm(position) {
+    const form = document.querySelector(`.insert-form[data-position="${position}"]`)
+    if (form) {
+      form.style.display = 'none'
+      // Clear the inputs
+      const nameInput = form.querySelector('.operation-name-input')
+      const textInput = form.querySelector('.operation-text-input')
+      if (nameInput) nameInput.value = ''
+      if (textInput) textInput.value = ''
+    }
+  }
+
+  handleConfirmInsert(position) {
+    const form = document.querySelector(`.insert-form[data-position="${position}"]`)
+    if (!form) return
+
+    const operationName = form.querySelector('.operation-name-input').value.trim()
+    const operationText = form.querySelector('.operation-text-input').value.trim()
+
+    if (!operationText) {
+      alert('Please enter operation instructions')
+      return
+    }
+
+    this.insertOperationAtPosition(position, operationText, operationName || 'Custom Operation', form)
+  }
+
+  async insertOperationAtPosition(position, operationText, displayName, form) {
+    // Optimistic UI update - add operation immediately
     const tempId = 'temp_' + Date.now()
     const newOperationHTML = this.createOperationHTML(position, displayName, operationText, tempId)
 
-    strip.insertAdjacentHTML('afterend', newOperationHTML)
+    // Find the right place to insert (after the corresponding add button)
+    const operationsContainer = document.getElementById('operations-container')
+    const addButtons = operationsContainer.querySelectorAll('.add-operation-btn')
+    let insertAfter = null
 
-    form.classList.add('hidden')
+    addButtons.forEach(button => {
+      if (parseInt(button.dataset.insertPosition) === position) {
+        insertAfter = button.closest('div')
+      }
+    })
+
+    if (insertAfter) {
+      insertAfter.insertAdjacentHTML('afterend', newOperationHTML)
+    } else {
+      // Insert at end if no matching button found
+      operationsContainer.insertAdjacentHTML('beforeend', newOperationHTML)
+    }
+
+    // Hide and clear the form
+    form.style.display = 'none'
     form.querySelector('.operation-name-input').value = ''
     form.querySelector('.operation-text-input').value = ''
 
+    // Update positions of subsequent operations
     this.updateSubsequentPositions(position)
 
     try {
