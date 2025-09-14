@@ -30,12 +30,13 @@ export default class extends Controller {
   connect() {
     console.log("Parts Form controller connected")
 
-    // Check if we're in locked editing mode by looking for locked operations
+    // Check if we're in locked editing mode
     this.isLockedMode = this.element.querySelector('.bg-orange-100.text-orange-800') !== null ||
-                       document.querySelector('[data-locked-mode="true"]') !== null
+                       document.querySelector('[data-locked-mode="true"]') !== null ||
+                       document.getElementById('operations-container') !== null
 
     if (this.isLockedMode) {
-      console.log("Parts form in locked editing mode - skipping treatment configuration")
+      console.log("Parts form in locked editing mode - setting up manual operation management")
       this.setupLockedMode()
       return
     }
@@ -99,7 +100,7 @@ export default class extends Controller {
       'Hytorque Jig'
     ]
 
-    // Available stripping types and methods - UPDATED FOR E28
+    // Available stripping types and methods
     this.availableStrippingTypes = [
       { value: 'anodising_stripping', label: 'Anodising Stripping' },
       { value: 'enp_stripping', label: 'ENP Stripping' }
@@ -135,29 +136,16 @@ export default class extends Controller {
 
   // Setup locked mode - click-based operation management
   setupLockedMode() {
-    console.log("Setting up locked mode - click-based operation management")
+    console.log("Setting up locked mode with click-based operation management")
 
-    // Disable any treatment configuration elements that might still be present
-    this.element.querySelectorAll('.treatment-btn').forEach(button => {
-      button.disabled = true
-      button.classList.add('opacity-50', 'cursor-not-allowed')
-    })
-
-    this.initializeClickBasedOperationManagement()
-  }
-
-  // Initialize click-based operation management for locked mode
-  initializeClickBasedOperationManagement() {
-    if (!this.isLockedMode) return
-
-    const partId = this.getPartIdFromUrl()
-    if (!partId) {
-      console.error('Part ID not found for operation management')
+    // Get part ID from URL or form
+    this.partId = this.getPartIdFromUrl()
+    if (!this.partId) {
+      console.error('Part ID not found for manual operation management')
       return
     }
 
-    this.partId = partId
-    this.setupClickBasedHandlers()
+    this.setupClickBasedOperationManagement()
   }
 
   getPartIdFromUrl() {
@@ -166,8 +154,8 @@ export default class extends Controller {
     return partsIndex !== -1 && pathParts[partsIndex + 1] ? pathParts[partsIndex + 1] : null
   }
 
-  setupClickBasedHandlers() {
-    // Single delegated event listener for all operation management
+  setupClickBasedOperationManagement() {
+    // Handle add operation button clicks
     document.addEventListener('click', (e) => {
       // Add operation buttons
       if (e.target.classList.contains('add-operation-btn')) {
@@ -186,20 +174,18 @@ export default class extends Controller {
       // Confirm insert buttons
       if (e.target.classList.contains('confirm-insert')) {
         const position = parseInt(e.target.dataset.position)
-        this.handleInsertConfirm(position)
+        this.confirmInsert(position)
         return
       }
 
       // Delete operation buttons
       if (e.target.classList.contains('delete-operation-btn')) {
         const position = parseInt(e.target.dataset.position)
-        if (confirm('Are you sure you want to delete this operation? This cannot be undone.')) {
-          this.deleteOperation(position)
-        }
+        this.deleteOperation(position)
         return
       }
 
-      // Reorder up buttons
+      // Reorder buttons
       if (e.target.classList.contains('reorder-up-btn')) {
         const fromPosition = parseInt(e.target.dataset.position)
         const toPosition = fromPosition - 1
@@ -207,37 +193,26 @@ export default class extends Controller {
         return
       }
 
-      // Reorder down buttons
       if (e.target.classList.contains('reorder-down-btn')) {
         const fromPosition = parseInt(e.target.dataset.position)
         const toPosition = fromPosition + 1
         this.reorderOperation(fromPosition, toPosition)
         return
       }
-
-      // Click outside insert forms - hide them
-      if (!e.target.closest('.insert-form') && !e.target.classList.contains('add-operation-btn')) {
-        this.hideAllInsertForms()
-      }
     })
   }
 
   showInsertForm(position) {
     // Hide all forms first
-    this.hideAllInsertForms()
+    document.querySelectorAll('.insert-form').forEach(form => {
+      form.style.display = 'none'
+    })
 
     // Show the form for this position
     const form = document.querySelector(`.insert-form[data-position="${position}"]`)
     if (form) {
       form.style.display = 'block'
-
-      // Focus on the first input after a brief delay to ensure form is visible
-      setTimeout(() => {
-        const nameInput = form.querySelector('.operation-name-input')
-        if (nameInput) {
-          nameInput.focus()
-        }
-      }, 50)
+      form.querySelector('.operation-name-input').focus()
     }
   }
 
@@ -245,26 +220,13 @@ export default class extends Controller {
     const form = document.querySelector(`.insert-form[data-position="${position}"]`)
     if (form) {
       form.style.display = 'none'
-      // Clear the inputs when hiding
-      const nameInput = form.querySelector('.operation-name-input')
-      const textInput = form.querySelector('.operation-text-input')
-      if (nameInput) nameInput.value = ''
-      if (textInput) textInput.value = ''
+      // Clear the inputs
+      form.querySelector('.operation-name-input').value = ''
+      form.querySelector('.operation-text-input').value = ''
     }
   }
 
-  hideAllInsertForms() {
-    document.querySelectorAll('.insert-form').forEach(form => {
-      form.style.display = 'none'
-      // Clear inputs when hiding
-      const nameInput = form.querySelector('.operation-name-input')
-      const textInput = form.querySelector('.operation-text-input')
-      if (nameInput) nameInput.value = ''
-      if (textInput) textInput.value = ''
-    })
-  }
-
-  handleInsertConfirm(position) {
+  confirmInsert(position) {
     const form = document.querySelector(`.insert-form[data-position="${position}"]`)
     if (!form) return
 
@@ -280,36 +242,51 @@ export default class extends Controller {
   }
 
   async insertOperationAtPosition(position, operationText, displayName, form) {
-    // Optimistic UI update
+    // Generate temp ID for optimistic update
     const tempId = 'temp_' + Date.now()
+
+    // CRITICAL: Insert at correct DOM position
     const newOperationHTML = this.createOperationHTML(position, displayName, operationText, tempId)
 
-    // Find the right place to insert
+    // Find the correct insertion point in the DOM
     const operationsContainer = document.getElementById('operations-container')
-    const addButtons = operationsContainer.querySelectorAll('.add-operation-btn')
-    let insertAfter = null
+    let insertionPoint = null
 
-    // Find the add button that corresponds to this position
-    addButtons.forEach(button => {
-      if (parseInt(button.dataset.insertPosition) === position) {
-        insertAfter = button.closest('div')
+    // Find where to insert based on position
+    const existingOperations = operationsContainer.querySelectorAll('.operation-item')
+
+    if (position === 1) {
+      // Insert at the beginning (before first operation)
+      if (existingOperations.length > 0) {
+        insertionPoint = existingOperations[0]
       }
-    })
-
-    if (insertAfter) {
-      insertAfter.insertAdjacentHTML('afterend', newOperationHTML)
     } else {
-      // Insert at end if no specific button found
-      operationsContainer.insertAdjacentHTML('beforeend', newOperationHTML)
+      // Find the operation that should come after our new operation
+      for (let op of existingOperations) {
+        const opPosition = parseInt(op.dataset.position)
+        if (opPosition >= position) {
+          insertionPoint = op
+          break
+        }
+      }
+    }
+
+    // Insert the new operation at the correct position
+    if (insertionPoint) {
+      insertionPoint.insertAdjacentHTML('beforebegin', newOperationHTML)
+    } else {
+      // Insert at the end if no insertion point found
+      operationsContainer.querySelector('.add-operation-btn:last-of-type').closest('div').insertAdjacentHTML('beforebegin', newOperationHTML)
     }
 
     // Hide and clear the form
     this.hideInsertForm(position)
 
-    // Update positions of subsequent operations
-    this.updateSubsequentPositions(position)
+    // Update positions of ALL operations to maintain sequence
+    this.updateAllOperationPositions()
 
     try {
+      // Sync with server
       const response = await fetch(`/parts/${this.partId}/insert_operation`, {
         method: 'POST',
         headers: {
@@ -326,6 +303,7 @@ export default class extends Controller {
       const data = await response.json()
 
       if (data.success) {
+        // Update the temp operation to show success
         const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`)
         if (tempOp) {
           tempOp.removeAttribute('data-temp-id')
@@ -334,21 +312,122 @@ export default class extends Controller {
         }
         this.showSuccessMessage('Operation added successfully')
       } else {
+        // Remove the optimistic update on failure
         const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`)
         if (tempOp) tempOp.remove()
-        this.revertPositionUpdates(position)
+        this.revertOperationPositions()
         alert('Error: ' + data.error)
       }
     } catch (error) {
       console.error('Error:', error)
+      // Remove the optimistic update on error
       const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`)
       if (tempOp) tempOp.remove()
-      this.revertPositionUpdates(position)
+      this.revertOperationPositions()
       alert('An error occurred while adding the operation')
     }
   }
 
+  createOperationHTML(position, displayName, operationText, tempId) {
+    return `
+      <div class="border border-gray-200 rounded-lg p-4 bg-green-100 operation-item transition-colors duration-1000" data-position="${position}" data-temp-id="${tempId}">
+        <div class="flex justify-between items-start mb-3">
+          <div class="flex items-center space-x-3">
+            <h4 class="font-medium text-gray-900">Operation ${position}: ${displayName}</h4>
+          </div>
+          <div class="flex items-center space-x-2">
+            <button type="button" class="reorder-up-btn text-blue-600 hover:text-blue-800 text-sm font-medium" data-position="${position}" title="Move up">↑</button>
+            <button type="button" class="reorder-down-btn text-blue-600 hover:text-blue-800 text-sm font-medium" data-position="${position}" title="Move down">↓</button>
+            <button type="button" class="delete-operation-btn text-red-600 hover:text-red-800 text-xl font-bold" data-position="${position}" title="Delete this operation">×</button>
+          </div>
+        </div>
+        <textarea name="locked_operations[${position}]" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">${operationText}</textarea>
+      </div>
+    `
+  }
+
+  // Update all operation positions to maintain proper sequence
+  updateAllOperationPositions() {
+    const operations = document.querySelectorAll('.operation-item')
+    operations.forEach((item, index) => {
+      const newPosition = index + 1
+      const oldPosition = parseInt(item.dataset.position)
+
+      // Update data attribute
+      item.dataset.position = newPosition
+
+      // Update header text
+      const header = item.querySelector('h4')
+      if (header) {
+        header.textContent = header.textContent.replace(/Operation \d+:/, `Operation ${newPosition}:`)
+      }
+
+      // Update textarea name (only for non-temp operations)
+      if (!item.dataset.tempId) {
+        const textarea = item.querySelector('textarea')
+        if (textarea) {
+          textarea.name = `locked_operations[${newPosition}]`
+        }
+      }
+
+      // Update reorder button positions
+      const reorderButtons = item.querySelectorAll('.reorder-up-btn, .reorder-down-btn')
+      reorderButtons.forEach(btn => {
+        btn.dataset.position = newPosition
+      })
+
+      // Update delete button position
+      const deleteBtn = item.querySelector('.delete-operation-btn')
+      if (deleteBtn) {
+        deleteBtn.dataset.position = newPosition
+      }
+    })
+  }
+
+  // Store original positions for reverting on error
+  storeOriginalPositions() {
+    this.originalPositions = []
+    document.querySelectorAll('.operation-item').forEach(item => {
+      this.originalPositions.push({
+        element: item,
+        position: parseInt(item.dataset.position)
+      })
+    })
+  }
+
+  revertOperationPositions() {
+    if (!this.originalPositions) return
+
+    this.originalPositions.forEach(({element, position}) => {
+      element.dataset.position = position
+
+      const header = element.querySelector('h4')
+      if (header) {
+        header.textContent = header.textContent.replace(/Operation \d+:/, `Operation ${position}:`)
+      }
+
+      const textarea = element.querySelector('textarea')
+      if (textarea) {
+        textarea.name = `locked_operations[${position}]`
+      }
+
+      const reorderButtons = element.querySelectorAll('.reorder-up-btn, .reorder-down-btn')
+      reorderButtons.forEach(btn => {
+        btn.dataset.position = position
+      })
+
+      const deleteBtn = element.querySelector('.delete-operation-btn')
+      if (deleteBtn) {
+        deleteBtn.dataset.position = position
+      }
+    })
+  }
+
   async deleteOperation(position) {
+    if (!confirm('Are you sure you want to delete this operation? This cannot be undone.')) {
+      return
+    }
+
     try {
       const response = await fetch(`/parts/${this.partId}/delete_operation`, {
         method: 'DELETE',
@@ -361,7 +440,7 @@ export default class extends Controller {
 
       const data = await response.json()
       if (data.success) {
-        location.reload() // Could implement optimistic UI update here too
+        location.reload() // Reload to get fresh state
       } else {
         alert('Error: ' + data.error)
       }
@@ -387,7 +466,7 @@ export default class extends Controller {
 
       const data = await response.json()
       if (data.success) {
-        location.reload() // Could implement optimistic UI update here too
+        location.reload() // Reload to get fresh state
       } else {
         alert('Error: ' + data.error)
       }
@@ -397,76 +476,6 @@ export default class extends Controller {
     }
   }
 
-  createOperationHTML(position, displayName, operationText, tempId) {
-    return `
-      <div class="border border-gray-200 rounded-lg p-4 bg-green-100 operation-item transition-colors duration-1000" data-position="${position}" data-temp-id="${tempId}">
-        <div class="flex justify-between items-start mb-3">
-          <div class="flex items-center space-x-3">
-            <h4 class="font-medium text-gray-900">Operation ${position}: ${displayName}</h4>
-          </div>
-          <div class="flex items-center space-x-2">
-            <button type="button" class="reorder-up-btn text-blue-600 hover:text-blue-800 text-sm font-medium" data-position="${position}" title="Move up">↑</button>
-            <button type="button" class="reorder-down-btn text-blue-600 hover:text-blue-800 text-sm font-medium" data-position="${position}" title="Move down">↓</button>
-            <button type="button" class="delete-operation-btn text-red-600 hover:text-red-800 text-xl font-bold" data-position="${position}" title="Delete this operation">×</button>
-          </div>
-        </div>
-        <textarea name="locked_operations[${position}]" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">${operationText}</textarea>
-      </div>
-    `
-  }
-
-  updateSubsequentPositions(insertPosition) {
-    document.querySelectorAll('.operation-item').forEach(item => {
-      const currentPosition = parseInt(item.dataset.position)
-      if (currentPosition >= insertPosition && !item.dataset.tempId) {
-        const newPosition = currentPosition + 1
-        item.dataset.position = newPosition
-        const header = item.querySelector('h4')
-        if (header) {
-          header.textContent = header.textContent.replace(/Operation \d+:/, `Operation ${newPosition}:`)
-        }
-        const textarea = item.querySelector('textarea')
-        if (textarea) {
-          textarea.name = `locked_operations[${newPosition}]`
-        }
-
-        // Update reorder button positions
-        const upBtn = item.querySelector('.reorder-up-btn')
-        const downBtn = item.querySelector('.reorder-down-btn')
-        const deleteBtn = item.querySelector('.delete-operation-btn')
-        if (upBtn) upBtn.dataset.position = newPosition
-        if (downBtn) downBtn.dataset.position = newPosition
-        if (deleteBtn) deleteBtn.dataset.position = newPosition
-      }
-    })
-  }
-
-  revertPositionUpdates(insertPosition) {
-    document.querySelectorAll('.operation-item').forEach(item => {
-      const currentPosition = parseInt(item.dataset.position)
-      if (currentPosition > insertPosition) {
-        const newPosition = currentPosition - 1
-        item.dataset.position = newPosition
-        const header = item.querySelector('h4')
-        if (header) {
-          header.textContent = header.textContent.replace(/Operation \d+:/, `Operation ${newPosition}:`)
-        }
-        const textarea = item.querySelector('textarea')
-        if (textarea) {
-          textarea.name = `locked_operations[${newPosition}]`
-        }
-
-        // Update reorder button positions
-        const upBtn = item.querySelector('.reorder-up-btn')
-        const downBtn = item.querySelector('.reorder-down-btn')
-        const deleteBtn = item.querySelector('.delete-operation-btn')
-        if (upBtn) upBtn.dataset.position = newPosition
-        if (downBtn) downBtn.dataset.position = newPosition
-        if (deleteBtn) deleteBtn.dataset.position = newPosition
-      }
-    })
-  }
-
   showSuccessMessage(message) {
     const successDiv = document.createElement('div')
     successDiv.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50'
@@ -474,6 +483,10 @@ export default class extends Controller {
     document.body.appendChild(successDiv)
     setTimeout(() => successDiv.remove(), 3000)
   }
+
+  // =====================
+  // UNLOCKED MODE METHODS (keeping existing functionality)
+  // =====================
 
   // Initialize with existing treatment data (unlocked mode only)
   initializeExistingData() {
@@ -853,7 +866,7 @@ export default class extends Controller {
     return this.availableStrippingMethods[strippingType] || []
   }
 
-  // Get preview text for stripping operation - UPDATED FOR E28
+  // Get preview text for stripping operation
   getStrippingPreviewText(strippingType, strippingMethod) {
     if (!strippingType || !strippingMethod) return 'Select strip type and method to see preview'
 
@@ -998,7 +1011,7 @@ export default class extends Controller {
     `
   }
 
-  // Generate treatment modifiers HTML (unlocked mode only) - UPDATED FOR E28
+  // Generate treatment modifiers HTML (unlocked mode only)
   generateTreatmentModifiersHTML(treatment) {
     if (this.isLockedMode) return ''
 
@@ -1043,7 +1056,7 @@ export default class extends Controller {
           </div>
 
           <div class="grid grid-cols-1 gap-4 ${showSealing && showDye ? 'sm:grid-cols-3' : (showSealing || showDye ? 'sm:grid-cols-2' : 'sm:grid-cols-1')}">
-            <!-- Stripping Method - UPDATED FOR E28 -->
+            <!-- Stripping Method -->
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Stripping</label>
               <select class="stripping-method-select w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm" data-treatment-id="${treatment.id}">
