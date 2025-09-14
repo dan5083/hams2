@@ -281,11 +281,21 @@ export default class extends Controller {
 
     if (insertBeforeElement) {
       console.log(`🔍 JS: Inserting before element with position ${insertBeforeElement.dataset.position}`)
-      // Insert before the found element
-      insertBeforeElement.insertAdjacentHTML('beforebegin', newOperationHTML)
+
+      // Find any "Add Operation" button div immediately before this operation
+      let actualInsertionPoint = insertBeforeElement
+      let previousElement = insertBeforeElement.previousElementSibling
+
+      // If there's an "Add Operation" button div right before this operation,
+      // insert before that instead
+      if (previousElement && previousElement.querySelector('.add-operation-btn')) {
+        actualInsertionPoint = previousElement
+        console.log(`🔍 JS: Found Add Operation button before target, inserting before that instead`)
+      }
+
+      actualInsertionPoint.insertAdjacentHTML('beforebegin', newOperationHTML)
     } else {
       console.log(`🔍 JS: Inserting at end of container`)
-      // Insert at the end (before the last "Add Operation" button)
       const lastAddButton = operationsContainer.querySelector('.add-operation-btn[data-insert-position]:last-of-type')
       if (lastAddButton) {
         lastAddButton.closest('div').insertAdjacentHTML('beforebegin', newOperationHTML)
