@@ -52,23 +52,44 @@ before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled
     @part.customisation_data = { "operation_selection" => {} }
   end
 
-  def create
-    Rails.logger.info "🔍 Raw Params: #{params.inspect}"
-    Rails.logger.info "🔍 Part Params: #{part_params.inspect}"
-    Rails.logger.info "🔍 Switch to Manual: #{params[:switch_to_manual]}"
+ def create
+  Rails.logger.info "🔍 Raw Params: #{params.inspect}"
+  Rails.logger.info "🔍 Part Params: #{part_params.inspect}"
+  Rails.logger.info "🔍 Switch to Manual: #{params[:switch_to_manual]}"
 
-    @part = Part.new(part_params)
+  @part = Part.new(part_params)
 
-    Rails.logger.info "🔍 Part before save: customer_id=#{@part.customer_id}, part_number=#{@part.part_number}, part_issue=#{@part.part_issue}"
-    # Set defaults for new parts with processing instructions
-    @part.process_type = determine_process_type if @part.process_type.blank?
+  Rails.logger.info "🔍 Part before save: customer_id=#{@part.customer_id}, part_number=#{@part.part_number}, part_issue=#{@part.part_issue}"
 
-    # Handle manual mode switch - generate operations and lock them before save
-    if params[:switch_to_manual] == 'true'
-      Rails.logger.info "🔄 Processing manual mode switch for new part"
+  # Set defaults for new parts with processing instructions
+  @part.process_type = determine_process_type if @part.process_type.blank?
 
-      begin
-        # Generate operations from current configuration
+  # Handle manual mode switch - generate operations and lock them before save
+  if params[:switch_to_manual] == 'true'
+    Rails.logger.info "🔄 Processing manual mode switch for new part"
+
+    begin
+      # Check if we have locked_operations from the copy functionality
+      if params[:locked_operations].present?
+        Rails.logger.info "📋 Using provided locked operations (#{params[:locked_operations].keys.length} operations)"
+
+        # Convert the locked_operations params to the expected format
+        locked_ops = params[:locked_operations].map do |position, operation_text|
+          {
+            "id" => "COPIED_OP_#{position}",
+            "display_name" => "Operation #{position}",
+            "operation_text" => operation_text.to_s,
+            "position" => position.to_i,
+            "specifications" => "",
+            "vat_numbers" => [],
+            "process_type" => "manual",
+            "target_thickness" => 0,
+            "auto_inserted" => false
+          }
+        end.sort_by { |op| op["position"] }
+
+      else
+        # Generate operations from current configuration (original behavior)
         current_ops = @part.get_operations_with_auto_ops
 
         if current_ops.empty?
@@ -79,48 +100,51 @@ before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled
           return
         end
 
-        # Lock the operations before saving
-        @part.customisation_data = @part.customisation_data.dup || {}
-        @part.customisation_data["operation_selection"] ||= {}
-        @part.customisation_data["operation_selection"]["locked"] = true
-        @part.customisation_data["operation_selection"]["locked_operations"] = current_ops.map.with_index do |op, index|
+        locked_ops = current_ops.map.with_index do |op, index|
           {
             "id" => op.id,
             "display_name" => op.display_name,
             "operation_text" => op.operation_text,
             "position" => index + 1,
-            "specifications" => op.specifications,
-            "vat_numbers" => op.vat_numbers,
-            "process_type" => op.process_type,
-            "target_thickness" => op.target_thickness,
+            "specifications" => op.respond_to?(:specifications) ? (op.specifications || '') : '',
+            "vat_numbers" => op.respond_to?(:vat_numbers) ? (op.vat_numbers || []) : [],
+            "process_type" => op.respond_to?(:process_type) ? op.process_type : 'manual',
+            "target_thickness" => op.respond_to?(:target_thickness) ? (op.target_thickness || 0) : 0,
             "auto_inserted" => op.respond_to?(:auto_inserted?) ? op.auto_inserted? : false
           }
         end
-
-        Rails.logger.info "🔒 Locked #{current_ops.length} operations for manual editing"
-
-      rescue => e
-        Rails.logger.error "❌ Error during manual mode switch: #{e.message}"
-        Rails.logger.error e.backtrace.join("\n")
-        @part.errors.add(:base, "Failed to switch to manual mode: #{e.message}")
-        load_form_data_for_errors
-        render :new, status: :unprocessable_entity
-        return
       end
-    end
 
-    if @part.save
-      if params[:switch_to_manual] == 'true'
-        redirect_to edit_part_path(@part), notice: 'Part created and switched to manual editing mode. You can now customize each operation.'
-      else
-        redirect_to @part, notice: 'Part was successfully created.'
-      end
-    else
-      Rails.logger.error "🚨 Part Save Errors: #{@part.errors.full_messages}"
+      # Lock the operations before saving
+      @part.customisation_data = @part.customisation_data.dup || {}
+      @part.customisation_data["operation_selection"] ||= {}
+      @part.customisation_data["operation_selection"]["locked"] = true
+      @part.customisation_data["operation_selection"]["locked_operations"] = locked_ops
+
+      Rails.logger.info "🔒 Locked #{locked_ops.length} operations for manual editing"
+
+    rescue => e
+      Rails.logger.error "❌ Error during manual mode switch: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+      @part.errors.add(:base, "Failed to switch to manual mode: #{e.message}")
       load_form_data_for_errors
       render :new, status: :unprocessable_entity
+      return
     end
   end
+
+  if @part.save
+    if params[:switch_to_manual] == 'true'
+      redirect_to edit_part_path(@part), notice: 'Part created and switched to manual editing mode. You can now customize each operation.'
+    else
+      redirect_to @part, notice: 'Part was successfully created.'
+    end
+  else
+    Rails.logger.error "🚨 Part Save Errors: #{@part.errors.full_messages}"
+    load_form_data_for_errors
+    render :new, status: :unprocessable_entity
+  end
+end
 
   def edit
     @customers = [@part.customer] # Don't allow changing customer on existing part
