@@ -28,27 +28,27 @@ export default class extends Controller {
   }
 
   connect() {
-    console.log("Parts Form controller connected")
+    console.log("Parts Form controller connected");
 
     // Check if we're in locked editing mode
     this.isLockedMode = this.element.querySelector('.bg-orange-100.text-orange-800') !== null ||
                        document.querySelector('[data-locked-mode="true"]') !== null ||
-                       document.getElementById('operations-container') !== null
+                       document.getElementById('operations-container') !== null;
 
     if (this.isLockedMode) {
-      console.log("Parts form in locked editing mode - setting up manual operation management")
-      this.setupLockedMode()
-      return
+      console.log("Parts form in locked editing mode - setting up manual operation management");
+      this.setupLockedMode();
+      return;
     }
 
     // Check if we have the required targets for unlocked mode
     if (!this.hasTreatmentsFieldTarget || !this.hasTreatmentsContainerTarget || !this.hasSelectedContainerTarget) {
-      console.log("Required targets missing - likely in locked mode or different view")
-      return
+      console.log("Required targets missing - likely in locked mode or different view");
+      return;
     }
 
     // Initialize unlocked mode variables and setup
-    this.treatments = []
+    this.treatments = [];
     this.treatmentCounts = {
       standard_anodising: 0,
       hard_anodising: 0,
@@ -56,14 +56,14 @@ export default class extends Controller {
       chemical_conversion: 0,
       electroless_nickel_plating: 0,
       stripping_only: 0
-    }
-    this.maxTreatments = 5
-    this.enpStripType = 'nitric'
-    this.enpStripMaskEnabled = false
-    this.selectedEnpPreHeatTreatment = 'none'
-    this.selectedEnpHeatTreatment = 'none'
-    this.aerospaceDefense = false
-    this.treatmentIdCounter = 0
+    };
+    this.maxTreatments = 5;
+    this.enpStripType = 'nitric';
+    this.enpStripMaskEnabled = false;
+    this.selectedEnpPreHeatTreatment = 'none';
+    this.selectedEnpHeatTreatment = 'none';
+    this.aerospaceDefense = false;
+    this.treatmentIdCounter = 0;
 
     // Available jig types
     this.availableJigTypes = [
@@ -98,13 +98,13 @@ export default class extends Controller {
       'Thin Wrap Around Jig',
       'Monobloc Jig',
       'Hytorque Jig'
-    ]
+    ];
 
     // Available stripping types and methods
     this.availableStrippingTypes = [
       { value: 'anodising_stripping', label: 'Anodising Stripping' },
       { value: 'enp_stripping', label: 'ENP Stripping' }
-    ]
+    ];
 
     this.availableStrippingMethods = {
       anodising_stripping: [
@@ -115,7 +115,7 @@ export default class extends Controller {
         { value: 'nitric', label: 'Nitric Acid' },
         { value: 'metex_dekote', label: 'Metex Dekote' }
       ]
-    }
+    };
 
     // Available local treatments for anodising
     this.availableLocalTreatments = [
@@ -123,256 +123,286 @@ export default class extends Controller {
       { value: 'LOCAL_ALOCHROM_1200_PEN', label: 'Alochrom 1200 (Pen)' },
       { value: 'LOCAL_SURTEC_650V_PEN', label: 'SurTec 650V (Pen)' },
       { value: 'LOCAL_PTFE_APPLICATION', label: 'PTFE Application' }
-    ]
+    ];
 
-    this.initializeExistingData()
-    this.setupTreatmentButtons()
-    this.setupENPPreHeatTreatmentListener()
-    this.setupENPHeatTreatmentListener()
-    this.setupENPStripTypeListener()
-    this.setupENPStripMaskListener()
-    this.setupAerospaceDefenseListener()
+    this.initializeExistingData();
+    this.setupTreatmentButtons();
+    this.setupENPPreHeatTreatmentListener();
+    this.setupENPHeatTreatmentListener();
+    this.setupENPStripTypeListener();
+    this.setupENPStripMaskListener();
+    this.setupAerospaceDefenseListener();
   }
 
-  // Setup locked mode - click-based operation management with modal
+  disconnect() {
+    // Clean up event listeners when controller disconnects
+    if (this.isLockedMode && this.boundEventHandler) {
+      document.removeEventListener('click', this.boundEventHandler);
+    }
+  }
+
+  // Setup locked mode - modal-based operation management
   setupLockedMode() {
-    console.log("Setting up locked mode with click-based operation management")
+    console.log("Setting up locked mode with modal-based operation management");
 
     // Get part ID from URL or form
-    this.partId = this.getPartIdFromUrl()
+    this.partId = this.getPartIdFromUrl();
     if (!this.partId) {
-      console.error('Part ID not found for manual operation management')
-      return
+      console.error('Part ID not found for manual operation management');
+      return;
     }
 
-    // Add modal-specific properties
-    this.modal = null
-    this.deletionInProgress = false
-    this.currentInsertPosition = null
+    // Create and inject the modal HTML
+    this.createInsertModal();
 
-    this.setupClickBasedOperationManagement()
+    // Set up single event delegation handler to avoid duplicates
+    this.boundEventHandler = this.handleLockedModeClick.bind(this);
+    document.addEventListener('click', this.boundEventHandler);
+
+    // Initialize modal variables
+    this.currentInsertPosition = null;
+    this.deleteInProgress = false; // Prevent multiple delete confirmations
   }
 
-  getPartIdFromUrl() {
-    const pathParts = window.location.pathname.split('/')
-    const partsIndex = pathParts.indexOf('parts')
-    return partsIndex !== -1 && pathParts[partsIndex + 1] ? pathParts[partsIndex + 1] : null
-  }
-
-  setupClickBasedOperationManagement() {
-    // Handle add operation button clicks
-    document.addEventListener('click', (e) => {
-      // Add operation buttons
-      if (e.target.classList.contains('add-operation-btn')) {
-        const position = parseInt(e.target.dataset.insertPosition)
-        this.showModal(position, e.target)
-        return
-      }
-
-      // Delete operation buttons
-      if (e.target.classList.contains('delete-operation-btn')) {
-        const position = parseInt(e.target.dataset.position)
-        this.deleteOperation(position)
-        return
-      }
-
-      // Reorder buttons
-      if (e.target.classList.contains('reorder-up-btn')) {
-        const fromPosition = parseInt(e.target.dataset.position)
-        const toPosition = fromPosition - 1
-        this.reorderOperation(fromPosition, toPosition)
-        return
-      }
-
-      if (e.target.classList.contains('reorder-down-btn')) {
-        const fromPosition = parseInt(e.target.dataset.position)
-        const toPosition = fromPosition + 1
-        this.reorderOperation(fromPosition, toPosition)
-        return
-      }
-    })
-  }
-
-  showModal(position, clickedButton) {
-    this.currentInsertPosition = position
-    if (!this.modal) {
-      this.createModal()
-    }
-
-    // Update modal title to show insertion context
-    const insertContext = this.getInsertionContext(position)
-    this.modal.querySelector('.modal-title').textContent = `Add Operation ${insertContext}`
-
-    // Clear previous input
-    this.modal.querySelector('.operation-name-input').value = ''
-    this.modal.querySelector('.operation-text-input').value = ''
-
-    // Position modal near the clicked button
-    this.positionModal(clickedButton)
-
-    // Show modal
-    this.modal.classList.remove('hidden')
-    this.modal.querySelector('.operation-name-input').focus()
-  }
-
-  createModal() {
+  createInsertModal() {
     const modalHTML = `
-      <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden modal-overlay">
-        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 modal-dialog">
-          <div class="p-6">
-            <div class="flex justify-between items-center mb-4">
-              <h3 class="text-lg font-medium text-gray-900 modal-title">Add Operation</h3>
-              <button type="button" class="modal-close text-gray-400 hover:text-gray-600">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-              </button>
-            </div>
+      <div id="insert-operation-modal" class="fixed inset-0 z-50 hidden">
+        <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity modal-backdrop"></div>
+        <div class="fixed inset-0 z-10 overflow-y-auto">
+          <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            <div class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
 
-            <div class="mb-4">
-              <label class="block text-sm font-medium text-gray-700 mb-1">Operation Name (optional)</label>
-              <input type="text" class="operation-name-input w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., Custom Inspection">
-            </div>
+              <!-- Modal Header -->
+              <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div class="sm:flex sm:items-start">
+                  <div class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
+                    <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                  </div>
+                  <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                    <h3 class="text-lg font-medium text-gray-900" id="modal-title">Add Operation</h3>
+                    <p class="text-sm text-gray-500" id="modal-subtitle">Adding operation at position X</p>
+                  </div>
+                </div>
+              </div>
 
-            <div class="mb-6">
-              <label class="block text-sm font-medium text-gray-700 mb-1">Operation Instructions</label>
-              <textarea class="operation-text-input w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" rows="4" placeholder="Enter detailed operation instructions..."></textarea>
-            </div>
+              <!-- Modal Body -->
+              <div class="bg-white px-4 pb-4 sm:p-6 sm:pt-0">
+                <div class="mb-4">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Operation Name (optional)</label>
+                  <input type="text" id="modal-operation-name" class="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., Custom Inspection">
+                </div>
+                <div class="mb-4">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Operation Instructions</label>
+                  <textarea id="modal-operation-text" class="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" rows="4" placeholder="Enter detailed operation instructions..."></textarea>
+                </div>
+              </div>
 
-            <div class="flex justify-end space-x-3">
-              <button type="button" class="modal-cancel px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors">Cancel</button>
-              <button type="button" class="modal-confirm px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors">Add Operation</button>
+              <!-- Modal Footer -->
+              <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                <button type="button" id="modal-confirm-btn" class="inline-flex w-full justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm">
+                  Add Operation
+                </button>
+                <button type="button" id="modal-cancel-btn" class="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                  Cancel
+                </button>
+              </div>
+
             </div>
           </div>
         </div>
       </div>
-    `
+    `;
 
-    document.body.insertAdjacentHTML('beforeend', modalHTML)
-    this.modal = document.querySelector('.modal-overlay')
+    // Inject modal into page
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
 
-    // Add event listeners
-    this.modal.querySelector('.modal-close').addEventListener('click', () => this.hideModal())
-    this.modal.querySelector('.modal-cancel').addEventListener('click', () => this.hideModal())
-    this.modal.querySelector('.modal-confirm').addEventListener('click', () => this.confirmInsert())
+    // Set up modal event listeners
+    this.setupModalEventListeners();
+  }
 
-    // Close on overlay click
-    this.modal.addEventListener('click', (e) => {
-      if (e.target === this.modal) this.hideModal()
-    })
+  setupModalEventListeners() {
+    const modal = document.getElementById('insert-operation-modal');
+    const cancelBtn = document.getElementById('modal-cancel-btn');
+    const confirmBtn = document.getElementById('modal-confirm-btn');
+    const backdrop = modal.querySelector('.modal-backdrop');
 
-    // Close on Escape key
+    // Close modal handlers
+    const closeModal = () => this.hideInsertModal();
+
+    cancelBtn.addEventListener('click', closeModal);
+    backdrop.addEventListener('click', closeModal);
+
+    // Confirm button
+    confirmBtn.addEventListener('click', () => this.confirmInsert());
+
+    // ESC key to close
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && !this.modal.classList.contains('hidden')) {
-        this.hideModal()
+      if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+        closeModal();
       }
-    })
+    });
   }
 
-  getInsertionContext(position) {
-    const operations = document.querySelectorAll('.operation-item')
-    const totalOps = operations.length
-
-    if (position === 1) {
-      return 'at Beginning'
-    } else if (position > totalOps) {
-      return 'at End'
-    } else {
-      return `between ${position - 1} and ${position}`
+  handleLockedModeClick(e) {
+    // Prevent event bubbling for our handled events
+    const handled = this.processLockedModeEvent(e);
+    if (handled) {
+      e.preventDefault();
+      e.stopPropagation();
     }
   }
 
-  positionModal(clickedButton) {
-    // Simple center positioning for now - can enhance with positioning near button later
-    this.modal.classList.add('flex', 'items-center', 'justify-center')
+  processLockedModeEvent(e) {
+    // Add operation buttons
+    if (e.target.classList.contains('add-operation-btn')) {
+      const position = parseInt(e.target.dataset.insertPosition);
+      this.showInsertModal(position);
+      return true;
+    }
+
+    // Delete operation buttons - with debounce protection
+    if (e.target.classList.contains('delete-operation-btn') && !this.deleteInProgress) {
+      const position = parseInt(e.target.dataset.position);
+      this.deleteOperation(position);
+      return true;
+    }
+
+    // Reorder buttons
+    if (e.target.classList.contains('reorder-up-btn')) {
+      const fromPosition = parseInt(e.target.dataset.position);
+      const toPosition = fromPosition - 1;
+      this.reorderOperation(fromPosition, toPosition);
+      return true;
+    }
+
+    if (e.target.classList.contains('reorder-down-btn')) {
+      const fromPosition = parseInt(e.target.dataset.position);
+      const toPosition = fromPosition + 1;
+      this.reorderOperation(fromPosition, toPosition);
+      return true;
+    }
+
+    return false;
   }
 
-  hideModal() {
-    if (this.modal) {
-      this.modal.classList.add('hidden')
-      this.currentInsertPosition = null
-    }
+  getPartIdFromUrl() {
+    const pathParts = window.location.pathname.split('/');
+    const partsIndex = pathParts.indexOf('parts');
+    return partsIndex !== -1 && pathParts[partsIndex + 1] ? pathParts[partsIndex + 1] : null;
+  }
+
+  showInsertModal(position) {
+    this.currentInsertPosition = position;
+    const modal = document.getElementById('insert-operation-modal');
+    const subtitle = document.getElementById('modal-subtitle');
+    const nameInput = document.getElementById('modal-operation-name');
+    const textInput = document.getElementById('modal-operation-text');
+
+    // Update modal content
+    subtitle.textContent = `Adding operation at position ${position}`;
+
+    // Clear inputs
+    nameInput.value = '';
+    textInput.value = '';
+
+    // Show modal
+    modal.classList.remove('hidden');
+
+    // Focus on first input
+    setTimeout(() => textInput.focus(), 100);
+  }
+
+  hideInsertModal() {
+    const modal = document.getElementById('insert-operation-modal');
+    modal.classList.add('hidden');
+    this.currentInsertPosition = null;
   }
 
   confirmInsert() {
-    if (!this.currentInsertPosition) return
+    const nameInput = document.getElementById('modal-operation-name');
+    const textInput = document.getElementById('modal-operation-text');
 
-    const operationName = this.modal.querySelector('.operation-name-input').value.trim()
-    const operationText = this.modal.querySelector('.operation-text-input').value.trim()
+    const operationName = nameInput.value.trim();
+    const operationText = textInput.value.trim();
 
     if (!operationText) {
-      alert('Please enter operation instructions')
-      return
+      alert('Please enter operation instructions');
+      textInput.focus();
+      return;
     }
 
-    this.hideModal()
-    this.insertOperationAtPosition(this.currentInsertPosition, operationText, operationName || 'Custom Operation')
+    this.insertOperationAtPosition(
+      this.currentInsertPosition,
+      operationText,
+      operationName || 'Custom Operation'
+    );
+
+    this.hideInsertModal();
   }
 
   async insertOperationAtPosition(position, operationText, displayName) {
-    console.log(`🔍 JS: Attempting to insert at position ${position}`)
+    console.log(`🔍 JS: Attempting to insert at position ${position}`);
 
     // Generate temp ID for optimistic update
-    const tempId = 'temp_' + Date.now()
+    const tempId = 'temp_' + Date.now();
 
     // Find the operations container
-    const operationsContainer = document.getElementById('operations-container')
+    const operationsContainer = document.getElementById('operations-container');
 
     // Get all existing operation items (not buttons)
-    const existingOperations = Array.from(operationsContainer.querySelectorAll('.operation-item'))
+    const existingOperations = Array.from(operationsContainer.querySelectorAll('.operation-item'));
 
-    console.log(`🔍 JS: Found ${existingOperations.length} existing operations:`)
-    existingOperations.forEach((op, index) => {
-      console.log(`  DOM[${index}]: Position ${op.dataset.position}, Classes: ${op.className}`)
-    })
+    console.log(`🔍 JS: Found ${existingOperations.length} existing operations`);
 
     // Find the correct insertion point by looking for the first operation with position >= target position
-    let insertBeforeElement = null
+    let insertBeforeElement = null;
 
     for (let op of existingOperations) {
-      const currentPosition = parseInt(op.dataset.position)
-      console.log(`🔍 JS: Checking operation at position ${currentPosition} against target ${position}`)
+      const currentPosition = parseInt(op.dataset.position);
+      console.log(`🔍 JS: Checking operation at position ${currentPosition} against target ${position}`);
       if (currentPosition >= position) {
-        insertBeforeElement = op
-        console.log(`🔍 JS: Found insertion point before position ${currentPosition}`)
-        break
+        insertBeforeElement = op;
+        console.log(`🔍 JS: Found insertion point before position ${currentPosition}`);
+        break;
       }
     }
 
     if (!insertBeforeElement) {
-      console.log(`🔍 JS: No insertion point found, will insert at end`)
+      console.log(`🔍 JS: No insertion point found, will insert at end`);
     }
 
-    // CRITICAL: Insert at correct DOM position using a simpler, more reliable approach
-    const newOperationHTML = this.createOperationHTML(position, displayName, operationText, tempId)
+    // Insert at correct DOM position
+    const newOperationHTML = this.createOperationHTML(position, displayName, operationText, tempId);
 
     if (insertBeforeElement) {
-      console.log(`🔍 JS: Inserting before element with position ${insertBeforeElement.dataset.position}`)
+      console.log(`🔍 JS: Inserting before element with position ${insertBeforeElement.dataset.position}`);
 
       // Find any "Add Operation" button div immediately before this operation
-      let actualInsertionPoint = insertBeforeElement
-      let previousElement = insertBeforeElement.previousElementSibling
+      let actualInsertionPoint = insertBeforeElement;
+      let previousElement = insertBeforeElement.previousElementSibling;
 
       // If there's an "Add Operation" button div right before this operation,
       // insert before that instead
       if (previousElement && previousElement.querySelector('.add-operation-btn')) {
-        actualInsertionPoint = previousElement
-        console.log(`🔍 JS: Found Add Operation button before target, inserting before that instead`)
+        actualInsertionPoint = previousElement;
+        console.log(`🔍 JS: Found Add Operation button before target, inserting before that instead`);
       }
 
-      actualInsertionPoint.insertAdjacentHTML('beforebegin', newOperationHTML)
+      actualInsertionPoint.insertAdjacentHTML('beforebegin', newOperationHTML);
     } else {
-      console.log(`🔍 JS: Inserting at end of container`)
-      const lastAddButton = operationsContainer.querySelector('.add-operation-btn[data-insert-position]:last-of-type')
+      console.log(`🔍 JS: Inserting at end of container`);
+      const lastAddButton = operationsContainer.querySelector('.add-operation-btn[data-insert-position]:last-of-type');
       if (lastAddButton) {
-        lastAddButton.closest('div').insertAdjacentHTML('beforebegin', newOperationHTML)
+        lastAddButton.closest('div').insertAdjacentHTML('beforebegin', newOperationHTML);
       } else {
-        operationsContainer.insertAdjacentHTML('beforeend', newOperationHTML)
+        operationsContainer.insertAdjacentHTML('beforeend', newOperationHTML);
       }
     }
 
-    // CRITICAL: Update positions AND regenerate "Add Operation" buttons
-    this.updateAllOperationPositionsAndButtons()
+    // Update positions AND regenerate "Add Operation" buttons
+    this.updateAllOperationPositionsAndButtons();
 
     try {
       // Sync with server
@@ -387,96 +417,96 @@ export default class extends Controller {
           operation_text: operationText,
           display_name: displayName
         })
-      })
+      });
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (data.success) {
         // Update the temp operation to show success
-        const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`)
+        const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`);
         if (tempOp) {
-          tempOp.removeAttribute('data-temp-id')
-          tempOp.classList.remove('bg-green-100')
-          tempOp.classList.add('bg-gray-50')
+          tempOp.removeAttribute('data-temp-id');
+          tempOp.classList.remove('bg-green-100');
+          tempOp.classList.add('bg-gray-50');
         }
-        this.showSuccessMessage('Operation added successfully')
+        this.showSuccessMessage('Operation added successfully');
 
         // Regenerate the add buttons with correct positions
-        this.regenerateAddOperationButtons()
+        this.regenerateAddOperationButtons();
       } else {
         // Remove the optimistic update on failure
-        const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`)
-        if (tempOp) tempOp.remove()
-        this.revertOperationPositions()
-        alert('Error: ' + data.error)
+        const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`);
+        if (tempOp) tempOp.remove();
+        this.revertOperationPositions();
+        alert('Error: ' + data.error);
       }
     } catch (error) {
-      console.error('Error:', error)
+      console.error('Error:', error);
       // Remove the optimistic update on error
-      const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`)
-      if (tempOp) tempOp.remove()
-      this.revertOperationPositions()
-      alert('An error occurred while adding the operation')
+      const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`);
+      if (tempOp) tempOp.remove();
+      this.revertOperationPositions();
+      alert('An error occurred while adding the operation');
     }
   }
 
   // New method to update positions AND regenerate buttons
   updateAllOperationPositionsAndButtons() {
-    const operations = document.querySelectorAll('.operation-item')
+    const operations = document.querySelectorAll('.operation-item');
     operations.forEach((item, index) => {
-      const newPosition = index + 1
+      const newPosition = index + 1;
 
       // Update data attribute
-      item.dataset.position = newPosition
+      item.dataset.position = newPosition;
 
       // Update header text
-      const header = item.querySelector('h4')
+      const header = item.querySelector('h4');
       if (header) {
-        header.textContent = header.textContent.replace(/Operation \d+:/, `Operation ${newPosition}:`)
+        header.textContent = header.textContent.replace(/Operation \d+:/, `Operation ${newPosition}:`);
       }
 
       // Update textarea name (only for non-temp operations)
       if (!item.dataset.tempId) {
-        const textarea = item.querySelector('textarea')
+        const textarea = item.querySelector('textarea');
         if (textarea) {
-          textarea.name = `locked_operations[${newPosition}]`
+          textarea.name = `locked_operations[${newPosition}]`;
         }
       }
 
       // Update reorder button positions
-      const reorderButtons = item.querySelectorAll('.reorder-up-btn, .reorder-down-btn')
+      const reorderButtons = item.querySelectorAll('.reorder-up-btn, .reorder-down-btn');
       reorderButtons.forEach(btn => {
-        btn.dataset.position = newPosition
-      })
+        btn.dataset.position = newPosition;
+      });
 
       // Update delete button position
-      const deleteBtn = item.querySelector('.delete-operation-btn')
+      const deleteBtn = item.querySelector('.delete-operation-btn');
       if (deleteBtn) {
-        deleteBtn.dataset.position = newPosition
+        deleteBtn.dataset.position = newPosition;
       }
-    })
+    });
 
     // Now regenerate the "Add Operation" buttons
-    this.regenerateAddOperationButtons()
+    this.regenerateAddOperationButtons();
   }
 
   // New method to regenerate "Add Operation" buttons with correct positioning
   regenerateAddOperationButtons() {
-    const operationsContainer = document.getElementById('operations-container')
+    const operationsContainer = document.getElementById('operations-container');
 
     // Remove all existing "Add Operation" button divs
     operationsContainer.querySelectorAll('div').forEach(div => {
       if (div.querySelector('.add-operation-btn')) {
-        div.remove()
+        div.remove();
       }
-    })
+    });
 
-    const operations = Array.from(operationsContainer.querySelectorAll('.operation-item'))
+    const operations = Array.from(operationsContainer.querySelectorAll('.operation-item'));
 
     // Add button before each operation (except the first)
     operations.forEach((operation, index) => {
       if (index > 0) { // Skip first operation
-        const position = parseInt(operation.dataset.position)
+        const position = parseInt(operation.dataset.position);
         const buttonHTML = `
           <div class="flex justify-center py-2">
             <button type="button" class="add-operation-btn bg-blue-100 hover:bg-blue-200 text-blue-700 px-4 py-2 rounded-lg text-sm border border-blue-300 transition-colors"
@@ -484,13 +514,13 @@ export default class extends Controller {
               + Add Operation Here
             </button>
           </div>
-        `
-        operation.insertAdjacentHTML('beforebegin', buttonHTML)
+        `;
+        operation.insertAdjacentHTML('beforebegin', buttonHTML);
       }
-    })
+    });
 
     // Add button at the end
-    const lastPosition = operations.length > 0 ? parseInt(operations[operations.length - 1].dataset.position) + 1 : 1
+    const lastPosition = operations.length > 0 ? parseInt(operations[operations.length - 1].dataset.position) + 1 : 1;
     const endButtonHTML = `
       <div class="flex justify-center py-2">
         <button type="button" class="add-operation-btn bg-blue-100 hover:bg-blue-200 text-blue-700 px-4 py-2 rounded-lg text-sm border border-blue-300 transition-colors"
@@ -498,8 +528,8 @@ export default class extends Controller {
           + Add Operation at End
         </button>
       </div>
-    `
-    operationsContainer.insertAdjacentHTML('beforeend', endButtonHTML)
+    `;
+    operationsContainer.insertAdjacentHTML('beforeend', endButtonHTML);
   }
 
   createOperationHTML(position, displayName, operationText, tempId) {
@@ -517,61 +547,103 @@ export default class extends Controller {
         </div>
         <textarea name="locked_operations[${position}]" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">${operationText}</textarea>
       </div>
-    `
+    `;
+  }
+
+  // Update all operation positions to maintain proper sequence
+  updateAllOperationPositions() {
+    const operations = document.querySelectorAll('.operation-item');
+    operations.forEach((item, index) => {
+      const newPosition = index + 1;
+      const oldPosition = parseInt(item.dataset.position);
+
+      // Update data attribute
+      item.dataset.position = newPosition;
+
+      // Update header text
+      const header = item.querySelector('h4');
+      if (header) {
+        header.textContent = header.textContent.replace(/Operation \d+:/, `Operation ${newPosition}:`);
+      }
+
+      // Update textarea name (only for non-temp operations)
+      if (!item.dataset.tempId) {
+        const textarea = item.querySelector('textarea');
+        if (textarea) {
+          textarea.name = `locked_operations[${newPosition}]`;
+        }
+      }
+
+      // Update reorder button positions
+      const reorderButtons = item.querySelectorAll('.reorder-up-btn, .reorder-down-btn');
+      reorderButtons.forEach(btn => {
+        btn.dataset.position = newPosition;
+      });
+
+      // Update delete button position
+      const deleteBtn = item.querySelector('.delete-operation-btn');
+      if (deleteBtn) {
+        deleteBtn.dataset.position = newPosition;
+      }
+    });
   }
 
   // Store original positions for reverting on error
   storeOriginalPositions() {
-    this.originalPositions = []
+    this.originalPositions = [];
     document.querySelectorAll('.operation-item').forEach(item => {
       this.originalPositions.push({
         element: item,
         position: parseInt(item.dataset.position)
-      })
-    })
+      });
+    });
   }
 
   revertOperationPositions() {
-    if (!this.originalPositions) return
+    if (!this.originalPositions) return;
 
     this.originalPositions.forEach(({element, position}) => {
-      element.dataset.position = position
+      element.dataset.position = position;
 
-      const header = element.querySelector('h4')
+      const header = element.querySelector('h4');
       if (header) {
-        header.textContent = header.textContent.replace(/Operation \d+:/, `Operation ${position}:`)
+        header.textContent = header.textContent.replace(/Operation \d+:/, `Operation ${position}:`);
       }
 
-      const textarea = element.querySelector('textarea')
+      const textarea = element.querySelector('textarea');
       if (textarea) {
-        textarea.name = `locked_operations[${position}]`
+        textarea.name = `locked_operations[${position}]`;
       }
 
-      const reorderButtons = element.querySelectorAll('.reorder-up-btn, .reorder-down-btn')
+      const reorderButtons = element.querySelectorAll('.reorder-up-btn, .reorder-down-btn');
       reorderButtons.forEach(btn => {
-        btn.dataset.position = position
-      })
+        btn.dataset.position = position;
+      });
 
-      const deleteBtn = element.querySelector('.delete-operation-btn')
+      const deleteBtn = element.querySelector('.delete-operation-btn');
       if (deleteBtn) {
-        deleteBtn.dataset.position = position
+        deleteBtn.dataset.position = position;
       }
-    })
+    });
   }
 
   async deleteOperation(position) {
-    if (this.deletionInProgress) {
-      console.log('Deletion already in progress, ignoring')
-      return
+    // Prevent multiple delete operations
+    if (this.deleteInProgress) {
+      console.log('Delete operation already in progress, ignoring');
+      return;
     }
 
-    if (!confirm('Are you sure you want to delete this operation? This cannot be undone.')) {
-      return
-    }
-
-    this.deletionInProgress = true
+    this.deleteInProgress = true;
 
     try {
+      const confirmed = confirm('Are you sure you want to delete this operation? This cannot be undone.');
+
+      if (!confirmed) {
+        this.deleteInProgress = false;
+        return;
+      }
+
       const response = await fetch(`/parts/${this.partId}/delete_operation`, {
         method: 'DELETE',
         headers: {
@@ -579,19 +651,23 @@ export default class extends Controller {
           'X-CSRF-Token': this.csrfTokenValue
         },
         body: JSON.stringify({ position: position })
-      })
+      });
 
-      const data = await response.json()
+      const data = await response.json();
+
       if (data.success) {
-        location.reload() // Reload to get fresh state
+        location.reload(); // Reload to get fresh state
       } else {
-        alert('Error: ' + data.error)
+        alert('Error: ' + data.error);
       }
     } catch (error) {
-      console.error('Error:', error)
-      alert('An error occurred while deleting the operation')
+      console.error('Error:', error);
+      alert('An error occurred while deleting the operation');
     } finally {
-      this.deletionInProgress = false
+      // Reset the flag after a delay to prevent rapid clicks
+      setTimeout(() => {
+        this.deleteInProgress = false;
+      }, 1000);
     }
   }
 
@@ -607,26 +683,26 @@ export default class extends Controller {
           from_position: fromPosition,
           to_position: toPosition
         })
-      })
+      });
 
-      const data = await response.json()
+      const data = await response.json();
       if (data.success) {
-        location.reload() // Reload to get fresh state
+        location.reload(); // Reload to get fresh state
       } else {
-        alert('Error: ' + data.error)
+        alert('Error: ' + data.error);
       }
     } catch (error) {
-      console.error('Error:', error)
-      alert('An error occurred while reordering the operation')
+      console.error('Error:', error);
+      alert('An error occurred while reordering the operation');
     }
   }
 
   showSuccessMessage(message) {
-    const successDiv = document.createElement('div')
-    successDiv.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50'
-    successDiv.textContent = message
-    document.body.appendChild(successDiv)
-    setTimeout(() => successDiv.remove(), 3000)
+    const successDiv = document.createElement('div');
+    successDiv.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50';
+    successDiv.textContent = message;
+    document.body.appendChild(successDiv);
+    setTimeout(() => successDiv.remove(), 3000);
   }
 
   // =====================
@@ -635,135 +711,135 @@ export default class extends Controller {
 
   // Initialize with existing treatment data (unlocked mode only)
   initializeExistingData() {
-    if (this.isLockedMode || !this.hasTreatmentsFieldTarget) return
+    if (this.isLockedMode || !this.hasTreatmentsFieldTarget) return;
 
     try {
-      const existingData = JSON.parse(this.treatmentsFieldTarget.value || '[]')
-      this.treatments = existingData
-      this.updateTreatmentCounts()
-      this.renderTreatmentCards()
+      const existingData = JSON.parse(this.treatmentsFieldTarget.value || '[]');
+      this.treatments = existingData;
+      this.updateTreatmentCounts();
+      this.renderTreatmentCards();
 
       // Initialize ENP pre-heat treatment selection
       if (this.hasEnpPreHeatTreatmentFieldTarget && this.hasEnpPreHeatTreatmentSelectTarget) {
-        this.selectedEnpPreHeatTreatment = this.enpPreHeatTreatmentFieldTarget.value || 'none'
-        this.enpPreHeatTreatmentSelectTarget.value = this.selectedEnpPreHeatTreatment
+        this.selectedEnpPreHeatTreatment = this.enpPreHeatTreatmentFieldTarget.value || 'none';
+        this.enpPreHeatTreatmentSelectTarget.value = this.selectedEnpPreHeatTreatment;
       }
 
       // Initialize ENP post-heat treatment selection
       if (this.hasEnpHeatTreatmentFieldTarget && this.hasEnpHeatTreatmentSelectTarget) {
-        this.selectedEnpHeatTreatment = this.enpHeatTreatmentFieldTarget.value || 'none'
-        this.enpHeatTreatmentSelectTarget.value = this.selectedEnpHeatTreatment
+        this.selectedEnpHeatTreatment = this.enpHeatTreatmentFieldTarget.value || 'none';
+        this.enpHeatTreatmentSelectTarget.value = this.selectedEnpHeatTreatment;
       }
 
       // Initialize aerospace/defense flag
       if (this.hasAerospaceDefenseCheckboxTarget && this.hasAerospaceDefenseFieldTarget) {
-        this.aerospaceDefense = this.aerospaceDefenseCheckboxTarget.checked
-        this.aerospaceDefenseFieldTarget.value = this.aerospaceDefense
+        this.aerospaceDefense = this.aerospaceDefenseCheckboxTarget.checked;
+        this.aerospaceDefenseFieldTarget.value = this.aerospaceDefense;
       }
 
       // Show ENP options if ENP treatments are present
-      this.updateENPOptionsVisibility()
-      this.updatePreview()
+      this.updateENPOptionsVisibility();
+      this.updatePreview();
     } catch(e) {
-      console.error("Error parsing existing treatments:", e)
-      this.treatments = []
+      console.error("Error parsing existing treatments:", e);
+      this.treatments = [];
     }
   }
 
   // Set up treatment button click handlers (unlocked mode only)
   setupTreatmentButtons() {
-    if (this.isLockedMode) return
+    if (this.isLockedMode) return;
 
     this.element.querySelectorAll('.treatment-btn').forEach(button => {
-      button.addEventListener('click', (e) => this.handleTreatmentClick(e))
-    })
+      button.addEventListener('click', (e) => this.handleTreatmentClick(e));
+    });
   }
 
   // Set up ENP pre-heat treatment dropdown listener (unlocked mode only)
   setupENPPreHeatTreatmentListener() {
-    if (this.isLockedMode || !this.hasEnpPreHeatTreatmentSelectTarget || !this.hasEnpPreHeatTreatmentFieldTarget) return
+    if (this.isLockedMode || !this.hasEnpPreHeatTreatmentSelectTarget || !this.hasEnpPreHeatTreatmentFieldTarget) return;
 
     this.enpPreHeatTreatmentSelectTarget.addEventListener('change', (e) => {
-      this.selectedEnpPreHeatTreatment = e.target.value
-      this.enpPreHeatTreatmentFieldTarget.value = this.selectedEnpPreHeatTreatment
-      console.log("ENP Pre-Heat Treatment changed to:", this.selectedEnpPreHeatTreatment)
-      this.updatePreview()
-    })
+      this.selectedEnpPreHeatTreatment = e.target.value;
+      this.enpPreHeatTreatmentFieldTarget.value = this.selectedEnpPreHeatTreatment;
+      console.log("ENP Pre-Heat Treatment changed to:", this.selectedEnpPreHeatTreatment);
+      this.updatePreview();
+    });
   }
 
   // Set up ENP post-heat treatment dropdown listener (unlocked mode only)
   setupENPHeatTreatmentListener() {
-    if (this.isLockedMode || !this.hasEnpHeatTreatmentSelectTarget || !this.hasEnpHeatTreatmentFieldTarget) return
+    if (this.isLockedMode || !this.hasEnpHeatTreatmentSelectTarget || !this.hasEnpHeatTreatmentFieldTarget) return;
 
     this.enpHeatTreatmentSelectTarget.addEventListener('change', (e) => {
-      this.selectedEnpHeatTreatment = e.target.value
-      this.enpHeatTreatmentFieldTarget.value = this.selectedEnpHeatTreatment
-      console.log("ENP Post-Heat Treatment changed to:", this.selectedEnpHeatTreatment)
-      this.updatePreview()
-    })
+      this.selectedEnpHeatTreatment = e.target.value;
+      this.enpHeatTreatmentFieldTarget.value = this.selectedEnpHeatTreatment;
+      console.log("ENP Post-Heat Treatment changed to:", this.selectedEnpHeatTreatment);
+      this.updatePreview();
+    });
   }
 
   // Set up ENP strip type radio button listener (unlocked mode only)
   setupENPStripTypeListener() {
-    if (this.isLockedMode || !this.hasEnpStripTypeRadioTarget || !this.hasEnpStripTypeFieldTarget) return
+    if (this.isLockedMode || !this.hasEnpStripTypeRadioTarget || !this.hasEnpStripTypeFieldTarget) return;
 
     this.enpStripTypeRadioTargets.forEach(radio => {
       radio.addEventListener('change', (e) => {
-        this.enpStripType = e.target.value
-        this.enpStripTypeFieldTarget.value = this.enpStripType
-        this.updatePreview()
-      })
-    })
+        this.enpStripType = e.target.value;
+        this.enpStripTypeFieldTarget.value = this.enpStripType;
+        this.updatePreview();
+      });
+    });
   }
 
   // Set up ENP strip mask checkbox listener (unlocked mode only)
   setupENPStripMaskListener() {
-    if (this.isLockedMode || !this.hasEnpStripMaskCheckboxTarget || !this.hasEnpStripMaskFieldTarget) return
+    if (this.isLockedMode || !this.hasEnpStripMaskCheckboxTarget || !this.hasEnpStripMaskFieldTarget) return;
 
     this.enpStripMaskCheckboxTarget.addEventListener('change', (e) => {
-      this.enpStripMaskEnabled = e.target.checked
-      this.updateENPStripMaskField()
-      this.updatePreview()
-    })
+      this.enpStripMaskEnabled = e.target.checked;
+      this.updateENPStripMaskField();
+      this.updatePreview();
+    });
   }
 
   // Set up aerospace/defense checkbox listener (unlocked mode only)
   setupAerospaceDefenseListener() {
-    if (this.isLockedMode || !this.hasAerospaceDefenseCheckboxTarget || !this.hasAerospaceDefenseFieldTarget) return
+    if (this.isLockedMode || !this.hasAerospaceDefenseCheckboxTarget || !this.hasAerospaceDefenseFieldTarget) return;
 
     this.aerospaceDefenseCheckboxTarget.addEventListener('change', (e) => {
-      this.aerospaceDefense = e.target.checked
-      this.aerospaceDefenseFieldTarget.value = this.aerospaceDefense
-      this.updatePreview()
+      this.aerospaceDefense = e.target.checked;
+      this.aerospaceDefenseFieldTarget.value = this.aerospaceDefense;
+      this.updatePreview();
 
       // Provide visual feedback when enabled
       if (this.aerospaceDefense) {
-        console.log("Aerospace/Defense mode enabled - foil verification, water break tests and OCV operations will be included")
+        console.log("Aerospace/Defense mode enabled - foil verification, water break tests and OCV operations will be included");
       }
-    })
+    });
   }
 
   // Handle treatment button clicks (unlocked mode only)
   handleTreatmentClick(event) {
-    if (this.isLockedMode) return
+    if (this.isLockedMode) return;
 
-    event.preventDefault()
-    const button = event.currentTarget
-    const treatmentType = button.dataset.treatment
+    event.preventDefault();
+    const button = event.currentTarget;
+    const treatmentType = button.dataset.treatment;
 
     if (this.treatments.length >= this.maxTreatments) {
-      alert(`Maximum ${this.maxTreatments} treatments allowed`)
-      return
+      alert(`Maximum ${this.maxTreatments} treatments allowed`);
+      return;
     }
 
-    this.addTreatment(treatmentType, button)
+    this.addTreatment(treatmentType, button);
   }
 
   // Add a new treatment (unlocked mode only)
   addTreatment(treatmentType, button) {
-    if (this.isLockedMode) return
+    if (this.isLockedMode) return;
 
-    this.treatmentIdCounter++
+    this.treatmentIdCounter++;
 
     const treatment = {
       id: `treatment_${this.treatmentIdCounter}`,
@@ -782,30 +858,30 @@ export default class extends Controller {
       dye_color: 'none',
       ptfe_enabled: false,
       local_treatment_type: 'none'
-    }
+    };
 
-    this.treatments.push(treatment)
-    this.treatmentCounts[treatmentType]++
-    this.updateButtonAppearance(button, treatmentType)
-    this.renderTreatmentCards()
-    this.updateTreatmentsField()
-    this.updateENPOptionsVisibility()
+    this.treatments.push(treatment);
+    this.treatmentCounts[treatmentType]++;
+    this.updateButtonAppearance(button, treatmentType);
+    this.renderTreatmentCards();
+    this.updateTreatmentsField();
+    this.updateENPOptionsVisibility();
   }
 
   // Update ENP options visibility based on treatment selection (unlocked mode only)
   updateENPOptionsVisibility() {
-    if (this.isLockedMode || !this.hasEnpOptionsContainerTarget) return
+    if (this.isLockedMode || !this.hasEnpOptionsContainerTarget) return;
 
-    const hasENPTreatment = this.treatments.some(t => t.type === 'electroless_nickel_plating')
-    this.enpOptionsContainerTarget.style.display = hasENPTreatment ? 'block' : 'none'
+    const hasENPTreatment = this.treatments.some(t => t.type === 'electroless_nickel_plating');
+    this.enpOptionsContainerTarget.style.display = hasENPTreatment ? 'block' : 'none';
   }
 
   // Update button appearance (unlocked mode only)
   updateButtonAppearance(button, treatmentType) {
-    if (this.isLockedMode) return
+    if (this.isLockedMode) return;
 
-    const countBadge = button.querySelector('.count-badge')
-    button.classList.remove('border-gray-300')
+    const countBadge = button.querySelector('.count-badge');
+    button.classList.remove('border-gray-300');
 
     const colors = {
       'standard_anodising': ['border-blue-500', 'bg-blue-50', 'bg-blue-500'],
@@ -814,67 +890,67 @@ export default class extends Controller {
       'chemical_conversion': ['border-orange-500', 'bg-orange-50', 'bg-orange-500'],
       'electroless_nickel_plating': ['border-indigo-500', 'bg-indigo-50', 'bg-indigo-500'],
       'stripping_only': ['border-red-500', 'bg-red-50', 'bg-red-500']
-    }
+    };
 
-    const [borderColor, bgColor, badgeColor] = colors[treatmentType]
-    button.classList.add(borderColor, bgColor)
-    countBadge.classList.remove('bg-gray-100')
-    countBadge.classList.add(badgeColor, 'text-white')
-    countBadge.textContent = this.treatmentCounts[treatmentType]
+    const [borderColor, bgColor, badgeColor] = colors[treatmentType];
+    button.classList.add(borderColor, bgColor);
+    countBadge.classList.remove('bg-gray-100');
+    countBadge.classList.add(badgeColor, 'text-white');
+    countBadge.textContent = this.treatmentCounts[treatmentType];
   }
 
   // Update treatment counts from current treatments array (unlocked mode only)
   updateTreatmentCounts() {
-    if (this.isLockedMode) return
+    if (this.isLockedMode) return;
 
     // Reset counts
     Object.keys(this.treatmentCounts).forEach(type => {
-      this.treatmentCounts[type] = 0
-    })
+      this.treatmentCounts[type] = 0;
+    });
 
     // Count current treatments
     this.treatments.forEach(treatment => {
       if (this.treatmentCounts.hasOwnProperty(treatment.type)) {
-        this.treatmentCounts[treatment.type]++
+        this.treatmentCounts[treatment.type]++;
       }
-    })
+    });
 
     // Update button appearances
     this.element.querySelectorAll('.treatment-btn').forEach(button => {
-      const treatmentType = button.dataset.treatment
-      const count = this.treatmentCounts[treatmentType]
+      const treatmentType = button.dataset.treatment;
+      const count = this.treatmentCounts[treatmentType];
 
       if (count > 0) {
-        this.updateButtonAppearance(button, treatmentType)
+        this.updateButtonAppearance(button, treatmentType);
       }
-    })
+    });
   }
 
   // Render treatment cards (unlocked mode only)
   renderTreatmentCards() {
-    if (this.isLockedMode || !this.hasTreatmentsContainerTarget) return
+    if (this.isLockedMode || !this.hasTreatmentsContainerTarget) return;
 
     if (this.treatments.length === 0) {
-      this.treatmentsContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">Select treatments above to configure them</p>'
-      return
+      this.treatmentsContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">Select treatments above to configure them</p>';
+      return;
     }
 
     this.treatmentsContainerTarget.innerHTML = this.treatments.map((treatment, index) => {
-      return this.generateTreatmentCardHTML(treatment, index)
-    }).join('')
+      return this.generateTreatmentCardHTML(treatment, index);
+    }).join('');
 
     // Add event listeners to the newly created elements
-    this.addTreatmentCardListeners()
+    this.addTreatmentCardListeners();
   }
 
   // Generate HTML for a treatment card (unlocked mode only)
   generateTreatmentCardHTML(treatment, index) {
-    if (this.isLockedMode) return ''
+    if (this.isLockedMode) return '';
 
-    const treatmentName = this.formatTreatmentName(treatment.type)
-    const isENP = treatment.type === 'electroless_nickel_plating'
-    const isStripOnly = treatment.type === 'stripping_only'
-    const isAnodising = ['standard_anodising', 'hard_anodising', 'chromic_anodising'].includes(treatment.type)
+    const treatmentName = this.formatTreatmentName(treatment.type);
+    const isENP = treatment.type === 'electroless_nickel_plating';
+    const isStripOnly = treatment.type === 'stripping_only';
+    const isAnodising = ['standard_anodising', 'hard_anodising', 'chromic_anodising'].includes(treatment.type);
 
     return `
       <div class="border border-gray-200 rounded-lg p-4 bg-gray-50" data-treatment-id="${treatment.id}">
@@ -911,7 +987,7 @@ export default class extends Controller {
 
         ${isStripOnly ? this.generateStripOnlyModifiersHTML(treatment) : ''}
       </div>
-    `
+    `;
   }
 
   // Generate strip-only selection HTML
@@ -948,7 +1024,7 @@ export default class extends Controller {
           </p>
         </div>
       </div>
-    `
+    `;
   }
 
   // Generate operation selection HTML for non-strip-only treatments
@@ -961,7 +1037,7 @@ export default class extends Controller {
           <p class="text-gray-500 text-xs">Configure criteria below to see operations</p>
         </div>
       </div>
-    `
+    `;
   }
 
   // Generate strip-only modifiers HTML
@@ -1003,17 +1079,17 @@ export default class extends Controller {
           </div>
         </div>
       </div>
-    `
+    `;
   }
 
   // Get stripping methods for a given type
   getStrippingMethodsForType(strippingType) {
-    return this.availableStrippingMethods[strippingType] || []
+    return this.availableStrippingMethods[strippingType] || [];
   }
 
   // Get preview text for stripping operation
   getStrippingPreviewText(strippingType, strippingMethod) {
-    if (!strippingType || !strippingMethod) return 'Select strip type and method to see preview'
+    if (!strippingType || !strippingMethod) return 'Select strip type and method to see preview';
 
     const methodMap = {
       'anodising_stripping': {
@@ -1024,33 +1100,33 @@ export default class extends Controller {
         'nitric': 'Strip ENP in nitric acid solution 30 to 40 minutes per 25 microns [or until black smut dissolves]',
         'metex_dekote': 'Strip ENP in Metex Dekote at 80 to 90°C, for approximately 20 microns per hour strip rate'
       }
-    }
+    };
 
-    return methodMap[strippingType]?.[strippingMethod] || 'Strip as specified'
+    return methodMap[strippingType]?.[strippingMethod] || 'Strip as specified';
   }
 
   // Generate criteria selection HTML (unlocked mode only)
   generateCriteriaHTML(treatment) {
-    if (this.isLockedMode) return ''
+    if (this.isLockedMode) return '';
 
     if (treatment.type === 'chemical_conversion') {
-      return ''
+      return '';
     }
 
     if (treatment.type === 'electroless_nickel_plating') {
-      return this.generateENPCriteriaHTML(treatment)
+      return this.generateENPCriteriaHTML(treatment);
     }
 
     if (treatment.type === 'chromic_anodising') {
-      return this.generateChromicCriteriaHTML(treatment)
+      return this.generateChromicCriteriaHTML(treatment);
     }
 
-    return this.generateAnodisingCriteriaHTML(treatment)
+    return this.generateAnodisingCriteriaHTML(treatment);
   }
 
   // Generate chromic criteria HTML (unlocked mode only)
   generateChromicCriteriaHTML(treatment) {
-    if (this.isLockedMode) return ''
+    if (this.isLockedMode) return '';
 
     return `
       <div class="grid grid-cols-1 gap-4 mb-4">
@@ -1067,12 +1143,12 @@ export default class extends Controller {
           <p class="mt-1 text-xs text-gray-500">Chromic anodising - no class selection needed</p>
         </div>
       </div>
-    `
+    `;
   }
 
   // Generate ENP criteria HTML (unlocked mode only)
   generateENPCriteriaHTML(treatment) {
-    if (this.isLockedMode) return ''
+    if (this.isLockedMode) return '';
 
     return `
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-4">
@@ -1108,12 +1184,12 @@ export default class extends Controller {
           <input type="number" class="thickness-input mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" data-treatment-id="${treatment.id}" placeholder="e.g., 25" min="1" max="100" value="${treatment.target_thickness || ''}">
         </div>
       </div>
-    `
+    `;
   }
 
   // Generate anodising criteria HTML (unlocked mode only)
   generateAnodisingCriteriaHTML(treatment) {
-    if (this.isLockedMode) return ''
+    if (this.isLockedMode) return '';
 
     return `
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-4">
@@ -1153,17 +1229,17 @@ export default class extends Controller {
           </select>
         </div>
       </div>
-    `
+    `;
   }
 
   // Generate treatment modifiers HTML (unlocked mode only)
   generateTreatmentModifiersHTML(treatment) {
-    if (this.isLockedMode) return ''
+    if (this.isLockedMode) return '';
 
-    const anodisingTypes = ['standard_anodising', 'hard_anodising', 'chromic_anodising']
-    const showSealing = anodisingTypes.includes(treatment.type)
-    const showDye = anodisingTypes.includes(treatment.type)
-    const showLocalTreatment = anodisingTypes.includes(treatment.type)
+    const anodisingTypes = ['standard_anodising', 'hard_anodising', 'chromic_anodising'];
+    const showSealing = anodisingTypes.includes(treatment.type);
+    const showDye = anodisingTypes.includes(treatment.type);
+    const showLocalTreatment = anodisingTypes.includes(treatment.type);
 
     return `
       <div class="border-t border-gray-200 pt-4 mt-4">
@@ -1270,121 +1346,121 @@ export default class extends Controller {
           ` : ''}
         </div>
       </div>
-    `
+    `;
   }
 
   // Add event listeners to treatment cards (unlocked mode only)
   addTreatmentCardListeners() {
-    if (this.isLockedMode || !this.hasTreatmentsContainerTarget) return
+    if (this.isLockedMode || !this.hasTreatmentsContainerTarget) return;
 
     this.treatmentsContainerTarget.querySelectorAll('select, input').forEach(element => {
-      element.addEventListener('change', (e) => this.handleTreatmentChange(e))
+      element.addEventListener('change', (e) => this.handleTreatmentChange(e));
       if (element.type === 'text') {
-        element.addEventListener('input', (e) => this.handleTreatmentChange(e))
+        element.addEventListener('input', (e) => this.handleTreatmentChange(e));
       }
-    })
+    });
 
     // Load operations for each non-strip-only treatment
     this.treatments.forEach(treatment => {
       if (treatment.type !== 'stripping_only') {
-        this.loadOperationsForTreatment(treatment.id)
+        this.loadOperationsForTreatment(treatment.id);
       }
-    })
+    });
   }
 
   // Handle changes in treatment configuration (unlocked mode only)
   handleTreatmentChange(event) {
-    if (this.isLockedMode) return
+    if (this.isLockedMode) return;
 
-    const treatmentId = event.target.dataset.treatmentId
-    if (!treatmentId) return
+    const treatmentId = event.target.dataset.treatmentId;
+    if (!treatmentId) return;
 
-    const treatment = this.treatments.find(t => t.id === treatmentId)
-    if (!treatment) return
+    const treatment = this.treatments.find(t => t.id === treatmentId);
+    if (!treatment) return;
 
     // Handle jig selection changes
     if (event.target.classList.contains('jig-type-select')) {
-      treatment.selected_jig_type = event.target.value
+      treatment.selected_jig_type = event.target.value;
     }
 
     // Handle strip-only specific changes
     if (event.target.classList.contains('strip-type-select')) {
-      treatment.stripping_type = event.target.value
+      treatment.stripping_type = event.target.value;
       // Update the strip method dropdown
-      this.updateStripMethodDropdown(treatmentId, treatment.stripping_type)
+      this.updateStripMethodDropdown(treatmentId, treatment.stripping_type);
       // Update the preview
-      this.updateStripPreview(treatmentId, treatment.stripping_type, treatment.stripping_method)
+      this.updateStripPreview(treatmentId, treatment.stripping_type, treatment.stripping_method);
     }
 
     if (event.target.classList.contains('strip-method-select')) {
-      treatment.stripping_method = event.target.value
+      treatment.stripping_method = event.target.value;
       // Update the preview
-      this.updateStripPreview(treatmentId, treatment.stripping_type, treatment.stripping_method)
+      this.updateStripPreview(treatmentId, treatment.stripping_type, treatment.stripping_method);
     }
 
     // Store alloy selection for ENP treatments
     if (event.target.classList.contains('alloy-select') && treatment.type === 'electroless_nickel_plating') {
-      treatment.selected_alloy = event.target.value
+      treatment.selected_alloy = event.target.value;
     }
 
     // Store alloy selection for chromic treatments
     if (event.target.classList.contains('alloy-select') && treatment.type === 'chromic_anodising') {
-      treatment.selected_alloy = event.target.value
+      treatment.selected_alloy = event.target.value;
     }
 
     // Store thickness for ENP treatments
     if (event.target.classList.contains('thickness-input') && treatment.type === 'electroless_nickel_plating') {
-      treatment.target_thickness = parseFloat(event.target.value) || null
+      treatment.target_thickness = parseFloat(event.target.value) || null;
     }
 
     // Handle masking checkbox changes
     if (event.target.classList.contains('masking-checkbox')) {
-      const method = event.target.dataset.method
-      const isChecked = event.target.checked
+      const method = event.target.dataset.method;
+      const isChecked = event.target.checked;
 
       if (isChecked) {
-        treatment.masking_methods[method] = ''
-        const locationInput = this.treatmentsContainerTarget.querySelector(`input[data-treatment-id="${treatmentId}"][data-method="${method}"].masking-location`)
+        treatment.masking_methods[method] = '';
+        const locationInput = this.treatmentsContainerTarget.querySelector(`input[data-treatment-id="${treatmentId}"][data-method="${method}"].masking-location`);
         if (locationInput) {
-          locationInput.style.display = ''
-          locationInput.focus()
+          locationInput.style.display = '';
+          locationInput.focus();
         }
       } else {
-        delete treatment.masking_methods[method]
-        const locationInput = this.treatmentsContainerTarget.querySelector(`input[data-treatment-id="${treatmentId}"][data-method="${method}"].masking-location`)
+        delete treatment.masking_methods[method];
+        const locationInput = this.treatmentsContainerTarget.querySelector(`input[data-treatment-id="${treatmentId}"][data-method="${method}"].masking-location`);
         if (locationInput) {
-          locationInput.style.display = 'none'
-          locationInput.value = ''
+          locationInput.style.display = 'none';
+          locationInput.value = '';
         }
       }
     }
 
     // Handle masking location input changes
     if (event.target.classList.contains('masking-location')) {
-      const method = event.target.dataset.method
-      treatment.masking_methods[method] = event.target.value
+      const method = event.target.dataset.method;
+      treatment.masking_methods[method] = event.target.value;
     }
 
     // Handle other modifier changes
     if (event.target.classList.contains('stripping-method-select')) {
-      treatment.stripping_method_secondary = event.target.value
-      treatment.stripping_enabled = (event.target.value !== 'none')
+      treatment.stripping_method_secondary = event.target.value;
+      treatment.stripping_enabled = (event.target.value !== 'none');
     }
 
     if (event.target.classList.contains('sealing-method-select')) {
-      treatment.sealing_method = event.target.value
+      treatment.sealing_method = event.target.value;
     }
 
     if (event.target.classList.contains('dye-color-select')) {
-      treatment.dye_color = event.target.value
+      treatment.dye_color = event.target.value;
     }
 
     if (event.target.classList.contains('ptfe-checkbox')) {
-      treatment.ptfe_enabled = event.target.checked
+      treatment.ptfe_enabled = event.target.checked;
     }
 
     if (event.target.classList.contains('local-treatment-select')) {
-      treatment.local_treatment_type = event.target.value
+      treatment.local_treatment_type = event.target.value;
     }
 
     // Update treatment data based on the changed element
@@ -1394,105 +1470,105 @@ export default class extends Controller {
         event.target.classList.contains('anodic-select') ||
         event.target.classList.contains('enp-type-select')) {
 
-      this.loadOperationsForTreatment(treatmentId)
+      this.loadOperationsForTreatment(treatmentId);
     }
 
-    this.updateTreatmentsField()
-    this.updatePreview()
+    this.updateTreatmentsField();
+    this.updatePreview();
   }
 
   // Update strip method dropdown based on selected strip type
   updateStripMethodDropdown(treatmentId, stripType) {
-    const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
-    const methodSelect = card?.querySelector('.strip-method-select')
+    const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`);
+    const methodSelect = card?.querySelector('.strip-method-select');
 
     if (methodSelect) {
-      const methods = this.getStrippingMethodsForType(stripType)
+      const methods = this.getStrippingMethodsForType(stripType);
       methodSelect.innerHTML = methods.map(method =>
         `<option value="${method.value}">${method.label}</option>`
-      ).join('')
+      ).join('');
 
       // Update the treatment data
-      const treatment = this.treatments.find(t => t.id === treatmentId)
+      const treatment = this.treatments.find(t => t.id === treatmentId);
       if (treatment && methods.length > 0) {
-        treatment.stripping_method = methods[0].value
-        methodSelect.value = methods[0].value
+        treatment.stripping_method = methods[0].value;
+        methodSelect.value = methods[0].value;
       }
     }
   }
 
   // Update strip preview text
   updateStripPreview(treatmentId, stripType, stripMethod) {
-    const previewElement = this.treatmentsContainerTarget.querySelector(`[data-strip-preview="${treatmentId}"]`)
+    const previewElement = this.treatmentsContainerTarget.querySelector(`[data-strip-preview="${treatmentId}"]`);
     if (previewElement) {
-      previewElement.textContent = this.getStrippingPreviewText(stripType, stripMethod)
+      previewElement.textContent = this.getStrippingPreviewText(stripType, stripMethod);
     }
   }
 
   // Load operations for a treatment (unlocked mode only)
   async loadOperationsForTreatment(treatmentId) {
-    if (this.isLockedMode || !this.hasTreatmentsContainerTarget) return
+    if (this.isLockedMode || !this.hasTreatmentsContainerTarget) return;
 
-    const treatment = this.treatments.find(t => t.id === treatmentId)
-    if (!treatment || treatment.type === 'stripping_only') return
+    const treatment = this.treatments.find(t => t.id === treatmentId);
+    if (!treatment || treatment.type === 'stripping_only') return;
 
-    const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
-    if (!card) return
+    const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`);
+    if (!card) return;
 
-    const operationsList = card.querySelector('.operations-list')
-    if (!operationsList) return
+    const operationsList = card.querySelector('.operations-list');
+    if (!operationsList) return;
 
     try {
-      const criteria = this.buildCriteriaForTreatment(treatment, card)
-      const operations = await this.fetchOperations(criteria)
-      this.displayOperationsInCard(operations, operationsList, treatmentId)
+      const criteria = this.buildCriteriaForTreatment(treatment, card);
+      const operations = await this.fetchOperations(criteria);
+      this.displayOperationsInCard(operations, operationsList, treatmentId);
     } catch (error) {
-      console.error('Error loading operations:', error)
-      operationsList.innerHTML = '<p class="text-red-500 text-xs">Error loading operations</p>'
+      console.error('Error loading operations:', error);
+      operationsList.innerHTML = '<p class="text-red-500 text-xs">Error loading operations</p>';
     }
   }
 
   // Build criteria for operation filtering (unlocked mode only)
   buildCriteriaForTreatment(treatment, card) {
-    if (this.isLockedMode) return {}
+    if (this.isLockedMode) return {};
 
-    const criteria = { anodising_types: [treatment.type] }
+    const criteria = { anodising_types: [treatment.type] };
 
     if (treatment.type === 'electroless_nickel_plating') {
-      const alloySelect = card.querySelector('.alloy-select')
-      const enpTypeSelect = card.querySelector('.enp-type-select')
-      const thicknessInput = card.querySelector('.thickness-input')
+      const alloySelect = card.querySelector('.alloy-select');
+      const enpTypeSelect = card.querySelector('.enp-type-select');
+      const thicknessInput = card.querySelector('.thickness-input');
 
-      if (alloySelect?.value) criteria.alloys = [alloySelect.value]
-      if (enpTypeSelect?.value) criteria.enp_types = [enpTypeSelect.value]
+      if (alloySelect?.value) criteria.alloys = [alloySelect.value];
+      if (enpTypeSelect?.value) criteria.enp_types = [enpTypeSelect.value];
       if (thicknessInput?.value) {
-        const thickness = parseFloat(thicknessInput.value)
-        criteria.target_thicknesses = [thickness]
-        treatment.target_thickness = thickness
+        const thickness = parseFloat(thicknessInput.value);
+        criteria.target_thicknesses = [thickness];
+        treatment.target_thickness = thickness;
       }
     } else if (treatment.type === 'chromic_anodising') {
-      const alloySelect = card.querySelector('.alloy-select')
-      if (alloySelect?.value) criteria.alloys = [alloySelect.value]
+      const alloySelect = card.querySelector('.alloy-select');
+      if (alloySelect?.value) criteria.alloys = [alloySelect.value];
     } else if (treatment.type !== 'chemical_conversion') {
-      const alloySelect = card.querySelector('.alloy-select')
-      const thicknessSelect = card.querySelector('.thickness-select')
-      const anodicSelect = card.querySelector('.anodic-select')
+      const alloySelect = card.querySelector('.alloy-select');
+      const thicknessSelect = card.querySelector('.thickness-select');
+      const anodicSelect = card.querySelector('.anodic-select');
 
-      if (alloySelect?.value) criteria.alloys = [alloySelect.value]
-      if (thicknessSelect?.value) criteria.target_thicknesses = [parseFloat(thicknessSelect.value)]
-      if (anodicSelect?.value) criteria.anodic_classes = [anodicSelect.value]
+      if (alloySelect?.value) criteria.alloys = [alloySelect.value];
+      if (thicknessSelect?.value) criteria.target_thicknesses = [parseFloat(thicknessSelect.value)];
+      if (anodicSelect?.value) criteria.anodic_classes = [anodicSelect.value];
     }
 
-    return criteria
+    return criteria;
   }
 
   // Display operations in card with event delegation support
   displayOperationsInCard(operations, container, treatmentId) {
-    if (this.isLockedMode) return
+    if (this.isLockedMode) return;
 
     if (operations.length === 0) {
-      container.innerHTML = '<p class="text-gray-500 text-xs">No matching operations found</p>'
-      return
+      container.innerHTML = '<p class="text-gray-500 text-xs">No matching operations found</p>';
+      return;
     }
 
     container.innerHTML = operations.map(op => `
@@ -1506,132 +1582,132 @@ export default class extends Controller {
         <p class="text-gray-600 mt-1">${op.operation_text}</p>
         ${op.specifications ? `<p class="text-purple-600 text-xs mt-1">${op.specifications}</p>` : ''}
       </div>
-    `).join('')
+    `).join('');
 
     // Add click handlers for the entire operation card
     container.querySelectorAll('.operation-card').forEach(card => {
       card.addEventListener('click', (e) => {
-        const operationId = card.dataset.operationId
-        const treatmentId = card.dataset.treatmentId
-        this.selectOperationForTreatment(operationId, treatmentId)
-      })
-    })
+        const operationId = card.dataset.operationId;
+        const treatmentId = card.dataset.treatmentId;
+        this.selectOperationForTreatment(operationId, treatmentId);
+      });
+    });
   }
 
   // Select operation for treatment
   selectOperationForTreatment(operationId, treatmentId) {
-    if (this.isLockedMode) return
+    if (this.isLockedMode) return;
 
-    const treatment = this.treatments.find(t => t.id === treatmentId)
+    const treatment = this.treatments.find(t => t.id === treatmentId);
     if (!treatment) {
-      console.error(`Treatment not found: ${treatmentId}`)
-      return
+      console.error(`Treatment not found: ${treatmentId}`);
+      return;
     }
 
-    console.log(`Selecting operation ${operationId} for treatment ${treatmentId}`)
-    treatment.operation_id = operationId
+    console.log(`Selecting operation ${operationId} for treatment ${treatmentId}`);
+    treatment.operation_id = operationId;
 
     // For ENP treatments, store alloy and thickness
     if (treatment.type === 'electroless_nickel_plating') {
-      const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
-      const alloySelect = card?.querySelector('.alloy-select')
-      const thicknessInput = card?.querySelector('.thickness-input')
+      const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`);
+      const alloySelect = card?.querySelector('.alloy-select');
+      const thicknessInput = card?.querySelector('.thickness-input');
 
       if (alloySelect && alloySelect.value && !treatment.selected_alloy) {
-        treatment.selected_alloy = alloySelect.value
+        treatment.selected_alloy = alloySelect.value;
       }
 
       if (thicknessInput && thicknessInput.value) {
-        treatment.target_thickness = parseFloat(thicknessInput.value)
+        treatment.target_thickness = parseFloat(thicknessInput.value);
       }
     }
 
     // For chromic treatments, store alloy
     if (treatment.type === 'chromic_anodising') {
-      const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
-      const alloySelect = card?.querySelector('.alloy-select')
+      const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`);
+      const alloySelect = card?.querySelector('.alloy-select');
 
       if (alloySelect && alloySelect.value && !treatment.selected_alloy) {
-        treatment.selected_alloy = alloySelect.value
+        treatment.selected_alloy = alloySelect.value;
       }
     }
 
     // Update visual feedback
     if (this.hasTreatmentsContainerTarget) {
-      const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
-      const operationsList = card?.querySelector('.operations-list')
+      const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`);
+      const operationsList = card?.querySelector('.operations-list');
 
       if (operationsList) {
         // Reset all cards
         operationsList.querySelectorAll('.operation-card').forEach(div => {
-          div.classList.remove('bg-blue-100', 'border-blue-400')
-          div.classList.add('bg-white', 'border-gray-200')
-          const indicator = div.querySelector('.select-operation-indicator')
+          div.classList.remove('bg-blue-100', 'border-blue-400');
+          div.classList.add('bg-white', 'border-gray-200');
+          const indicator = div.querySelector('.select-operation-indicator');
           if (indicator) {
-            indicator.textContent = 'Select'
-            indicator.classList.remove('text-green-600', 'font-bold')
-            indicator.classList.add('text-blue-600')
+            indicator.textContent = 'Select';
+            indicator.classList.remove('text-green-600', 'font-bold');
+            indicator.classList.add('text-blue-600');
           }
-        })
+        });
 
         // Highlight selected card
-        const selectedDiv = operationsList.querySelector(`[data-operation-id="${operationId}"]`)
+        const selectedDiv = operationsList.querySelector(`[data-operation-id="${operationId}"]`);
         if (selectedDiv) {
-          selectedDiv.classList.remove('bg-white', 'border-gray-200')
-          selectedDiv.classList.add('bg-blue-100', 'border-blue-400')
-          const indicator = selectedDiv.querySelector('.select-operation-indicator')
+          selectedDiv.classList.remove('bg-white', 'border-gray-200');
+          selectedDiv.classList.add('bg-blue-100', 'border-blue-400');
+          const indicator = selectedDiv.querySelector('.select-operation-indicator');
           if (indicator) {
-            indicator.textContent = '✓ Selected'
-            indicator.classList.remove('text-blue-600')
-            indicator.classList.add('text-green-600', 'font-bold')
+            indicator.textContent = '✓ Selected';
+            indicator.classList.remove('text-blue-600');
+            indicator.classList.add('text-green-600', 'font-bold');
           }
         }
       }
     }
 
-    this.updateTreatmentsField()
-    this.updatePreview()
+    this.updateTreatmentsField();
+    this.updatePreview();
   }
 
   // Remove treatment (unlocked mode only)
   removeTreatment(event) {
-    if (this.isLockedMode) return
+    if (this.isLockedMode) return;
 
-    const treatmentId = event.params.treatmentId
-    const treatmentIndex = this.treatments.findIndex(t => t.id === treatmentId)
+    const treatmentId = event.params.treatmentId;
+    const treatmentIndex = this.treatments.findIndex(t => t.id === treatmentId);
 
-    if (treatmentIndex === -1) return
+    if (treatmentIndex === -1) return;
 
-    const treatment = this.treatments[treatmentIndex]
-    this.treatmentCounts[treatment.type]--
-    this.treatments.splice(treatmentIndex, 1)
+    const treatment = this.treatments[treatmentIndex];
+    this.treatmentCounts[treatment.type]--;
+    this.treatments.splice(treatmentIndex, 1);
 
     // Reset button if no more of this type
     if (this.treatmentCounts[treatment.type] === 0) {
-      const button = this.element.querySelector(`[data-treatment="${treatment.type}"]`)
+      const button = this.element.querySelector(`[data-treatment="${treatment.type}"]`);
       if (button) {
-        this.resetButtonAppearance(button)
+        this.resetButtonAppearance(button);
       }
     } else {
       // Update count badge
-      const button = this.element.querySelector(`[data-treatment="${treatment.type}"]`)
+      const button = this.element.querySelector(`[data-treatment="${treatment.type}"]`);
       if (button) {
-        const countBadge = button.querySelector('.count-badge')
-        if (countBadge) countBadge.textContent = this.treatmentCounts[treatment.type]
+        const countBadge = button.querySelector('.count-badge');
+        if (countBadge) countBadge.textContent = this.treatmentCounts[treatment.type];
       }
     }
 
-    this.renderTreatmentCards()
-    this.updateTreatmentsField()
-    this.updateENPOptionsVisibility()
-    this.updatePreview()
+    this.renderTreatmentCards();
+    this.updateTreatmentsField();
+    this.updateENPOptionsVisibility();
+    this.updatePreview();
   }
 
   // Reset button appearance (unlocked mode only)
   resetButtonAppearance(button) {
-    if (this.isLockedMode) return
+    if (this.isLockedMode) return;
 
-    const countBadge = button.querySelector('.count-badge')
+    const countBadge = button.querySelector('.count-badge');
 
     // Remove all color classes
     const colorClasses = [
@@ -1641,74 +1717,74 @@ export default class extends Controller {
       'border-orange-500', 'bg-orange-50', 'bg-orange-500',
       'border-indigo-500', 'bg-indigo-50', 'bg-indigo-500',
       'border-red-500', 'bg-red-50', 'bg-red-500'
-    ]
+    ];
 
-    button.classList.remove(...colorClasses)
-    button.classList.add('border-gray-300')
+    button.classList.remove(...colorClasses);
+    button.classList.add('border-gray-300');
 
     if (countBadge) {
-      countBadge.classList.remove('bg-blue-500', 'bg-purple-500', 'bg-green-500', 'bg-orange-500', 'bg-indigo-500', 'bg-red-500', 'text-white')
-      countBadge.classList.add('bg-gray-100')
-      countBadge.textContent = '0'
+      countBadge.classList.remove('bg-blue-500', 'bg-purple-500', 'bg-green-500', 'bg-orange-500', 'bg-indigo-500', 'bg-red-500', 'text-white');
+      countBadge.classList.add('bg-gray-100');
+      countBadge.textContent = '0';
     }
   }
 
   // Update ENP strip mask field (unlocked mode only)
   updateENPStripMaskField() {
-    if (this.isLockedMode || !this.hasEnpStripMaskFieldTarget) return
+    if (this.isLockedMode || !this.hasEnpStripMaskFieldTarget) return;
 
-    const enpStripMaskOps = this.enpStripMaskEnabled ? this.getENPStripMaskOperationIds(this.enpStripType) : []
-    this.enpStripMaskFieldTarget.value = JSON.stringify(enpStripMaskOps)
+    const enpStripMaskOps = this.enpStripMaskEnabled ? this.getENPStripMaskOperationIds(this.enpStripType) : [];
+    this.enpStripMaskFieldTarget.value = JSON.stringify(enpStripMaskOps);
   }
 
   // Get ENP Strip Mask operation IDs (unlocked mode only)
   getENPStripMaskOperationIds(stripType) {
-    if (this.isLockedMode) return []
+    if (this.isLockedMode) return [];
 
-    const stripOperation = stripType === 'metex_dekote' ? 'ENP_STRIP_METEX' : 'ENP_STRIP_NITRIC'
+    const stripOperation = stripType === 'metex_dekote' ? 'ENP_STRIP_METEX' : 'ENP_STRIP_NITRIC';
     return [
       'ENP_MASK',
       'ENP_MASKING_CHECK',
       stripOperation,
       'ENP_STRIP_MASKING',
       'ENP_MASKING_CHECK_FINAL'
-    ]
+    ];
   }
 
   // Update treatments field (unlocked mode only)
   updateTreatmentsField() {
-    if (this.isLockedMode || !this.hasTreatmentsFieldTarget) return
+    if (this.isLockedMode || !this.hasTreatmentsFieldTarget) return;
 
-    this.treatmentsFieldTarget.value = JSON.stringify(this.treatments)
+    this.treatmentsFieldTarget.value = JSON.stringify(this.treatments);
   }
 
   // Update preview (unlocked mode only)
   async updatePreview() {
-    if (this.isLockedMode || !this.hasSelectedContainerTarget) return
+    if (this.isLockedMode || !this.hasSelectedContainerTarget) return;
 
-    console.log('Updating preview with treatments:', this.treatments, 'ENP Pre-Heat:', this.selectedEnpPreHeatTreatment, 'ENP Post-Heat:', this.selectedEnpHeatTreatment, 'Aerospace/Defense:', this.aerospaceDefense)
+    console.log('Updating preview with treatments:', this.treatments, 'ENP Pre-Heat:', this.selectedEnpPreHeatTreatment, 'ENP Post-Heat:', this.selectedEnpHeatTreatment, 'Aerospace/Defense:', this.aerospaceDefense);
 
     if (this.treatments.length === 0) {
-      this.selectedContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">No treatments selected</p>'
-      if (this.hasSpecificationFieldTarget) this.specificationFieldTarget.value = ''
-      return
+      this.selectedContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">No treatments selected</p>';
+      if (this.hasSpecificationFieldTarget) this.specificationFieldTarget.value = '';
+      return;
     }
 
     // Filter treatments that have operations selected OR are strip-only
-    const treatmentsWithOperations = this.treatments.filter(t => t.operation_id || t.type === 'stripping_only')
+    const treatmentsWithOperations = this.treatments.filter(t => t.operation_id || t.type === 'stripping_only');
 
     if (treatmentsWithOperations.length === 0) {
-      this.selectedContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">Select operations for treatments to see preview</p>'
-      if (this.hasSpecificationFieldTarget) this.specificationFieldTarget.value = ''
-      return
+      this.selectedContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">Select operations for treatments to see preview</p>';
+      if (this.hasSpecificationFieldTarget) this.specificationFieldTarget.value = '';
+      return;
     }
 
     // Check if all treatments have jig types selected
-    const treatmentsWithoutJigs = treatmentsWithOperations.filter(t => !t.selected_jig_type)
+    const treatmentsWithoutJigs = treatmentsWithOperations.filter(t => !t.selected_jig_type);
     if (treatmentsWithoutJigs.length > 0) {
-      this.selectedContainerTarget.innerHTML = '<p class="text-yellow-600 text-sm">Select jig types for all treatments to see preview</p>'
-      if (this.hasSpecificationFieldTarget) this.specificationFieldTarget.value = ''
-      return
+      this.selectedContainerTarget.innerHTML = '<p class="text-yellow-600 text-sm">Select jig types for all treatments to see preview</p>';
+      if (this.hasSpecificationFieldTarget) this.specificationFieldTarget.value = '';
+      return;
     }
 
     try {
@@ -1747,19 +1823,19 @@ export default class extends Controller {
           enabled: treatment.local_treatment_type !== 'none',
           type: treatment.local_treatment_type !== 'none' ? treatment.local_treatment_type : null
         }
-      }))
+      }));
 
       const requestData = {
         treatments_data: treatmentsData,
         aerospace_defense: this.aerospaceDefense,
         selected_enp_pre_heat_treatment: this.selectedEnpPreHeatTreatment,
         selected_enp_heat_treatment: this.selectedEnpHeatTreatment
-      }
+      };
 
       // Add ENP strip mask if enabled
       if (this.enpStripMaskEnabled) {
-        requestData.enp_strip_type = this.enpStripType
-        requestData.selected_operations = this.getENPStripMaskOperationIds(this.enpStripType)
+        requestData.enp_strip_type = this.enpStripType;
+        requestData.selected_operations = this.getENPStripMaskOperationIds(this.enpStripType);
       }
 
       const response = await fetch(this.previewPathValue, {
@@ -1769,88 +1845,88 @@ export default class extends Controller {
           'X-CSRF-Token': this.csrfTokenValue
         },
         body: JSON.stringify(requestData)
-      })
+      });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json()
-      const operations = data.operations || []
+      const data = await response.json();
+      const operations = data.operations || [];
 
       if (operations.length === 0) {
-        this.selectedContainerTarget.innerHTML = '<p class="text-yellow-600 text-sm">No operations generated - check treatment configuration</p>'
-        if (this.hasSpecificationFieldTarget) this.specificationFieldTarget.value = ''
-        return
+        this.selectedContainerTarget.innerHTML = '<p class="text-yellow-600 text-sm">No operations generated - check treatment configuration</p>';
+        if (this.hasSpecificationFieldTarget) this.specificationFieldTarget.value = '';
+        return;
       }
 
       this.selectedContainerTarget.innerHTML = operations.map((op, index) => {
-        const isAutoInserted = op.auto_inserted
-        const isWaterBreakTest = op.id === 'WATER_BREAK_TEST'
-        const isFoilVerification = op.id && (op.id === 'FOIL_VERIFICATION' || op.id.startsWith('FOIL_VERIFICATION_'))
-        const isOcvCheck = op.id === 'OCV_CHECK'
-        const isDye = op.id && (op.id.includes('_DYE') || op.display_name?.includes('Dye'))
-        const isPreHeatTreatment = op.id && op.id.startsWith('PRE_ENP_HEAT_TREAT')
-        const isPostHeatTreatment = op.id && (op.id.startsWith('POST_ENP_HEAT_TREAT') || op.id.includes('ENP_POST_HEAT_TREAT') || op.id.includes('ENP_BAKE'))
-        const isLocalTreatment = op.id && op.id.startsWith('LOCAL_')
-        const isStripping = op.id === 'STRIPPING' || op.display_name?.includes('Strip')
+        const isAutoInserted = op.auto_inserted;
+        const isWaterBreakTest = op.id === 'WATER_BREAK_TEST';
+        const isFoilVerification = op.id && (op.id === 'FOIL_VERIFICATION' || op.id.startsWith('FOIL_VERIFICATION_'));
+        const isOcvCheck = op.id === 'OCV_CHECK';
+        const isDye = op.id && (op.id.includes('_DYE') || op.display_name?.includes('Dye'));
+        const isPreHeatTreatment = op.id && op.id.startsWith('PRE_ENP_HEAT_TREAT');
+        const isPostHeatTreatment = op.id && (op.id.startsWith('POST_ENP_HEAT_TREAT') || op.id.includes('ENP_POST_HEAT_TREAT') || op.id.includes('ENP_BAKE'));
+        const isLocalTreatment = op.id && op.id.startsWith('LOCAL_');
+        const isStripping = op.id === 'STRIPPING' || op.display_name?.includes('Strip');
 
-        let bgColor = 'bg-blue-100 border border-blue-300'
-        let textColor = 'text-gray-900'
-        let autoLabel = ''
+        let bgColor = 'bg-blue-100 border border-blue-300';
+        let textColor = 'text-gray-900';
+        let autoLabel = '';
 
         if (isAutoInserted) {
-          bgColor = 'bg-gray-100 border border-gray-300'
-          textColor = 'italic text-gray-600'
-          autoLabel = '<span class="text-xs text-gray-500 ml-2">(auto-inserted)</span>'
+          bgColor = 'bg-gray-100 border border-gray-300';
+          textColor = 'italic text-gray-600';
+          autoLabel = '<span class="text-xs text-gray-500 ml-2">(auto-inserted)</span>';
         }
 
         if (isWaterBreakTest) {
-          bgColor = 'bg-red-50 border border-red-200'
-          textColor = 'text-red-800'
-          autoLabel = '<span class="text-xs text-red-600 ml-2">(requires manual recording)</span>'
+          bgColor = 'bg-red-50 border border-red-200';
+          textColor = 'text-red-800';
+          autoLabel = '<span class="text-xs text-red-600 ml-2">(requires manual recording)</span>';
         }
 
         if (isFoilVerification) {
-          bgColor = 'bg-yellow-50 border border-yellow-200'
-          textColor = 'text-yellow-800'
-          autoLabel = '<span class="text-xs text-yellow-600 ml-2">(per-treatment verification)</span>'
+          bgColor = 'bg-yellow-50 border border-yellow-200';
+          textColor = 'text-yellow-800';
+          autoLabel = '<span class="text-xs text-yellow-600 ml-2">(per-treatment verification)</span>';
         }
 
         if (isOcvCheck) {
-          bgColor = 'bg-cyan-50 border border-cyan-200'
-          textColor = 'text-cyan-800'
-          autoLabel = '<span class="text-xs text-cyan-600 ml-2">(aerospace/defense monitoring)</span>'
+          bgColor = 'bg-cyan-50 border border-cyan-200';
+          textColor = 'text-cyan-800';
+          autoLabel = '<span class="text-xs text-cyan-600 ml-2">(aerospace/defense monitoring)</span>';
         }
 
         if (isDye) {
-          bgColor = 'bg-purple-50 border border-purple-200'
-          textColor = 'text-purple-800'
-          autoLabel = '<span class="text-xs text-purple-600 ml-2">(dye operation)</span>'
+          bgColor = 'bg-purple-50 border border-purple-200';
+          textColor = 'text-purple-800';
+          autoLabel = '<span class="text-xs text-purple-600 ml-2">(dye operation)</span>';
         }
 
         if (isPreHeatTreatment) {
-          bgColor = 'bg-amber-50 border border-amber-200'
-          textColor = 'text-amber-800'
-          autoLabel = '<span class="text-xs text-amber-600 ml-2">(ENP pre-heat treatment)</span>'
+          bgColor = 'bg-amber-50 border border-amber-200';
+          textColor = 'text-amber-800';
+          autoLabel = '<span class="text-xs text-amber-600 ml-2">(ENP pre-heat treatment)</span>';
         }
 
         if (isPostHeatTreatment) {
-          bgColor = 'bg-orange-50 border border-orange-200'
-          textColor = 'text-orange-800'
-          autoLabel = '<span class="text-xs text-orange-600 ml-2">(ENP post-heat treatment)</span>'
+          bgColor = 'bg-orange-50 border border-orange-200';
+          textColor = 'text-orange-800';
+          autoLabel = '<span class="text-xs text-orange-600 ml-2">(ENP post-heat treatment)</span>';
         }
 
         if (isLocalTreatment) {
-          bgColor = 'bg-teal-50 border border-teal-200'
-          textColor = 'text-teal-800'
-          autoLabel = '<span class="text-xs text-teal-600 ml-2">(local treatment)</span>'
+          bgColor = 'bg-teal-50 border border-teal-200';
+          textColor = 'text-teal-800';
+          autoLabel = '<span class="text-xs text-teal-600 ml-2">(local treatment)</span>';
         }
 
         if (isStripping) {
-          bgColor = 'bg-red-100 border border-red-300'
-          textColor = 'text-red-900'
-          autoLabel = '<span class="text-xs text-red-600 ml-2">(strip-only treatment)</span>'
+          bgColor = 'bg-red-100 border border-red-300';
+          textColor = 'text-red-900';
+          autoLabel = '<span class="text-xs text-red-600 ml-2">(strip-only treatment)</span>';
         }
 
         return `
@@ -1861,18 +1937,18 @@ export default class extends Controller {
               ${autoLabel}
             </span>
           </div>
-        `
-      }).join('')
+        `;
+      }).join('');
 
     } catch (error) {
-      console.error('Error updating preview:', error)
-      this.selectedContainerTarget.innerHTML = '<p class="text-red-500 text-sm">Error loading preview</p>'
+      console.error('Error updating preview:', error);
+      this.selectedContainerTarget.innerHTML = '<p class="text-red-500 text-sm">Error loading preview</p>';
     }
   }
 
   // Fetch operations from server (unlocked mode only)
   async fetchOperations(criteria) {
-    if (this.isLockedMode) return []
+    if (this.isLockedMode) return [];
 
     const response = await fetch(this.filterPathValue, {
       method: 'POST',
@@ -1881,18 +1957,18 @@ export default class extends Controller {
         'X-CSRF-Token': this.csrfTokenValue
       },
       body: JSON.stringify(criteria)
-    })
+    });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    return await response.json()
+    return await response.json();
   }
 
   // Format treatment name (unlocked mode only)
   formatTreatmentName(treatmentType) {
-    if (this.isLockedMode) return ''
+    if (this.isLockedMode) return '';
 
     const nameMap = {
       'stripping_only': 'Strip Only',
@@ -1901,7 +1977,7 @@ export default class extends Controller {
       'chromic_anodising': 'Chromic Anodising',
       'chemical_conversion': 'Chemical Conversion',
       'electroless_nickel_plating': 'Electroless Nickel Plating'
-    }
+    };
 
     return nameMap[treatmentType] || treatmentType
       .replace('_anodising', '')
@@ -1909,6 +1985,6 @@ export default class extends Controller {
       .replace('_nickel_plating', '')
       .split('_')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ')
+      .join(' ');
   }
 }

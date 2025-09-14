@@ -293,7 +293,7 @@
         </div>
       </div>
 
-      <!-- Modal will be created dynamically by JavaScript -->
+      <!-- Modal will be injected here by the Stimulus controller -->
     </div>
 
   <% else %>
@@ -533,7 +533,7 @@
   </div>
 <% end %>
 
-<% if !part.locked_for_editing? %>
+<% unless part.locked_for_editing? %>
   <% unless part.persisted? %>
     <script>
     // Customer autocomplete initialization and manual mode function
