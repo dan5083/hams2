@@ -80,16 +80,12 @@ class Part < ApplicationRecord
 
     operations_data = customisation_data.dig("operation_selection", "locked_operations") || []
 
-    Rails.logger.info "🔧 LOCKED_OPERATIONS: Raw operations_data from database:"
     operations_data.each_with_index do |op, index|
-      Rails.logger.info "  Array[#{index}]: Position #{op['position']}, ID: #{op['id']}"
     end
 
     sorted_ops = operations_data.sort_by { |op| op["position"] || 0 }
 
-    Rails.logger.info "🔧 LOCKED_OPERATIONS: After sort_by position:"
     sorted_ops.each_with_index do |op, index|
-      Rails.logger.info "  Sorted[#{index}]: Position #{op['position']}, ID: #{op['id']}"
     end
 
     sorted_ops
@@ -172,7 +168,6 @@ class Part < ApplicationRecord
       save!
       true
     else
-      Rails.logger.error "No operation found at position #{position}"
       false
     end
   end
@@ -181,23 +176,17 @@ class Part < ApplicationRecord
     return false unless locked_for_editing?
     return false if operation_text.blank?
 
-    Rails.logger.info "🔧 MODEL: insert_operation_at called with position=#{position}, text='#{operation_text[0..50]}...'"
-
     locked_ops = customisation_data.dig('operation_selection', 'locked_operations') || []
-    Rails.logger.info "🔧 MODEL: Current locked_ops array length: #{locked_ops.length}"
 
     locked_ops.each_with_index do |op, index|
-      Rails.logger.info "  Array[#{index}]: Position #{op['position']}, ID: #{op['id']}"
     end
 
     # Shift existing operations at or after this position
-    Rails.logger.info "🔧 MODEL: Shifting operations at position >= #{position}"
     locked_ops.each do |op|
       current_pos = op["position"].to_i
       if current_pos >= position
         old_pos = current_pos
         op["position"] = current_pos + 1
-        Rails.logger.info "  Shifted operation #{op['id']} from position #{old_pos} to #{op['position']}"
       end
     end
 
@@ -214,38 +203,27 @@ class Part < ApplicationRecord
       "auto_inserted" => false
     }
 
-    Rails.logger.info "🔧 MODEL: Created new operation: #{new_operation['id']} at position #{position}"
-
     # Insert at correct array position
     insert_index = locked_ops.find_index { |op| op["position"].to_i > position } || locked_ops.length
-    Rails.logger.info "🔧 MODEL: Inserting at array index #{insert_index} (total length: #{locked_ops.length})"
 
     locked_ops.insert(insert_index, new_operation)
 
-    Rails.logger.info "🔧 MODEL: Array after insert (length: #{locked_ops.length}):"
     locked_ops.each_with_index do |op, index|
-      Rails.logger.info "  Array[#{index}]: Position #{op['position']}, ID: #{op['id']}"
     end
 
     # Update atomically
     self.customisation_data = customisation_data.dup
     self.customisation_data["operation_selection"]["locked_operations"] = locked_ops
 
-    Rails.logger.info "🔧 MODEL: About to save..."
     result = save!
 
-    Rails.logger.info "🔧 MODEL: After save, calling renumber_operations..."
     renumber_operations
 
-    Rails.logger.info "🔧 MODEL: Final state after renumber:"
     locked_operations.each do |op|
-      Rails.logger.info "  Final Position #{op['position']}: #{op['display_name']} (#{op['id']})"
     end
 
     true
   rescue => e
-    Rails.logger.error "❌ MODEL: Failed to insert operation: #{e.message}"
-    Rails.logger.error e.backtrace.join("\n")
     false
   end
 
@@ -278,7 +256,6 @@ class Part < ApplicationRecord
     renumber_operations # Ensure sequential numbering
     true
   rescue => e
-    Rails.logger.error "Failed to delete operation: #{e.message}"
     false
   end
 
@@ -326,7 +303,6 @@ class Part < ApplicationRecord
     renumber_operations # Ensure sequential numbering
     true
   rescue => e
-    Rails.logger.error "Failed to reorder operation: #{e.message}"
     false
   end
 
@@ -350,7 +326,6 @@ class Part < ApplicationRecord
     save!
     true
   rescue => e
-    Rails.logger.error "Failed to renumber operations: #{e.message}"
     false
   end
 
@@ -713,7 +688,6 @@ class Part < ApplicationRecord
       []
     end
   rescue JSON::ParserError => e
-    Rails.logger.error "Failed to parse treatments data: #{e.message}"
     []
   end
 
@@ -730,14 +704,12 @@ class Part < ApplicationRecord
       []
     end
   rescue JSON::ParserError => e
-    Rails.logger.error "Failed to parse selected operations: #{e.message}"
     []
   end
 
   # Helper method to safely add operations to sequence with nil checking
   def safe_add_to_sequence(sequence, operation, description)
     if operation.nil?
-      Rails.logger.error "NIL OPERATION: #{description}"
     else
       sequence << operation
     end
@@ -759,7 +731,6 @@ class Part < ApplicationRecord
       )
       safe_add_to_sequence(sequence, pre_heat_op, "ENP Pre-Heat Treatment")
     else
-      Rails.logger.warn "ENP Pre-Heat Treatment not found: #{selected_enp_pre_heat_treatment}"
     end
   end
 
@@ -779,7 +750,6 @@ class Part < ApplicationRecord
       )
       safe_add_to_sequence(sequence, post_heat_op, "ENP Post-Heat Treatment")
     else
-      Rails.logger.warn "ENP Post-Heat Treatment not found: #{selected_enp_heat_treatment}"
     end
   end
 
@@ -909,7 +879,6 @@ class Part < ApplicationRecord
 
   # Strip-only cycle - updated workflow: mask -> jig -> degrease -> strip -> deox -> rinse -> unjig -> unmask
   def add_strip_only_cycle(sequence, strip_op, treatment_data, treatment_jig_type, masking)
-    Rails.logger.info "🔍 Strip-only cycle - masking data received: #{masking.inspect}"
 
     # 1. Masking (if configured) - USE PROPER MASKING LIBRARY VALIDATION
     if OperationLibrary::Masking.masking_selected?(masking)
@@ -922,7 +891,6 @@ class Part < ApplicationRecord
       masking_inspection = OperationLibrary::Masking.get_masking_inspection_operation
       safe_add_to_sequence(sequence, masking_inspection, "Strip Masking Inspection")
     else
-      Rails.logger.info "❌ Masking validation failed - masking enabled: #{masking['enabled']}, methods: #{masking['methods']}"
     end
 
     # 2. Jig - USE TREATMENT-SPECIFIC JIG TYPE
@@ -954,12 +922,10 @@ class Part < ApplicationRecord
       masking_methods = masking["methods"] || {}
 
       if OperationLibrary::Masking.masking_removal_required?(masking_methods)
-        Rails.logger.info "✅ Masking removal required - adding removal operations"
         OperationLibrary::Masking.get_masking_removal_operations.each do |removal_op|
           safe_add_to_sequence(sequence, removal_op, "Strip Masking Removal")
         end
       else
-        Rails.logger.info "ℹ️ Masking present but removal not required (bungs only)"
       end
     end
   end
@@ -1110,7 +1076,6 @@ class Part < ApplicationRecord
     expected_positions = (1..positions.length).to_a
 
     if positions != expected_positions
-      Rails.logger.warn "Operation positions out of sequence for part #{id}: #{positions}"
       renumber_operations
     end
 

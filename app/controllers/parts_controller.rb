@@ -53,25 +53,17 @@ before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled
   end
 
   def create
-    Rails.logger.info "🔍 Raw Params: #{params.inspect}"
-    Rails.logger.info "🔍 Part Params: #{part_params.inspect}"
-    Rails.logger.info "🔍 Switch to Manual: #{params[:switch_to_manual]}"
 
     @part = Part.new(part_params)
-
-    Rails.logger.info "🔍 Part before save: customer_id=#{@part.customer_id}, part_number=#{@part.part_number}, part_issue=#{@part.part_issue}"
 
     # Set defaults for new parts with processing instructions
     @part.process_type = determine_process_type if @part.process_type.blank?
 
     # Handle manual mode switch - generate operations and lock them before save
     if params[:switch_to_manual] == 'true'
-      Rails.logger.info "🔄 Processing manual mode switch for new part"
-
       begin
         # Check if we have locked_operations from the copy functionality
         if params[:locked_operations].present?
-          Rails.logger.info "📋 Using provided locked operations (#{params[:locked_operations].keys.length} operations)"
 
           # Convert ActionController::Parameters to hash and then map
           locked_operations_hash = params[:locked_operations].to_unsafe_h
@@ -97,7 +89,6 @@ before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled
           current_ops = @part.get_operations_with_auto_ops
 
           if current_ops.empty?
-            Rails.logger.warn "⚠️ No operations generated for manual mode switch"
             @part.errors.add(:base, "No operations found to switch to manual mode. Please configure treatments first.")
             load_form_data_for_errors
             render :new, status: :unprocessable_entity
@@ -125,11 +116,8 @@ before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled
         @part.customisation_data["operation_selection"]["locked"] = true
         @part.customisation_data["operation_selection"]["locked_operations"] = locked_ops
 
-        Rails.logger.info "🔒 Locked #{locked_ops.length} operations for manual editing"
 
       rescue => e
-        Rails.logger.error "❌ Error during manual mode switch: #{e.message}"
-        Rails.logger.error e.backtrace.join("\n")
         @part.errors.add(:base, "Failed to switch to manual mode: #{e.message}")
         load_form_data_for_errors
         render :new, status: :unprocessable_entity
@@ -144,7 +132,6 @@ before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled
       redirect_to @part, notice: 'Part was successfully created.'
     end
   else
-    Rails.logger.error "🚨 Part Save Errors: #{@part.errors.full_messages}"
     load_form_data_for_errors
     render :new, status: :unprocessable_entity
   end
@@ -190,7 +177,6 @@ end
         end
 
       rescue => e
-        Rails.logger.error "Error switching to manual mode: #{e.message}"
         redirect_to edit_part_path(@part), alert: "Failed to switch to manual mode: #{e.message}"
         return
       end
@@ -410,8 +396,6 @@ end
     selected_enp_pre_heat_treatment = params[:selected_enp_pre_heat_treatment]
     selected_enp_heat_treatment = params[:selected_enp_heat_treatment]
 
-    Rails.logger.info "Preview params: treatments=#{treatments_data.length}, pre_heat_treatment=#{selected_enp_pre_heat_treatment}, post_heat_treatment=#{selected_enp_heat_treatment}, aerospace=#{aerospace_defense}"
-
     # Get operations using the updated treatment cycle system - includes correct stripping sequence:
     # For anodising cycles: Degrease → Strip → DeOx → Main Operation
     # For strip-only: Degrease → Strip → DeOx
@@ -427,8 +411,6 @@ end
       selected_enp_pre_heat_treatment
     )
 
-    Rails.logger.info "Generated operations: #{operations_with_auto_ops.length} operations (includes corrected stripping sequence, water break, foil verification, OCV, and ENP heat treatments if aerospace_defense=#{aerospace_defense})"
-
     render json: { operations: operations_with_auto_ops }
   end
 
@@ -439,14 +421,10 @@ end
     operation_text = params[:operation_text]
     display_name = params[:display_name]
 
-    Rails.logger.info "🔍 INSERT_OPERATION: Attempting to insert at position #{position}"
-    Rails.logger.info "🔍 INSERT_OPERATION: Current locked operations before insert:"
     @part.locked_operations.each do |op|
-      Rails.logger.info "  Position #{op['position']}: #{op['display_name']} (#{op['id']})"
     end
 
     if position.nil? || operation_text.blank?
-      Rails.logger.error "❌ INSERT_OPERATION: Missing position or operation_text"
       render json: { success: false, error: 'Position and operation text are required' }, status: :unprocessable_entity
       return
     end
@@ -455,9 +433,7 @@ end
       # Reload to get fresh data from database
       @part.reload
 
-      Rails.logger.info "✅ INSERT_OPERATION: Success! Operations after insert and reload:"
       @part.locked_operations.each do |op|
-        Rails.logger.info "  Position #{op['position']}: #{op['display_name']} (#{op['id']})"
       end
 
       # Return the updated operations list for optimistic UI sync
@@ -479,15 +455,12 @@ end
         }
       }
     else
-      Rails.logger.error "❌ INSERT_OPERATION: Failed to insert operation"
       render json: {
         success: false,
         error: 'Failed to insert operation'
       }, status: :unprocessable_entity
     end
   rescue => e
-    Rails.logger.error "❌ INSERT_OPERATION: Exception occurred: #{e.message}"
-    Rails.logger.error e.backtrace.join("\n")
     render json: {
       success: false,
       error: 'An error occurred while inserting the operation'
@@ -530,7 +503,6 @@ end
       }, status: :unprocessable_entity
     end
   rescue => e
-    Rails.logger.error "Error reordering operation: #{e.message}"
     render json: {
       success: false,
       error: 'An error occurred while reordering the operation'
@@ -572,7 +544,6 @@ end
       }, status: :unprocessable_entity
     end
   rescue => e
-    Rails.logger.error "Error deleting operation: #{e.message}"
     render json: {
       success: false,
       error: 'An error occurred while deleting the operation'
@@ -650,7 +621,6 @@ end
         customer_name: @part.customer.name
       }
     rescue => e
-      Rails.logger.error "Error copying operations from part #{@part.id}: #{e.message}"
       render json: {
         success: false,
         error: 'An error occurred while copying operations'
