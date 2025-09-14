@@ -79,7 +79,20 @@ class Part < ApplicationRecord
     end
 
     operations_data = customisation_data.dig("operation_selection", "locked_operations") || []
-    operations_data.sort_by { |op| op["position"] || 0 }
+
+    Rails.logger.info "🔧 LOCKED_OPERATIONS: Raw operations_data from database:"
+    operations_data.each_with_index do |op, index|
+      Rails.logger.info "  Array[#{index}]: Position #{op['position']}, ID: #{op['id']}"
+    end
+
+    sorted_ops = operations_data.sort_by { |op| op["position"] || 0 }
+
+    Rails.logger.info "🔧 LOCKED_OPERATIONS: After sort_by position:"
+    sorted_ops.each_with_index do |op, index|
+      Rails.logger.info "  Sorted[#{index}]: Position #{op['position']}, ID: #{op['id']}"
+    end
+
+    sorted_ops
   end
 
   def auto_lock_for_editing!
@@ -168,13 +181,23 @@ class Part < ApplicationRecord
     return false unless locked_for_editing?
     return false if operation_text.blank?
 
+    Rails.logger.info "🔧 MODEL: insert_operation_at called with position=#{position}, text='#{operation_text[0..50]}...'"
+
     locked_ops = customisation_data.dig('operation_selection', 'locked_operations') || []
+    Rails.logger.info "🔧 MODEL: Current locked_ops array length: #{locked_ops.length}"
+
+    locked_ops.each_with_index do |op, index|
+      Rails.logger.info "  Array[#{index}]: Position #{op['position']}, ID: #{op['id']}"
+    end
 
     # Shift existing operations at or after this position
+    Rails.logger.info "🔧 MODEL: Shifting operations at position >= #{position}"
     locked_ops.each do |op|
       current_pos = op["position"].to_i
       if current_pos >= position
+        old_pos = current_pos
         op["position"] = current_pos + 1
+        Rails.logger.info "  Shifted operation #{op['id']} from position #{old_pos} to #{op['position']}"
       end
     end
 
@@ -191,19 +214,38 @@ class Part < ApplicationRecord
       "auto_inserted" => false
     }
 
-    # Insert at correct array position based on final position values
+    Rails.logger.info "🔧 MODEL: Created new operation: #{new_operation['id']} at position #{position}"
+
+    # Insert at correct array position
     insert_index = locked_ops.find_index { |op| op["position"].to_i > position } || locked_ops.length
+    Rails.logger.info "🔧 MODEL: Inserting at array index #{insert_index} (total length: #{locked_ops.length})"
+
     locked_ops.insert(insert_index, new_operation)
+
+    Rails.logger.info "🔧 MODEL: Array after insert (length: #{locked_ops.length}):"
+    locked_ops.each_with_index do |op, index|
+      Rails.logger.info "  Array[#{index}]: Position #{op['position']}, ID: #{op['id']}"
+    end
 
     # Update atomically
     self.customisation_data = customisation_data.dup
     self.customisation_data["operation_selection"]["locked_operations"] = locked_ops
 
-    save!
-    renumber_operations # Ensure sequential numbering
+    Rails.logger.info "🔧 MODEL: About to save..."
+    result = save!
+
+    Rails.logger.info "🔧 MODEL: After save, calling renumber_operations..."
+    renumber_operations
+
+    Rails.logger.info "🔧 MODEL: Final state after renumber:"
+    locked_operations.each do |op|
+      Rails.logger.info "  Final Position #{op['position']}: #{op['display_name']} (#{op['id']})"
+    end
+
     true
   rescue => e
-    Rails.logger.error "Failed to insert operation: #{e.message}"
+    Rails.logger.error "❌ MODEL: Failed to insert operation: #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
     false
   end
 

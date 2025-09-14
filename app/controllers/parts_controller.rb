@@ -411,12 +411,27 @@ before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled
     operation_text = params[:operation_text]
     display_name = params[:display_name]
 
+    Rails.logger.info "🔍 INSERT_OPERATION: Attempting to insert at position #{position}"
+    Rails.logger.info "🔍 INSERT_OPERATION: Current locked operations before insert:"
+    @part.locked_operations.each do |op|
+      Rails.logger.info "  Position #{op['position']}: #{op['display_name']} (#{op['id']})"
+    end
+
     if position.nil? || operation_text.blank?
+      Rails.logger.error "❌ INSERT_OPERATION: Missing position or operation_text"
       render json: { success: false, error: 'Position and operation text are required' }, status: :unprocessable_entity
       return
     end
 
     if @part.insert_operation_at(position, operation_text, display_name)
+      # Reload to get fresh data from database
+      @part.reload
+
+      Rails.logger.info "✅ INSERT_OPERATION: Success! Operations after insert and reload:"
+      @part.locked_operations.each do |op|
+        Rails.logger.info "  Position #{op['position']}: #{op['display_name']} (#{op['id']})"
+      end
+
       # Return the updated operations list for optimistic UI sync
       render json: {
         success: true,
@@ -436,13 +451,15 @@ before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled
         }
       }
     else
+      Rails.logger.error "❌ INSERT_OPERATION: Failed to insert operation"
       render json: {
         success: false,
         error: 'Failed to insert operation'
       }, status: :unprocessable_entity
     end
   rescue => e
-    Rails.logger.error "Error inserting operation: #{e.message}"
+    Rails.logger.error "❌ INSERT_OPERATION: Exception occurred: #{e.message}"
+    Rails.logger.error e.backtrace.join("\n")
     render json: {
       success: false,
       error: 'An error occurred while inserting the operation'
