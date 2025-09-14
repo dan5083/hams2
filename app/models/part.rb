@@ -649,6 +649,31 @@ class Part < ApplicationRecord
     parse_selected_operations
   end
 
+  # Get operations formatted for copying to a new part
+  def operations_for_copying
+    operations = get_operations_with_auto_ops
+    return [] if operations.empty?
+
+    operations.map.with_index do |operation, index|
+      {
+        id: operation.id,
+        display_name: operation.display_name,
+        operation_text: operation.operation_text,
+        position: index + 1,
+        specifications: operation.respond_to?(:specifications) ? (operation.specifications || '') : '',
+        vat_numbers: operation.respond_to?(:vat_numbers) ? (operation.vat_numbers || []) : [],
+        process_type: operation.respond_to?(:process_type) ? (operation.process_type || 'manual') : 'manual',
+        target_thickness: operation.respond_to?(:target_thickness) ? (operation.target_thickness || 0) : 0,
+        auto_inserted: operation.respond_to?(:auto_inserted?) ? operation.auto_inserted? : false
+      }
+    end
+  end
+
+  # Check if part has operations that can be copied
+  def has_copyable_operations?
+    get_operations_with_auto_ops.any?
+  end
+
   private
 
   # Create a mock stripping operation for strip-only treatments

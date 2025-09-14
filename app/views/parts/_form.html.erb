@@ -1,4 +1,4 @@
-<%# app/views/parts/_form.html.erb - Complete form with modal-based manual operation management %>
+<%# app/views/parts/_form.html.erb - Complete form with modal-based manual operation management and copy from existing part %>
 <%= form_with model: part, local: true, class: "space-y-6",
     data: {
       controller: "parts-form",
@@ -33,6 +33,35 @@
   <!-- Part Details Section -->
   <div class="bg-white shadow rounded-lg p-6">
     <h3 class="text-lg font-medium text-gray-900 mb-4">Part Details</h3>
+
+    <!-- Copy from Existing Part Section (only for new parts) -->
+    <% unless part.persisted? %>
+      <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <h4 class="text-md font-medium text-blue-900 mb-3">Copy from Existing Part (Optional)</h4>
+        <div class="relative">
+          <input type="text"
+                id="copy_from_part_autocomplete"
+                placeholder="Start typing to search for existing parts..."
+                autocomplete="off"
+                class="w-full border border-blue-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+
+          <!-- Dropdown for autocomplete results -->
+          <div id="copy_from_part_dropdown"
+              class="absolute z-50 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto hidden">
+            <!-- Results will be populated here by JavaScript -->
+          </div>
+
+          <!-- Loading indicator -->
+          <div id="copy_from_part_loading"
+              class="absolute right-3 top-3 hidden">
+            <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+          </div>
+        </div>
+        <p class="mt-2 text-xs text-blue-600">
+          Selecting a part will copy its operations and switch to manual editing mode
+        </p>
+      </div>
+    <% end %>
 
     <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
       <!-- Customer Selection -->
@@ -638,6 +667,244 @@
       });
     }
 
+    // Copy from Existing Part functionality
+    function initializeCopyFromPartAutocomplete() {
+      const copyAutocompleteInput = document.getElementById('copy_from_part_autocomplete');
+      const copyDropdown = document.getElementById('copy_from_part_dropdown');
+      const copyLoadingIndicator = document.getElementById('copy_from_part_loading');
+
+      if (!copyAutocompleteInput || !copyDropdown) {
+        return; // Elements don't exist (probably editing existing part)
+      }
+
+      let copySearchTimeout;
+      let copyCurrentRequest;
+
+      copyAutocompleteInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        clearTimeout(copySearchTimeout);
+
+        if (copyCurrentRequest) {
+          copyCurrentRequest.abort();
+        }
+
+        if (query.length < 2) {
+          copyDropdown.classList.add('hidden');
+          return;
+        }
+
+        if (copyLoadingIndicator) {
+          copyLoadingIndicator.classList.remove('hidden');
+        }
+
+        copySearchTimeout = setTimeout(() => {
+          searchAllParts(query);
+        }, 300);
+      });
+
+      function searchAllParts(query) {
+        copyCurrentRequest = new AbortController();
+
+        fetch(`/parts/search_all_parts?q=${encodeURIComponent(query)}`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          signal: copyCurrentRequest.signal
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (copyLoadingIndicator) {
+            copyLoadingIndicator.classList.add('hidden');
+          }
+          displayCopyResults(data);
+        })
+        .catch(error => {
+          if (copyLoadingIndicator) {
+            copyLoadingIndicator.classList.add('hidden');
+          }
+          if (error.name !== 'AbortError') {
+            console.error('Copy search error:', error);
+          }
+        });
+      }
+
+      function displayCopyResults(parts) {
+        copyDropdown.innerHTML = '';
+
+        if (parts.length === 0) {
+          copyDropdown.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500">No parts found.</div>';
+        } else {
+          parts.forEach(part => {
+            const item = document.createElement('div');
+            item.className = 'dropdown-item px-4 py-3 cursor-pointer hover:bg-blue-50 text-sm border-b border-gray-100 last:border-b-0';
+
+            const partInfo = document.createElement('div');
+            partInfo.innerHTML = `
+              <div class="font-medium text-gray-900">${part.display_name}</div>
+              <div class="text-xs text-gray-500">${part.customer_name}</div>
+              <div class="text-xs text-gray-600 mt-1">${part.operations_summary || 'No operations'}</div>
+            `;
+            item.appendChild(partInfo);
+
+            item.addEventListener('click', function() {
+              copyPartOperations(part.id, part.display_name);
+              copyAutocompleteInput.value = `Copying from: ${part.display_name} (${part.customer_name})`;
+              copyDropdown.classList.add('hidden');
+            });
+
+            copyDropdown.appendChild(item);
+          });
+        }
+
+        copyDropdown.classList.remove('hidden');
+      }
+
+      function copyPartOperations(partId, partName) {
+        // Show loading state
+        copyAutocompleteInput.disabled = true;
+        copyAutocompleteInput.style.backgroundColor = '#f9fafb';
+
+        // Fetch part operations
+        fetch(`/parts/${partId}/copy_operations`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            // Switch to manual mode and populate operations
+            switchToManualModeWithOperations(data.operations, partName);
+          } else {
+            alert('Failed to copy operations: ' + data.error);
+            copyAutocompleteInput.disabled = false;
+            copyAutocompleteInput.style.backgroundColor = '';
+          }
+        })
+        .catch(error => {
+          console.error('Error copying operations:', error);
+          alert('An error occurred while copying operations');
+          copyAutocompleteInput.disabled = false;
+          copyAutocompleteInput.style.backgroundColor = '';
+        });
+      }
+
+      document.addEventListener('click', function(event) {
+        if (!copyAutocompleteInput.contains(event.target) && !copyDropdown.contains(event.target)) {
+          copyDropdown.classList.add('hidden');
+        }
+      });
+    }
+
+    function switchToManualModeWithOperations(operations, sourcePart) {
+      // Hide the treatment selection section
+      const treatmentSection = document.querySelector('.bg-white.shadow.rounded-lg.p-6:last-of-type');
+      if (treatmentSection) {
+        treatmentSection.style.display = 'none';
+      }
+
+      // Create and show manual operations section
+      const manualSection = document.createElement('div');
+      manualSection.className = 'bg-white shadow rounded-lg p-6';
+      manualSection.innerHTML = `
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-medium text-gray-900">Manual Operations Mode</h3>
+          <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+            Copied from: ${sourcePart}
+          </span>
+        </div>
+        <p class="text-sm text-gray-600 mb-6">Operations copied from existing part. You can modify, add, or remove operations below.</p>
+        <div class="space-y-1" id="operations-container">
+          ${generateOperationsHTML(operations)}
+        </div>
+      `;
+
+      // Insert the manual section before the form actions
+      const formActions = document.querySelector('.flex.justify-end.space-x-3');
+      if (formActions) {
+        formActions.parentNode.insertBefore(manualSection, formActions);
+      }
+
+      // Set the manual mode flag
+      document.getElementById('switch_to_manual_field').value = 'true';
+
+      // Hide the "Switch to Manual Mode" button
+      const switchButton = document.querySelector('button[onclick="switchToManualMode()"]');
+      if (switchButton) {
+        switchButton.style.display = 'none';
+      }
+    }
+
+    function generateOperationsHTML(operations) {
+      let html = '';
+
+      operations.forEach((op, index) => {
+        // Add operation button before each operation (except first)
+        if (index > 0) {
+          html += `
+            <div class="flex justify-center py-2">
+              <button type="button" class="add-operation-btn bg-blue-100 hover:bg-blue-200 text-blue-700 px-4 py-2 rounded-lg text-sm border border-blue-300 transition-colors"
+                      data-insert-position="${op.position}">
+                + Add Operation Here
+              </button>
+            </div>
+          `;
+        }
+
+        html += `
+          <div class="border border-gray-200 rounded-lg p-4 bg-gray-50 operation-item" data-position="${op.position}">
+            <div class="flex justify-between items-start mb-3">
+              <div class="flex items-center space-x-3">
+                <h4 class="font-medium text-gray-900">Operation ${op.position}: ${op.display_name}</h4>
+                ${op.vat_numbers && op.vat_numbers.length > 0 ? `<span class="text-xs text-gray-500">Vats ${op.vat_numbers.join(', ')}</span>` : ''}
+              </div>
+              <div class="flex items-center space-x-2">
+                ${index > 0 ? `
+                  <button type="button" class="reorder-up-btn text-blue-600 hover:text-blue-800 text-sm font-medium"
+                          data-position="${op.position}" title="Move up">↑</button>
+                ` : ''}
+                ${index < operations.length - 1 ? `
+                  <button type="button" class="reorder-down-btn text-blue-600 hover:text-blue-800 text-sm font-medium"
+                          data-position="${op.position}" title="Move down">↓</button>
+                ` : ''}
+                <button type="button" class="delete-operation-btn text-red-600 hover:text-red-800 text-xl font-bold"
+                        data-position="${op.position}" title="Delete this operation">×</button>
+              </div>
+            </div>
+            <textarea name="locked_operations[${op.position}]" rows="3" autocomplete="off"
+                      class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      placeholder="Enter operation text...">${op.operation_text}</textarea>
+            ${op.specifications ? `
+              <p class="mt-2 text-xs text-purple-600">
+                <strong>Specifications:</strong> ${op.specifications}
+              </p>
+            ` : ''}
+            <div class="flex flex-wrap gap-2 mt-2 text-xs text-gray-500">
+              <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded">Type: ${op.process_type ? op.process_type.replace(/_/g, ' ') : 'Manual'}</span>
+              ${op.target_thickness && op.target_thickness > 0 ? `<span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Target: ${op.target_thickness}μm</span>` : ''}
+              ${op.auto_inserted ? '<span class="bg-gray-100 text-gray-800 px-2 py-1 rounded">Auto-inserted</span>' : ''}
+            </div>
+          </div>
+        `;
+      });
+
+      // Add operation button at end
+      html += `
+        <div class="flex justify-center py-2">
+          <button type="button" class="add-operation-btn bg-blue-100 hover:bg-blue-200 text-blue-700 px-4 py-2 rounded-lg text-sm border border-blue-300 transition-colors"
+                  data-insert-position="${operations.length + 1}">
+            + Add Operation at End
+          </button>
+        </div>
+      `;
+
+      return html;
+    }
+
     // Manual Mode Function
     window.switchToManualMode = function() {
       const treatmentsField = document.querySelector('[data-parts-form-target="treatmentsField"]');
@@ -661,9 +928,13 @@
     };
 
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initializeCustomerAutocomplete);
+      document.addEventListener('DOMContentLoaded', function() {
+        initializeCustomerAutocomplete();
+        initializeCopyFromPartAutocomplete();
+      });
     } else {
       initializeCustomerAutocomplete();
+      initializeCopyFromPartAutocomplete();
     }
     </script>
   <% end %>

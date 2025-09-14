@@ -551,6 +551,67 @@ before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled
     }, status: :internal_server_error
   end
 
+  # Search all parts across all customers (for copy functionality)
+  def search_all_parts
+    if params[:q].present?
+      search_term = params[:q].upcase.strip
+      @parts = Part.enabled
+                  .includes(:customer)
+                  .where(
+                    "UPPER(part_number) ILIKE ? OR UPPER(description) ILIKE ?",
+                    "%#{search_term}%", "%#{search_term}%"
+                  )
+                  .order(:part_number, :part_issue)
+                  .limit(50) # Limit to prevent large result sets
+    else
+      @parts = Part.none
+    end
+
+    respond_to do |format|
+      format.json do
+        render json: @parts.map { |part|
+          {
+            id: part.id,
+            display_name: part.display_name,
+            customer_name: part.customer.name,
+            customer_id: part.customer_id,
+            specification: part.specification,
+            operations_summary: part.operations_summary,
+            description: part.description
+          }
+        }
+      end
+    end
+  end
+
+  # Get operations from a part for copying
+  def copy_operations
+    @part = Part.find(params[:id])
+
+    begin
+      unless @part.has_copyable_operations?
+        render json: {
+          success: false,
+          error: 'No operations found for this part'
+        }
+        return
+      end
+
+      render json: {
+        success: true,
+        operations: @part.operations_for_copying,
+        source_part: @part.display_name,
+        customer_name: @part.customer.name
+      }
+    rescue => e
+      Rails.logger.error "Error copying operations from part #{@part.id}: #{e.message}"
+      render json: {
+        success: false,
+        error: 'An error occurred while copying operations'
+      }, status: :internal_server_error
+    end
+  end
+
   private
 
   def operation_params

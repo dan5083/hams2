@@ -12,16 +12,17 @@ Rails.application.routes.draw do
   # Magic link route - AFTER Xero routes
   get '/auth/:token', to: 'sessions#magic_link', as: :magic_link
 
-  # 1. Parts management - Now includes integrated processing instructions
   resources :parts do
     member do
       patch :toggle_enabled
       post :insert_operation
       patch :reorder_operation
       delete :delete_operation
+      get :copy_operations  # NEW
     end
     collection do
       get :search
+      get :search_all_parts  # NEW
       # Operations endpoints for the complex treatment form
       post :filter_operations
       post :operation_details
