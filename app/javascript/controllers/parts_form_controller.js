@@ -251,7 +251,7 @@ export default class extends Controller {
     // Find the operations container
     const operationsContainer = document.getElementById('operations-container')
 
-    // Get all existing operation items (not buttons)
+    // Get all existing operation items (not buttons or forms)
     const existingOperations = Array.from(operationsContainer.querySelectorAll('.operation-item'))
 
     console.log(`🔍 JS: Found ${existingOperations.length} existing operations:`)
@@ -259,47 +259,46 @@ export default class extends Controller {
       console.log(`  DOM[${index}]: Position ${op.dataset.position}, Classes: ${op.className}`)
     })
 
-    // Find the correct insertion point by looking for the first operation with position >= target position
-    let insertBeforeElement = null
+    // Create the new operation HTML
+    const newOperationHTML = this.createOperationHTML(position, displayName, operationText, tempId)
 
+    // Find the correct insertion point
+    let insertionPoint = null
+
+    // Look for the first operation with position >= target position
     for (let op of existingOperations) {
       const currentPosition = parseInt(op.dataset.position)
-      console.log(`🔍 JS: Checking operation at position ${currentPosition} against target ${position}`)
       if (currentPosition >= position) {
-        insertBeforeElement = op
-        console.log(`🔍 JS: Found insertion point before position ${currentPosition}`)
+        insertionPoint = op
+        console.log(`🔍 JS: Will insert before operation at position ${currentPosition}`)
         break
       }
     }
 
-    if (!insertBeforeElement) {
-      console.log(`🔍 JS: No insertion point found, will insert at end`)
-    }
+    if (insertionPoint) {
+      // Insert before the found operation
+      // But first check if there's an "Add Operation" button right before it
+      let previousElement = insertionPoint.previousElementSibling
 
-    // CRITICAL: Insert at correct DOM position using a simpler, more reliable approach
-    const newOperationHTML = this.createOperationHTML(position, displayName, operationText, tempId)
-
-    if (insertBeforeElement) {
-      console.log(`🔍 JS: Inserting before element with position ${insertBeforeElement.dataset.position}`)
-
-      // Find any "Add Operation" button div immediately before this operation
-      let actualInsertionPoint = insertBeforeElement
-      let previousElement = insertBeforeElement.previousElementSibling
-
-      // If there's an "Add Operation" button div right before this operation,
-      // insert before that instead
+      // If the previous element is an "Add Operation" button div, insert before that
       if (previousElement && previousElement.querySelector('.add-operation-btn')) {
-        actualInsertionPoint = previousElement
-        console.log(`🔍 JS: Found Add Operation button before target, inserting before that instead`)
-      }
-
-      actualInsertionPoint.insertAdjacentHTML('beforebegin', newOperationHTML)
-    } else {
-      console.log(`🔍 JS: Inserting at end of container`)
-      const lastAddButton = operationsContainer.querySelector('.add-operation-btn[data-insert-position]:last-of-type')
-      if (lastAddButton) {
-        lastAddButton.closest('div').insertAdjacentHTML('beforebegin', newOperationHTML)
+        console.log(`🔍 JS: Found Add Operation button before target, inserting before the button`)
+        previousElement.insertAdjacentHTML('beforebegin', newOperationHTML)
       } else {
+        // Insert directly before the operation
+        console.log(`🔍 JS: Inserting directly before the operation`)
+        insertionPoint.insertAdjacentHTML('beforebegin', newOperationHTML)
+      }
+    } else {
+      // No operation found with position >= target, so insert at the end
+      console.log(`🔍 JS: No operation found with position >= ${position}, inserting at end`)
+
+      // Find the last "Add Operation at End" button and insert before it
+      const endAddButton = operationsContainer.querySelector('.add-operation-btn[data-insert-position]:last-of-type')
+      if (endAddButton) {
+        endAddButton.closest('div').insertAdjacentHTML('beforebegin', newOperationHTML)
+      } else {
+        // Fallback: insert at the very end
         operationsContainer.insertAdjacentHTML('beforeend', newOperationHTML)
       }
     }

@@ -753,26 +753,61 @@
       });
 
       function insertOperation(position, operationText, displayName, form) {
-        // Optimistic UI update - add operation immediately
+        console.log(`🔍 ERB: Attempting to insert at position ${position}`);
+
+        // Generate temp ID for optimistic update
         const tempId = 'temp_' + Date.now();
+
+        // Find the operations container
+        const operationsContainer = document.getElementById('operations-container');
+
+        // Get all existing operation items (not buttons or forms)
+        const existingOperations = Array.from(operationsContainer.querySelectorAll('.operation-item'));
+
+        console.log(`🔍 ERB: Found ${existingOperations.length} existing operations`);
+
+        // Create the new operation HTML
         const newOperationHTML = createOperationHTML(position, displayName, operationText, tempId);
 
-        // Find the right place to insert
-        const operationsContainer = document.getElementById('operations-container');
-        const addButtons = operationsContainer.querySelectorAll('.add-operation-btn');
-        let insertAfter = null;
+        // Find the correct insertion point
+        let insertionPoint = null;
 
-        addButtons.forEach(button => {
-          if (parseInt(button.dataset.insertPosition) === position) {
-            insertAfter = button.closest('div');
+        // Look for the first operation with position >= target position
+        for (let op of existingOperations) {
+          const currentPosition = parseInt(op.dataset.position);
+          if (currentPosition >= position) {
+            insertionPoint = op;
+            console.log(`🔍 ERB: Will insert before operation at position ${currentPosition}`);
+            break;
           }
-        });
+        }
 
-        if (insertAfter) {
-          insertAfter.insertAdjacentHTML('afterend', newOperationHTML);
+        if (insertionPoint) {
+          // Insert before the found operation
+          // But first check if there's an "Add Operation" button right before it
+          let previousElement = insertionPoint.previousElementSibling;
+
+          // If the previous element is an "Add Operation" button div, insert before that
+          if (previousElement && previousElement.querySelector('.add-operation-btn')) {
+            console.log(`🔍 ERB: Found Add Operation button before target, inserting before the button`);
+            previousElement.insertAdjacentHTML('beforebegin', newOperationHTML);
+          } else {
+            // Insert directly before the operation
+            console.log(`🔍 ERB: Inserting directly before the operation`);
+            insertionPoint.insertAdjacentHTML('beforebegin', newOperationHTML);
+          }
         } else {
-          // Insert at end
-          operationsContainer.insertAdjacentHTML('beforeend', newOperationHTML);
+          // No operation found with position >= target, so insert at the end
+          console.log(`🔍 ERB: No operation found with position >= ${position}, inserting at end`);
+
+          // Find the last "Add Operation at End" button and insert before it
+          const endAddButton = operationsContainer.querySelector('.add-operation-btn[data-insert-position]:last-of-type');
+          if (endAddButton) {
+            endAddButton.closest('div').insertAdjacentHTML('beforebegin', newOperationHTML);
+          } else {
+            // Fallback: insert at the very end
+            operationsContainer.insertAdjacentHTML('beforeend', newOperationHTML);
+          }
         }
 
         // Hide and clear the form
@@ -780,8 +815,8 @@
         form.querySelector('.operation-name-input').value = '';
         form.querySelector('.operation-text-input').value = '';
 
-        // Update positions of subsequent operations
-        updateSubsequentPositions(position);
+        // Update positions of all operations and regenerate add buttons
+        updateAllOperationPositionsAndButtons();
 
         // Sync with server
         fetch(`/parts/${partId}/insert_operation`, {
@@ -805,13 +840,16 @@
               tempOp.removeAttribute('data-temp-id');
               tempOp.classList.remove('bg-green-100');
               tempOp.classList.add('bg-gray-50');
+
+              // Add event listeners to the new operation's buttons
+              addEventListenersToOperation(tempOp);
             }
             showSuccessMessage('Operation added successfully');
           } else {
             // Remove the optimistic update
             const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`);
             if (tempOp) tempOp.remove();
-            revertPositionUpdates(position);
+            revertOperationPositions();
             alert('Error: ' + data.error);
           }
         })
@@ -820,7 +858,7 @@
           // Remove the optimistic update
           const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`);
           if (tempOp) tempOp.remove();
-          revertPositionUpdates(position);
+          revertOperationPositions();
           alert('An error occurred while adding the operation');
         });
       }
@@ -843,40 +881,122 @@
         `;
       }
 
-      function updateSubsequentPositions(insertPosition) {
-        document.querySelectorAll('.operation-item').forEach(item => {
-          const currentPosition = parseInt(item.dataset.position);
-          if (currentPosition >= insertPosition && !item.dataset.tempId) {
-            const newPosition = currentPosition + 1;
-            item.dataset.position = newPosition;
-            const header = item.querySelector('h4');
-            if (header) {
-              header.textContent = header.textContent.replace(/Operation \d+:/, `Operation ${newPosition}:`);
-            }
+      function updateAllOperationPositionsAndButtons() {
+        const operations = document.querySelectorAll('.operation-item');
+        operations.forEach((item, index) => {
+          const newPosition = index + 1;
+
+          // Update data attribute
+          item.dataset.position = newPosition;
+
+          // Update header text
+          const header = item.querySelector('h4');
+          if (header) {
+            header.textContent = header.textContent.replace(/Operation \d+:/, `Operation ${newPosition}:`);
+          }
+
+          // Update textarea name (only for non-temp operations)
+          if (!item.dataset.tempId) {
             const textarea = item.querySelector('textarea');
             if (textarea) {
               textarea.name = `locked_operations[${newPosition}]`;
             }
           }
+
+          // Update button positions
+          const buttons = item.querySelectorAll('.reorder-up-btn, .reorder-down-btn, .delete-operation-btn');
+          buttons.forEach(btn => {
+            btn.dataset.position = newPosition;
+          });
+        });
+
+        // Regenerate add operation buttons
+        regenerateAddOperationButtons();
+      }
+
+      function regenerateAddOperationButtons() {
+        const operationsContainer = document.getElementById('operations-container');
+
+        // Remove all existing "Add Operation" button divs
+        operationsContainer.querySelectorAll('div').forEach(div => {
+          if (div.querySelector('.add-operation-btn')) {
+            div.remove();
+          }
+        });
+
+        const operations = Array.from(operationsContainer.querySelectorAll('.operation-item'));
+
+        // Add button before each operation (except the first)
+        operations.forEach((operation, index) => {
+          if (index > 0) { // Skip first operation
+            const position = parseInt(operation.dataset.position);
+            const buttonHTML = `
+              <div class="flex justify-center py-2">
+                <button type="button" class="add-operation-btn bg-blue-100 hover:bg-blue-200 text-blue-700 px-4 py-2 rounded-lg text-sm border border-blue-300 transition-colors"
+                        data-insert-position="${position}">
+                  + Add Operation Here
+                </button>
+              </div>
+            `;
+            operation.insertAdjacentHTML('beforebegin', buttonHTML);
+          }
+        });
+
+        // Add button at the end
+        const lastPosition = operations.length > 0 ? parseInt(operations[operations.length - 1].dataset.position) + 1 : 1;
+        const endButtonHTML = `
+          <div class="flex justify-center py-2">
+            <button type="button" class="add-operation-btn bg-blue-100 hover:bg-blue-200 text-blue-700 px-4 py-2 rounded-lg text-sm border border-blue-300 transition-colors"
+                    data-insert-position="${lastPosition}">
+              + Add Operation at End
+            </button>
+          </div>
+        `;
+        operationsContainer.insertAdjacentHTML('beforeend', endButtonHTML);
+
+        // Add event listeners to new add buttons
+        operationsContainer.querySelectorAll('.add-operation-btn').forEach(button => {
+          button.addEventListener('click', function() {
+            const position = parseInt(this.dataset.insertPosition);
+            showInsertForm(position);
+          });
         });
       }
 
-      function revertPositionUpdates(insertPosition) {
-        document.querySelectorAll('.operation-item').forEach(item => {
-          const currentPosition = parseInt(item.dataset.position);
-          if (currentPosition > insertPosition) {
-            const newPosition = currentPosition - 1;
-            item.dataset.position = newPosition;
-            const header = item.querySelector('h4');
-            if (header) {
-              header.textContent = header.textContent.replace(/Operation \d+:/, `Operation ${newPosition}:`);
-            }
-            const textarea = item.querySelector('textarea');
-            if (textarea) {
-              textarea.name = `locked_operations[${newPosition}]`;
-            }
-          }
-        });
+      function addEventListenersToOperation(operation) {
+        // Add listeners for reorder and delete buttons
+        const upButton = operation.querySelector('.reorder-up-btn');
+        const downButton = operation.querySelector('.reorder-down-btn');
+        const deleteButton = operation.querySelector('.delete-operation-btn');
+
+        if (upButton) {
+          upButton.addEventListener('click', function() {
+            const fromPosition = parseInt(this.dataset.position);
+            const toPosition = fromPosition - 1;
+            reorderOperation(fromPosition, toPosition);
+          });
+        }
+
+        if (downButton) {
+          downButton.addEventListener('click', function() {
+            const fromPosition = parseInt(this.dataset.position);
+            const toPosition = fromPosition + 1;
+            reorderOperation(fromPosition, toPosition);
+          });
+        }
+
+        if (deleteButton) {
+          deleteButton.addEventListener('click', function() {
+            const position = parseInt(this.dataset.position);
+            deleteOperation(position);
+          });
+        }
+      }
+
+      function revertOperationPositions() {
+        // This would need to store original state before changes
+        // For now, just reload the page on error
+        location.reload();
       }
 
       function showSuccessMessage(message) {
@@ -887,54 +1007,32 @@
         setTimeout(() => successDiv.remove(), 3000);
       }
 
-      // Delete operation buttons
-      document.querySelectorAll('.delete-operation-btn').forEach(button => {
-        button.addEventListener('click', function() {
-          const position = parseInt(this.dataset.position);
-
-          if (confirm('Are you sure you want to delete this operation? This cannot be undone.')) {
-            fetch(`/parts/${partId}/delete_operation`, {
-              method: 'DELETE',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-Token': csrfToken
-              },
-              body: JSON.stringify({
-                position: position
-              })
+      function deleteOperation(position) {
+        if (confirm('Are you sure you want to delete this operation? This cannot be undone.')) {
+          fetch(`/parts/${partId}/delete_operation`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRF-Token': csrfToken
+            },
+            body: JSON.stringify({
+              position: position
             })
-            .then(response => response.json())
-            .then(data => {
-              if (data.success) {
-                location.reload();
-              } else {
-                alert('Error: ' + data.error);
-              }
-            })
-            .catch(error => {
-              console.error('Error:', error);
-              alert('An error occurred while deleting the operation');
-            });
-          }
-        });
-      });
-
-      // Reorder operation buttons
-      document.querySelectorAll('.reorder-up-btn').forEach(button => {
-        button.addEventListener('click', function() {
-          const fromPosition = parseInt(this.dataset.position);
-          const toPosition = fromPosition - 1;
-          reorderOperation(fromPosition, toPosition);
-        });
-      });
-
-      document.querySelectorAll('.reorder-down-btn').forEach(button => {
-        button.addEventListener('click', function() {
-          const fromPosition = parseInt(this.dataset.position);
-          const toPosition = fromPosition + 1;
-          reorderOperation(fromPosition, toPosition);
-        });
-      });
+          })
+          .then(response => response.json())
+          .then(data => {
+            if (data.success) {
+              location.reload();
+            } else {
+              alert('Error: ' + data.error);
+            }
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while deleting the operation');
+          });
+        }
+      }
 
       function reorderOperation(fromPosition, toPosition) {
         fetch(`/parts/${partId}/reorder_operation`, {
@@ -961,6 +1059,36 @@
           alert('An error occurred while reordering the operation');
         });
       }
+
+      // Add event listeners to existing operations
+      document.querySelectorAll('.operation-item').forEach(operation => {
+        addEventListenersToOperation(operation);
+      });
+
+      // Delete operation buttons
+      document.querySelectorAll('.delete-operation-btn').forEach(button => {
+        button.addEventListener('click', function() {
+          const position = parseInt(this.dataset.position);
+          deleteOperation(position);
+        });
+      });
+
+      // Reorder operation buttons
+      document.querySelectorAll('.reorder-up-btn').forEach(button => {
+        button.addEventListener('click', function() {
+          const fromPosition = parseInt(this.dataset.position);
+          const toPosition = fromPosition - 1;
+          reorderOperation(fromPosition, toPosition);
+        });
+      });
+
+      document.querySelectorAll('.reorder-down-btn').forEach(button => {
+        button.addEventListener('click', function() {
+          const fromPosition = parseInt(this.dataset.position);
+          const toPosition = fromPosition + 1;
+          reorderOperation(fromPosition, toPosition);
+        });
+      });
     });
   </script>
 <% end %>
