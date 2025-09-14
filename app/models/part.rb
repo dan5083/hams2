@@ -170,7 +170,15 @@ class Part < ApplicationRecord
 
     locked_ops = customisation_data.dig('operation_selection', 'locked_operations') || []
 
-    # Create new operation with validated position
+    # Shift existing operations at or after this position
+    locked_ops.each do |op|
+      current_pos = op["position"].to_i
+      if current_pos >= position
+        op["position"] = current_pos + 1
+      end
+    end
+
+    # Create new operation
     new_operation = {
       "id" => "CUSTOM_OP_#{Time.current.to_i}_#{rand(1000)}",
       "display_name" => display_name.presence || "Custom Operation",
@@ -183,16 +191,9 @@ class Part < ApplicationRecord
       "auto_inserted" => false
     }
 
-    # Shift existing operations at or after this position
-    locked_ops.each do |op|
-      current_pos = op["position"].to_i
-      if current_pos >= position
-        op["position"] = current_pos + 1
-      end
-    end
-
-    # Add new operation
-    locked_ops << new_operation
+    # Insert at correct array position based on final position values
+    insert_index = locked_ops.find_index { |op| op["position"].to_i > position } || locked_ops.length
+    locked_ops.insert(insert_index, new_operation)
 
     # Update atomically
     self.customisation_data = customisation_data.dup
