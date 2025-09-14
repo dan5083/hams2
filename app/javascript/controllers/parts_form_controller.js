@@ -35,7 +35,7 @@ export default class extends Controller {
                        document.querySelector('[data-locked-mode="true"]') !== null
 
     if (this.isLockedMode) {
-      console.log("Parts form in locked editing mode - setting up click-to-add operations")
+      console.log("Parts form in locked editing mode - skipping treatment configuration")
       this.setupLockedMode()
       return
     }
@@ -133,9 +133,9 @@ export default class extends Controller {
     this.setupAerospaceDefenseListener()
   }
 
-  // Setup locked mode - click-to-add operation management
+  // Setup locked mode - click-based operation management
   setupLockedMode() {
-    console.log("Setting up locked mode with click-to-add operations")
+    console.log("Setting up locked mode - click-based operation management")
 
     // Disable any treatment configuration elements that might still be present
     this.element.querySelectorAll('.treatment-btn').forEach(button => {
@@ -143,11 +143,11 @@ export default class extends Controller {
       button.classList.add('opacity-50', 'cursor-not-allowed')
     })
 
-    this.initializeClickToAddOperations()
+    this.initializeClickBasedOperationManagement()
   }
 
-  // Initialize click-to-add operation management for locked mode
-  initializeClickToAddOperations() {
+  // Initialize click-based operation management for locked mode
+  initializeClickBasedOperationManagement() {
     if (!this.isLockedMode) return
 
     const partId = this.getPartIdFromUrl()
@@ -157,7 +157,7 @@ export default class extends Controller {
     }
 
     this.partId = partId
-    this.setupClickToAddHandlers()
+    this.setupClickBasedHandlers()
   }
 
   getPartIdFromUrl() {
@@ -166,10 +166,10 @@ export default class extends Controller {
     return partsIndex !== -1 && pathParts[partsIndex + 1] ? pathParts[partsIndex + 1] : null
   }
 
-  setupClickToAddHandlers() {
-    // Single delegated event listener for all operation management actions
+  setupClickBasedHandlers() {
+    // Single delegated event listener for all operation management
     document.addEventListener('click', (e) => {
-      // Add operation button clicks
+      // Add operation buttons
       if (e.target.classList.contains('add-operation-btn')) {
         const position = parseInt(e.target.dataset.insertPosition)
         this.showInsertForm(position)
@@ -186,7 +186,7 @@ export default class extends Controller {
       // Confirm insert buttons
       if (e.target.classList.contains('confirm-insert')) {
         const position = parseInt(e.target.dataset.position)
-        this.handleConfirmInsert(position)
+        this.handleInsertConfirm(position)
         return
       }
 
@@ -214,23 +214,30 @@ export default class extends Controller {
         this.reorderOperation(fromPosition, toPosition)
         return
       }
+
+      // Click outside insert forms - hide them
+      if (!e.target.closest('.insert-form') && !e.target.classList.contains('add-operation-btn')) {
+        this.hideAllInsertForms()
+      }
     })
   }
 
   showInsertForm(position) {
     // Hide all forms first
-    document.querySelectorAll('.insert-form').forEach(form => {
-      form.style.display = 'none'
-    })
+    this.hideAllInsertForms()
 
     // Show the form for this position
     const form = document.querySelector(`.insert-form[data-position="${position}"]`)
     if (form) {
       form.style.display = 'block'
-      const nameInput = form.querySelector('.operation-name-input')
-      if (nameInput) {
-        nameInput.focus()
-      }
+
+      // Focus on the first input after a brief delay to ensure form is visible
+      setTimeout(() => {
+        const nameInput = form.querySelector('.operation-name-input')
+        if (nameInput) {
+          nameInput.focus()
+        }
+      }, 50)
     }
   }
 
@@ -238,7 +245,7 @@ export default class extends Controller {
     const form = document.querySelector(`.insert-form[data-position="${position}"]`)
     if (form) {
       form.style.display = 'none'
-      // Clear the inputs
+      // Clear the inputs when hiding
       const nameInput = form.querySelector('.operation-name-input')
       const textInput = form.querySelector('.operation-text-input')
       if (nameInput) nameInput.value = ''
@@ -246,7 +253,18 @@ export default class extends Controller {
     }
   }
 
-  handleConfirmInsert(position) {
+  hideAllInsertForms() {
+    document.querySelectorAll('.insert-form').forEach(form => {
+      form.style.display = 'none'
+      // Clear inputs when hiding
+      const nameInput = form.querySelector('.operation-name-input')
+      const textInput = form.querySelector('.operation-text-input')
+      if (nameInput) nameInput.value = ''
+      if (textInput) textInput.value = ''
+    })
+  }
+
+  handleInsertConfirm(position) {
     const form = document.querySelector(`.insert-form[data-position="${position}"]`)
     if (!form) return
 
@@ -262,47 +280,31 @@ export default class extends Controller {
   }
 
   async insertOperationAtPosition(position, operationText, displayName, form) {
-     console.log('🔍 Inserting at position:', position)
-    // Optimistic UI update - add operation immediately
+    // Optimistic UI update
     const tempId = 'temp_' + Date.now()
     const newOperationHTML = this.createOperationHTML(position, displayName, operationText, tempId)
 
-    // Find the right place to insert based on position
+    // Find the right place to insert
     const operationsContainer = document.getElementById('operations-container')
-      console.log('🔍 Operations container:', operationsContainer)
+    const addButtons = operationsContainer.querySelectorAll('.add-operation-btn')
+    let insertAfter = null
 
-
-    // If inserting at position 1, insert at the very beginning
-    if (position === 1) {
-      console.log('🔍 Inserting at beginning')
-
-      operationsContainer.insertAdjacentHTML('afterbegin', newOperationHTML)
-    } else {
-      // Find the operation that should come BEFORE this position
-      // We want to insert after the operation at position-1
-      const targetOperation = operationsContainer.querySelector(`.operation-item[data-position="${position - 1}"]`)
-          console.log('🔍 Looking for operation at position:', position - 1)
-    console.log('🔍 Found target operation:', targetOperation)
-
-      if (targetOperation) {
-              console.log('🔍 Inserting after target operation')
-
-        targetOperation.insertAdjacentHTML('afterend', newOperationHTML)
-      } else {
-        // If we can't find the previous operation, insert at the end
-        const lastOperation = operationsContainer.querySelector('.operation-item:last-of-type')
-        if (lastOperation) {
-          lastOperation.insertAdjacentHTML('afterend', newOperationHTML)
-        } else {
-          operationsContainer.insertAdjacentHTML('beforeend', newOperationHTML)
-        }
+    // Find the add button that corresponds to this position
+    addButtons.forEach(button => {
+      if (parseInt(button.dataset.insertPosition) === position) {
+        insertAfter = button.closest('div')
       }
+    })
+
+    if (insertAfter) {
+      insertAfter.insertAdjacentHTML('afterend', newOperationHTML)
+    } else {
+      // Insert at end if no specific button found
+      operationsContainer.insertAdjacentHTML('beforeend', newOperationHTML)
     }
 
     // Hide and clear the form
-    form.style.display = 'none'
-    form.querySelector('.operation-name-input').value = ''
-    form.querySelector('.operation-text-input').value = ''
+    this.hideInsertForm(position)
 
     // Update positions of subsequent operations
     this.updateSubsequentPositions(position)
@@ -427,6 +429,14 @@ export default class extends Controller {
         if (textarea) {
           textarea.name = `locked_operations[${newPosition}]`
         }
+
+        // Update reorder button positions
+        const upBtn = item.querySelector('.reorder-up-btn')
+        const downBtn = item.querySelector('.reorder-down-btn')
+        const deleteBtn = item.querySelector('.delete-operation-btn')
+        if (upBtn) upBtn.dataset.position = newPosition
+        if (downBtn) downBtn.dataset.position = newPosition
+        if (deleteBtn) deleteBtn.dataset.position = newPosition
       }
     })
   }
@@ -445,6 +455,14 @@ export default class extends Controller {
         if (textarea) {
           textarea.name = `locked_operations[${newPosition}]`
         }
+
+        // Update reorder button positions
+        const upBtn = item.querySelector('.reorder-up-btn')
+        const downBtn = item.querySelector('.reorder-down-btn')
+        const deleteBtn = item.querySelector('.delete-operation-btn')
+        if (upBtn) upBtn.dataset.position = newPosition
+        if (downBtn) downBtn.dataset.position = newPosition
+        if (deleteBtn) deleteBtn.dataset.position = newPosition
       }
     })
   }
