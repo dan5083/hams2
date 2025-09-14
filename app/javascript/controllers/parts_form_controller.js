@@ -241,91 +241,177 @@ export default class extends Controller {
     this.insertOperationAtPosition(position, operationText, operationName || 'Custom Operation', form)
   }
 
-  async insertOperationAtPosition(position, operationText, displayName, form) {
-    // Generate temp ID for optimistic update
-    const tempId = 'temp_' + Date.now()
+// Replace the insertOperationAtPosition method in your controller with this:
 
-    // CRITICAL: Insert at correct DOM position
-    const newOperationHTML = this.createOperationHTML(position, displayName, operationText, tempId)
+async insertOperationAtPosition(position, operationText, displayName, form) {
+  // Generate temp ID for optimistic update
+  const tempId = 'temp_' + Date.now()
 
-    // Find the correct insertion point in the DOM
-    const operationsContainer = document.getElementById('operations-container')
-    let insertionPoint = null
+  // CRITICAL: Insert at correct DOM position using a simpler, more reliable approach
+  const newOperationHTML = this.createOperationHTML(position, displayName, operationText, tempId)
 
-    // Find where to insert based on position
-    const existingOperations = operationsContainer.querySelectorAll('.operation-item')
+  // Find the operations container
+  const operationsContainer = document.getElementById('operations-container')
 
-    if (position === 1) {
-      // Insert at the beginning (before first operation)
-      if (existingOperations.length > 0) {
-        insertionPoint = existingOperations[0]
-      }
-    } else {
-      // Find the operation that should come after our new operation
-      for (let op of existingOperations) {
-        const opPosition = parseInt(op.dataset.position)
-        if (opPosition >= position) {
-          insertionPoint = op
-          break
-        }
-      }
+  // Get all existing operation items (not buttons)
+  const existingOperations = Array.from(operationsContainer.querySelectorAll('.operation-item'))
+
+  // Find the correct insertion point by looking for the first operation with position >= target position
+  let insertBeforeElement = null
+
+  for (let op of existingOperations) {
+    const currentPosition = parseInt(op.dataset.position)
+    if (currentPosition >= position) {
+      insertBeforeElement = op
+      break
     }
+  }
 
-    // Insert the new operation at the correct position
-    if (insertionPoint) {
-      insertionPoint.insertAdjacentHTML('beforebegin', newOperationHTML)
+  if (insertBeforeElement) {
+    // Insert before the found element
+    insertBeforeElement.insertAdjacentHTML('beforebegin', newOperationHTML)
+  } else {
+    // Insert at the end (before the last "Add Operation" button)
+    const lastAddButton = operationsContainer.querySelector('.add-operation-btn[data-insert-position]:last-of-type')
+    if (lastAddButton) {
+      lastAddButton.closest('div').insertAdjacentHTML('beforebegin', newOperationHTML)
     } else {
-      // Insert at the end if no insertion point found
-      operationsContainer.querySelector('.add-operation-btn:last-of-type').closest('div').insertAdjacentHTML('beforebegin', newOperationHTML)
+      operationsContainer.insertAdjacentHTML('beforeend', newOperationHTML)
     }
+  }
 
-    // Hide and clear the form
-    this.hideInsertForm(position)
+  // Hide and clear the form
+  this.hideInsertForm(position)
 
-    // Update positions of ALL operations to maintain sequence
-    this.updateAllOperationPositions()
+  // CRITICAL: Update positions AND regenerate "Add Operation" buttons
+  this.updateAllOperationPositionsAndButtons()
 
-    try {
-      // Sync with server
-      const response = await fetch(`/parts/${this.partId}/insert_operation`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': this.csrfTokenValue
-        },
-        body: JSON.stringify({
-          position: position,
-          operation_text: operationText,
-          display_name: displayName
-        })
+  try {
+    // Sync with server
+    const response = await fetch(`/parts/${this.partId}/insert_operation`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': this.csrfTokenValue
+      },
+      body: JSON.stringify({
+        position: position,
+        operation_text: operationText,
+        display_name: displayName
       })
+    })
 
-      const data = await response.json()
+    const data = await response.json()
 
-      if (data.success) {
-        // Update the temp operation to show success
-        const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`)
-        if (tempOp) {
-          tempOp.removeAttribute('data-temp-id')
-          tempOp.classList.remove('bg-green-100')
-          tempOp.classList.add('bg-gray-50')
-        }
-        this.showSuccessMessage('Operation added successfully')
-      } else {
-        // Remove the optimistic update on failure
-        const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`)
-        if (tempOp) tempOp.remove()
-        this.revertOperationPositions()
-        alert('Error: ' + data.error)
+    if (data.success) {
+      // Update the temp operation to show success
+      const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`)
+      if (tempOp) {
+        tempOp.removeAttribute('data-temp-id')
+        tempOp.classList.remove('bg-green-100')
+        tempOp.classList.add('bg-gray-50')
       }
-    } catch (error) {
-      console.error('Error:', error)
-      // Remove the optimistic update on error
+      this.showSuccessMessage('Operation added successfully')
+
+      // Regenerate the add buttons with correct positions
+      this.regenerateAddOperationButtons()
+    } else {
+      // Remove the optimistic update on failure
       const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`)
       if (tempOp) tempOp.remove()
       this.revertOperationPositions()
-      alert('An error occurred while adding the operation')
+      alert('Error: ' + data.error)
     }
+  } catch (error) {
+    console.error('Error:', error)
+    // Remove the optimistic update on error
+    const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`)
+    if (tempOp) tempOp.remove()
+    this.revertOperationPositions()
+    alert('An error occurred while adding the operation')
+  }
+}
+
+  // New method to update positions AND regenerate buttons
+  updateAllOperationPositionsAndButtons() {
+    const operations = document.querySelectorAll('.operation-item')
+    operations.forEach((item, index) => {
+      const newPosition = index + 1
+
+      // Update data attribute
+      item.dataset.position = newPosition
+
+      // Update header text
+      const header = item.querySelector('h4')
+      if (header) {
+        header.textContent = header.textContent.replace(/Operation \d+:/, `Operation ${newPosition}:`)
+      }
+
+      // Update textarea name (only for non-temp operations)
+      if (!item.dataset.tempId) {
+        const textarea = item.querySelector('textarea')
+        if (textarea) {
+          textarea.name = `locked_operations[${newPosition}]`
+        }
+      }
+
+      // Update reorder button positions
+      const reorderButtons = item.querySelectorAll('.reorder-up-btn, .reorder-down-btn')
+      reorderButtons.forEach(btn => {
+        btn.dataset.position = newPosition
+      })
+
+      // Update delete button position
+      const deleteBtn = item.querySelector('.delete-operation-btn')
+      if (deleteBtn) {
+        deleteBtn.dataset.position = newPosition
+      }
+    })
+
+    // Now regenerate the "Add Operation" buttons
+    this.regenerateAddOperationButtons()
+  }
+
+  // New method to regenerate "Add Operation" buttons with correct positioning
+  regenerateAddOperationButtons() {
+    const operationsContainer = document.getElementById('operations-container')
+
+    // Remove all existing "Add Operation" button divs
+    operationsContainer.querySelectorAll('div').forEach(div => {
+      if (div.querySelector('.add-operation-btn')) {
+        div.remove()
+      }
+    })
+
+    const operations = Array.from(operationsContainer.querySelectorAll('.operation-item'))
+
+    // Add button before each operation (except the first)
+    operations.forEach((operation, index) => {
+      if (index > 0) { // Skip first operation
+        const position = parseInt(operation.dataset.position)
+        const buttonHTML = `
+          <div class="flex justify-center py-2">
+            <button type="button" class="add-operation-btn bg-blue-100 hover:bg-blue-200 text-blue-700 px-4 py-2 rounded-lg text-sm border border-blue-300 transition-colors"
+                    data-insert-position="${position}">
+              + Add Operation Here
+            </button>
+          </div>
+        `
+        operation.insertAdjacentHTML('beforebegin', buttonHTML)
+      }
+    })
+
+    // Add button at the end
+    const lastPosition = operations.length > 0 ? parseInt(operations[operations.length - 1].dataset.position) + 1 : 1
+    const endButtonHTML = `
+      <div class="flex justify-center py-2">
+        <button type="button" class="add-operation-btn bg-blue-100 hover:bg-blue-200 text-blue-700 px-4 py-2 rounded-lg text-sm border border-blue-300 transition-colors"
+                data-insert-position="${lastPosition}">
+          + Add Operation at End
+        </button>
+      </div>
+    `
+    operationsContainer.insertAdjacentHTML('beforeend', endButtonHTML)
   }
 
   createOperationHTML(position, displayName, operationText, tempId) {
