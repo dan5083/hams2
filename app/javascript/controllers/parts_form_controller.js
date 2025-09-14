@@ -134,7 +134,7 @@ export default class extends Controller {
     this.setupAerospaceDefenseListener()
   }
 
-  // Setup locked mode - click-based operation management
+  // Setup locked mode - click-based operation management with modal
   setupLockedMode() {
     console.log("Setting up locked mode with click-based operation management")
 
@@ -144,6 +144,11 @@ export default class extends Controller {
       console.error('Part ID not found for manual operation management')
       return
     }
+
+    // Add modal-specific properties
+    this.modal = null
+    this.deletionInProgress = false
+    this.currentInsertPosition = null
 
     this.setupClickBasedOperationManagement()
   }
@@ -160,21 +165,7 @@ export default class extends Controller {
       // Add operation buttons
       if (e.target.classList.contains('add-operation-btn')) {
         const position = parseInt(e.target.dataset.insertPosition)
-        this.showInsertForm(position)
-        return
-      }
-
-      // Cancel insert buttons
-      if (e.target.classList.contains('cancel-insert')) {
-        const position = e.target.dataset.position
-        this.hideInsertForm(position)
-        return
-      }
-
-      // Confirm insert buttons
-      if (e.target.classList.contains('confirm-insert')) {
-        const position = parseInt(e.target.dataset.position)
-        this.confirmInsert(position)
+        this.showModal(position, e.target)
         return
       }
 
@@ -202,47 +193,123 @@ export default class extends Controller {
     })
   }
 
-  showInsertForm(position) {
-    // Hide all forms first
-    document.querySelectorAll('.insert-form').forEach(form => {
-      form.style.display = 'none'
+  showModal(position, clickedButton) {
+    this.currentInsertPosition = position
+    if (!this.modal) {
+      this.createModal()
+    }
+
+    // Update modal title to show insertion context
+    const insertContext = this.getInsertionContext(position)
+    this.modal.querySelector('.modal-title').textContent = `Add Operation ${insertContext}`
+
+    // Clear previous input
+    this.modal.querySelector('.operation-name-input').value = ''
+    this.modal.querySelector('.operation-text-input').value = ''
+
+    // Position modal near the clicked button
+    this.positionModal(clickedButton)
+
+    // Show modal
+    this.modal.classList.remove('hidden')
+    this.modal.querySelector('.operation-name-input').focus()
+  }
+
+  createModal() {
+    const modalHTML = `
+      <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden modal-overlay">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 modal-dialog">
+          <div class="p-6">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="text-lg font-medium text-gray-900 modal-title">Add Operation</h3>
+              <button type="button" class="modal-close text-gray-400 hover:text-gray-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Operation Name (optional)</label>
+              <input type="text" class="operation-name-input w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., Custom Inspection">
+            </div>
+
+            <div class="mb-6">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Operation Instructions</label>
+              <textarea class="operation-text-input w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" rows="4" placeholder="Enter detailed operation instructions..."></textarea>
+            </div>
+
+            <div class="flex justify-end space-x-3">
+              <button type="button" class="modal-cancel px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors">Cancel</button>
+              <button type="button" class="modal-confirm px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition-colors">Add Operation</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML)
+    this.modal = document.querySelector('.modal-overlay')
+
+    // Add event listeners
+    this.modal.querySelector('.modal-close').addEventListener('click', () => this.hideModal())
+    this.modal.querySelector('.modal-cancel').addEventListener('click', () => this.hideModal())
+    this.modal.querySelector('.modal-confirm').addEventListener('click', () => this.confirmInsert())
+
+    // Close on overlay click
+    this.modal.addEventListener('click', (e) => {
+      if (e.target === this.modal) this.hideModal()
     })
 
-    // Show the form for this position
-    const form = document.querySelector(`.insert-form[data-position="${position}"]`)
-    if (form) {
-      form.style.display = 'block'
-      form.querySelector('.operation-name-input').focus()
+    // Close on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !this.modal.classList.contains('hidden')) {
+        this.hideModal()
+      }
+    })
+  }
+
+  getInsertionContext(position) {
+    const operations = document.querySelectorAll('.operation-item')
+    const totalOps = operations.length
+
+    if (position === 1) {
+      return 'at Beginning'
+    } else if (position > totalOps) {
+      return 'at End'
+    } else {
+      return `between ${position - 1} and ${position}`
     }
   }
 
-  hideInsertForm(position) {
-    const form = document.querySelector(`.insert-form[data-position="${position}"]`)
-    if (form) {
-      form.style.display = 'none'
-      // Clear the inputs
-      form.querySelector('.operation-name-input').value = ''
-      form.querySelector('.operation-text-input').value = ''
+  positionModal(clickedButton) {
+    // Simple center positioning for now - can enhance with positioning near button later
+    this.modal.classList.add('flex', 'items-center', 'justify-center')
+  }
+
+  hideModal() {
+    if (this.modal) {
+      this.modal.classList.add('hidden')
+      this.currentInsertPosition = null
     }
   }
 
-  confirmInsert(position) {
-    const form = document.querySelector(`.insert-form[data-position="${position}"]`)
-    if (!form) return
+  confirmInsert() {
+    if (!this.currentInsertPosition) return
 
-    const operationName = form.querySelector('.operation-name-input').value.trim()
-    const operationText = form.querySelector('.operation-text-input').value.trim()
+    const operationName = this.modal.querySelector('.operation-name-input').value.trim()
+    const operationText = this.modal.querySelector('.operation-text-input').value.trim()
 
     if (!operationText) {
       alert('Please enter operation instructions')
       return
     }
 
-    this.insertOperationAtPosition(position, operationText, operationName || 'Custom Operation', form)
+    this.hideModal()
+    this.insertOperationAtPosition(this.currentInsertPosition, operationText, operationName || 'Custom Operation')
   }
 
-
-  async insertOperationAtPosition(position, operationText, displayName, form) {
+  async insertOperationAtPosition(position, operationText, displayName) {
     console.log(`🔍 JS: Attempting to insert at position ${position}`)
 
     // Generate temp ID for optimistic update
@@ -303,9 +370,6 @@ export default class extends Controller {
         operationsContainer.insertAdjacentHTML('beforeend', newOperationHTML)
       }
     }
-
-    // Hide and clear the form
-    this.hideInsertForm(position)
 
     // CRITICAL: Update positions AND regenerate "Add Operation" buttons
     this.updateAllOperationPositionsAndButtons()
@@ -456,44 +520,6 @@ export default class extends Controller {
     `
   }
 
-  // Update all operation positions to maintain proper sequence
-  updateAllOperationPositions() {
-    const operations = document.querySelectorAll('.operation-item')
-    operations.forEach((item, index) => {
-      const newPosition = index + 1
-      const oldPosition = parseInt(item.dataset.position)
-
-      // Update data attribute
-      item.dataset.position = newPosition
-
-      // Update header text
-      const header = item.querySelector('h4')
-      if (header) {
-        header.textContent = header.textContent.replace(/Operation \d+:/, `Operation ${newPosition}:`)
-      }
-
-      // Update textarea name (only for non-temp operations)
-      if (!item.dataset.tempId) {
-        const textarea = item.querySelector('textarea')
-        if (textarea) {
-          textarea.name = `locked_operations[${newPosition}]`
-        }
-      }
-
-      // Update reorder button positions
-      const reorderButtons = item.querySelectorAll('.reorder-up-btn, .reorder-down-btn')
-      reorderButtons.forEach(btn => {
-        btn.dataset.position = newPosition
-      })
-
-      // Update delete button position
-      const deleteBtn = item.querySelector('.delete-operation-btn')
-      if (deleteBtn) {
-        deleteBtn.dataset.position = newPosition
-      }
-    })
-  }
-
   // Store original positions for reverting on error
   storeOriginalPositions() {
     this.originalPositions = []
@@ -534,9 +560,16 @@ export default class extends Controller {
   }
 
   async deleteOperation(position) {
+    if (this.deletionInProgress) {
+      console.log('Deletion already in progress, ignoring')
+      return
+    }
+
     if (!confirm('Are you sure you want to delete this operation? This cannot be undone.')) {
       return
     }
+
+    this.deletionInProgress = true
 
     try {
       const response = await fetch(`/parts/${this.partId}/delete_operation`, {
@@ -557,6 +590,8 @@ export default class extends Controller {
     } catch (error) {
       console.error('Error:', error)
       alert('An error occurred while deleting the operation')
+    } finally {
+      this.deletionInProgress = false
     }
   }
 
