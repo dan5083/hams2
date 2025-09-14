@@ -888,6 +888,8 @@
               ${op.target_thickness && op.target_thickness > 0 ? `<span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Target: ${op.target_thickness}μm</span>` : ''}
               ${op.auto_inserted ? '<span class="bg-gray-100 text-gray-800 px-2 py-1 rounded">Auto-inserted</span>' : ''}
             </div>
+            <!-- Hidden field to store the display name -->
+            <input type="hidden" name="locked_operations_display_names[${op.position}]" value="${op.display_name}">
           </div>
         `;
       });

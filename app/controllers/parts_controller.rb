@@ -75,10 +75,13 @@ before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled
 
           # Convert ActionController::Parameters to hash and then map
           locked_operations_hash = params[:locked_operations].to_unsafe_h
+          display_names_hash = params[:locked_operations_display_names]&.to_unsafe_h || {}
+
           locked_ops = locked_operations_hash.map do |position, operation_text|
+            display_name = display_names_hash[position] || "Operation #{position}"
             {
               "id" => "COPIED_OP_#{position}",
-              "display_name" => "Operation #{position}",
+              "display_name" => display_name,  # Use the proper display name
               "operation_text" => operation_text.to_s,
               "position" => position.to_i,
               "specifications" => "",
@@ -614,7 +617,10 @@ end
     @part = Part.find(params[:id])
 
     begin
-      unless @part.has_copyable_operations?
+      # Get operations from the source part
+      operations = @part.get_operations_with_auto_ops
+
+      if operations.empty?
         render json: {
           success: false,
           error: 'No operations found for this part'
@@ -622,9 +628,24 @@ end
         return
       end
 
+      # Format operations for the frontend - INCLUDING proper display names
+      formatted_operations = operations.map.with_index do |operation, index|
+        {
+          id: operation.id,
+          display_name: operation.display_name,  # This is the proper name like "Contract Review", "Standard Anodising", etc.
+          operation_text: operation.operation_text,
+          position: index + 1,
+          specifications: operation.respond_to?(:specifications) ? (operation.specifications || '') : '',
+          vat_numbers: operation.respond_to?(:vat_numbers) ? (operation.vat_numbers || []) : [],
+          process_type: operation.respond_to?(:process_type) ? (operation.process_type || 'manual') : 'manual',
+          target_thickness: operation.respond_to?(:target_thickness) ? (operation.target_thickness || 0) : 0,
+          auto_inserted: operation.respond_to?(:auto_inserted?) ? operation.auto_inserted? : false
+        }
+      end
+
       render json: {
         success: true,
-        operations: @part.operations_for_copying,
+        operations: formatted_operations,
         source_part: @part.display_name,
         customer_name: @part.customer.name
       }
