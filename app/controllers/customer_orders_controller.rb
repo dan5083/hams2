@@ -39,7 +39,7 @@ class CustomerOrdersController < ApplicationController
 
   def new
     @customer_order = CustomerOrder.new
-    # Include all enabled organizations, not just those marked as customers
+    # Include all enabled organizations for consistency
     @customers = Organization.enabled.order(:name)
   end
 
@@ -49,7 +49,7 @@ class CustomerOrdersController < ApplicationController
     if @customer_order.save
       redirect_to @customer_order, notice: 'Customer order was successfully created.'
     else
-      # Include all enabled organizations, not just those marked as customers
+      # Include all enabled organizations for consistency
       @customers = Organization.enabled.order(:name)
       render :new, status: :unprocessable_entity
     end
@@ -114,7 +114,7 @@ class CustomerOrdersController < ApplicationController
   end
 
   def edit
-    # Include all enabled organizations, not just those marked as customers
+    # Include all enabled organizations for consistency
     @customers = Organization.enabled.order(:name)
   end
 
@@ -122,7 +122,7 @@ class CustomerOrdersController < ApplicationController
     if @customer_order.update(customer_order_params)
       redirect_to @customer_order, notice: 'Customer order was successfully updated.'
     else
-      # Include all enabled organizations, not just those marked as customers
+      # Include all enabled organizations for consistency
       @customers = Organization.enabled.order(:name)
       render :edit, status: :unprocessable_entity
     end
@@ -150,7 +150,6 @@ class CustomerOrdersController < ApplicationController
     if params[:q].present?
       search_term = params[:q].strip
       @customers = Organization.enabled
-                            .where(is_customer: true)
                             .where("name ILIKE ?", "%#{search_term}%")
                             .order(:name)
                             .limit(10)

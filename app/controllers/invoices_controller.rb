@@ -19,8 +19,8 @@ class InvoicesController < ApplicationController
       @invoices = @invoices.where(customer_id: params[:customer_id])
     end
 
-    # For the filter dropdown
-    @customers = Organization.customers.enabled.order(:name)
+    # For the filter dropdown - include all enabled organizations for consistency
+    @customers = Organization.enabled.order(:name)
   end
 
   def show
@@ -28,7 +28,8 @@ class InvoicesController < ApplicationController
 
   def new
     @invoice = Invoice.new
-    @customers = Organization.customers.enabled.order(:name)
+    # Include all enabled organizations for consistency
+    @customers = Organization.enabled.order(:name)
   end
 
   def create
@@ -37,20 +38,23 @@ class InvoicesController < ApplicationController
     if @invoice.save
       redirect_to @invoice, notice: 'Invoice was successfully created.'
     else
-      @customers = Organization.customers.enabled.order(:name)
+      # Include all enabled organizations for consistency
+      @customers = Organization.enabled.order(:name)
       render :new, status: :unprocessable_entity
     end
   end
 
   def edit
-    @customers = Organization.customers.enabled.order(:name)
+    # Include all enabled organizations for consistency
+    @customers = Organization.enabled.order(:name)
   end
 
   def update
     if @invoice.update(invoice_params)
       redirect_to @invoice, notice: 'Invoice was successfully updated.'
     else
-      @customers = Organization.customers.enabled.order(:name)
+      # Include all enabled organizations for consistency
+      @customers = Organization.enabled.order(:name)
       render :edit, status: :unprocessable_entity
     end
   end

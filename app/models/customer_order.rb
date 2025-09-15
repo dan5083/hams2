@@ -1,4 +1,4 @@
-# app/models/customer_order.rb - Fixed outstanding logic
+# app/models/customer_order.rb - Fixed outstanding logic and auto-marking
 class CustomerOrder < ApplicationRecord
   belongs_to :customer, class_name: 'Organization'
   has_many :works_orders, dependent: :restrict_with_error
@@ -21,6 +21,8 @@ class CustomerOrder < ApplicationRecord
   }
 
   after_initialize :set_defaults, if: :new_record?
+  # NEW: Auto-mark organizations as customers when they place their first order
+  after_create :mark_customer_as_customer
 
   def display_name
     "#{customer.name} - #{number}"
@@ -84,5 +86,13 @@ class CustomerOrder < ApplicationRecord
   def set_defaults
     self.voided = false if voided.nil?
     self.date_received = Date.current if date_received.blank?
+  end
+
+  # NEW: Auto-mark organizations as customers when they place orders
+  def mark_customer_as_customer
+    unless customer.is_customer?
+      customer.update!(is_customer: true)
+      Rails.logger.info "Auto-marked #{customer.name} as customer due to new customer order #{number}"
+    end
   end
 end
