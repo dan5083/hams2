@@ -386,7 +386,6 @@ class Part < ApplicationRecord
     safe_add_to_sequence(sequence, OperationLibrary::ContractReviewOperations.get_contract_review_operation, "Contract Review")
 
     safe_add_to_sequence(sequence, OperationLibrary::InspectFinalInspectVatInspect.get_incoming_inspection_operation, "Incoming Inspection")
-    safe_add_to_sequence(sequence, OperationLibrary::InspectFinalInspectVatInspect.get_vat_inspection_operation, "VAT Inspection")
 
     # ENP Pre-Heat Treatment (before any treatment cycles)
     add_enp_pre_heat_treatment_if_selected(sequence) if has_enp
@@ -789,21 +788,26 @@ class Part < ApplicationRecord
     # 2. Jig - USE TREATMENT-SPECIFIC JIG TYPE
     safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_jig_operation(treatment_jig_type), "Jig")
 
-    # 3. Degrease + rinse
+    # 3. VAT Inspection (before degrease in each cycle)
+    if needs_degrease?(op)
+      safe_add_to_sequence(sequence, OperationLibrary::InspectFinalInspectVatInspect.get_vat_inspection_operation, "VAT Inspection")
+    end
+
+    # 4. Degrease + rinse
     if needs_degrease?(op)
       degrease = OperationLibrary::DegreaseOperations.get_degrease_operation
       safe_add_to_sequence(sequence, degrease, "Degrease")
       safe_add_to_sequence(sequence, get_rinse(degrease, has_enp, masking), "Rinse after Degrease")
     end
 
-    # 4. Stripping + rinse (MOVED BEFORE PRETREATMENTS for anodising cycles)
+    # 5. Stripping + rinse (MOVED BEFORE PRETREATMENTS for anodising cycles)
     if stripping[:enabled] && stripping[:type].present? && stripping[:method].present? && is_anodising?(op)
       strip_op = OperationLibrary::Stripping.get_stripping_operation(stripping[:type], stripping[:method])
       safe_add_to_sequence(sequence, strip_op, "Stripping")
       safe_add_to_sequence(sequence, get_rinse(strip_op, has_enp, masking), "Rinse after Stripping")
     end
 
-    # 5. Pretreatments + rinses (NOW AFTER STRIPPING for anodising)
+    # 6. Pretreatments + rinses (NOW AFTER STRIPPING for anodising)
     if needs_pretreatment?(op)
       pretreatments = OperationLibrary::Pretreatments.get_pretreatment_sequence([op], nil)
       pretreatments.each do |pretreat|
@@ -812,24 +816,24 @@ class Part < ApplicationRecord
       end
     end
 
-    # 6. Stripping + rinse (FOR NON-ANODISING processes - keep in original position)
+    # 7. Stripping + rinse (FOR NON-ANODISING processes - keep in original position)
     if stripping["enabled"] && stripping["type"].present? && stripping["method"].present? && !is_anodising?(op)
       strip_op = OperationLibrary::Stripping.get_stripping_operation(stripping["type"], stripping["method"])
       safe_add_to_sequence(sequence, strip_op, "Stripping")
       safe_add_to_sequence(sequence, get_rinse(strip_op, has_enp, masking), "Rinse after Stripping")
     end
 
-    # 7. Main operation + rinse
+    # 8. Main operation + rinse
     safe_add_to_sequence(sequence, op, "Main Operation")
     safe_add_to_sequence(sequence, get_rinse(op, has_enp, masking), "Rinse after Main Operation")
 
-    # 7.5. Foil verification (for anodising treatments if aerospace/defense)
+    # 8.5. Foil verification (for anodising treatments if aerospace/defense)
     if is_anodising?(op) && aerospace_defense?
       foil_verification_op = OperationLibrary::FoilVerification.get_foil_verification_operation_for_treatment(op.process_type)
       safe_add_to_sequence(sequence, foil_verification_op, "Foil Verification")
     end
 
-    # 8. Dye + rinse (for anodising operations only)
+    # 9. Dye + rinse (for anodising operations only)
     if dye["enabled"] && dye["color"].present? && is_anodising?(op)
       dye_op = OperationLibrary::Dye.get_dye_operation(dye["color"])
       if dye_op
@@ -838,7 +842,7 @@ class Part < ApplicationRecord
       end
     end
 
-    # 9. Sealing + rinse
+    # 10. Sealing + rinse
     if sealing["enabled"] && sealing["type"].present? && is_anodising?(op)
       seal_op = OperationLibrary::Sealing.get_sealing_operation(sealing["type"], aerospace_defense: aerospace_defense?)
       if seal_op
@@ -847,7 +851,7 @@ class Part < ApplicationRecord
       end
     end
 
-    # 10. PTFE + rinse (for anodising operations only, after sealing)
+    # 11. PTFE + rinse (for anodising operations only, after sealing)
     if ptfe["enabled"] && is_anodising?(op)
       ptfe_op = OperationLibrary::Ptfe.get_ptfe_operation
       if ptfe_op
@@ -856,10 +860,10 @@ class Part < ApplicationRecord
       end
     end
 
-    # 11. Unjig
+    # 12. Unjig
     safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_unjig_operation, "Unjig")
 
-    # 12. Masking removal - simplified logic
+    # 13. Masking removal - simplified logic
     if masking["enabled"] && masking["methods"].present?
       if OperationLibrary::Masking.masking_removal_required?(masking["methods"])
         OperationLibrary::Masking.get_masking_removal_operations.each do |removal_op|
@@ -868,7 +872,7 @@ class Part < ApplicationRecord
       end
     end
 
-    # 13. Local treatment (after masking removal, only for anodising operations)
+    # 14. Local treatment (after masking removal, only for anodising operations)
     if local_treatment["enabled"] && local_treatment["type"].present? && is_anodising?(op)
       local_treatment_op = OperationLibrary::LocalTreatment.get_local_treatment_operation(local_treatment["type"])
       if local_treatment_op
@@ -877,7 +881,7 @@ class Part < ApplicationRecord
     end
   end
 
-  # Strip-only cycle - updated workflow: mask -> jig -> degrease -> strip -> deox -> rinse -> unjig -> unmask
+  # Strip-only cycle - updated workflow: mask -> jig -> vat inspect -> degrease -> strip -> deox -> rinse -> unjig -> unmask
   def add_strip_only_cycle(sequence, strip_op, treatment_data, treatment_jig_type, masking)
 
     # 1. Masking (if configured) - USE PROPER MASKING LIBRARY VALIDATION
@@ -896,16 +900,19 @@ class Part < ApplicationRecord
     # 2. Jig - USE TREATMENT-SPECIFIC JIG TYPE
     safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_jig_operation(treatment_jig_type), "Strip Jig")
 
-    # 3. Degrease + rinse
+    # 3. VAT Inspection (before degrease)
+    safe_add_to_sequence(sequence, OperationLibrary::InspectFinalInspectVatInspect.get_vat_inspection_operation, "VAT Inspection")
+
+    # 4. Degrease + rinse
     degrease = OperationLibrary::DegreaseOperations.get_degrease_operation
     safe_add_to_sequence(sequence, degrease, "Strip Degrease")
     safe_add_to_sequence(sequence, get_rinse(degrease, false, masking), "Rinse after Strip Degrease")
 
-    # 4. Strip operation + rinse
+    # 5. Strip operation + rinse
     safe_add_to_sequence(sequence, strip_op, "Strip Operation")
     safe_add_to_sequence(sequence, get_rinse(strip_op, false, masking), "Rinse after Strip")
 
-    # 5. DeOx pretreatment + rinse (NEW: Added for proper surface preparation after stripping)
+    # 6. DeOx pretreatment + rinse (NEW: Added for proper surface preparation after stripping)
     if defined?(OperationLibrary::Pretreatments)
       deox_op = OperationLibrary::Pretreatments.get_simple_pretreatment_operation
       if deox_op
@@ -914,10 +921,10 @@ class Part < ApplicationRecord
       end
     end
 
-    # 6. Unjig
+    # 7. Unjig
     safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_unjig_operation, "Strip Unjig")
 
-    # 7. Masking removal (if masking was applied) - USE PROPER MASKING LIBRARY LOGIC
+    # 8. Masking removal (if masking was applied) - USE PROPER MASKING LIBRARY LOGIC
     if OperationLibrary::Masking.masking_selected?(masking)
       masking_methods = masking["methods"] || {}
 
@@ -935,12 +942,15 @@ class Part < ApplicationRecord
     # 1. Jig - USE TREATMENT-SPECIFIC JIG TYPE
     safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_jig_operation(treatment_jig_type), "ENP Jig")
 
-    # 2. Degrease + rinse
+    # 2. VAT Inspection (before degrease)
+    safe_add_to_sequence(sequence, OperationLibrary::InspectFinalInspectVatInspect.get_vat_inspection_operation, "VAT Inspection")
+
+    # 3. Degrease + rinse
     degrease = OperationLibrary::DegreaseOperations.get_degrease_operation
     safe_add_to_sequence(sequence, degrease, "ENP Degrease")
     safe_add_to_sequence(sequence, get_rinse(degrease, true, {}), "ENP Rinse after Degrease")
 
-    # 3. ENP pretreatments + rinses
+    # 4. ENP pretreatments + rinses
     if defined?(OperationLibrary::Pretreatments)
       # Get the selected alloy for the ENP treatment from the treatment data
       selected_alloy = get_selected_enp_alloy_for_treatment_data(treatment_data)
@@ -953,11 +963,11 @@ class Part < ApplicationRecord
       end
     end
 
-    # 4. ENP operation + rinse
+    # 5. ENP operation + rinse
     safe_add_to_sequence(sequence, enp_op, "ENP Operation")
     safe_add_to_sequence(sequence, get_rinse(enp_op, true, {}), "ENP Rinse after Operation")
 
-    # 5. Unjig
+    # 6. Unjig
     safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_unjig_operation, "ENP Unjig")
   end
 
