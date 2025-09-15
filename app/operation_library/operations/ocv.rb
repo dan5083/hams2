@@ -23,7 +23,7 @@ module OperationLibrary
         Operation.new(
           id: 'OCV_CHECK',
           process_type: 'ocv',
-          operation_text: 'OCV: Batch 1: Time {TIME}m {SECONDS}s    Temp {TEMP}°C\nOCV: Batch 2: Time {TIME}m {SECONDS}s    Temp {TEMP}°C\nOCV: Batch 3: Time {TIME}m {SECONDS}s    Temp {TEMP}°C'
+          operation_text: 'OCV: Batch ___: Time {TIME}m {SECONDS}s    Temp {TEMP}°C\nOCV: Batch ___: Time {TIME}m {SECONDS}s    Temp {TEMP}°C\nOCV: Batch ___: Time {TIME}m {SECONDS}s    Temp {TEMP}°C'
         )
       ]
     end
@@ -57,7 +57,7 @@ module OperationLibrary
         Operation.new(
           id: base_operation.id,
           process_type: base_operation.process_type,
-          operation_text: "Batch 1: Time ___m ___s    Temp ___°C\nBatch 2: Time ___m ___s    Temp ___°C\nBatch 3: Time ___m ___s    Temp ___°C"
+          operation_text: "Batch ___: Time ___m ___s    Temp ___°C\nBatch ___: Time ___m ___s    Temp ___°C\nBatch ___: Time ___m ___s    Temp ___°C"
         )
       end
     end
@@ -120,7 +120,7 @@ module OperationLibrary
           time_mark = interval * 5
           interval_texts << "#{time_mark}min: ___V"
         end
-        text_lines << "Batch #{batch}: Temp ___°C [#{interval_texts.join(' | ')}]"
+        text_lines << "Batch ___: Temp ___°C [#{interval_texts.join(' | ')}]"
       end
 
       text_lines.join("\n")
