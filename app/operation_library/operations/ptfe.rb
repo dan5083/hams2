@@ -7,7 +7,7 @@ module OperationLibrary
         Operation.new(
           id: 'PTFE_ANOLUBE',
           process_type: 'ptfe',
-          operation_text: '**PTFE** - Anolube treatment 2-10 seconds, spray rinse white residue'
+          operation_text: '**PTFE** - Anolube treatment 2-3 minutes, and remove white residue with spray-rinse'
         )
       ]
     end
