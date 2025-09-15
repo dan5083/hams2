@@ -152,34 +152,31 @@
         <p class="mt-1 text-xs text-gray-500">e.g., 25±5μm, 10-15μm, 20μm nominal</p>
       </div>
 
-      <div>
+      <!-- Enhanced Specifications Section -->
+      <div class="sm:col-span-2">
         <%= form.label :specification, "Specifications", class: "block text-sm font-medium text-gray-700 mb-1" %>
 
-        <!-- Parse existing specifications back into array for pre-selection -->
-        <% existing_specs = part.specification.present? ? part.specification.scan(/\[([^\]]+)\]/).flatten : [] %>
-
-        <div class="mt-1 space-y-2 max-h-48 overflow-y-auto border border-gray-300 rounded-md p-3 bg-white">
+        <!-- Quick-add buttons -->
+        <div class="mb-2 flex flex-wrap gap-1">
           <% @specification_presets.each do |preset| %>
-            <label class="flex items-start">
-              <%= check_box_tag "part[specification][]",
-                  "[#{preset.content}]",
-                  existing_specs.include?(preset.content),
-                  {
-                    class: "rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-offset-0 focus:ring-blue-200 focus:ring-opacity-50 mt-0.5 flex-shrink-0"
-                  } %>
-              <span class="ml-2 text-sm text-gray-900 leading-tight">
-                <strong><%= preset.name %></strong>
-                <br>
-                <span class="text-gray-600 text-xs"><%= preset.content %></span>
-              </span>
-            </label>
+            <button type="button"
+                    class="spec-quick-add-btn text-xs px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded border border-blue-300 transition-colors"
+                    data-spec-content="[<%= preset.content %>]"
+                    title="<%= preset.content %>">
+              <%= preset.name %>
+            </button>
           <% end %>
         </div>
 
-        <!-- Hidden field to ensure empty array is sent when nothing is selected -->
-        <%= hidden_field_tag "part[specification][]", "", id: "specification_placeholder" %>
+        <!-- Text area for specifications -->
+        <%= form.text_area :specification,
+            rows: 3,
+            placeholder: "Enter specifications manually or use quick-add buttons above. Each specification should be in brackets: [Spec 1][Spec 2]",
+            class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
 
-        <p class="mt-1 text-xs text-gray-500">Select one or more specifications. They will be combined as [Spec 1][Spec 2][Spec 3]</p>
+        <p class="mt-1 text-xs text-gray-500">
+          Use buttons above for common specs or type custom ones. Format: [Specification 1][Specification 2][Custom Spec]
+        </p>
       </div>
 
       <!-- Aerospace/Defense Application (only for unlocked parts) -->
@@ -565,6 +562,31 @@
 <% unless part.locked_for_editing? %>
   <% unless part.persisted? %>
     <script>
+    // Specification quick-add functionality
+    function initializeSpecificationQuickAdd() {
+      document.querySelectorAll('.spec-quick-add-btn').forEach(button => {
+        button.addEventListener('click', function() {
+          const specField = document.querySelector('textarea[name="part[specification]"]');
+          const content = this.dataset.specContent;
+
+          if (specField.selectionStart !== undefined) {
+            const start = specField.selectionStart;
+            const end = specField.selectionEnd;
+            specField.value = specField.value.substring(0, start) + content + specField.value.substring(end);
+            specField.setSelectionRange(start + content.length, start + content.length);
+          } else {
+            specField.value += content;
+          }
+
+          // Visual feedback
+          this.classList.add('bg-green-200');
+          setTimeout(() => this.classList.remove('bg-green-200'), 300);
+
+          specField.focus();
+        });
+      });
+    }
+
     // Customer autocomplete initialization and manual mode function
     function initializeCustomerAutocomplete() {
       const autocompleteInput = document.getElementById('part_customer_autocomplete');
@@ -931,10 +953,12 @@
 
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', function() {
+        initializeSpecificationQuickAdd();
         initializeCustomerAutocomplete();
         initializeCopyFromPartAutocomplete();
       });
     } else {
+      initializeSpecificationQuickAdd();
       initializeCustomerAutocomplete();
       initializeCopyFromPartAutocomplete();
     }
