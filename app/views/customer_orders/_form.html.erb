@@ -1,5 +1,5 @@
 <%# Customer Order Form with Autocomplete - app/views/customer_orders/_form.html.erb %>
-<%= form_with model: customer_order, local: true, class: "space-y-6" do |form| %>
+<%= form_with model: customer_order, local: true, class: "space-y-6", id: "customer_order_form" do |form| %>
   <% if customer_order.errors.any? %>
     <div class="bg-red-50 border border-red-200 rounded-md p-4">
       <div class="flex">
@@ -81,11 +81,13 @@
     <%= link_to "Cancel", customer_order.persisted? ? customer_order : customer_orders_path,
         class: "bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded" %>
     <%= form.submit customer_order.persisted? ? "Update Customer Order" : "Create Customer Order",
-        class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" %>
+        class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded",
+        id: "submit_button",
+        data: { disable_with: "Creating..." } %>
   </div>
 <% end %>
 
-<!-- JavaScript for Autocomplete - Using same defensive pattern as parts form -->
+<!-- JavaScript for Autocomplete and Double-Click Protection -->
 <script>
 // Wait and retry approach like parts form
 function initializeCustomerAutocomplete() {
@@ -93,14 +95,47 @@ function initializeCustomerAutocomplete() {
   const customerIdHidden = document.getElementById('customer_id_hidden');
   const dropdown = document.getElementById('customer_dropdown');
   const loadingIndicator = document.getElementById('customer_loading');
+  const form = document.getElementById('customer_order_form');
 
-  if (!autocompleteInput || !customerIdHidden || !dropdown) {
+  if (!autocompleteInput || !customerIdHidden || !dropdown || !form) {
     console.log('Customer elements not ready yet, retrying...');
     setTimeout(initializeCustomerAutocomplete, 100);
     return;
   }
 
   console.log('Customer autocomplete initialized');
+
+  // Double-click protection
+  let isSubmitting = false;
+
+  form.addEventListener('submit', function(event) {
+    if (isSubmitting) {
+      event.preventDefault();
+      console.log('Form submission prevented - already submitting');
+      return false;
+    }
+
+    isSubmitting = true;
+    console.log('Form submission started');
+
+    // Visual feedback
+    const submitButton = document.getElementById('submit_button');
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.style.opacity = '0.6';
+      submitButton.style.cursor = 'not-allowed';
+    }
+
+    // Re-enable after timeout as fallback
+    setTimeout(() => {
+      isSubmitting = false;
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.style.opacity = '1';
+        submitButton.style.cursor = 'pointer';
+      }
+    }, 5000);
+  });
 
   let searchTimeout;
   let currentRequest;
