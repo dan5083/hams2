@@ -5,6 +5,7 @@
   top_style = has_variables ? 'border-bottom-style: dashed;' : ''
   bottom_style = has_variables ? 'border-top-style: dashed;' : ''
   rowspan = has_variables ? 2 : 1
+  is_op_1 = op[:number] == 1
 %>
 
 <tr class="op op-<%= op[:number] %>">
@@ -21,8 +22,14 @@
     <% end %>
   </td>
 
-  <% batch_cols.times do %>
-    <td style="<%= top_style %>"></td>
+  <% if is_op_1 %>
+    <!-- For OP 1, merge all batch columns into one -->
+    <td colspan="<%= batch_cols %>" style="<%= top_style %>"></td>
+  <% else %>
+    <!-- For all other operations, use separate columns -->
+    <% batch_cols.times do %>
+      <td style="<%= top_style %>"></td>
+    <% end %>
   <% end %>
 </tr>
 
@@ -36,8 +43,14 @@
       <% end %>
     </td>
 
-    <% batch_cols.times do %>
-      <td style="<%= bottom_style %>"></td>
+    <% if is_op_1 %>
+      <!-- For OP 1, merge all batch columns into one -->
+      <td colspan="<%= batch_cols %>" style="<%= bottom_style %>"></td>
+    <% else %>
+      <!-- For all other operations, use separate columns -->
+      <% batch_cols.times do %>
+        <td style="<%= bottom_style %>"></td>
+      <% end %>
     <% end %>
   </tr>
 <% end %>
