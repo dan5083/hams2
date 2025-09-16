@@ -50,9 +50,9 @@ class Operation
     # Add OCV operations
     operations += OperationLibrary::Ocv.operations if defined?(OperationLibrary::Ocv)
 
-    operations += OperationLibrary::AnodisingStandard.operations if defined?(OperationLibrary::AnodisingStandard)
+    operations += OperationLibrary::AnodisingStandard.operations(aerospace_defense) if defined?(OperationLibrary::AnodisingStandard)
     operations += OperationLibrary::AnodisingHard.operations(aerospace_defense) if defined?(OperationLibrary::AnodisingHard)
-    operations += OperationLibrary::AnodisingChromic.operations if defined?(OperationLibrary::AnodisingChromic)
+    operations += OperationLibrary::AnodisingChromic.operations(aerospace_defense) if defined?(OperationLibrary::AnodisingChromic)
     operations += OperationLibrary::ChemicalConversions.operations if defined?(OperationLibrary::ChemicalConversions)
 
     # Pass thickness to ENP operations for time interpolation
