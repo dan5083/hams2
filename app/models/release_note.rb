@@ -1,4 +1,4 @@
-# app/models/release_note.rb - Updated for multiple thickness measurements per treatment type
+# app/models/release_note.rb - Updated to allow post-invoice editing of remarks and quantities
 require 'digest/sha2'
 
 class ReleaseNote < ApplicationRecord
@@ -10,7 +10,7 @@ class ReleaseNote < ApplicationRecord
   validates :quantity_accepted, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validates :quantity_rejected, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validate :total_quantity_must_be_positive
-  validate :quantity_available_for_release
+  validate :quantity_available_for_release, unless: :invoiced? # Skip quantity validation for invoiced release notes
   validate :validate_thickness_measurements
 
   scope :active, -> { where(voided: false) }
@@ -33,7 +33,7 @@ class ReleaseNote < ApplicationRecord
   before_validation :set_date, if: :new_record?
   before_validation :assign_next_number, if: :new_record?
   after_initialize :set_defaults, if: :new_record?
-  after_save :update_works_order_quantity_released
+  after_save :update_works_order_quantity_released, unless: :invoiced? # Skip works order quantity updates for invoiced release notes
   after_destroy :update_works_order_quantity_released
 
   # Process types that can have thickness measurements
@@ -107,6 +107,19 @@ class ReleaseNote < ApplicationRecord
     !voided && quantity_accepted > 0 && !no_invoice
   end
 
+  # NEW: Enhanced editing capabilities for invoiced release notes
+  def can_be_edited?
+    !voided # Can edit as long as not voided, even if invoiced
+  end
+
+  def can_edit_quantities?
+    invoiced? # Can edit quantities only if already invoiced (to prevent invoice impact)
+  end
+
+  def can_edit_remarks?
+    true # Can always edit remarks (unless voided, handled by can_be_edited?)
+  end
+
   # NEW: Enhanced invoicing status methods
   def invoiced?
     invoice_item.present?
@@ -139,6 +152,16 @@ class ReleaseNote < ApplicationRecord
     else
       0
     end
+  end
+
+  # NEW: Warning methods for post-invoice editing
+  def editing_invoiced_warning
+    return nil unless invoiced?
+    "⚠️ This release note has been invoiced. Editing quantities will not affect the invoice amounts."
+  end
+
+  def show_invoice_impact_warning?
+    invoiced? && (quantity_accepted_changed? || quantity_rejected_changed?)
   end
 
   # NEW THICKNESS MEASUREMENT METHODS - Support multiple measurements per treatment type

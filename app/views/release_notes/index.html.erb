@@ -124,14 +124,18 @@
                 <%= link_to "View", release_note, class: "text-blue-600 hover:text-blue-900" %>
                 <%= link_to "PDF", pdf_release_note_path(release_note),
                     class: "text-green-600 hover:text-green-900", target: "_blank" %>
-                <% unless release_note.voided || release_note.invoice_item.present? %>
-                  <%= link_to "Edit", edit_release_note_path(release_note), class: "text-yellow-600 hover:text-yellow-900" %>
-                  <% if release_note.can_be_voided? %>
-                    <%= link_to "Void", void_release_note_path(release_note),
-                        method: :patch,
-                        class: "text-red-600 hover:text-red-900",
-                        data: { confirm: "Are you sure you want to void this release note?" } %>
-                  <% end %>
+                <!-- UPDATED: Allow editing for all non-voided release notes -->
+                <% if release_note.can_be_edited? %>
+                  <%= link_to "Edit", edit_release_note_path(release_note),
+                      class: "text-yellow-600 hover:text-yellow-900",
+                      title: release_note.invoiced? ? "Edit (invoiced - changes won't affect invoice)" : "Edit" %>
+                <% end %>
+                <!-- Void only available for non-invoiced release notes -->
+                <% if release_note.can_be_voided? %>
+                  <%= link_to "Void", void_release_note_path(release_note),
+                      method: :patch,
+                      class: "text-red-600 hover:text-red-900",
+                      data: { confirm: "Are you sure you want to void this release note?" } %>
                 <% end %>
               </div>
             </td>
@@ -170,6 +174,28 @@
       <p class="text-2xl font-bold text-red-600">
         <%= ReleaseNote.voided.count %>
       </p>
+    </div>
+  </div>
+
+  <!-- NEW: Information Panel about Post-Invoice Editing -->
+  <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+    <div class="flex">
+      <div class="flex-shrink-0">
+        <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+        </svg>
+      </div>
+      <div class="ml-3 flex-1">
+        <h3 class="text-sm font-medium text-blue-800">Post-Invoice Editing</h3>
+        <div class="mt-2 text-sm text-blue-700">
+          <p><strong>Invoiced release notes can now be edited</strong> for record accuracy and updated delivery documentation:</p>
+          <ul class="mt-2 list-disc list-inside">
+            <li><strong>Quantities:</strong> Can be updated but won't affect existing invoices</li>
+            <li><strong>Remarks:</strong> Can be freely updated and will appear in new PDFs</li>
+            <li><strong>Specifications & Details:</strong> Auto-update from part records when PDFs are regenerated</li>
+          </ul>
+        </div>
+      </div>
     </div>
   </div>
 </div>

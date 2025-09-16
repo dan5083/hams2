@@ -1,4 +1,4 @@
-# app/controllers/release_notes_controller.rb
+# app/controllers/release_notes_controller.rb - Updated to allow post-invoice editing
 class ReleaseNotesController < ApplicationController
   before_action :set_release_note, only: [:show, :edit, :update, :destroy, :void, :pdf]
   before_action :set_works_order, only: [:new, :create]
@@ -60,17 +60,45 @@ class ReleaseNotesController < ApplicationController
   end
 
   def edit
+    # NEW: Allow editing for all non-voided release notes (including invoiced ones)
+    unless @release_note.can_be_edited?
+      redirect_to @release_note, alert: 'Cannot edit voided release notes.'
+      return
+    end
+
+    # Store original quantities for comparison (used in form warnings)
+    @original_quantity_accepted = @release_note.quantity_accepted
+    @original_quantity_rejected = @release_note.quantity_rejected
   end
 
   def update
+    # NEW: Allow editing for all non-voided release notes (including invoiced ones)
+    unless @release_note.can_be_edited?
+      redirect_to @release_note, alert: 'Cannot edit voided release notes.'
+      return
+    end
+
     # Handle thickness measurements if present
     if thickness_measurements_provided?
       process_thickness_measurements
     end
 
+    # Store whether this release note was invoiced before update for messaging
+    was_invoiced = @release_note.invoiced?
+
     if @release_note.update(release_note_params)
-      redirect_to @release_note, notice: 'Release note was successfully updated.'
+      success_message = 'Release note was successfully updated.'
+
+      # Add warning if quantities were changed on an invoiced release note
+      if was_invoiced && (@release_note.quantity_accepted_previously_changed? || @release_note.quantity_rejected_previously_changed?)
+        success_message += ' Note: This release note has already been invoiced - the invoice amounts will not be affected by quantity changes.'
+      end
+
+      redirect_to @release_note, notice: success_message
     else
+      # Store original quantities again for form warnings on re-render
+      @original_quantity_accepted = @release_note.quantity_accepted_was
+      @original_quantity_rejected = @release_note.quantity_rejected_was
       render :edit, status: :unprocessable_entity
     end
   end
