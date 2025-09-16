@@ -22,15 +22,16 @@ class WorksOrdersController < ApplicationController
       @works_orders = @works_orders.closed
     end
 
+    # For customer autocomplete - get all customers with active works orders
+    # Do this before pagination to get all available customers
+    @customers_for_autocomplete = WorksOrder.joins(customer_order: :customer)
+                                          .where(voided: false)
+                                          .select('DISTINCT customers.name')
+                                          .order('customers.name')
+                                          .pluck('customers.name')
+
     # Order by works order number descending (largest numbers first) and paginate
     @works_orders = @works_orders.order(number: :desc).page(params[:page]).per(20)
-
-    # For customer autocomplete - get all customers with active works orders
-    @customers_for_autocomplete = Customer.joins(customer_orders: :works_orders)
-                                        .where(works_orders: { voided: false })
-                                        .distinct
-                                        .order(:name)
-                                        .pluck(:name)
   end
 
   def show
