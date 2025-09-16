@@ -2,6 +2,7 @@
 class WorksOrdersController < ApplicationController
   before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :create_invoice]
 
+
   def index
     @works_orders = WorksOrder.includes(:customer_order, :part, :release_level, :transport_method, customer: [])
                               .active
@@ -10,15 +11,23 @@ class WorksOrdersController < ApplicationController
     if params[:search].present?
       search_term = params[:search].strip
 
+      # Handle common prefixes that users might type
+      numeric_search_term = search_term.gsub(/^(WO|RN)/, '').strip
+
       # Search across multiple fields: works order number, part number, release note number, customer name
       @works_orders = @works_orders.joins(customer_order: :customer)
                                   .left_joins(:release_notes)
                                   .where(
                                     "CAST(works_orders.number AS TEXT) ILIKE ? OR " \
+                                    "CAST(works_orders.number AS TEXT) ILIKE ? OR " \
                                     "works_orders.part_number ILIKE ? OR " \
                                     "CAST(release_notes.number AS TEXT) ILIKE ? OR " \
+                                    "CAST(release_notes.number AS TEXT) ILIKE ? OR " \
                                     "organizations.name ILIKE ?",
-                                    "%#{search_term}%", "%#{search_term}%", "%#{search_term}%", "%#{search_term}%"
+                                    "%#{search_term}%", "%#{numeric_search_term}%",
+                                    "%#{search_term}%",
+                                    "%#{search_term}%", "%#{numeric_search_term}%",
+                                    "%#{search_term}%"
                                   ).distinct
     elsif params[:customer_search].present?
       # Legacy customer search (for backwards compatibility)
