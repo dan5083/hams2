@@ -10,7 +10,7 @@ class WorksOrdersController < ApplicationController
     if params[:customer_search].present?
       customer_search_term = params[:customer_search].strip
       @works_orders = @works_orders.joins(customer_order: :customer)
-                                  .where("customers.name ILIKE ?", "%#{customer_search_term}%")
+                                  .where("organizations.name ILIKE ?", "%#{customer_search_term}%")
     elsif params[:customer_id].present?
       @works_orders = @works_orders.for_customer(params[:customer_id])
     end
@@ -26,9 +26,9 @@ class WorksOrdersController < ApplicationController
     # Do this before pagination to get all available customers
     @customers_for_autocomplete = WorksOrder.joins(customer_order: :customer)
                                           .where(voided: false)
-                                          .select('DISTINCT customers.name')
-                                          .order('customers.name')
-                                          .pluck('customers.name')
+                                          .select('DISTINCT organizations.name')
+                                          .order('organizations.name')
+                                          .pluck('organizations.name')
 
     # Order by works order number descending (largest numbers first) and paginate
     @works_orders = @works_orders.order(number: :desc).page(params[:page]).per(20)
