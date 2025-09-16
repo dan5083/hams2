@@ -19,7 +19,7 @@ module OperationLibrary
       ending_text = if aerospace_defense
         " -- check film thickness against specification, if out of range inform an A stampholder"
       else
-        " -- check film thickness against specification, if out of range inform an A stampholder\n-- record film thickness ___μm"
+        " -- check film thickness against specification, if out of range inform an A stampholder\n-- record film thickness ___ μm"
       end
 
       operation_text = base_text + ending_text
