@@ -400,6 +400,9 @@ end
     # For anodising cycles: Degrease → Strip → DeOx → Main Operation
     # For strip-only: Degrease → Strip → DeOx
     # Also includes OCV, foil verification, water break, and ENP heat treatments
+
+      Rails.logger.info "🔍 preview_operations aerospace_defense param: #{params[:aerospace_defense].inspect}"
+
     operations_with_auto_ops = Part.simulate_operations_with_auto_ops(
       treatments_data,
       nil,  # selected_jig_type no longer used globally

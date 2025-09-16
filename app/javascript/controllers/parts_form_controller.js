@@ -1832,6 +1832,9 @@ export default class extends Controller {
         selected_enp_heat_treatment: this.selectedEnpHeatTreatment
       };
 
+      console.log('🔍 JS sending aerospace_defense:', this.aerospaceDefense);
+
+
       // Add ENP strip mask if enabled
       if (this.enpStripMaskEnabled) {
         requestData.enp_strip_type = this.enpStripType;

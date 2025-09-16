@@ -2,8 +2,12 @@
 module OperationLibrary
   class AnodisingHard
     def self.operations(aerospace_defense = nil)
+        Rails.logger.info "🔍 AnodisingHard.operations called with aerospace_defense: #{aerospace_defense.inspect}"
+
       # Default to aerospace/defense true if not specified to maintain existing behavior
       aerospace_defense = true if aerospace_defense.nil?
+
+        Rails.logger.info "🔍 AnodisingHard.operations using aerospace_defense: #{aerospace_defense.inspect}"
 
       base_operations.map do |operation_data|
         create_operation(operation_data, aerospace_defense)

@@ -29,6 +29,8 @@ class Operation
   end
 
   def self.load_all_operations(target_thickness = nil, aerospace_defense = nil)
+      Rails.logger.info "🔍 Operation.load_all_operations called with aerospace_defense: #{aerospace_defense.inspect}"
+
     operations = []
     operations += OperationLibrary::ContractReviewOperations.operations if defined?(OperationLibrary::ContractReviewOperations)
     operations += OperationLibrary::InspectFinalInspectVatInspect.operations if defined?(OperationLibrary::InspectFinalInspectVatInspect)

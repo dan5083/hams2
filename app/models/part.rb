@@ -432,6 +432,9 @@ class Part < ApplicationRecord
     treatments_data = parse_treatments_data
     return [] if treatments_data.empty?
 
+      Rails.logger.info "🔍 Part.get_operations_with_auto_ops aerospace_defense?: #{aerospace_defense?.inspect}"
+
+
     # Get operations with target thickness for ENP time interpolation
     target_thickness = get_enp_target_thickness_from_treatments(treatments_data)
     all_operations = Operation.all_operations(target_thickness, aerospace_defense?)
