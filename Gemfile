@@ -80,3 +80,4 @@ gem "dotenv-rails", "~> 3.1"
 gem 'grover'
 
 gem 'rack-canonical-host'
+gem 'kaminari'

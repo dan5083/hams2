@@ -7,7 +7,25 @@
 
   <!-- Filters -->
   <div class="bg-white p-4 rounded-lg shadow mb-6">
-    <%= form_with url: works_orders_path, method: :get, local: true, class: "flex gap-4 items-end" do |form| %>
+    <%= form_with url: works_orders_path, method: :get, local: true, class: "flex flex-wrap gap-4 items-end" do |form| %>
+
+      <!-- Customer Search -->
+      <div class="flex-1 min-w-64">
+        <%= form.label :customer_search, "Customer", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.text_field :customer_search,
+            value: params[:customer_search],
+            placeholder: "Search by customer name...",
+            list: "customers-datalist",
+            autocomplete: "off",
+            class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" %>
+        <datalist id="customers-datalist">
+          <% @customers_for_autocomplete.each do |customer_name| %>
+            <option value="<%= customer_name %>">
+          <% end %>
+        </datalist>
+      </div>
+
+      <!-- Status Filter -->
       <div>
         <%= form.label :status, class: "block text-sm font-medium text-gray-700 mb-1" %>
         <%= form.select :status,
@@ -20,10 +38,26 @@
             { class: "border border-gray-300 rounded-md px-3 py-2" } %>
       </div>
 
-      <div>
+      <!-- Filter and Clear Buttons -->
+      <div class="flex gap-2">
         <%= form.submit "Filter", class: "bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" %>
+        <%= link_to "Clear", works_orders_path, class: "bg-gray-300 hover:bg-gray-400 text-gray-700 font-bold py-2 px-4 rounded" %>
       </div>
+
     <% end %>
+  </div>
+
+  <!-- Results Summary -->
+  <div class="mb-4">
+    <p class="text-sm text-gray-600">
+      Showing <%= @works_orders.count %> of <%= @works_orders.total_count %> works orders
+      <% if params[:customer_search].present? %>
+        for "<%= params[:customer_search] %>"
+      <% end %>
+      <% if params[:status].present? %>
+        with status "<%= params[:status] %>"
+      <% end %>
+    </p>
   </div>
 
   <!-- Works Orders Table -->
@@ -144,9 +178,107 @@
     <% if @works_orders.empty? %>
       <div class="text-center py-8">
         <p class="text-gray-500">No works orders found.</p>
+        <% if params[:customer_search].present? || params[:status].present? %>
+          <p class="text-sm text-gray-400 mt-2">
+            Try adjusting your search filters.
+          </p>
+        <% end %>
       </div>
     <% end %>
   </div>
+
+  <!-- Pagination -->
+  <% if @works_orders.respond_to?(:total_pages) && @works_orders.total_pages > 1 %>
+    <div class="flex justify-center mt-6">
+      <nav class="inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+
+        <!-- Previous Page -->
+        <% if @works_orders.prev_page %>
+          <%= link_to works_orders_path(params.permit(:customer_search, :status, :page).merge(page: @works_orders.prev_page)),
+              class: "relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50" do %>
+            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+            </svg>
+            <span class="sr-only">Previous</span>
+          <% end %>
+        <% else %>
+          <span class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-gray-100 text-sm font-medium text-gray-400">
+            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+            </svg>
+            <span class="sr-only">Previous</span>
+          </span>
+        <% end %>
+
+        <!-- Page Numbers -->
+        <% page_range = [[@works_orders.current_page - 2, 1].max, [@works_orders.current_page + 2, @works_orders.total_pages].min] %>
+
+        <% if page_range[0] > 1 %>
+          <%= link_to works_orders_path(params.permit(:customer_search, :status, :page).merge(page: 1)),
+              class: "relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50" do %>
+            1
+          <% end %>
+          <% if page_range[0] > 2 %>
+            <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+              ...
+            </span>
+          <% end %>
+        <% end %>
+
+        <% (page_range[0]..page_range[1]).each do |page| %>
+          <% if page == @works_orders.current_page %>
+            <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-blue-50 text-sm font-medium text-blue-600">
+              <%= page %>
+            </span>
+          <% else %>
+            <%= link_to works_orders_path(params.permit(:customer_search, :status, :page).merge(page: page)),
+                class: "relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50" do %>
+              <%= page %>
+            <% end %>
+          <% end %>
+        <% end %>
+
+        <% if page_range[1] < @works_orders.total_pages %>
+          <% if page_range[1] < @works_orders.total_pages - 1 %>
+            <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+              ...
+            </span>
+          <% end %>
+          <%= link_to works_orders_path(params.permit(:customer_search, :status, :page).merge(page: @works_orders.total_pages)),
+              class: "relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50" do %>
+            <%= @works_orders.total_pages %>
+          <% end %>
+        <% end %>
+
+        <!-- Next Page -->
+        <% if @works_orders.next_page %>
+          <%= link_to works_orders_path(params.permit(:customer_search, :status, :page).merge(page: @works_orders.next_page)),
+              class: "relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50" do %>
+            <span class="sr-only">Next</span>
+            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+            </svg>
+          <% end %>
+        <% else %>
+          <span class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-gray-100 text-sm font-medium text-gray-400">
+            <span class="sr-only">Next</span>
+            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+            </svg>
+          </span>
+        <% end %>
+
+      </nav>
+    </div>
+
+    <!-- Pagination Info -->
+    <div class="text-center mt-4">
+      <p class="text-sm text-gray-600">
+        Page <%= @works_orders.current_page %> of <%= @works_orders.total_pages %>
+        (<%= @works_orders.total_count %> total works orders)
+      </p>
+    </div>
+  <% end %>
 </div>
 
 <!-- JavaScript for Route Card Print Functionality -->

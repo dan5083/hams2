@@ -3,20 +3,34 @@ class WorksOrdersController < ApplicationController
   before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :create_invoice]
 
   def index
-    @works_orders = WorksOrder.includes(:customer_order, :part, :release_level, :transport_method)
+    @works_orders = WorksOrder.includes(:customer_order, :part, :release_level, :transport_method, customer: [])
                               .active
-                              .order(created_at: :desc)
 
-    # Add filtering if needed
-    if params[:customer_id].present?
+    # Customer search/filter
+    if params[:customer_search].present?
+      customer_search_term = params[:customer_search].strip
+      @works_orders = @works_orders.joins(customer_order: :customer)
+                                  .where("customers.name ILIKE ?", "%#{customer_search_term}%")
+    elsif params[:customer_id].present?
       @works_orders = @works_orders.for_customer(params[:customer_id])
     end
 
+    # Status filtering
     if params[:status] == 'open'
       @works_orders = @works_orders.open
     elsif params[:status] == 'closed'
       @works_orders = @works_orders.closed
     end
+
+    # Order by works order number descending (largest numbers first) and paginate
+    @works_orders = @works_orders.order(number: :desc).page(params[:page]).per(20)
+
+    # For customer autocomplete - get all customers with active works orders
+    @customers_for_autocomplete = Customer.joins(customer_orders: :works_orders)
+                                        .where(works_orders: { voided: false })
+                                        .distinct
+                                        .order(:name)
+                                        .pluck(:name)
   end
 
   def show
