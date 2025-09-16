@@ -20,16 +20,15 @@ class Operation
   end
 
   # Class methods to get all operations from all files
-  def self.all_operations(target_thickness = nil)
-    # Don't memoize when thickness is provided (ENP needs fresh interpolation)
-    if target_thickness.present?
-      load_all_operations(target_thickness)
+  def self.all_operations(target_thickness = nil, aerospace_defense = nil)
+    if target_thickness.present? || aerospace_defense.present?
+      load_all_operations(target_thickness, aerospace_defense)
     else
-      @all_operations ||= load_all_operations(nil)
+      @all_operations ||= load_all_operations(nil, nil)
     end
   end
 
-  def self.load_all_operations(target_thickness = nil)
+  def self.load_all_operations(target_thickness = nil, aerospace_defense = nil)
     operations = []
     operations += OperationLibrary::ContractReviewOperations.operations if defined?(OperationLibrary::ContractReviewOperations)
     operations += OperationLibrary::InspectFinalInspectVatInspect.operations if defined?(OperationLibrary::InspectFinalInspectVatInspect)
@@ -50,7 +49,7 @@ class Operation
     operations += OperationLibrary::Ocv.operations if defined?(OperationLibrary::Ocv)
 
     operations += OperationLibrary::AnodisingStandard.operations if defined?(OperationLibrary::AnodisingStandard)
-    operations += OperationLibrary::AnodisingHard.operations if defined?(OperationLibrary::AnodisingHard)
+    operations += OperationLibrary::AnodisingHard.operations(aerospace_defense) if defined?(OperationLibrary::AnodisingHard)
     operations += OperationLibrary::AnodisingChromic.operations if defined?(OperationLibrary::AnodisingChromic)
     operations += OperationLibrary::ChemicalConversions.operations if defined?(OperationLibrary::ChemicalConversions)
 

@@ -434,7 +434,7 @@ class Part < ApplicationRecord
 
     # Get operations with target thickness for ENP time interpolation
     target_thickness = get_enp_target_thickness_from_treatments(treatments_data)
-    all_operations = Operation.all_operations(target_thickness)
+    all_operations = Operation.all_operations(target_thickness, aerospace_defense?)
 
     treatments_data.map do |data|
 
