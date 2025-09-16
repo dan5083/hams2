@@ -6,8 +6,22 @@ class WorksOrdersController < ApplicationController
     @works_orders = WorksOrder.includes(:customer_order, :part, :release_level, :transport_method, customer: [])
                               .active
 
-    # Customer search/filter
-    if params[:customer_search].present?
+    # Search functionality - supports multiple search types
+    if params[:search].present?
+      search_term = params[:search].strip
+
+      # Search across multiple fields: works order number, part number, release note number, customer name
+      @works_orders = @works_orders.joins(customer_order: :customer)
+                                  .left_joins(:release_notes)
+                                  .where(
+                                    "CAST(works_orders.number AS TEXT) ILIKE ? OR " \
+                                    "works_orders.part_number ILIKE ? OR " \
+                                    "CAST(release_notes.number AS TEXT) ILIKE ? OR " \
+                                    "organizations.name ILIKE ?",
+                                    "%#{search_term}%", "%#{search_term}%", "%#{search_term}%", "%#{search_term}%"
+                                  ).distinct
+    elsif params[:customer_search].present?
+      # Legacy customer search (for backwards compatibility)
       customer_search_term = params[:customer_search].strip
       @works_orders = @works_orders.joins(customer_order: :customer)
                                   .where("organizations.name ILIKE ?", "%#{customer_search_term}%")
@@ -26,9 +40,9 @@ class WorksOrdersController < ApplicationController
     # Do this before pagination to get all available customers
     @customers_for_autocomplete = WorksOrder.joins(customer_order: :customer)
                                           .where(voided: false)
-                                          .select('DISTINCT organizations.name')
-                                          .order('organizations.name')
+                                          .distinct
                                           .pluck('organizations.name')
+                                          .sort
 
     # Order by works order number descending (largest numbers first) and paginate
     @works_orders = @works_orders.order(number: :desc).page(params[:page]).per(20)

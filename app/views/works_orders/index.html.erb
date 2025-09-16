@@ -9,20 +9,17 @@
   <div class="bg-white p-4 rounded-lg shadow mb-6">
     <%= form_with url: works_orders_path, method: :get, local: true, class: "flex flex-wrap gap-4 items-end" do |form| %>
 
-      <!-- Customer Search -->
+      <!-- Search Field -->
       <div class="flex-1 min-w-64">
-        <%= form.label :customer_search, "Customer", class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.text_field :customer_search,
-            value: params[:customer_search],
-            placeholder: "Search by customer name...",
-            list: "customers-datalist",
+        <%= form.label :search, "Search", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.text_field :search,
+            value: params[:search],
+            placeholder: "Search by WO number, part number, release note number, or customer...",
             autocomplete: "off",
             class: "w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" %>
-        <datalist id="customers-datalist">
-          <% @customers_for_autocomplete.each do |customer_name| %>
-            <option value="<%= customer_name %>">
-          <% end %>
-        </datalist>
+        <p class="text-xs text-gray-500 mt-1">
+          Search works order numbers, part numbers, release note numbers, or customer names
+        </p>
       </div>
 
       <!-- Status Filter -->
@@ -51,8 +48,8 @@
   <div class="mb-4">
     <p class="text-sm text-gray-600">
       Showing <%= @works_orders.count %> of <%= @works_orders.total_count %> works orders
-      <% if params[:customer_search].present? %>
-        for "<%= params[:customer_search] %>"
+      <% if params[:search].present? %>
+        matching "<%= params[:search] %>"
       <% end %>
       <% if params[:status].present? %>
         with status "<%= params[:status] %>"
@@ -178,9 +175,9 @@
     <% if @works_orders.empty? %>
       <div class="text-center py-8">
         <p class="text-gray-500">No works orders found.</p>
-        <% if params[:customer_search].present? || params[:status].present? %>
+        <% if params[:search].present? || params[:status].present? %>
           <p class="text-sm text-gray-400 mt-2">
-            Try adjusting your search filters.
+            Try adjusting your search or filters.
           </p>
         <% end %>
       </div>
@@ -194,7 +191,7 @@
 
         <!-- Previous Page -->
         <% if @works_orders.prev_page %>
-          <%= link_to works_orders_path(params.permit(:customer_search, :status, :page).merge(page: @works_orders.prev_page)),
+          <%= link_to works_orders_path(params.permit(:search, :status, :page).merge(page: @works_orders.prev_page)),
               class: "relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50" do %>
             <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
@@ -214,7 +211,7 @@
         <% page_range = [[@works_orders.current_page - 2, 1].max, [@works_orders.current_page + 2, @works_orders.total_pages].min] %>
 
         <% if page_range[0] > 1 %>
-          <%= link_to works_orders_path(params.permit(:customer_search, :status, :page).merge(page: 1)),
+          <%= link_to works_orders_path(params.permit(:search, :status, :page).merge(page: 1)),
               class: "relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50" do %>
             1
           <% end %>
@@ -231,7 +228,7 @@
               <%= page %>
             </span>
           <% else %>
-            <%= link_to works_orders_path(params.permit(:customer_search, :status, :page).merge(page: page)),
+            <%= link_to works_orders_path(params.permit(:search, :status, :page).merge(page: page)),
                 class: "relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50" do %>
               <%= page %>
             <% end %>
@@ -244,7 +241,7 @@
               ...
             </span>
           <% end %>
-          <%= link_to works_orders_path(params.permit(:customer_search, :status, :page).merge(page: @works_orders.total_pages)),
+          <%= link_to works_orders_path(params.permit(:search, :status, :page).merge(page: @works_orders.total_pages)),
               class: "relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50" do %>
             <%= @works_orders.total_pages %>
           <% end %>
@@ -252,7 +249,7 @@
 
         <!-- Next Page -->
         <% if @works_orders.next_page %>
-          <%= link_to works_orders_path(params.permit(:customer_search, :status, :page).merge(page: @works_orders.next_page)),
+          <%= link_to works_orders_path(params.permit(:search, :status, :page).merge(page: @works_orders.next_page)),
               class: "relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50" do %>
             <span class="sr-only">Next</span>
             <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
