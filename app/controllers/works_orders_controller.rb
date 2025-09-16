@@ -3,7 +3,7 @@ class WorksOrdersController < ApplicationController
   before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :create_invoice]
 
 
-  def index
+ def index
     @works_orders = WorksOrder.includes(:customer_order, :part, :release_level, :transport_method, customer: [])
                               .active
 
@@ -11,24 +11,31 @@ class WorksOrdersController < ApplicationController
     if params[:search].present?
       search_term = params[:search].strip
 
-      # Handle common prefixes that users might type
-      numeric_search_term = search_term.gsub(/^(WO|RN)/, '').strip
+      # Handle RN/WO prefixes - if user types "RN1" or "WO22", extract the exact number
+      if search_term.match(/^RN(\d+)$/i)
+        # Exact release note number search
+        release_note_number = search_term.match(/^RN(\d+)$/i)[1]
+        @works_orders = @works_orders.where(
+          "EXISTS(SELECT 1 FROM release_notes WHERE release_notes.works_order_id = works_orders.id AND release_notes.number = ?)",
+          release_note_number.to_i
+        )
+      elsif search_term.match(/^WO(\d+)$/i)
+        # Exact works order number search
+        works_order_number = search_term.match(/^WO(\d+)$/i)[1]
+        @works_orders = @works_orders.where("works_orders.number = ?", works_order_number.to_i)
+      else
+        # General search across all fields
+        @works_orders = @works_orders.joins(customer_order: :customer)
+                                    .where(
+                                      "CAST(works_orders.number AS TEXT) ILIKE ? OR " \
+                                      "works_orders.part_number ILIKE ? OR " \
+                                      "organizations.name ILIKE ? OR " \
+                                      "EXISTS(SELECT 1 FROM release_notes WHERE release_notes.works_order_id = works_orders.id AND CAST(release_notes.number AS TEXT) ILIKE ?)",
+                                      "%#{search_term}%", "%#{search_term}%", "%#{search_term}%", "%#{search_term}%"
+                                    )
+      end
 
-      # Search across multiple fields: works order number, part number, release note number, customer name
-      @works_orders = @works_orders.joins(customer_order: :customer)
-                                  .left_joins(:release_notes)
-                                  .where(
-                                    "CAST(works_orders.number AS TEXT) ILIKE ? OR " \
-                                    "CAST(works_orders.number AS TEXT) ILIKE ? OR " \
-                                    "works_orders.part_number ILIKE ? OR " \
-                                    "CAST(release_notes.number AS TEXT) ILIKE ? OR " \
-                                    "CAST(release_notes.number AS TEXT) ILIKE ? OR " \
-                                    "organizations.name ILIKE ?",
-                                    "%#{search_term}%", "%#{numeric_search_term}%",
-                                    "%#{search_term}%",
-                                    "%#{search_term}%", "%#{numeric_search_term}%",
-                                    "%#{search_term}%"
-                                  ).distinct
+      @works_orders = @works_orders.distinct
     elsif params[:customer_search].present?
       # Legacy customer search (for backwards compatibility)
       customer_search_term = params[:customer_search].strip
