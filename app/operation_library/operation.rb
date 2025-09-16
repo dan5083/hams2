@@ -21,7 +21,7 @@ class Operation
 
   # Class methods to get all operations from all files
   def self.all_operations(target_thickness = nil, aerospace_defense = nil)
-    if target_thickness.present? || aerospace_defense.present?
+    if target_thickness.present? || !aerospace_defense.nil?
       load_all_operations(target_thickness, aerospace_defense)
     else
       @all_operations ||= load_all_operations(nil, nil)
