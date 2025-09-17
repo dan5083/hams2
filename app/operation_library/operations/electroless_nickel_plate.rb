@@ -87,7 +87,7 @@ module OperationLibrary
       # Use a simple array lookup to avoid recursion issues
       base_operations = [
         { id: 'HIGH_PHOS_VANDALLOY_4100', deposition_rate_range: [12.0, 14.1] },
-        { id: 'MEDIUM_PHOS_NICKLAD_767', deposition_rate_range: [13.3, 17.1] },
+        { id: 'MEDIUM_PHOS_NICKLAD_767', deposition_rate_range: [18.0, 23.0] },
         { id: 'LOW_PHOS_NICKLAD_ELV_824', deposition_rate_range: [6.8, 18.2] },
         { id: 'PTFE_NICKLAD_ICE', deposition_rate_range: [5.0, 11.0] }
       ]
