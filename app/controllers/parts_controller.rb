@@ -52,78 +52,82 @@ before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled
     @part.customisation_data = { "operation_selection" => {} }
   end
 
-  def create
+ def create
+  @part = Part.new(part_params)
 
-    @part = Part.new(part_params)
+  # Set defaults for new parts with processing instructions
+  @part.process_type = determine_process_type if @part.process_type.blank?
 
-    # Set defaults for new parts with processing instructions
-    @part.process_type = determine_process_type if @part.process_type.blank?
+  # NEW: Check validation BEFORE manual mode switch
+  if params[:switch_to_manual] == 'true'
+    unless @part.valid?
+      load_form_data_for_errors
+      render :new, status: :unprocessable_entity
+      return
+    end
 
     # Handle manual mode switch - generate operations and lock them before save
-    if params[:switch_to_manual] == 'true'
-      begin
-        # Check if we have locked_operations from the copy functionality
-        if params[:locked_operations].present?
+    begin
+      # Check if we have locked_operations from the copy functionality
+      if params[:locked_operations].present?
+        # Convert ActionController::Parameters to hash and then map
+        locked_operations_hash = params[:locked_operations].to_unsafe_h
+        display_names_hash = params[:locked_operations_display_names]&.to_unsafe_h || {}
 
-          # Convert ActionController::Parameters to hash and then map
-          locked_operations_hash = params[:locked_operations].to_unsafe_h
-          display_names_hash = params[:locked_operations_display_names]&.to_unsafe_h || {}
+        locked_ops = locked_operations_hash.map do |position, operation_text|
+          display_name = display_names_hash[position] || "Operation #{position}"
+          {
+            "id" => "COPIED_OP_#{position}",
+            "display_name" => display_name,  # Use the proper display name
+            "operation_text" => operation_text.to_s,
+            "position" => position.to_i,
+            "specifications" => "",
+            "vat_numbers" => [],
+            "process_type" => "manual",
+            "target_thickness" => 0,
+            "auto_inserted" => false
+          }
+        end.sort_by { |op| op["position"] }
 
-          locked_ops = locked_operations_hash.map do |position, operation_text|
-            display_name = display_names_hash[position] || "Operation #{position}"
-            {
-              "id" => "COPIED_OP_#{position}",
-              "display_name" => display_name,  # Use the proper display name
-              "operation_text" => operation_text.to_s,
-              "position" => position.to_i,
-              "specifications" => "",
-              "vat_numbers" => [],
-              "process_type" => "manual",
-              "target_thickness" => 0,
-              "auto_inserted" => false
-            }
-          end.sort_by { |op| op["position"] }
+      else
+        # Generate operations from current configuration (original behavior)
+        current_ops = @part.get_operations_with_auto_ops
 
-        else
-          # Generate operations from current configuration (original behavior)
-          current_ops = @part.get_operations_with_auto_ops
-
-          if current_ops.empty?
-            @part.errors.add(:base, "No operations found to switch to manual mode. Please configure treatments first.")
-            load_form_data_for_errors
-            render :new, status: :unprocessable_entity
-            return
-          end
-
-          locked_ops = current_ops.map.with_index do |op, index|
-            {
-              "id" => op.id,
-              "display_name" => op.display_name,
-              "operation_text" => op.operation_text,
-              "position" => index + 1,
-              "specifications" => op.respond_to?(:specifications) ? (op.specifications || '') : '',
-              "vat_numbers" => op.respond_to?(:vat_numbers) ? (op.vat_numbers || []) : [],
-              "process_type" => op.respond_to?(:process_type) ? op.process_type : 'manual',
-              "target_thickness" => op.respond_to?(:target_thickness) ? (op.target_thickness || 0) : 0,
-              "auto_inserted" => op.respond_to?(:auto_inserted?) ? op.auto_inserted? : false
-            }
-          end
+        if current_ops.empty?
+          @part.errors.add(:base, "No operations found to switch to manual mode. Please configure treatments first.")
+          load_form_data_for_errors
+          render :new, status: :unprocessable_entity
+          return
         end
 
-        # Lock the operations before saving
-        @part.customisation_data = @part.customisation_data.dup || {}
-        @part.customisation_data["operation_selection"] ||= {}
-        @part.customisation_data["operation_selection"]["locked"] = true
-        @part.customisation_data["operation_selection"]["locked_operations"] = locked_ops
-
-
-      rescue => e
-        @part.errors.add(:base, "Failed to switch to manual mode: #{e.message}")
-        load_form_data_for_errors
-        render :new, status: :unprocessable_entity
-        return
+        locked_ops = current_ops.map.with_index do |op, index|
+          {
+            "id" => op.id,
+            "display_name" => op.display_name,
+            "operation_text" => op.operation_text,
+            "position" => index + 1,
+            "specifications" => op.respond_to?(:specifications) ? (op.specifications || '') : '',
+            "vat_numbers" => op.respond_to?(:vat_numbers) ? (op.vat_numbers || []) : [],
+            "process_type" => op.respond_to?(:process_type) ? op.process_type : 'manual',
+            "target_thickness" => op.respond_to?(:target_thickness) ? (op.target_thickness || 0) : 0,
+            "auto_inserted" => op.respond_to?(:auto_inserted?) ? op.auto_inserted? : false
+          }
+        end
       end
+
+      # Lock the operations before saving
+      @part.customisation_data = @part.customisation_data.dup || {}
+      @part.customisation_data["operation_selection"] ||= {}
+      @part.customisation_data["operation_selection"]["locked"] = true
+      @part.customisation_data["operation_selection"]["locked_operations"] = locked_ops
+
+    rescue => e
+      @part.errors.add(:base, "Failed to switch to manual mode: #{e.message}")
+      load_form_data_for_errors
+      render :new, status: :unprocessable_entity
+      return
     end
+  end
 
   if @part.save
     if params[:switch_to_manual] == 'true'
