@@ -14,6 +14,7 @@ class Part < ApplicationRecord
     message: "and issue must be unique per customer"
   }
   validate :validate_treatments
+  validate :must_have_configured_treatments, unless: :locked_for_editing?
 
   scope :enabled, -> { where(enabled: true) }
   scope :disabled, -> { where(enabled: false) }
@@ -652,6 +653,34 @@ class Part < ApplicationRecord
   end
 
   private
+
+  def must_have_configured_treatments
+    # Skip for existing parts
+    return if persisted?
+
+    treatments_data = parse_treatments_data
+
+    # Must have at least one treatment
+    if treatments_data.empty?
+      errors.add(:base, "Must configure at least one treatment before creating the part")
+      return
+    end
+
+    # Each treatment must have an operation selected (or be a valid strip-only)
+    valid_treatments = treatments_data.select do |treatment|
+      if treatment["type"] == "stripping_only"
+        treatment["stripping_method"].present?
+      elsif treatment["type"] == "chemical_conversion"
+        true  # Chemical conversion doesn't need operation selection
+      else
+        treatment["operation_id"].present?
+      end
+    end
+
+    if valid_treatments.empty?
+      errors.add(:base, "Must select operations for configured treatments before creating the part")
+    end
+  end
 
   # Create a mock stripping operation for strip-only treatments
   def create_strip_only_operation(treatment_data)
