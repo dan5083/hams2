@@ -22,9 +22,9 @@ module OperationLibrary
           process_type: 'electroless_nickel_plating',
           enp_type: 'medium_phosphorous',
           target_thickness: nil, # Calculated based on time
-          deposition_rate_range: [13.3, 17.1], # μm/hour
+          deposition_rate_range: [18.0, 23.0], # μm/hour
           vat_numbers: [7, 8],
-          operation_text: "Electroless nickel plate in Nicklad 767 (Medium Phos) at 82-91°C. Deposition rate: 13.3-17.1 μm/hour. Time for {THICKNESS}μm: {TIME_RANGE}"
+          operation_text: "Electroless nickel plate in Nicklad 767 (Medium Phos) at 82-91°C. Deposition rate: 18.0-23.0 μm/hour. Time for {THICKNESS}μm: {TIME_RANGE}"
         ),
 
         # Low Phosphorous - Nicklad ELV 824
