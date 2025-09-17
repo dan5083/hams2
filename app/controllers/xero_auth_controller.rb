@@ -125,7 +125,7 @@ class XeroAuthController < ApplicationController
 
   # Syncs all active contacts from Xero, regardless of customer/supplier status
   # This allows the app to manage customer/supplier flags independently of Xero transaction history
-  def sync_contacts_from_xero(token_set, tenant_id)
+    def sync_contacts_from_xero(token_set, tenant_id)
     begin
       Rails.logger.info "Fetching contacts from Xero..."
 
@@ -144,7 +144,6 @@ class XeroAuthController < ApplicationController
       Rails.logger.info "=== ALL CONTACT NAMES ==="
       contacts_data.each { |c| Rails.logger.info "- #{c['Name']} (Customer: #{c['IsCustomer']}, Supplier: #{c['IsSupplier']}, Status: #{c['ContactStatus']})" }
 
-      # No longer clearing existing data - just sync new contacts
       contact_count = 0
       contacts_data.each do |contact|
         Rails.logger.info "Contact: #{contact['Name']} - Status: #{contact['ContactStatus']} - IsCustomer: #{contact['IsCustomer']} - IsSupplier: #{contact['IsSupplier']}"
@@ -168,26 +167,44 @@ class XeroAuthController < ApplicationController
         )
         xero_contact.save!
 
-        # Only create organizations for contacts that don't already have one
-        organization = Organization.find_by(xero_contact: xero_contact)
-        if organization
-          Rails.logger.info "Skipping existing organization: #{organization.name}"
-        else
-          # Create new organization only
+        # Find or create organization
+        organization = Organization.find_or_initialize_by(xero_contact: xero_contact)
+
+        if organization.new_record?
           Rails.logger.info "Creating new organization: #{contact['Name']}"
-          organization = Organization.create!(
+          organization.assign_attributes(
             name: contact['Name'] || 'Unknown',
             enabled: true,
             is_customer: contact['IsCustomer'] || false,
-            is_supplier: contact['IsSupplier'] || false,
-            xero_contact: xero_contact
+            is_supplier: contact['IsSupplier'] || false
           )
+        else
+          Rails.logger.info "Updating existing organization: #{organization.name}"
+          # Update organization details from fresh Xero data
+          organization.assign_attributes(
+            name: contact['Name'] || organization.name,
+            is_customer: contact['IsCustomer'] || false,
+            is_supplier: contact['IsSupplier'] || false
+          )
+        end
+
+        organization.save!
+
+        # Sync address for customer organizations
+        if organization.is_customer
+          Rails.logger.info "Syncing address for customer: #{organization.name}"
+          begin
+            organization.sync_address_from_xero!
+            Rails.logger.info "Address synced for #{organization.name}"
+          rescue => e
+            Rails.logger.error "Failed to sync address for #{organization.name}: #{e.message}"
+          end
         end
 
         contact_count += 1
       end
 
-      Rails.logger.info "✅ Successfully synced #{contact_count} contacts"
+      Rails.logger.info "✅ Successfully synced #{contact_count} contacts with addresses"
       contact_count
 
     rescue => e

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_09_09_122055) do
+ActiveRecord::Schema[8.0].define(version: 2025_09_17_073446) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -88,6 +88,9 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_09_122055) do
     t.uuid "xero_contact_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.jsonb "address_data", default: {}
+    t.index ["address_data"], name: "index_organizations_on_address_data", using: :gin
+    t.index ["is_customer"], name: "index_organizations_on_is_customer", where: "(is_customer = true)"
     t.index ["xero_contact_id"], name: "index_organizations_on_xero_contact_id"
   end
 

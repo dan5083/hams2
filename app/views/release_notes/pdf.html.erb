@@ -205,8 +205,8 @@
             <td class="address">
               <h2>Invoice To</h2>
               <p>
-                <%= @release_note.invoice_customer_name %><br/>
-                <%= simple_format(@release_note.invoice_address) if @release_note.invoice_address %>
+                <%= @release_note.works_order.customer_order.customer.display_name %><br/>
+                <%= simple_format(@release_note.works_order.customer_order.customer.pdf_address) %>
               </p>
             </td>
             <td class="address">
@@ -215,6 +215,7 @@
           </tr>
         </tbody>
       </table>
+
 
       <!-- Release Note Details -->
       <table class="detail-table compact">
@@ -335,8 +336,8 @@
               <td class="address">
                 <h2>Invoice To</h2>
                 <p>
-                  <%= @release_note.invoice_customer_name %><br/>
-                  <%= simple_format(@release_note.invoice_address) if @release_note.invoice_address %>
+                  <%= @release_note.works_order.customer_order.customer.display_name %><br/>
+                  <%= simple_format(@release_note.works_order.customer_order.customer.pdf_address) %>
                 </p>
               </td>
               <td class="address">

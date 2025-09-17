@@ -39,7 +39,67 @@ class Organization < ApplicationRecord
         is_customer: xero_contact.is_customer,
         is_supplier: xero_contact.is_supplier
       )
+
+      # Sync address for customers
+      if organization.is_customer
+        organization.sync_address_from_xero!
+      end
     end
+  end
+
+  # Sync address from Xero contact data
+  def sync_address_from_xero!
+    return unless is_customer && xero_contact&.xero_data.present?
+
+    addresses = xero_contact.xero_data['Addresses']
+    return unless addresses.present?
+
+    # Look for POBOX first, then STREET address
+    address = addresses.find { |addr| addr['AddressType'] == 'POBOX' } ||
+              addresses.find { |addr| addr['AddressType'] == 'STREET' } ||
+              addresses.first
+
+    if address.present?
+      # Format the address from Xero data
+      address_parts = []
+      address_parts << address['AttentionTo'] if address['AttentionTo'].present?
+      address_parts << address['AddressLine1'] if address['AddressLine1'].present?
+      address_parts << address['AddressLine2'] if address['AddressLine2'].present?
+      address_parts << address['AddressLine3'] if address['AddressLine3'].present?
+      address_parts << address['AddressLine4'] if address['AddressLine4'].present?
+
+      # Add city/region/postal
+      location_parts = []
+      location_parts << address['City'] if address['City'].present?
+      location_parts << address['Region'] if address['Region'].present?
+      location_parts << address['PostalCode'] if address['PostalCode'].present?
+
+      address_parts << location_parts.join(' ') if location_parts.any?
+      address_parts << address['Country'] if address['Country'].present?
+
+      if address_parts.any?
+        update!(address_data: address_parts.join("\n"))
+        return true
+      end
+    end
+
+    false
+  end
+
+  # Address methods for customers
+  def formatted_address
+    return nil unless is_customer && address_data.present?
+    address_data.to_s
+  end
+
+  # Check if customer has an address set
+  def has_address?
+    is_customer && address_data.present?
+  end
+
+  # For PDF generation - returns formatted address or a default message
+  def pdf_address
+    has_address? ? formatted_address : "Address not on file"
   end
 
   def display_name
@@ -55,6 +115,7 @@ class Organization < ApplicationRecord
   end
 
   def contact_address
+    # Keep this method for backward compatibility, but prefer pdf_address for PDFs
     xero_contact&.primary_address
   end
 
@@ -69,6 +130,17 @@ class Organization < ApplicationRecord
 
   def active?
     enabled && (!xero_contact || xero_contact.active?)
+  end
+
+  # Class method to sync all customer addresses from Xero
+  def self.sync_all_customer_addresses!
+    customers.includes(:xero_contact).find_each do |customer|
+      begin
+        customer.sync_address_from_xero!
+      rescue => e
+        Rails.logger.error "Failed to sync address for customer #{customer.name}: #{e.message}"
+      end
+    end
   end
 
   private
