@@ -1,7 +1,7 @@
 class CustomerOrdersController < ApplicationController
   before_action :set_customer_order, only: [:show, :edit, :update, :destroy, :void, :create_invoice]
 
-  def index
+    def index
     @customer_orders = CustomerOrder.includes(:customer, :works_orders)
                                    .order(date_received: :desc)
 
@@ -20,16 +20,23 @@ class CustomerOrdersController < ApplicationController
       @customer_orders = @customer_orders.active
     end
 
-    # Search by order number
+    # Search by order number or customer name
     if params[:search].present?
-      @customer_orders = @customer_orders.where(
-        "number ILIKE ?", "%#{params[:search]}%"
-      )
+      search_term = params[:search].strip
+      @customer_orders = @customer_orders.joins(:customer)
+                                        .where(
+                                          "customer_orders.number ILIKE ? OR organizations.name ILIKE ?",
+                                          "%#{search_term}%", "%#{search_term}%"
+                                        )
     end
 
     # For the filter dropdown - include all enabled organizations
     @customers = Organization.enabled.order(:name)
+
+    # Add pagination - 20 items per page to match works orders
+    @customer_orders = @customer_orders.page(params[:page]).per(20)
   end
+
 
   def show
     @works_orders = @customer_order.works_orders
