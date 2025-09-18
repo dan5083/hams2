@@ -58,9 +58,12 @@ before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled
   # Set defaults for new parts with processing instructions
   @part.process_type = determine_process_type if @part.process_type.blank?
 
-  # NEW: Check validation BEFORE manual mode switch
+  # NEW: Check if this is a copy operation - skip treatment validation
+  is_copy_operation = params[:switch_to_manual] == 'true' && params[:locked_operations].present?
+
+  # Check validation BEFORE manual mode switch (but skip treatment validation for copies)
   if params[:switch_to_manual] == 'true'
-    unless @part.valid?
+    unless is_copy_operation || @part.valid?
       load_form_data_for_errors
       render :new, status: :unprocessable_entity
       return
@@ -78,7 +81,7 @@ before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled
           display_name = display_names_hash[position] || "Operation #{position}"
           {
             "id" => "COPIED_OP_#{position}",
-            "display_name" => display_name,  # Use the proper display name
+            "display_name" => display_name,
             "operation_text" => operation_text.to_s,
             "position" => position.to_i,
             "specifications" => "",
@@ -128,6 +131,23 @@ before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled
       return
     end
   end
+
+  # MODIFIED: Skip treatment validation for copy operations
+  if is_copy_operation
+    @part.define_singleton_method(:skip_treatment_validation?) { true }
+  end
+
+  if @part.save
+    if params[:switch_to_manual] == 'true'
+      redirect_to edit_part_path(@part), notice: 'Part created and switched to manual editing mode. You can now customize each operation.'
+    else
+      redirect_to @part, notice: 'Part was successfully created.'
+    end
+  else
+    load_form_data_for_errors
+    render :new, status: :unprocessable_entity
+  end
+end
 
   if @part.save
     if params[:switch_to_manual] == 'true'

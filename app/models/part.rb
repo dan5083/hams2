@@ -658,6 +658,9 @@ class Part < ApplicationRecord
     # Skip for existing parts
     return if persisted?
 
+    # Skip if this is a copy operation (flag set by controller)
+    return if respond_to?(:skip_treatment_validation?) && skip_treatment_validation?
+
     treatments_data = parse_treatments_data
 
     # Must have at least one treatment
