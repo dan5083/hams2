@@ -149,18 +149,6 @@ before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled
   end
 end
 
-  if @part.save
-    if params[:switch_to_manual] == 'true'
-      redirect_to edit_part_path(@part), notice: 'Part created and switched to manual editing mode. You can now customize each operation.'
-    else
-      redirect_to @part, notice: 'Part was successfully created.'
-    end
-  else
-    load_form_data_for_errors
-    render :new, status: :unprocessable_entity
-  end
-end
-
   def edit
     @customers = [@part.customer] # Don't allow changing customer on existing part
     @specification_presets = SpecificationPreset.enabled.ordered
