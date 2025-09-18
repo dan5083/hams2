@@ -3,32 +3,19 @@ before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled
 
   def index
     @parts = Part.includes(:customer, :works_orders)
-                 .order(:part_number, :part_issue)
+                .order(:part_number, :part_issue)
 
-    # Filter by customer if provided
-    if params[:customer_id].present?
-      @parts = @parts.for_customer(params[:customer_id])
-    end
-
-    # Filter by enabled status
-    case params[:status]
-    when 'enabled'
-      @parts = @parts.enabled
-    when 'disabled'
-      @parts = @parts.where(enabled: false)
-    end
-
-    # Search by part number or issue
+    # Search by part number, issue, or customer name
     if params[:search].present?
       search_term = params[:search].upcase.strip
-      @parts = @parts.where(
-        "UPPER(part_number) ILIKE ? OR UPPER(part_issue) ILIKE ?",
-        "%#{search_term}%", "%#{search_term}%"
+      @parts = @parts.joins(:customer).where(
+        "UPPER(parts.part_number) ILIKE ? OR UPPER(parts.part_issue) ILIKE ? OR UPPER(organizations.name) ILIKE ?",
+        "%#{search_term}%", "%#{search_term}%", "%#{search_term}%"
       )
     end
 
-    # For the filter dropdown - show all organizations
-    @customers = Organization.enabled.order(:name)
+    # Add pagination (using kaminari gem)
+    @parts = @parts.page(params[:page]).per(25) # 25 parts per page
   end
 
   def show
