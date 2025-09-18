@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_09_17_073446) do
+ActiveRecord::Schema[8.0].define(version: 2025_09_18_101742) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -40,6 +40,27 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_17_073446) do
     t.index ["date_received"], name: "index_customer_orders_on_date_received"
     t.index ["number"], name: "index_customer_orders_on_number"
     t.index ["voided"], name: "index_customer_orders_on_voided"
+  end
+
+  create_table "external_ncrs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.integer "hal_ncr_number", null: false
+    t.date "date", default: -> { "CURRENT_DATE" }, null: false
+    t.string "status", default: "draft", null: false
+    t.uuid "created_by_id", null: false
+    t.uuid "assigned_to_id"
+    t.jsonb "ncr_data", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "release_note_id", null: false
+    t.index ["assigned_to_id"], name: "index_external_ncrs_on_assigned_to_id"
+    t.index ["created_by_id"], name: "index_external_ncrs_on_created_by_id"
+    t.index ["date"], name: "index_external_ncrs_on_date"
+    t.index ["hal_ncr_number"], name: "index_external_ncrs_on_hal_ncr_number", unique: true
+    t.index ["ncr_data"], name: "index_external_ncrs_on_ncr_data", using: :gin
+    t.index ["release_note_id"], name: "index_external_ncrs_on_release_note_id"
+    t.index ["status"], name: "index_external_ncrs_on_status"
+    t.check_constraint "hal_ncr_number > 0", name: "check_positive_ncr_number"
+    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying, 'in_progress'::character varying, 'completed'::character varying]::text[])", name: "check_valid_status"
   end
 
   create_table "invoice_items", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -258,6 +279,9 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_17_073446) do
   end
 
   add_foreign_key "customer_orders", "organizations", column: "customer_id"
+  add_foreign_key "external_ncrs", "release_notes"
+  add_foreign_key "external_ncrs", "users", column: "assigned_to_id"
+  add_foreign_key "external_ncrs", "users", column: "created_by_id"
   add_foreign_key "invoice_items", "invoices"
   add_foreign_key "invoice_items", "release_notes"
   add_foreign_key "invoices", "organizations", column: "customer_id"

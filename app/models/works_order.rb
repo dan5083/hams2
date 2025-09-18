@@ -367,6 +367,10 @@ class WorksOrder < ApplicationRecord
     total.round(2)
   end
 
+  def has_quality_issues?
+    release_notes.joins(:external_ncrs).exists?
+  end
+
   private
 
   def set_defaults

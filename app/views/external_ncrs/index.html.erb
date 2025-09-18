@@ -1,0 +1,141 @@
+<%# app/views/external_ncrs/index.html.erb %>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+  <div class="md:flex md:items-center md:justify-between mb-6">
+    <div class="flex-1 min-w-0">
+      <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
+        External NCRs
+      </h2>
+    </div>
+    <div class="mt-4 flex md:mt-0 md:ml-4">
+      <%= link_to new_external_ncr_path,
+          class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
+        <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+        </svg>
+        New NCR
+      <% end %>
+    </div>
+  </div>
+
+  <!-- Search and Filters -->
+  <div class="bg-white shadow rounded-lg mb-6">
+    <div class="px-4 py-5 sm:p-6">
+      <%= form_with url: external_ncrs_path, method: :get, local: true, class: "space-y-4" do |f| %>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <%= f.text_field :search,
+                placeholder: "Search NCRs, customers, parts...",
+                value: params[:search],
+                class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md" %>
+          </div>
+          <div>
+            <%= f.select :status,
+                options_for_select([
+                  ['All Statuses', 'all'],
+                  ['Draft', 'draft'],
+                  ['In Progress', 'in_progress'],
+                  ['Completed', 'completed']
+                ], params[:status]),
+                {},
+                class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md" %>
+          </div>
+          <div>
+            <%= f.submit "Search", class: "w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <!-- NCRs Table -->
+  <div class="bg-white shadow overflow-hidden sm:rounded-md">
+    <% if @external_ncrs.any? %>
+      <ul class="divide-y divide-gray-200">
+        <% @external_ncrs.each do |ncr| %>
+          <li>
+            <%= link_to ncr, class: "block hover:bg-gray-50" do %>
+              <div class="px-4 py-4 sm:px-6">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center">
+                    <p class="text-sm font-medium text-indigo-600 truncate">
+                      <%= ncr.display_name %>
+                    </p>
+                    <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium <%= ncr.status_badge_class %>">
+                      <%= ncr.status.humanize %>
+                    </span>
+                  </div>
+                  <div class="ml-2 flex-shrink-0 flex">
+                    <p class="text-sm text-gray-500">
+                      <%= ncr.date.strftime("%d %b %Y") %>
+                    </p>
+                  </div>
+                </div>
+                <div class="mt-2 sm:flex sm:justify-between">
+                  <div class="sm:flex">
+                    <p class="flex items-center text-sm text-gray-500">
+                      <span class="font-medium">Customer:</span>
+                      <span class="ml-1"><%= ncr.customer_name %></span>
+                    </p>
+                    <p class="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 sm:ml-6">
+                      <span class="font-medium">Release Note:</span>
+                      <span class="ml-1"><%= ncr.release_note_number %></span>
+                    </p>
+                    <p class="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 sm:ml-6">
+                      <span class="font-medium">Part:</span>
+                      <span class="ml-1"><%= ncr.part_number %>-<%= ncr.part_issue %></span>
+                    </p>
+                  </div>
+                  <div class="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
+                    <% if ncr.assigned_to %>
+                      <span class="font-medium">Assigned to:</span>
+                      <span class="ml-1"><%= ncr.assigned_to.full_name %></span>
+                    <% else %>
+                      <span class="text-gray-400">Unassigned</span>
+                    <% end %>
+                  </div>
+                </div>
+                <% if ncr.description_of_non_conformance.present? %>
+                  <div class="mt-2">
+                    <p class="text-sm text-gray-600 line-clamp-2">
+                      <%= truncate(ncr.description_of_non_conformance, length: 120) %>
+                    </p>
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    <% else %>
+      <div class="px-4 py-12 text-center">
+        <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">No NCRs found</h3>
+        <p class="mt-1 text-sm text-gray-500">
+          <% if params[:search].present? || params[:status].present? %>
+            No NCRs match your current search or filter criteria.
+          <% else %>
+            Get started by creating a new external NCR.
+          <% end %>
+        </p>
+        <div class="mt-6">
+          <%= link_to new_external_ncr_path,
+              class: "inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
+            <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+            </svg>
+            New NCR
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+
+  <!-- Pagination -->
+  <% if @external_ncrs.respond_to?(:total_pages) && @external_ncrs.total_pages > 1 %>
+    <div class="mt-6">
+      <%= paginate @external_ncrs %>
+    </div>
+  <% end %>
+</div>

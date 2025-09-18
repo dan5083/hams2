@@ -84,6 +84,16 @@ Rails.application.routes.draw do
     collection do
       get :pending_invoice  # Release notes ready for invoicing
     end
+
+    # Nested route for creating NCRs from release notes
+    resources :external_ncrs, only: [:new, :create], shallow: true
+  end
+
+  # 5.5 External NCRs - can be created from release notes
+  resources :external_ncrs do
+    member do
+      patch :advance_status
+    end
   end
 
   # 6. Invoice routes (PDFs handled by Xero)

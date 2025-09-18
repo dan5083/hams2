@@ -1,0 +1,203 @@
+<%# app/views/external_ncrs/_form.html.erb %>
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+  <div class="mb-6">
+    <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl">
+      <%= @external_ncr.persisted? ? "Edit NCR #{@external_ncr.display_name}" : "New External NCR" %>
+    </h2>
+  </div>
+
+  <%= form_with(model: @external_ncr, local: true, class: "space-y-6") do |f| %>
+    <% if @external_ncr.errors.any? %>
+      <div class="bg-red-50 border border-red-200 rounded-md p-4">
+        <div class="flex">
+          <div class="flex-shrink-0">
+            <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+            </svg>
+          </div>
+          <div class="ml-3">
+            <h3 class="text-sm font-medium text-red-800">
+              There <%= @external_ncr.errors.count == 1 ? 'was' : 'were' %>
+              <%= pluralize(@external_ncr.errors.count, 'error') %> with your submission:
+            </h3>
+            <div class="mt-2 text-sm text-red-700">
+              <ul class="list-disc pl-5 space-y-1">
+                <% @external_ncr.errors.full_messages.each do |message| %>
+                  <li><%= message %></li>
+                <% end %>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% end %>
+
+    <!-- Basic Information -->
+    <div class="bg-white shadow sm:rounded-lg">
+      <div class="px-4 py-5 sm:p-6">
+        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Basic Information</h3>
+
+        <div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+          <!-- Release Note Selection -->
+          <div class="sm:col-span-2">
+            <label class="block text-sm font-medium text-gray-700">Release Note</label>
+            <% if @external_ncr.persisted? %>
+              <!-- Show existing release note (read-only) -->
+              <div class="mt-1 p-3 bg-gray-50 rounded-md">
+                <p class="text-sm text-gray-900">
+                  <%= link_to @external_ncr.release_note_number, @external_ncr.release_note, class: "text-indigo-600 hover:text-indigo-900 font-medium" %>
+                  - <%= @external_ncr.customer_name %> -
+                  <%= @external_ncr.part_number %>-<%= @external_ncr.part_issue %>
+                </p>
+              </div>
+            <% elsif @release_note %>
+              <!-- Pre-selected release note -->
+              <%= f.hidden_field :release_note_id, value: @release_note.id %>
+              <div class="mt-1 p-3 bg-gray-50 rounded-md">
+                <p class="text-sm text-gray-900">
+                  <%= link_to "RN#{@release_note.number}", @release_note, class: "text-indigo-600 hover:text-indigo-900 font-medium" %>
+                  - <%= @release_note.works_order.customer_name %> -
+                  <%= @release_note.works_order.part_number %>-<%= @release_note.works_order.part_issue %>
+                </p>
+              </div>
+            <% else %>
+              <!-- Release note dropdown -->
+              <%= f.collection_select :release_note_id, @release_notes, :id, :display_name,
+                  { prompt: "Select a release note..." },
+                  { class: "mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md" } %>
+            <% end %>
+          </div>
+
+          <!-- Date -->
+          <div>
+            <%= f.label :date, class: "block text-sm font-medium text-gray-700" %>
+            <%= f.date_field :date,
+                class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
+          </div>
+
+          <!-- Assigned To -->
+          <div>
+            <%= f.label :assigned_to_id, "Assigned to", class: "block text-sm font-medium text-gray-700" %>
+            <%= f.collection_select :assigned_to_id, @assignable_users, :id, :full_name,
+                { prompt: "Select user...", include_blank: "Unassigned" },
+                { class: "mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md" } %>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reference Numbers -->
+    <div class="bg-white shadow sm:rounded-lg">
+      <div class="px-4 py-5 sm:p-6">
+        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Reference Numbers</h3>
+
+        <div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+          <div>
+            <%= f.label :advice_number, "Advice No.", class: "block text-sm font-medium text-gray-700" %>
+            <%= f.text_field :advice_number,
+                class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
+          </div>
+
+          <div>
+            <%= f.label :concession_number, "Concession No.", class: "block text-sm font-medium text-gray-700" %>
+            <%= f.text_field :concession_number,
+                class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
+          </div>
+
+          <div>
+            <%= f.label :customer_po_number, "Customer P/O No.", class: "block text-sm font-medium text-gray-700" %>
+            <%= f.text_field :customer_po_number,
+                class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
+          </div>
+
+          <div>
+            <%= f.label :customer_ncr_number, "Customer NCR No.", class: "block text-sm font-medium text-gray-700" %>
+            <%= f.text_field :customer_ncr_number,
+                class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quantities -->
+    <div class="bg-white shadow sm:rounded-lg">
+      <div class="px-4 py-5 sm:p-6">
+        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Quantities</h3>
+
+        <div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+          <div>
+            <%= f.label :batch_quantity, "Batch Qty.", class: "block text-sm font-medium text-gray-700" %>
+            <%= f.number_field :batch_quantity,
+                class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
+          </div>
+
+          <div>
+            <%= f.label :reject_quantity, "Reject Qty.", class: "block text-sm font-medium text-gray-700" %>
+            <%= f.number_field :reject_quantity,
+                class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- NCR Content -->
+    <div class="bg-white shadow sm:rounded-lg">
+      <div class="px-4 py-5 sm:p-6">
+        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">NCR Content</h3>
+
+        <div class="space-y-6">
+          <div>
+            <%= f.label :description_of_non_conformance, "Description of Non-Conformance",
+                class: "block text-sm font-medium text-gray-700" %>
+            <%= f.text_area :description_of_non_conformance,
+                rows: 4,
+                class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
+          </div>
+
+          <div>
+            <%= f.label :investigation_root_cause_analysis, "Investigation/Root Cause Analysis",
+                class: "block text-sm font-medium text-gray-700" %>
+            <%= f.text_area :investigation_root_cause_analysis,
+                rows: 4,
+                class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
+          </div>
+
+          <div>
+            <%= f.label :root_cause_identified, "Root Cause Identified",
+                class: "block text-sm font-medium text-gray-700" %>
+            <%= f.text_area :root_cause_identified,
+                rows: 3,
+                class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
+          </div>
+
+          <div>
+            <%= f.label :containment_corrective_action, "Containment/Corrective Action",
+                class: "block text-sm font-medium text-gray-700" %>
+            <%= f.text_area :containment_corrective_action,
+                rows: 4,
+                class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
+          </div>
+
+          <div>
+            <%= f.label :preventive_action, "Preventive Action",
+                class: "block text-sm font-medium text-gray-700" %>
+            <%= f.text_area :preventive_action,
+                rows: 4,
+                class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Form Actions -->
+    <div class="flex justify-end space-x-3">
+      <%= link_to (@external_ncr.persisted? ? @external_ncr : external_ncrs_path),
+          class: "py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
+        Cancel
+      <% end %>
+
+      <%= f.submit (@external_ncr.persisted? ? "Update NCR" : "Create NCR"),
+          class: "py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+    </div>
+  <% end %>
+</div>

@@ -5,6 +5,7 @@ class ReleaseNote < ApplicationRecord
   belongs_to :works_order
   belongs_to :issued_by, class_name: 'User'
   has_one :invoice_item, dependent: :nullify
+  has_many :external_ncrs, dependent: :restrict_with_error
 
   validates :date, presence: true
   validates :quantity_accepted, presence: true, numericality: { greater_than_or_equal_to: 0 }
@@ -294,6 +295,19 @@ class ReleaseNote < ApplicationRecord
 
   def can_be_deleted?
     invoice_item.blank?
+  end
+
+    # NCR management methods for release notes
+  def can_create_ncr?
+    !voided && (quantity_accepted > 0 || quantity_rejected > 0)
+  end
+
+  def has_open_ncrs?
+    external_ncrs.active.exists?
+  end
+
+  def latest_ncr
+    external_ncrs.recent.first
   end
 
   private
