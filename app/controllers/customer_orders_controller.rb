@@ -32,15 +32,30 @@ class CustomerOrdersController < ApplicationController
     # For the filter dropdown - include all enabled organizations
     @customers = Organization.enabled.order(:name)
 
-    # Sort customer orders: fully-released orders first, then by date_received desc
+    # Sort customer orders: ready-to-invoice first, then in-progress, then fully invoiced
     @customer_orders = @customer_orders.sort_by do |customer_order|
       # Check if all works orders are fully released
       active_works_orders = customer_order.works_orders.active
       all_fully_released = active_works_orders.any? &&
                           active_works_orders.all? { |wo| wo.quantity_released >= wo.quantity }
 
-      # Sort key: [priority (0 for fully released, 1 for others), negative timestamp for desc order]
-      [all_fully_released ? 0 : 1, -customer_order.date_received.to_time.to_i]
+      # Check if has uninvoiced items
+      uninvoiced_release_notes = ReleaseNote.joins(:works_order)
+                                          .where(works_orders: { customer_order_id: customer_order.id })
+                                          .requires_invoicing
+      has_uninvoiced = uninvoiced_release_notes.sum(:quantity_accepted) > 0
+
+      # Priority: 0 = ready to invoice (all released + has uninvoiced), 1 = in progress, 2 = fully invoiced
+      if all_fully_released && has_uninvoiced
+        priority = 0  # Ready to invoice - top priority
+      elsif customer_order.works_orders.active.sum(:quantity_released) > 0 && !has_uninvoiced
+        priority = 2  # Fully invoiced - lowest priority
+      else
+        priority = 1  # In progress - middle priority
+      end
+
+      # Sort key: [priority, negative timestamp for desc order]
+      [priority, -customer_order.date_received.to_time.to_i]
     end
 
     # Convert back to ActiveRecord relation for pagination
@@ -63,7 +78,6 @@ class CustomerOrdersController < ApplicationController
     # Add pagination - 20 items per page to match works orders
     @customer_orders = @customer_orders.page(params[:page]).per(20)
   end
-
 
   def show
     @works_orders = @customer_order.works_orders
