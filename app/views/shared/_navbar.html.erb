@@ -25,6 +25,9 @@
         <%= link_to "Release Notes", release_notes_path,
             style: "color: white; padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; text-decoration: none; #{current_page?(release_notes_path) ? 'background-color: rgba(29, 78, 216, 1);' : ''}" %>
 
+        <%= link_to "NCRs", external_ncrs_path,
+            style: "color: white; padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; text-decoration: none; #{current_page?(external_ncrs_path) ? 'background-color: rgba(29, 78, 216, 1);' : ''}" %>
+
         <%= link_to "Parts", parts_path,
             style: "color: white; padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; text-decoration: none; #{current_page?(parts_path) ? 'background-color: rgba(29, 78, 216, 1);' : ''}" %>
 
