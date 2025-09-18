@@ -1,9 +1,8 @@
 class CustomerOrdersController < ApplicationController
   before_action :set_customer_order, only: [:show, :edit, :update, :destroy, :void, :create_invoice]
 
-    def index
+   def index
     @customer_orders = CustomerOrder.includes(:customer, :works_orders)
-                                   .order(date_received: :desc)
 
     # Filter by customer if provided
     if params[:customer_id].present?
@@ -32,6 +31,34 @@ class CustomerOrdersController < ApplicationController
 
     # For the filter dropdown - include all enabled organizations
     @customers = Organization.enabled.order(:name)
+
+    # Sort customer orders: fully-released orders first, then by date_received desc
+    @customer_orders = @customer_orders.sort_by do |customer_order|
+      # Check if all works orders are fully released
+      active_works_orders = customer_order.works_orders.active
+      all_fully_released = active_works_orders.any? &&
+                          active_works_orders.all? { |wo| wo.quantity_released >= wo.quantity }
+
+      # Sort key: [priority (0 for fully released, 1 for others), negative date for desc order]
+      [all_fully_released ? 0 : 1, -customer_order.date_received.to_i]
+    end
+
+    # Convert back to ActiveRecord relation for pagination
+    # Get the sorted IDs and re-query in that order
+    sorted_ids = @customer_orders.map(&:id)
+
+    if sorted_ids.any?
+      # Use CASE WHEN to maintain the custom sort order
+      order_clause = sorted_ids.map.with_index do |id, index|
+        "WHEN customer_orders.id = '#{id}' THEN #{index}"
+      end.join(' ')
+
+      @customer_orders = CustomerOrder.includes(:customer, :works_orders)
+                                    .where(id: sorted_ids)
+                                    .order(Arel.sql("CASE #{order_clause} END"))
+    else
+      @customer_orders = CustomerOrder.none
+    end
 
     # Add pagination - 20 items per page to match works orders
     @customer_orders = @customer_orders.page(params[:page]).per(20)
@@ -63,8 +90,26 @@ class CustomerOrdersController < ApplicationController
   end
 
   def create_invoice
+    # Check if ALL works orders are fully released (quantity_released >= quantity for each)
+    active_works_orders = @customer_order.works_orders.active
+
+    if active_works_orders.empty?
+      redirect_to @customer_order, alert: 'No active works orders found for this customer order.'
+      return
+    end
+
+    # Check that ALL works orders are fully released
+    incomplete_works_orders = active_works_orders.select { |wo| wo.quantity_released < wo.quantity }
+
+    if incomplete_works_orders.any?
+      incomplete_list = incomplete_works_orders.map { |wo| "WO#{wo.number}" }.join(', ')
+      redirect_to @customer_order,
+                  alert: "Cannot create invoice - not all works orders are fully released. Incomplete: #{incomplete_list}. Please complete all releases first."
+      return
+    end
+
     # Check if any quantity has been released
-    total_released = @customer_order.works_orders.active.sum(:quantity_released)
+    total_released = active_works_orders.sum(:quantity_released)
 
     if total_released <= 0
       redirect_to @customer_order, alert: 'No items available to invoice - no quantity has been released for this customer order yet.'
@@ -74,8 +119,8 @@ class CustomerOrdersController < ApplicationController
     begin
       # Get all uninvoiced release notes for this customer order
       uninvoiced_release_notes = ReleaseNote.joins(:works_order)
-                                           .where(works_orders: { customer_order_id: @customer_order.id })
-                                           .requires_invoicing
+                                          .where(works_orders: { customer_order_id: @customer_order.id })
+                                          .requires_invoicing
 
       if uninvoiced_release_notes.empty?
         redirect_to @customer_order, alert: 'No release notes available for invoicing. All items may already be invoiced.'
@@ -106,7 +151,7 @@ class CustomerOrdersController < ApplicationController
       works_order_count = uninvoiced_release_notes.joins(:works_order).select('works_orders.id').distinct.count
       release_note_count = uninvoiced_release_notes.count
 
-      summary = "Invoice created for customer order #{@customer_order.number} (#{works_order_count} works orders, #{release_note_count} release notes)"
+      summary = "Invoice created for fully completed customer order #{@customer_order.number} (#{works_order_count} works orders, #{release_note_count} release notes)"
 
       redirect_to @customer_order,
                   notice: "✅ Invoice INV#{invoice.number} staged successfully! #{summary}. Go to dashboard to push to Xero."
