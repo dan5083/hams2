@@ -201,13 +201,25 @@
   </div>
 
   <!-- Pagination -->
-  <% if respond_to?(:paginate) && @parts.respond_to?(:current_page) %>
+  <% if @parts.respond_to?(:current_page) %>
     <div class="mt-6 flex justify-between items-center">
       <div class="text-sm text-gray-700">
         Showing <%= @parts.offset_value + 1 %> to <%= [@parts.offset_value + @parts.limit_value, @parts.total_count].min %> of <%= @parts.total_count %> parts
       </div>
-      <div class="pagination">
-        <%= paginate @parts, theme: 'twitter_bootstrap_4' %>
+      <div class="flex items-center space-x-2">
+        <% if @parts.prev_page %>
+          <%= link_to "← Previous", parts_path(page: @parts.prev_page, search: params[:search]),
+              class: "px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50" %>
+        <% end %>
+
+        <span class="px-3 py-2 text-sm font-medium text-gray-700 bg-blue-50 border border-blue-300 rounded-md">
+          Page <%= @parts.current_page %> of <%= @parts.total_pages %>
+        </span>
+
+        <% if @parts.next_page %>
+          <%= link_to "Next →", parts_path(page: @parts.next_page, search: params[:search]),
+              class: "px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50" %>
+        <% end %>
       </div>
     </div>
   <% end %>
