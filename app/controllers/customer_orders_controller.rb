@@ -1,7 +1,7 @@
 class CustomerOrdersController < ApplicationController
   before_action :set_customer_order, only: [:show, :edit, :update, :destroy, :void, :create_invoice]
 
-   def index
+  def index
     @customer_orders = CustomerOrder.includes(:customer, :works_orders)
 
     # Filter by customer if provided
@@ -39,8 +39,8 @@ class CustomerOrdersController < ApplicationController
       all_fully_released = active_works_orders.any? &&
                           active_works_orders.all? { |wo| wo.quantity_released >= wo.quantity }
 
-      # Sort key: [priority (0 for fully released, 1 for others), negative date for desc order]
-      [all_fully_released ? 0 : 1, -customer_order.date_received.to_i]
+      # Sort key: [priority (0 for fully released, 1 for others), negative timestamp for desc order]
+      [all_fully_released ? 0 : 1, -customer_order.date_received.to_time.to_i]
     end
 
     # Convert back to ActiveRecord relation for pagination
