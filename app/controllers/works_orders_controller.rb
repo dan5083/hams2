@@ -5,7 +5,6 @@ class WorksOrdersController < ApplicationController
 
  def index
     @works_orders = WorksOrder.includes(:customer_order, :part, :release_level, :transport_method, customer: [])
-                              .active
 
     # Search functionality - supports multiple search types
     if params[:search].present?
@@ -24,7 +23,7 @@ class WorksOrdersController < ApplicationController
         works_order_number = search_term.match(/^WO(\d+)$/i)[1]
         @works_orders = @works_orders.where("works_orders.number = ?", works_order_number.to_i)
       else
-        # General search across all fields
+        # General search across all field
         @works_orders = @works_orders.joins(customer_order: :customer)
                                     .where(
                                       "CAST(works_orders.number AS TEXT) ILIKE ? OR " \
