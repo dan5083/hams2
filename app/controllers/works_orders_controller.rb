@@ -129,6 +129,15 @@ class WorksOrdersController < ApplicationController
     end
   end
 
+  def void
+    if @works_order.can_be_voided?
+      @works_order.void!
+      redirect_to @works_order, notice: 'Works order was successfully voided.'
+    else
+      redirect_to @works_order, alert: 'Cannot void works order - it has associated release notes.'
+    end
+  end
+
   def destroy
     if @works_order.can_be_deleted?
       @works_order.destroy

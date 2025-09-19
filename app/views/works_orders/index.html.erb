@@ -90,9 +90,14 @@
       </thead>
       <tbody class="bg-white divide-y divide-gray-200">
         <% @works_orders.each do |works_order| %>
-          <tr class="hover:bg-gray-50">
+          <tr class="hover:bg-gray-50 <%= 'bg-red-50' if works_order.voided %>">
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
               <%= link_to "WO#{works_order.number}", works_order, class: "text-blue-600 hover:text-blue-900" %>
+              <% if works_order.voided %>
+                <span class="ml-2 inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
+                  Voided
+                </span>
+              <% end %>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
               <%= link_to works_order.customer_order.number, works_order.customer_order,
@@ -108,21 +113,29 @@
               <%= works_order.quantity %>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-              <% if works_order.quantity_released > 0 %>
-                <span class="text-green-600 font-medium">
-                  <%= works_order.quantity_released %> released
-                </span>
-                <% if works_order.quantity_remaining > 0 %>
-                  <span class="text-gray-500">
-                    (<%= works_order.quantity_remaining %> remaining)
+              <% unless works_order.voided %>
+                <% if works_order.quantity_released > 0 %>
+                  <span class="text-green-600 font-medium">
+                    <%= works_order.quantity_released %> released
                   </span>
+                  <% if works_order.quantity_remaining > 0 %>
+                    <span class="text-gray-500">
+                      (<%= works_order.quantity_remaining %> remaining)
+                    </span>
+                  <% end %>
+                <% else %>
+                  <span class="text-gray-500">Not started</span>
                 <% end %>
               <% else %>
-                <span class="text-gray-500">Not started</span>
+                <span class="text-red-500">Voided</span>
               <% end %>
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
-              <% if works_order.is_open %>
+              <% if works_order.voided %>
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                  Voided
+                </span>
+              <% elsif works_order.is_open %>
                 <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
                   Open
                 </span>
@@ -135,34 +148,43 @@
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
               <div class="flex space-x-2">
                 <%= link_to "View", works_order, class: "text-blue-600 hover:text-blue-900" %>
-                <%= link_to "Edit", edit_works_order_path(works_order), class: "text-yellow-600 hover:text-yellow-900" %>
-                <%= link_to "Route Card",
-                    "javascript:void(0)",
-                    onclick: "printRouteCard('#{route_card_works_order_path(works_order)}')",
-                    class: "text-green-600 hover:text-green-900" %>
-                <%
-                  # Check if this customer order has any uninvoiced release notes
-                  customer_order_has_uninvoiced = ReleaseNote.joins(:works_order)
-                                                            .where(works_orders: { customer_order_id: works_order.customer_order_id })
-                                                            .requires_invoicing.any?
+                <% unless works_order.voided %>
+                  <%= link_to "Edit", edit_works_order_path(works_order), class: "text-yellow-600 hover:text-yellow-900" %>
+                  <%= link_to "Route Card",
+                      "javascript:void(0)",
+                      onclick: "printRouteCard('#{route_card_works_order_path(works_order)}')",
+                      class: "text-green-600 hover:text-green-900" %>
+                  <%
+                    # Check if this customer order has any uninvoiced release notes
+                    customer_order_has_uninvoiced = ReleaseNote.joins(:works_order)
+                                                              .where(works_orders: { customer_order_id: works_order.customer_order_id })
+                                                              .requires_invoicing.any?
 
-                  # Count works orders in this customer order with uninvoiced release notes
-                  uninvoiced_works_orders = works_order.customer_order.works_orders
-                                                      .joins(:release_notes)
-                                                      .merge(ReleaseNote.requires_invoicing)
-                                                      .distinct.count
-                %>
-                <% if customer_order_has_uninvoiced %>
-                  <% if uninvoiced_works_orders > 1 %>
-                    <%= button_to "Invoice Order", create_invoice_works_order_path(works_order),
+                    # Count works orders in this customer order with uninvoiced release notes
+                    uninvoiced_works_orders = works_order.customer_order.works_orders
+                                                        .joins(:release_notes)
+                                                        .merge(ReleaseNote.requires_invoicing)
+                                                        .distinct.count
+                  %>
+                  <% if customer_order_has_uninvoiced %>
+                    <% if uninvoiced_works_orders > 1 %>
+                      <%= button_to "Invoice Order", create_invoice_works_order_path(works_order),
+                          method: :patch,
+                          class: "text-orange-600 hover:text-orange-900 bg-transparent border-0 underline cursor-pointer text-sm",
+                          data: { confirm: "This will create one invoice for the entire customer order (#{uninvoiced_works_orders} works orders with uninvoiced items). Continue?" } %>
+                    <% else %>
+                      <%= button_to "Stage Invoice", create_invoice_works_order_path(works_order),
+                          method: :patch,
+                          class: "text-orange-600 hover:text-orange-900 bg-transparent border-0 underline cursor-pointer text-sm",
+                          data: { confirm: "Create invoice for this works order?" } %>
+                    <% end %>
+                  <% end %>
+
+                  <% if works_order.can_be_voided? %>
+                    <%= button_to "Void", void_works_order_path(works_order),
                         method: :patch,
-                        class: "text-orange-600 hover:text-orange-900 bg-transparent border-0 underline cursor-pointer text-sm",
-                        data: { confirm: "This will create one invoice for the entire customer order (#{uninvoiced_works_orders} works orders with uninvoiced items). Continue?" } %>
-                  <% else %>
-                    <%= button_to "Stage Invoice", create_invoice_works_order_path(works_order),
-                        method: :patch,
-                        class: "text-orange-600 hover:text-orange-900 bg-transparent border-0 underline cursor-pointer text-sm",
-                        data: { confirm: "Create invoice for this works order?" } %>
+                        class: "text-red-600 hover:text-red-900 bg-transparent border-0 underline cursor-pointer text-sm font-medium",
+                        data: { confirm: "Are you sure you want to void this works order? This cannot be undone." } %>
                   <% end %>
                 <% end %>
               </div>
