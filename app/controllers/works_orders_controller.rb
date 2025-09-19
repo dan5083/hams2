@@ -1,6 +1,6 @@
 # app/controllers/works_orders_controller.rb - Fixed pricing parameter handling and route card operations
 class WorksOrdersController < ApplicationController
-  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :create_invoice]
+  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :create_invoice, :void]
 
 
  def index
