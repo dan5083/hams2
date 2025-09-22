@@ -832,15 +832,15 @@ function initializeCopyFromPartAutocomplete() {
 
         const partInfo = document.createElement('div');
         partInfo.innerHTML = `
-          <div class="font-medium text-gray-900">${part.display_name}</div>
+          <div class="font-medium text-gray-900">${part.part_number}</div>
           <div class="text-xs text-gray-500">${part.customer_name}</div>
           <div class="text-xs text-gray-600 mt-1">${part.operations_summary || 'No operations'}</div>
         `;
         item.appendChild(partInfo);
 
         item.addEventListener('click', function() {
-          copyPartOperations(part.id, part.display_name);
-          copyAutocompleteInput.value = `Copying from: ${part.display_name} (${part.customer_name})`;
+          copyPartOperations(part.id, part.part_number);
+          copyAutocompleteInput.value = `Copying from: ${part.part_number} (${part.customer_name})`;
           copyDropdown.classList.add('hidden');
         });
 

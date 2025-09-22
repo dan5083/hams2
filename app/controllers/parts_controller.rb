@@ -251,7 +251,7 @@ end
         render json: @parts.map { |part|
           {
             id: part.id,
-            display_name: part.display_name,
+            part_number: part.part_number,
             customer_name: part.customer.name,
             customer_id: part.customer_id,
             specification: part.specification,
@@ -591,7 +591,7 @@ end
         render json: @parts.map { |part|
           {
             id: part.id,
-            display_name: part.display_name,
+            part_number: part.part_number,
             customer_name: part.customer.name,
             customer_id: part.customer_id,
             specification: part.specification,
@@ -637,7 +637,7 @@ end
       render json: {
         success: true,
         operations: formatted_operations,
-        source_part: @part.display_name,
+        source_part: @part.part_number,
         customer_name: @part.customer.name
       }
     rescue => e
