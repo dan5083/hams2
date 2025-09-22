@@ -527,6 +527,7 @@ class Part < ApplicationRecord
         "type" => treatment["type"] || treatment[:type],
         "operation_id" => treatment["operation_id"] || treatment[:operation_id],
         "selected_alloy" => treatment["selected_alloy"] || treatment[:selected_alloy],
+        "selected_material_type" => treatment["selected_material_type"] || treatment[:selected_material_type], # Add material type support
         "target_thickness" => treatment["target_thickness"] || treatment[:target_thickness],
         "selected_jig_type" => treatment["selected_jig_type"] || treatment[:selected_jig_type],
         "masking_methods" => treatment.dig("masking", "methods") || treatment["masking_methods"] || {},
@@ -844,7 +845,9 @@ class Part < ApplicationRecord
 
     # 6. Pretreatments + rinses (NOW AFTER STRIPPING for anodising)
     if needs_pretreatment?(op)
-      pretreatments = OperationLibrary::Pretreatments.get_pretreatment_sequence([op], nil)
+      # Get the appropriate material for pretreatment sequence
+      selected_material = get_selected_material_for_pretreatment(op, treatment_data)
+      pretreatments = OperationLibrary::Pretreatments.get_pretreatment_sequence([op], selected_material)
       pretreatments.each do |pretreat|
         safe_add_to_sequence(sequence, pretreat, "Pretreatment")
         safe_add_to_sequence(sequence, get_rinse(pretreat, has_enp, masking), "Rinse after Pretreatment") unless pretreat.process_type == 'rinse'
@@ -1022,8 +1025,20 @@ class Part < ApplicationRecord
     OperationLibrary::RinseOperations.get_rinse_operation(op, ppi_contains_electroless_nickel: has_enp, masking: masking)
   end
 
-  def get_selected_alloy(op)
-    op.process_type == 'electroless_nickel_plating' ? operation_selection["selected_enp_alloy"] : nil
+  # Get the appropriate material/alloy for pretreatment sequence
+  def get_selected_material_for_pretreatment(op, treatment_data)
+    if op.process_type == 'electroless_nickel_plating'
+      # ENP uses alloy for pretreatment
+      alloy = treatment_data["selected_alloy"] || operation_selection["selected_enp_alloy"]
+      convert_alloy_to_pretreatment_format(alloy)
+    elsif op.process_type == 'chemical_conversion'
+      # Chemical conversion uses material type for pretreatment
+      material_type = treatment_data["selected_material_type"]
+      convert_material_type_to_pretreatment_format(material_type)
+    else
+      # Other treatments don't need specific material info for pretreatment
+      nil
+    end
   end
 
   def add_enp_strip_mask_ops(sequence)
@@ -1042,6 +1057,8 @@ class Part < ApplicationRecord
 
   # Convert form alloy values to pretreatment sequence keys
   def convert_alloy_to_pretreatment_format(form_alloy)
+    return nil if form_alloy.blank?
+
     mapping = {
       'steel' => 'STEEL',
       'stainless_steel' => 'STAINLESS_STEEL',
@@ -1057,6 +1074,19 @@ class Part < ApplicationRecord
     }
 
     mapping[form_alloy]
+  end
+
+  # Convert form material type values to pretreatment sequence keys for chemical conversion
+  def convert_material_type_to_pretreatment_format(form_material_type)
+    return nil if form_material_type.blank?
+
+    mapping = {
+      'aerospace_minimal' => 'AEROSPACE_MINIMAL',
+      'castings_plate' => 'CASTINGS_PLATE',
+      'machined_wrought' => 'MACHINED_WROUGHT'
+    }
+
+    mapping[form_material_type]
   end
 
   # Validation and setup

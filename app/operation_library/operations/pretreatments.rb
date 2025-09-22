@@ -173,16 +173,20 @@ module OperationLibrary
 
       # Check if ENP is present AND we have an alloy selected
       has_enp = user_operations.any? { |op| op.process_type == 'electroless_nickel_plating' }
+      has_chemical_conversion = user_operations.any? { |op| op.process_type == 'chemical_conversion' }
 
       if has_enp && selected_alloy.present?
         # Complex ENP pretreatment sequence with RO rinses
         get_enp_pretreatment_sequence(selected_alloy)
-      elsif !has_enp
-        # Simple pretreatment for anodising/chemical conversion only
+      elsif has_chemical_conversion && selected_alloy.present?
+        # Chemical conversion pretreatment sequence based on material type
+        get_chemical_conversion_pretreatment_sequence(selected_alloy)
+      elsif !has_enp && !has_chemical_conversion
+        # Simple pretreatment for anodising only
         [get_simple_pretreatment_operation]
       else
-        # ENP is present but no alloy selected - return empty array
-        # This enforces that ENP requires alloy selection for pretreatments
+        # Either ENP or chemical conversion is present but no material/alloy selected - return empty array
+        # This enforces that these processes require material selection for pretreatments
         []
       end
     end
@@ -202,6 +206,35 @@ module OperationLibrary
       sequence_ids.map do |operation_id|
         pretreatment_ops.find { |op| op.id == operation_id }
       end.compact
+    end
+
+    # Get chemical conversion pretreatment sequence for specific material type
+    def self.get_chemical_conversion_pretreatment_sequence(material_type)
+      sequence_ids = chemical_conversion_sequences[material_type.upcase.to_sym] || []
+      return [] if sequence_ids.empty?
+
+      # Get the operations for this sequence
+      pretreatment_ops = enp_pretreatments # Reuse ENP pretreatment operations as they contain all the needed operations
+      sequence_ids.map do |operation_id|
+        pretreatment_ops.find { |op| op.id == operation_id }
+      end.compact
+    end
+
+    # Chemical conversion pretreatment sequences by material type
+    def self.chemical_conversion_sequences
+      {
+        AEROSPACE_MINIMAL: [],  # No special pretreatment - uses standard DeOx only
+        CASTINGS_PLATE: [
+          'ALUMINIUM_CLEAN_KEYCOTE_245_30_60SEC',
+          'DESMUT_MICROETCH_66_1_2_MIN_18_25C',
+          'ALUMON_70_1_2_MIN_18_25C',
+          'DESMUT_MICROETCH_66_35_40_MIN_18_25C'
+        ],
+        MACHINED_WROUGHT: [
+          'ALUMON_70_1_2_MIN_18_25C',
+          'DESMUT_MICROETCH_66_1_2_MIN_18_25C'
+        ]
+      }
     end
 
     # ENP pretreatment sequences by alloy
@@ -292,6 +325,11 @@ module OperationLibrary
     # Get available alloys for ENP pretreatment
     def self.available_enp_alloys
       enp_sequences.keys.map(&:to_s).map(&:downcase)
+    end
+
+    # Get available material types for chemical conversion pretreatment
+    def self.available_chemical_conversion_materials
+      chemical_conversion_sequences.keys.map(&:to_s).map(&:downcase)
     end
 
     # Insert pretreatments into operation sequence

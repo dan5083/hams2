@@ -846,6 +846,7 @@ export default class extends Controller {
       type: treatmentType,
       operation_id: null,
       selected_alloy: null,
+      selected_material_type: null, // Add material type for chemical conversion
       target_thickness: null,
       selected_jig_type: null,
       stripping_type: treatmentType === 'stripping_only' ? 'anodising_stripping' : null,
@@ -951,6 +952,7 @@ export default class extends Controller {
     const isENP = treatment.type === 'electroless_nickel_plating';
     const isStripOnly = treatment.type === 'stripping_only';
     const isAnodising = ['standard_anodising', 'hard_anodising', 'chromic_anodising'].includes(treatment.type);
+    const isChemicalConversion = treatment.type === 'chemical_conversion';
 
     return `
       <div class="border border-gray-200 rounded-lg p-4 bg-gray-50" data-treatment-id="${treatment.id}">
@@ -983,7 +985,7 @@ export default class extends Controller {
         ${isStripOnly ? '' : this.generateCriteriaHTML(treatment)}
 
         <!-- Treatment Modifiers -->
-        ${isENP || isStripOnly ? '' : this.generateTreatmentModifiersHTML(treatment)}
+        ${isENP || isStripOnly || isChemicalConversion ? '' : this.generateTreatmentModifiersHTML(treatment)}
 
         ${isStripOnly ? this.generateStripOnlyModifiersHTML(treatment) : ''}
       </div>
@@ -1110,7 +1112,7 @@ export default class extends Controller {
     if (this.isLockedMode) return '';
 
     if (treatment.type === 'chemical_conversion') {
-      return '';
+      return this.generateChemicalConversionCriteriaHTML(treatment);
     }
 
     if (treatment.type === 'electroless_nickel_plating') {
@@ -1122,6 +1124,26 @@ export default class extends Controller {
     }
 
     return this.generateAnodisingCriteriaHTML(treatment);
+  }
+
+  // Generate chemical conversion criteria HTML (unlocked mode only)
+  generateChemicalConversionCriteriaHTML(treatment) {
+    if (this.isLockedMode) return '';
+
+    return `
+      <div class="grid grid-cols-1 gap-4 mb-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Material Type</label>
+          <select class="material-type-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm" data-treatment-id="${treatment.id}">
+            <option value="">Select material type...</option>
+            <option value="aerospace_minimal" ${treatment.selected_material_type === 'aerospace_minimal' ? 'selected' : ''}>Aerospace (Minimal Pretreatment)</option>
+            <option value="castings_plate" ${treatment.selected_material_type === 'castings_plate' ? 'selected' : ''}>Castings/Plate</option>
+            <option value="machined_wrought" ${treatment.selected_material_type === 'machined_wrought' ? 'selected' : ''}>Machined/Wrought</option>
+          </select>
+          <p class="mt-1 text-xs text-gray-500">Material type determines required pretreatment sequence</p>
+        </div>
+      </div>
+    `;
   }
 
   // Generate chromic criteria HTML (unlocked mode only)
@@ -1383,6 +1405,13 @@ export default class extends Controller {
       treatment.selected_jig_type = event.target.value;
     }
 
+    // Handle chemical conversion material type changes
+    if (event.target.classList.contains('material-type-select')) {
+      treatment.selected_material_type = event.target.value;
+      // Load operations for chemical conversion treatments (they all use the same operations but different pretreatments)
+      this.loadOperationsForTreatment(treatmentId);
+    }
+
     // Handle strip-only specific changes
     if (event.target.classList.contains('strip-type-select')) {
       treatment.stripping_type = event.target.value;
@@ -1465,6 +1494,7 @@ export default class extends Controller {
 
     // Update treatment data based on the changed element
     if (event.target.classList.contains('alloy-select') ||
+        event.target.classList.contains('material-type-select') ||
         event.target.classList.contains('thickness-select') ||
         event.target.classList.contains('thickness-input') ||
         event.target.classList.contains('anodic-select') ||
@@ -1632,6 +1662,16 @@ export default class extends Controller {
       }
     }
 
+    // For chemical conversion treatments, store material type
+    if (treatment.type === 'chemical_conversion') {
+      const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`);
+      const materialTypeSelect = card?.querySelector('.material-type-select');
+
+      if (materialTypeSelect && materialTypeSelect.value && !treatment.selected_material_type) {
+        treatment.selected_material_type = materialTypeSelect.value;
+      }
+    }
+
     // Update visual feedback
     if (this.hasTreatmentsContainerTarget) {
       const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`);
@@ -1794,6 +1834,7 @@ export default class extends Controller {
         type: treatment.type,
         operation_id: treatment.operation_id,
         selected_alloy: treatment.selected_alloy,
+        selected_material_type: treatment.selected_material_type, // Add material type for chemical conversion
         target_thickness: treatment.target_thickness,
         selected_jig_type: treatment.selected_jig_type,
         stripping_type: treatment.stripping_type,
