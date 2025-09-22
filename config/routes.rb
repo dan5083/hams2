@@ -18,11 +18,12 @@ Rails.application.routes.draw do
       post :insert_operation
       patch :reorder_operation
       delete :delete_operation
-      get :copy_operations  # NEW
+      patch :update_locked_operation
+      get :copy_operations
     end
     collection do
       get :search
-      get :search_all_parts  # NEW
+      get :search_all_parts
       # Operations endpoints for the complex treatment form
       post :filter_operations
       post :operation_details

@@ -232,7 +232,7 @@
         </span>
       </div>
 
-      <p class="text-sm text-gray-600 mb-6">Operations are now in manual editing mode. You can customize the text, insert new operations between existing ones, reorder, or delete operations below.</p>
+      <p class="text-sm text-gray-600 mb-6">Operations are now in manual editing mode. You can customize the text, insert new operations between existing ones, reorder, or delete operations below. Changes to operation text are automatically saved when you click away.</p>
 
       <div class="space-y-1" id="operations-container">
         <% part.locked_operations.each_with_index do |operation, index| %>
@@ -288,8 +288,9 @@
                 {
                   rows: 3,
                   autocomplete: "off",
-                  class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
-                  placeholder: "Enter operation text..."
+                  class: "operation-textarea mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+                  placeholder: "Enter operation text...",
+                  data: { original_value: operation["operation_text"] }
                 } %>
 
             <% if operation["specifications"].present? %>
@@ -561,6 +562,74 @@
 
 <!-- JavaScript - Now ALWAYS runs regardless of form state -->
 <script>
+// Auto-save operation text functionality
+function setupOperationAutoSave() {
+  document.querySelectorAll('textarea.operation-textarea').forEach(textarea => {
+    let saveTimeout;
+
+    textarea.addEventListener('blur', function() {
+      const match = this.name.match(/\[(\d+)\]/);
+      if (!match) return;
+
+      const position = parseInt(match[1]);
+      const newText = this.value.trim();
+
+      clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(() => {
+        saveOperationText(position, newText, this);
+      }, 500);
+    });
+  });
+}
+
+function saveOperationText(position, text, textarea) {
+  const partId = getPartIdFromUrl();
+  if (!partId) return;
+
+  // Show saving state
+  textarea.style.backgroundColor = '#fef3c7'; // Light yellow
+
+  fetch(`/parts/${partId}/update_locked_operation`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content
+    },
+    body: JSON.stringify({
+      position: position,
+      operation_text: text
+    })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      // Update stored original value
+      textarea.dataset.originalValue = text;
+      // Show success with green flash
+      textarea.style.backgroundColor = '#f0fdf4';
+      setTimeout(() => {
+        textarea.style.backgroundColor = '';
+      }, 1000);
+    } else {
+      throw new Error('Save failed');
+    }
+  })
+  .catch(error => {
+    console.error('Error saving operation text:', error);
+    // Show error with red flash
+    textarea.style.backgroundColor = '#fef2f2';
+    setTimeout(() => {
+      textarea.style.backgroundColor = '';
+    }, 2000);
+  });
+}
+
+function getPartIdFromUrl() {
+  const pathParts = window.location.pathname.split('/');
+  const partsIndex = pathParts.indexOf('parts');
+  return partsIndex !== -1 && pathParts[partsIndex + 1] ? pathParts[partsIndex + 1] : null;
+}
+
 // Specification quick-add functionality
 function initializeSpecificationQuickAdd() {
   document.querySelectorAll('.spec-quick-add-btn').forEach(button => {
@@ -838,7 +907,7 @@ function switchToManualModeWithOperations(operations, sourcePart) {
         Copied from: ${sourcePart}
       </span>
     </div>
-    <p class="text-sm text-gray-600 mb-6">Operations copied from existing part. You can modify, add, or remove operations below.</p>
+    <p class="text-sm text-gray-600 mb-6">Operations copied from existing part. You can modify, add, or remove operations below. Changes to operation text are automatically saved when you click away.</p>
     <div class="space-y-1" id="operations-container">
       ${generateOperationsHTML(operations)}
     </div>
@@ -858,6 +927,9 @@ function switchToManualModeWithOperations(operations, sourcePart) {
   if (switchButton) {
     switchButton.style.display = 'none';
   }
+
+  // Set up auto-save for the new textareas
+  setupOperationAutoSave();
 }
 
 function generateOperationsHTML(operations) {
@@ -897,8 +969,8 @@ function generateOperationsHTML(operations) {
           </div>
         </div>
         <textarea name="locked_operations[${op.position}]" rows="3" autocomplete="off"
-                  class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder="Enter operation text...">${op.operation_text}</textarea>
+                  class="operation-textarea mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  placeholder="Enter operation text..." data-original-value="${op.operation_text}">${op.operation_text}</textarea>
         ${op.specifications ? `
           <p class="mt-2 text-xs text-purple-600">
             <strong>Specifications:</strong> ${op.specifications}
@@ -956,11 +1028,13 @@ if (document.readyState === 'loading') {
     initializeSpecificationQuickAdd();
     initializeCustomerAutocomplete();
     initializeCopyFromPartAutocomplete();
+    setupOperationAutoSave();
   });
 } else {
   initializeSpecificationQuickAdd();
   initializeCustomerAutocomplete();
   initializeCopyFromPartAutocomplete();
+  setupOperationAutoSave();
 }
 </script>
 

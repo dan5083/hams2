@@ -1,5 +1,5 @@
 class PartsController < ApplicationController
-before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled, :insert_operation, :reorder_operation, :delete_operation]
+before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled, :insert_operation, :reorder_operation, :delete_operation, :update_locked_operation]
 
   def index
     @parts = Part.includes(:customer, :works_orders)
@@ -550,6 +550,24 @@ end
       success: false,
       error: 'An error occurred while deleting the operation'
     }, status: :internal_server_error
+  end
+
+  def update_locked_operation
+    position = params[:position]&.to_i
+    operation_text = params[:operation_text]
+
+    if position.nil?
+      render json: { success: false, error: 'Position is required' }
+      return
+    end
+
+    if @part.update_locked_operation!(position, operation_text)
+      render json: { success: true }
+    else
+      render json: { success: false, error: 'Failed to update operation' }
+    end
+  rescue => e
+    render json: { success: false, error: 'An error occurred while updating the operation' }
   end
 
   # Search all parts across all customers (for copy functionality)
