@@ -211,10 +211,17 @@ module OperationLibrary
     # Get chemical conversion pretreatment sequence for specific material type
     def self.get_chemical_conversion_pretreatment_sequence(material_type)
       sequence_ids = chemical_conversion_sequences[material_type.upcase.to_sym] || []
+
+      # Special case: aerospace_minimal should get the simple desmut operation
+      if material_type.upcase == 'AEROSPACE_MINIMAL' && sequence_ids.empty?
+        desmut_op = enp_pretreatments.find { |op| op.id == 'DESMUT_MICROETCH_66_1_2_MIN_18_25C' }
+        return [desmut_op].compact
+      end
+
       return [] if sequence_ids.empty?
 
       # Get the operations for this sequence
-      pretreatment_ops = enp_pretreatments # Reuse ENP pretreatment operations as they contain all the needed operations
+      pretreatment_ops = enp_pretreatments
       sequence_ids.map do |operation_id|
         pretreatment_ops.find { |op| op.id == operation_id }
       end.compact
