@@ -65,7 +65,7 @@ class ExternalNcr < ApplicationRecord
   # Callbacks
   before_validation :set_ncr_number, if: :new_record?
   before_validation :set_defaults, if: :new_record?
-  after_create :upload_document_to_dropbox, if: :temp_document_attached?
+  after_create :upload_document_to_dropbox, if: -> { temp_document.attached? }
   after_create :log_creation
   after_update :log_status_change, if: :saved_change_to_status?
 
