@@ -66,12 +66,11 @@ Rails.application.routes.draw do
       patch :create_invoice_with_charges
     end
 
-    # 5. Release Notes nested under works orders
-    resources :release_notes, except: [:index] do
-      member do
-        patch :void
-        get :pdf            # Customer delivery/collection documentation
-      end
+  # 5. Release Notes nested under works orders
+  resources :release_notes, except: [:index] do
+    member do
+      patch :void
+      get :pdf            # Customer delivery/collection documentation
     end
   end
 
@@ -94,6 +93,10 @@ Rails.application.routes.draw do
   resources :external_ncrs do
     member do
       patch :advance_status
+      get :download_document
+    end
+    collection do
+      get :release_note_details  # AJAX endpoint for dynamic form updates
     end
   end
 
