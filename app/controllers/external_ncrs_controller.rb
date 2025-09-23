@@ -149,7 +149,11 @@ class ExternalNcrsController < ApplicationController
       part_number: release_note.works_order.part_number,
       part_issue: release_note.works_order.part_issue,
       part_description: release_note.works_order.part_description,
-      works_order_number: release_note.works_order.display_name
+      works_order_number: release_note.works_order.display_name,
+      customer_po_number: release_note.works_order.customer_order.number,
+      quantity_accepted: release_note.quantity_accepted,
+      quantity_rejected: release_note.quantity_rejected,
+      batch_quantity: release_note.quantity_accepted + release_note.quantity_rejected
     }
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Release note not found' }, status: :not_found
