@@ -6,7 +6,7 @@
     </h2>
   </div>
 
-  <%= form_with(model: @external_ncr, local: true, class: "space-y-6") do |f| %>
+  <%= form_with(model: @external_ncr, local: true, multipart: true, class: "space-y-6") do |f| %>
     <% if @external_ncr.errors.any? %>
       <div class="bg-red-50 border border-red-200 rounded-md p-4">
         <div class="flex">
@@ -31,6 +31,75 @@
         </div>
       </div>
     <% end %>
+
+    <!-- Document Upload Section -->
+    <div class="bg-white shadow sm:rounded-lg">
+      <div class="px-4 py-5 sm:p-6">
+        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Incoming NCR Document</h3>
+
+        <% if @external_ncr.persisted? && @external_ncr.has_document? %>
+          <!-- Existing Document Display -->
+          <div class="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center">
+                <svg class="h-8 w-8 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd" />
+                </svg>
+                <div class="ml-3">
+                  <p class="text-sm font-medium text-gray-900"><%= @external_ncr.document_filename %></p>
+                  <p class="text-xs text-gray-500">
+                    <%= @external_ncr.document_size_formatted %>
+                    <% if @external_ncr.document_uploaded_date %>
+                      • Uploaded <%= @external_ncr.document_uploaded_date.strftime("%d %b %Y at %H:%M") %>
+                    <% end %>
+                  </p>
+                </div>
+              </div>
+              <div class="flex items-center space-x-2">
+                <%= link_to download_document_external_ncr_path(@external_ncr),
+                    class: "inline-flex items-center px-3 py-1 border border-gray-300 rounded-md text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
+                  <svg class="-ml-1 mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Download
+                <% end %>
+              </div>
+            </div>
+          </div>
+
+          <!-- Document Replacement for Draft NCRs -->
+          <% if @external_ncr.can_replace_document? %>
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Replace Document
+                <span class="text-xs text-gray-500">(Optional - only for draft NCRs)</span>
+              </label>
+              <%= f.file_field :temp_document,
+                  accept: ".pdf,.jpg,.jpeg,.png,.tiff,.tif,.doc,.docx",
+                  class: "block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" %>
+              <p class="mt-1 text-xs text-gray-500">
+                Upload a new document to replace the existing one. Accepted formats: PDF, JPG, PNG, TIFF, DOC, DOCX (max 10MB)
+              </p>
+            </div>
+          <% end %>
+        <% else %>
+          <!-- New Document Upload -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              Upload Incoming NCR Document
+              <span class="text-red-500">*</span>
+            </label>
+            <%= f.file_field :temp_document,
+                accept: ".pdf,.jpg,.jpeg,.png,.tiff,.tif,.doc,.docx",
+                required: true,
+                class: "block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" %>
+            <p class="mt-1 text-xs text-gray-500">
+              Required. Upload the NCR document received from the customer. Accepted formats: PDF, JPG, PNG, TIFF, DOC, DOCX (max 10MB)
+            </p>
+          </div>
+        <% end %>
+      </div>
+    </div>
 
     <!-- Basic Information -->
     <div class="bg-white shadow sm:rounded-lg">
@@ -75,12 +144,15 @@
                 class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
           </div>
 
-          <!-- Assigned To -->
+          <!-- Respondent (Auto-assigned, Read-only) -->
           <div>
-            <%= f.label :assigned_to_id, "Assigned to", class: "block text-sm font-medium text-gray-700" %>
-            <%= f.collection_select :assigned_to_id, @assignable_users, :id, :full_name,
-                { prompt: "Select user...", include_blank: "Unassigned" },
-                { class: "mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md" } %>
+            <label class="block text-sm font-medium text-gray-700">Respondent</label>
+            <div class="mt-1 p-3 bg-gray-50 rounded-md">
+              <p class="text-sm text-gray-900">
+                <%= @external_ncr.persisted? ? @external_ncr.respondent&.full_name : Current.user.full_name %>
+                <span class="text-xs text-gray-500">(Auto-assigned)</span>
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -128,12 +200,14 @@
           <div>
             <%= f.label :batch_quantity, "Batch Qty.", class: "block text-sm font-medium text-gray-700" %>
             <%= f.number_field :batch_quantity,
+                min: 0,
                 class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
           </div>
 
           <div>
             <%= f.label :reject_quantity, "Reject Qty.", class: "block text-sm font-medium text-gray-700" %>
             <%= f.number_field :reject_quantity,
+                min: 0,
                 class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
           </div>
         </div>
@@ -149,6 +223,9 @@
           <div>
             <%= f.label :description_of_non_conformance, "Description of Non-Conformance",
                 class: "block text-sm font-medium text-gray-700" %>
+            <p class="mt-1 text-xs text-gray-500 mb-2">
+              Required to advance from draft status
+            </p>
             <%= f.text_area :description_of_non_conformance,
                 rows: 4,
                 class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
@@ -173,6 +250,9 @@
           <div>
             <%= f.label :containment_corrective_action, "Containment/Corrective Action",
                 class: "block text-sm font-medium text-gray-700" %>
+            <p class="mt-1 text-xs text-gray-500 mb-2">
+              Required to advance from in-progress to completed status
+            </p>
             <%= f.text_area :containment_corrective_action,
                 rows: 4,
                 class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
@@ -181,6 +261,9 @@
           <div>
             <%= f.label :preventive_action, "Preventive Action",
                 class: "block text-sm font-medium text-gray-700" %>
+            <p class="mt-1 text-xs text-gray-500 mb-2">
+              Required to advance from in-progress to completed status
+            </p>
             <%= f.text_area :preventive_action,
                 rows: 4,
                 class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
@@ -201,3 +284,40 @@
     </div>
   <% end %>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const fileInput = document.querySelector('input[type="file"]');
+  if (fileInput) {
+    fileInput.addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        // Validate file size (10MB limit)
+        if (file.size > 10 * 1024 * 1024) {
+          alert('File size must be less than 10MB');
+          e.target.value = '';
+          return;
+        }
+
+        // Validate file type
+        const allowedTypes = [
+          'application/pdf',
+          'image/jpeg',
+          'image/jpg',
+          'image/png',
+          'image/tiff',
+          'image/tif',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        ];
+
+        if (!allowedTypes.includes(file.type)) {
+          alert('Please upload a valid file type: PDF, JPG, PNG, TIFF, DOC, or DOCX');
+          e.target.value = '';
+          return;
+        }
+      }
+    });
+  }
+});
+</script>

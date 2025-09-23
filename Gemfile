@@ -81,3 +81,4 @@ gem 'grover'
 
 gem 'rack-canonical-host'
 gem 'kaminari'
+gem 'dropbox_api'

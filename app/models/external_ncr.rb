@@ -2,13 +2,16 @@
 class ExternalNcr < ApplicationRecord
   belongs_to :release_note
   belongs_to :created_by, class_name: 'User'
-  belongs_to :assigned_to, class_name: 'User', optional: true
+  belongs_to :respondent, class_name: 'User', foreign_key: 'assigned_to_id'
 
   # Delegate common fields to release_note -> works_order for easy access
   has_one :works_order, through: :release_note
   has_one :customer_order, through: :works_order
   has_one :customer, through: :customer_order
   has_one :part, through: :works_order
+
+  # Temporary file upload for processing before Dropbox upload
+  has_one_attached :temp_document
 
   # JSONB accessors for NCR-specific data
   store_accessor :ncr_data,
@@ -29,8 +32,16 @@ class ExternalNcr < ApplicationRecord
     :root_cause_identified,
     :containment_corrective_action,
     :preventive_action,
-    :completed_by_user_id
+    :completed_by_user_id,
 
+    # Dropbox document storage
+    :dropbox_file_path,
+    :original_filename,
+    :file_size_bytes,
+    :content_type,
+    :document_uploaded_at
+
+  # Validations
   validates :hal_ncr_number, presence: true, uniqueness: true, numericality: { greater_than: 0 }
   validates :release_note_id, presence: true
   validates :date, presence: true
@@ -41,15 +52,21 @@ class ExternalNcr < ApplicationRecord
   validates :batch_quantity, numericality: { greater_than: 0 }, allow_blank: true
   validates :reject_quantity, numericality: { greater_than: 0 }, allow_blank: true
 
+  # Validate temp document for new records
+  validates :temp_document, presence: true, on: :create, unless: :has_document?
+
   # Scopes
   scope :active, -> { where.not(status: 'completed') }
   scope :by_status, ->(status) { where(status: status) }
   scope :for_customer, ->(customer) { joins(:customer).where(customer: customer) }
   scope :recent, -> { order(created_at: :desc) }
+  scope :with_documents, -> { where.not(ncr_data: { dropbox_file_path: [nil, ''] }) }
+  scope :missing_documents, -> { where(ncr_data: { dropbox_file_path: [nil, ''] }) }
 
   # Callbacks
   before_validation :set_ncr_number, if: :new_record?
   before_validation :set_defaults, if: :new_record?
+  after_create :upload_document_to_dropbox, if: :temp_document_attached?
   after_create :log_creation
   after_update :log_status_change, if: :saved_change_to_status?
 
@@ -90,6 +107,50 @@ class ExternalNcr < ApplicationRecord
     "RN#{release_note.number}"
   end
 
+  # Document management methods
+  def has_document?
+    dropbox_file_path.present?
+  end
+
+  def document_filename
+    original_filename.presence || "NCR#{hal_ncr_number}_incoming_document"
+  end
+
+  def document_size_formatted
+    return nil unless file_size_bytes.present?
+
+    bytes = file_size_bytes.to_i
+    if bytes < 1024
+      "#{bytes} bytes"
+    elsif bytes < 1_048_576
+      "#{(bytes / 1024.0).round(1)} KB"
+    else
+      "#{(bytes / 1_048_576.0).round(1)} MB"
+    end
+  end
+
+  def document_uploaded_date
+    return nil unless document_uploaded_at.present?
+    Time.parse(document_uploaded_at)
+  rescue
+    nil
+  end
+
+  def generate_dropbox_download_url
+    return nil unless has_document?
+
+    begin
+      DropboxNcrService.generate_download_link(dropbox_file_path)
+    rescue => e
+      Rails.logger.error "Failed to generate Dropbox download URL for NCR #{hal_ncr_number}: #{e.message}"
+      nil
+    end
+  end
+
+  def can_replace_document?
+    status == 'draft'
+  end
+
   # Status management
   def next_status
     case status
@@ -102,7 +163,7 @@ class ExternalNcr < ApplicationRecord
   def can_advance_status?
     case status
     when 'draft'
-      description_of_non_conformance.present?
+      description_of_non_conformance.present? && has_document?
     when 'in_progress'
       containment_corrective_action.present? && preventive_action.present?
     else
@@ -155,10 +216,38 @@ class ExternalNcr < ApplicationRecord
       .where(
         "CAST(hal_ncr_number AS TEXT) ILIKE ? OR " \
         "organizations.name ILIKE ? OR " \
-        "works_orders.part_number ILIKE ?",
-        "%#{term}%", "%#{term}%", "%#{term}%"
+        "works_orders.part_number ILIKE ? OR " \
+        "(ncr_data->>'original_filename') ILIKE ?",
+        "%#{term}%", "%#{term}%", "%#{term}%", "%#{term}%"
       )
       .distinct
+  end
+
+  # Replace document (for draft NCRs only)
+  def replace_document!(new_file)
+    raise "Cannot replace document for non-draft NCR" unless can_replace_document?
+
+    # Delete old document from Dropbox if it exists
+    if has_document?
+      DropboxNcrService.delete_document(dropbox_file_path)
+    end
+
+    # Clear existing document data
+    self.dropbox_file_path = nil
+    self.original_filename = nil
+    self.file_size_bytes = nil
+    self.content_type = nil
+    self.document_uploaded_at = nil
+
+    # Attach new temporary file
+    self.temp_document = new_file
+
+    if save
+      upload_document_to_dropbox
+      true
+    else
+      false
+    end
   end
 
   private
@@ -173,6 +262,45 @@ class ExternalNcr < ApplicationRecord
     self.date ||= Date.current
     self.status ||= 'draft'
     self.ncr_data ||= {}
+    # Auto-assign respondent to creator
+    self.respondent = created_by if created_by.present?
+  end
+
+  def upload_document_to_dropbox
+    return unless temp_document.attached?
+
+    Rails.logger.info "Uploading document to Dropbox for NCR #{hal_ncr_number}"
+
+    begin
+      # Extract file information
+      attachment = temp_document.attachment
+      blob = attachment.blob
+
+      # Store file metadata
+      self.original_filename = blob.filename.to_s
+      self.file_size_bytes = blob.byte_size
+      self.content_type = blob.content_type
+
+      # Upload to Dropbox
+      file_path = DropboxNcrService.upload_document(self, temp_document)
+
+      if file_path
+        self.dropbox_file_path = file_path
+        self.document_uploaded_at = Time.current.iso8601
+        save!
+
+        # Clean up temporary file
+        temp_document.purge
+
+        Rails.logger.info "Successfully uploaded NCR #{hal_ncr_number} document to Dropbox: #{file_path}"
+      else
+        Rails.logger.error "Failed to upload NCR #{hal_ncr_number} document to Dropbox"
+      end
+
+    rescue => e
+      Rails.logger.error "Error uploading NCR #{hal_ncr_number} document: #{e.message}"
+      # Don't fail the NCR creation, but log the error
+    end
   end
 
   def log_creation
