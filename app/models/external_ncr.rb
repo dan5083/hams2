@@ -16,14 +16,11 @@ class ExternalNcr < ApplicationRecord
   # JSONB accessors for NCR-specific data
   store_accessor :ncr_data,
     # Identification numbers
-    :advice_number,
-    :release_number,
     :concession_number,
-    :customer_po_number,
     :customer_ncr_number,
+    :estimated_cost,
 
     # Quantities
-    :batch_quantity,
     :reject_quantity,
 
     # NCR Content
@@ -49,8 +46,20 @@ class ExternalNcr < ApplicationRecord
   validates :status, inclusion: { in: %w[draft in_progress completed] }
 
   # Validate quantities if provided
-  validates :batch_quantity, numericality: { greater_than: 0 }, allow_blank: true
   validates :reject_quantity, numericality: { greater_than: 0 }, allow_blank: true
+  validates :estimated_cost, numericality: { greater_than_or_equal_to: 0 }, allow_blank: true
+
+  # Custom validation: reject quantity shouldn't exceed total release note quantity
+  validate :reject_quantity_within_bounds, if: -> { reject_quantity.present? && release_note.present? }
+
+  private
+
+  def reject_quantity_within_bounds
+    total_quantity = release_note.quantity_accepted + release_note.quantity_rejected
+    if reject_quantity > total_quantity
+      errors.add(:reject_quantity, "cannot exceed total release note quantity (#{total_quantity})")
+    end
+  end
 
   # Validate temp document for new records
   validates :temp_document, presence: true, on: :create, unless: :has_document?
@@ -78,7 +87,16 @@ class ExternalNcr < ApplicationRecord
     "NCR#{hal_ncr_number} - #{customer_name} - #{part_display_name} - RN#{release_note.number}"
   end
 
-  # Delegated attributes from release_note -> works_order
+  # Auto-populated data from release note
+  def batch_quantity_from_release_note
+    return nil unless release_note
+    release_note.quantity_accepted + release_note.quantity_rejected
+  end
+
+  def customer_po_number_from_works_order
+    works_order&.customer_order&.number
+  end
+
   def customer_name
     customer&.name
   end

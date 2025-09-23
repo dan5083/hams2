@@ -144,11 +144,11 @@
                       Customer NCR: <%= ncr.customer_ncr_number %>
                     </div>
                   <% end %>
-                  <% if ncr.batch_quantity.present? || ncr.reject_quantity.present? %>
-                    <div class="text-xs text-gray-500 mt-1">
-                      <% if ncr.batch_quantity.present? %>Batch: <%= ncr.batch_quantity %><% end %>
-                      <% if ncr.reject_quantity.present% %>
-                        <% if ncr.batch_quantity.present? %> • <% end %>Reject: <%= ncr.reject_quantity %>
+                  <% if ncr.reject_quantity.present? %>
+                    <div class="text-xs text-gray-500">
+                      Reject Qty: <%= ncr.reject_quantity %>
+                      <% if ncr.batch_quantity_from_release_note %>
+                        of <%= ncr.batch_quantity_from_release_note %>
                       <% end %>
                     </div>
                   <% end %>

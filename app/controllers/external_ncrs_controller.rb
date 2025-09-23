@@ -196,8 +196,8 @@ class ExternalNcrsController < ApplicationController
   def external_ncr_params
     params.require(:external_ncr).permit(
       :release_note_id, :date,
-      :advice_number, :concession_number, :customer_po_number, :customer_ncr_number,
-      :batch_quantity, :reject_quantity,
+      :concession_number, :customer_ncr_number, :estimated_cost,
+      :reject_quantity,
       :description_of_non_conformance, :investigation_root_cause_analysis,
       :root_cause_identified, :containment_corrective_action, :preventive_action
     )

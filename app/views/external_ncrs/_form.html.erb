@@ -161,24 +161,12 @@
     <!-- Reference Numbers -->
     <div class="bg-white shadow sm:rounded-lg">
       <div class="px-4 py-5 sm:p-6">
-        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Reference Numbers</h3>
+        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Reference Numbers & Costs</h3>
 
         <div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
           <div>
-            <%= f.label :advice_number, "Advice No.", class: "block text-sm font-medium text-gray-700" %>
-            <%= f.text_field :advice_number,
-                class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
-          </div>
-
-          <div>
-            <%= f.label :concession_number, "Concession No.", class: "block text-sm font-medium text-gray-700" %>
+            <%= f.label :concession_number, "Concession No. (Optional)", class: "block text-sm font-medium text-gray-700" %>
             <%= f.text_field :concession_number,
-                class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
-          </div>
-
-          <div>
-            <%= f.label :customer_po_number, "Customer P/O No.", class: "block text-sm font-medium text-gray-700" %>
-            <%= f.text_field :customer_po_number,
                 class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
           </div>
 
@@ -186,6 +174,17 @@
             <%= f.label :customer_ncr_number, "Customer NCR No.", class: "block text-sm font-medium text-gray-700" %>
             <%= f.text_field :customer_ncr_number,
                 class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
+          </div>
+
+          <div class="sm:col-span-2">
+            <%= f.label :estimated_cost, "Estimated Cost (£)", class: "block text-sm font-medium text-gray-700" %>
+            <%= f.number_field :estimated_cost,
+                min: 0, step: 0.01,
+                placeholder: "e.g. 150.00",
+                class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
+            <p class="mt-1 text-xs text-gray-500">
+              Estimated cost to resolve this non-conformance (optional)
+            </p>
           </div>
         </div>
       </div>
@@ -197,18 +196,50 @@
         <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Quantities</h3>
 
         <div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+          <!-- Auto-populated batch quantity (read-only) -->
           <div>
-            <%= f.label :batch_quantity, "Batch Qty.", class: "block text-sm font-medium text-gray-700" %>
-            <%= f.number_field :batch_quantity,
-                min: 0,
-                class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
+            <label class="block text-sm font-medium text-gray-700">Batch Qty. (from Release Note)</label>
+            <div class="mt-1 p-3 bg-gray-50 rounded-md">
+              <p class="text-sm text-gray-900">
+                <% if @external_ncr.release_note&.present? %>
+                  <%= @external_ncr.batch_quantity_from_release_note %>
+                  <span class="text-xs text-gray-500">
+                    (Accepted: <%= @external_ncr.release_note.quantity_accepted %>,
+                     Rejected: <%= @external_ncr.release_note.quantity_rejected %>)
+                  </span>
+                <% else %>
+                  <span class="text-gray-400">Select release note to see batch quantity</span>
+                <% end %>
+              </p>
+            </div>
           </div>
 
+          <!-- Auto-populated customer PO (read-only) -->
           <div>
-            <%= f.label :reject_quantity, "Reject Qty.", class: "block text-sm font-medium text-gray-700" %>
+            <label class="block text-sm font-medium text-gray-700">Customer P/O No. (from Works Order)</label>
+            <div class="mt-1 p-3 bg-gray-50 rounded-md">
+              <p class="text-sm text-gray-900">
+                <% if @external_ncr.release_note&.present? %>
+                  <%= @external_ncr.customer_po_number_from_works_order || "Not specified" %>
+                <% else %>
+                  <span class="text-gray-400">Select release note to see customer P/O</span>
+                <% end %>
+              </p>
+            </div>
+          </div>
+
+          <div class="sm:col-span-2">
+            <%= f.label :reject_quantity, "NCR Reject Qty.", class: "block text-sm font-medium text-gray-700" %>
             <%= f.number_field :reject_quantity,
                 min: 0,
+                max: @external_ncr.release_note&.present? ? @external_ncr.batch_quantity_from_release_note : nil,
                 class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
+            <p class="mt-1 text-xs text-gray-500">
+              Quantity being rejected in this NCR
+              <% if @external_ncr.release_note&.present? %>
+                (max: <%= @external_ncr.batch_quantity_from_release_note %>)
+              <% end %>
+            </p>
           </div>
         </div>
       </div>
