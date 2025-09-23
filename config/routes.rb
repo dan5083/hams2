@@ -60,17 +60,18 @@ Rails.application.routes.draw do
   # 3. Works Orders routes (main CRUD) - Updated to reference parts directly
   resources :works_orders do
     member do
-      get :route_card       # Shop floor manufacturing instructions (HTML + PDF)
+      get :route_card
       patch :void
-      patch :create_invoice # Create invoice from works order
+      patch :create_invoice
       patch :create_invoice_with_charges
     end
 
-  # 5. Release Notes nested under works orders
-  resources :release_notes, except: [:index] do
-    member do
-      patch :void
-      get :pdf            # Customer delivery/collection documentation
+    # 5. Release Notes nested under works orders
+    resources :release_notes, except: [:index] do
+      member do
+        patch :void
+        get :pdf
+      end
     end
   end
 
