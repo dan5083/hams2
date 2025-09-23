@@ -5,7 +5,7 @@ class DropboxNcrService
   def self.client
     token = ENV['DROPBOX_ACCESS_TOKEN']
     raise "DROPBOX_ACCESS_TOKEN environment variable not set" if token.blank?
-    @client ||= DropboxApi::Client.new(access_token: token)
+    @client ||= DropboxApi::Client.new(token)
   end
 
   def self.upload_document(external_ncr, file_attachment)

@@ -49,8 +49,6 @@ class ExternalNcr < ApplicationRecord
   validates :reject_quantity, numericality: { greater_than: 0 }, allow_blank: true
   validates :estimated_cost, numericality: { greater_than_or_equal_to: 0 }, allow_blank: true
 
-  private
-
   # Validate temp document for new records
   validates :temp_document, presence: true, on: :create, unless: :has_document?
 
