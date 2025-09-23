@@ -1,6 +1,6 @@
 # app/controllers/external_ncrs_controller.rb
 class ExternalNcrsController < ApplicationController
-  before_action :set_external_ncr, only: [:show, :edit, :update, :destroy, :advance_status]
+  before_action :set_external_ncr, only: [:show, :edit, :update, :destroy, :advance_status, :download_document]
   before_action :set_release_note, only: [:new, :create], if: -> { params[:release_note_id].present? }
 
   def index
@@ -36,7 +36,8 @@ class ExternalNcrsController < ApplicationController
   end
 
   def new
-    if @release_note
+    if params[:release_note_id].present?
+      @release_note = ReleaseNote.find(params[:release_note_id])
       @external_ncr = @release_note.external_ncrs.build
     else
       @external_ncr = ExternalNcr.new
@@ -82,12 +83,25 @@ class ExternalNcrsController < ApplicationController
   def update
     # Handle document replacement for draft NCRs
     if params[:external_ncr][:temp_document].present? && @external_ncr.can_replace_document?
-      if @external_ncr.replace_document!(params[:external_ncr][:temp_document])
-        redirect_to @external_ncr, notice: "Document replaced successfully."
-        return
-      else
-        flash.now[:alert] = 'Failed to replace document.'
+      # Delete old document from Dropbox if it exists
+      if @external_ncr.has_document?
+        begin
+          DropboxNcrService.delete_document(@external_ncr.dropbox_file_path)
+        rescue => e
+          Rails.logger.error "Failed to delete old Dropbox document for NCR #{@external_ncr.hal_ncr_number}: #{e.message}"
+          # Continue with update even if Dropbox deletion fails
+        end
       end
+
+      # Clear existing document data
+      @external_ncr.dropbox_file_path = nil
+      @external_ncr.original_filename = nil
+      @external_ncr.file_size_bytes = nil
+      @external_ncr.content_type = nil
+      @external_ncr.document_uploaded_at = nil
+
+      # Attach new temporary file
+      @external_ncr.temp_document = params[:external_ncr][:temp_document]
     end
 
     # Regular update
