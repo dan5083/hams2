@@ -115,7 +115,7 @@ class ExternalNcr < ApplicationRecord
 
   # Document management methods
   def has_document?
-    dropbox_file_path.present?
+    dropbox_file_path.present? || temp_document.attached?
   end
 
   def document_filename
