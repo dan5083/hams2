@@ -133,7 +133,7 @@
               <!-- Release note dropdown -->
               <%= f.collection_select :release_note_id, @release_notes, :id, :display_name,
                   { prompt: "Select a release note..." },
-                  { class: "mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md" } %>
+                  { id: "external_ncr_release_note_id", class: "mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md" } %>
             <% end %>
           </div>
 
@@ -200,7 +200,7 @@
           <div>
             <label class="block text-sm font-medium text-gray-700">Batch Qty. (from Release Note)</label>
             <div class="mt-1 p-3 bg-gray-50 rounded-md">
-              <p class="text-sm text-gray-900">
+              <p class="text-sm text-gray-900 batch-qty-display">
                 <% if @external_ncr.release_note&.present? %>
                   <%= @external_ncr.batch_quantity_from_release_note %>
                   <span class="text-xs text-gray-500">
@@ -218,7 +218,7 @@
           <div>
             <label class="block text-sm font-medium text-gray-700">Customer P/O No. (from Works Order)</label>
             <div class="mt-1 p-3 bg-gray-50 rounded-md">
-              <p class="text-sm text-gray-900">
+              <p class="text-sm text-gray-900 customer-po-display">
                 <% if @external_ncr.release_note&.present? %>
                   <%= @external_ncr.customer_po_number_from_works_order || "Not specified" %>
                 <% else %>
@@ -412,7 +412,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const poDisplay = document.querySelector('.customer-po-display');
         if (poDisplay) {
           poDisplay.textContent = 'Select release note to see customer P/O';
-          poDisplay.className = 'text-gray-400';
+          poDisplay.className = 'text-sm text-gray-900 customer-po-display text-gray-400';
         }
       }
     });
