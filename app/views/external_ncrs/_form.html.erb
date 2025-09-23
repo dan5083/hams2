@@ -313,106 +313,129 @@
 </div>
 
 <script>
+// Use window load event instead of DOMContentLoaded to ensure everything is fully loaded
+window.addEventListener('load', function() {
+  initializeNcrForm();
+});
+
+// Also try with DOMContentLoaded as a fallback
 document.addEventListener('DOMContentLoaded', function() {
-  // Add a delay to ensure all form elements are fully rendered
-  setTimeout(function() {
-    const fileInput = document.querySelector('input[type="file"]');
+  // Use a longer delay and check multiple times
+  let attempts = 0;
+  const maxAttempts = 10;
+
+  function tryInitialize() {
+    attempts++;
     const releaseNoteSelect = document.getElementById('external_ncr_release_note_id');
 
-    // File validation
-    if (fileInput) {
-      fileInput.addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (file) {
-          // Validate file size (10MB limit)
-          if (file.size > 10 * 1024 * 1024) {
-            alert('File size must be less than 10MB');
-            e.target.value = '';
-            return;
-          }
-
-          // Validate file type
-          const allowedTypes = [
-            'application/pdf',
-            'image/jpeg',
-            'image/jpg',
-            'image/png',
-            'image/tiff',
-            'image/tif',
-            'application/msword',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-          ];
-
-          if (!allowedTypes.includes(file.type)) {
-            alert('Please upload a valid file type: PDF, JPG, PNG, TIFF, DOC, or DOCX');
-            e.target.value = '';
-            return;
-          }
-        }
-      });
+    if (releaseNoteSelect || attempts >= maxAttempts) {
+      initializeNcrForm();
+    } else {
+      setTimeout(tryInitialize, 200);
     }
+  }
 
-    // Release note change handler
-    if (releaseNoteSelect) {
-      releaseNoteSelect.addEventListener('change', function() {
-        const releaseNoteId = this.value;
+  tryInitialize();
+});
 
-        if (releaseNoteId) {
-          // Fetch release note details
-          fetch(`/external_ncrs/release_note_details?release_note_id=${releaseNoteId}`, {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json',
-              'X-Requested-With': 'XMLHttpRequest'
-            }
-          })
-          .then(response => response.json())
-          .then(data => {
-            // Update batch quantity display
-            const batchQtyDisplay = document.querySelector('.batch-qty-display');
-            if (batchQtyDisplay && data.batch_quantity !== undefined) {
-              batchQtyDisplay.innerHTML = `
-                ${data.batch_quantity}
-                <span class="text-xs text-gray-500">
-                  (Accepted: ${data.quantity_accepted}, Rejected: ${data.quantity_rejected})
-                </span>
-              `;
-            }
+function initializeNcrForm() {
+  const fileInput = document.querySelector('input[type="file"]');
+  const releaseNoteSelect = document.getElementById('external_ncr_release_note_id');
 
-            // Update customer PO display
-            const poDisplay = document.querySelector('.customer-po-display');
-            if (poDisplay) {
-              poDisplay.textContent = data.customer_po_number || 'Not specified';
-              poDisplay.className = 'text-sm text-gray-900 customer-po-display';
-            }
+  // File validation
+  if (fileInput && !fileInput.dataset.initialized) {
+    fileInput.dataset.initialized = 'true';
+    fileInput.addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        // Validate file size (10MB limit)
+        if (file.size > 10 * 1024 * 1024) {
+          alert('File size must be less than 10MB');
+          e.target.value = '';
+          return;
+        }
 
-            // Update reject quantity help text (removed max value since we removed bounds validation)
-            const rejectQtyInput = document.querySelector('input[name="external_ncr[reject_quantity]"]');
-            if (rejectQtyInput) {
-              const helpText = rejectQtyInput.parentElement.querySelector('.text-xs');
-              if (helpText) {
-                helpText.innerHTML = 'Quantity being rejected in this NCR';
-              }
-            }
-          })
-          .catch(error => {
-            console.error('Error fetching release note details:', error);
-          });
-        } else {
-          // Clear displays when no release note selected
+        // Validate file type
+        const allowedTypes = [
+          'application/pdf',
+          'image/jpeg',
+          'image/jpg',
+          'image/png',
+          'image/tiff',
+          'image/tif',
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        ];
+
+        if (!allowedTypes.includes(file.type)) {
+          alert('Please upload a valid file type: PDF, JPG, PNG, TIFF, DOC, or DOCX');
+          e.target.value = '';
+          return;
+        }
+      }
+    });
+  }
+
+  // Release note change handler
+  if (releaseNoteSelect && !releaseNoteSelect.dataset.initialized) {
+    releaseNoteSelect.dataset.initialized = 'true';
+    console.log('Initializing release note select handler'); // Debug log
+
+    releaseNoteSelect.addEventListener('change', function() {
+      console.log('Release note changed:', this.value); // Debug log
+      const releaseNoteId = this.value;
+
+      if (releaseNoteId) {
+        console.log('Fetching details for release note:', releaseNoteId); // Debug log
+        // Fetch release note details
+        fetch(`/external_ncrs/release_note_details?release_note_id=${releaseNoteId}`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        })
+        .then(response => {
+          console.log('Response status:', response.status); // Debug log
+          return response.json();
+        })
+        .then(data => {
+          console.log('Received data:', data); // Debug log
+          // Update batch quantity display
           const batchQtyDisplay = document.querySelector('.batch-qty-display');
-          if (batchQtyDisplay) {
-            batchQtyDisplay.innerHTML = '<span class="text-gray-400">Select release note to see batch quantity</span>';
+          if (batchQtyDisplay && data.batch_quantity !== undefined) {
+            batchQtyDisplay.innerHTML = `
+              ${data.batch_quantity}
+              <span class="text-xs text-gray-500">
+                (Accepted: ${data.quantity_accepted}, Rejected: ${data.quantity_rejected})
+              </span>
+            `;
           }
 
+          // Update customer PO display
           const poDisplay = document.querySelector('.customer-po-display');
           if (poDisplay) {
-            poDisplay.innerHTML = '<span class="text-gray-400">Select release note to see customer P/O</span>';
+            poDisplay.textContent = data.customer_po_number || 'Not specified';
             poDisplay.className = 'text-sm text-gray-900 customer-po-display';
           }
+        })
+        .catch(error => {
+          console.error('Error fetching release note details:', error);
+        });
+      } else {
+        // Clear displays when no release note selected
+        const batchQtyDisplay = document.querySelector('.batch-qty-display');
+        if (batchQtyDisplay) {
+          batchQtyDisplay.innerHTML = '<span class="text-gray-400">Select release note to see batch quantity</span>';
         }
-      });
-    }
-  }, 100); // 100ms delay to ensure DOM is fully ready
-});
+
+        const poDisplay = document.querySelector('.customer-po-display');
+        if (poDisplay) {
+          poDisplay.innerHTML = '<span class="text-gray-400">Select release note to see customer P/O</span>';
+          poDisplay.className = 'text-sm text-gray-900 customer-po-display';
+        }
+      }
+    });
+  }
+}
 </script>
