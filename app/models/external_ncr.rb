@@ -63,7 +63,10 @@ class ExternalNcr < ApplicationRecord
   # Callbacks
   before_validation :set_ncr_number, if: :new_record?
   before_validation :set_defaults, if: :new_record?
-  after_create :upload_document_to_dropbox, if: -> { temp_document.attached? }
+
+  # Changed from after_create to before_create to ensure file is available
+  before_create :upload_document_to_dropbox, if: -> { temp_document.attached? }
+  after_create :cleanup_temp_document, if: -> { temp_document.attached? }
   after_create :log_creation
   after_update :log_status_change, if: :saved_change_to_status?
 
@@ -234,8 +237,13 @@ class ExternalNcr < ApplicationRecord
     raise "Cannot replace document for non-draft NCR" unless can_replace_document?
 
     # Delete old document from Dropbox if it exists
-    if has_document?
-      DropboxNcrService.delete_document(dropbox_file_path)
+    if dropbox_file_path.present?
+      begin
+        DropboxNcrService.delete_document(dropbox_file_path)
+      rescue => e
+        Rails.logger.error "Failed to delete old Dropbox document: #{e.message}"
+        # Continue with replacement even if deletion fails
+      end
     end
 
     # Clear existing document data
@@ -248,8 +256,10 @@ class ExternalNcr < ApplicationRecord
     # Attach new temporary file
     self.temp_document = new_file
 
-    if save
-      upload_document_to_dropbox
+    # Upload new document and save
+    if upload_document_to_dropbox_sync
+      save!
+      cleanup_temp_document
       true
     else
       false
@@ -273,40 +283,84 @@ class ExternalNcr < ApplicationRecord
   end
 
   def upload_document_to_dropbox
-    return unless temp_document.attached?
+    return true unless temp_document.attached?
 
-    Rails.logger.info "Uploading document to Dropbox for NCR #{hal_ncr_number}"
+    Rails.logger.info "Uploading document to Dropbox for NCR #{hal_ncr_number || 'new'}"
 
     begin
-      # Extract file information
-      attachment = temp_document.attachment
-      blob = attachment.blob
+      # Get the uploaded file directly from the attachment
+      blob = temp_document.attachment.blob
 
-      # Store file metadata
+      # Store file metadata first
       self.original_filename = blob.filename.to_s
       self.file_size_bytes = blob.byte_size
       self.content_type = blob.content_type
 
+      # Create a wrapper that the service can work with
+      file_wrapper = OpenStruct.new(
+        blob: blob,
+        filename: blob.filename
+      )
+
       # Upload to Dropbox
-      file_path = DropboxNcrService.upload_document(self, temp_document)
+      file_path = DropboxNcrService.upload_document(self, file_wrapper)
 
       if file_path
         self.dropbox_file_path = file_path
         self.document_uploaded_at = Time.current.iso8601
-        save!
-
-        # Clean up temporary file
-        temp_document.purge
-
-        Rails.logger.info "Successfully uploaded NCR #{hal_ncr_number} document to Dropbox: #{file_path}"
+        Rails.logger.info "Successfully prepared NCR document for Dropbox: #{file_path}"
+        true
       else
-        Rails.logger.error "Failed to upload NCR #{hal_ncr_number} document to Dropbox"
+        Rails.logger.error "Failed to upload NCR document to Dropbox"
+        errors.add(:temp_document, "could not be uploaded to Dropbox")
+        throw(:abort)
       end
 
     rescue => e
-      Rails.logger.error "Error uploading NCR #{hal_ncr_number} document: #{e.message}"
-      # Don't fail the NCR creation, but log the error
+      Rails.logger.error "Error uploading NCR document: #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+      errors.add(:temp_document, "upload failed: #{e.message}")
+      throw(:abort)
     end
+  end
+
+  # Synchronous version for document replacement
+  def upload_document_to_dropbox_sync
+    return true unless temp_document.attached?
+
+    begin
+      blob = temp_document.attachment.blob
+
+      self.original_filename = blob.filename.to_s
+      self.file_size_bytes = blob.byte_size
+      self.content_type = blob.content_type
+
+      file_wrapper = OpenStruct.new(
+        blob: blob,
+        filename: blob.filename
+      )
+
+      file_path = DropboxNcrService.upload_document(self, file_wrapper)
+
+      if file_path
+        self.dropbox_file_path = file_path
+        self.document_uploaded_at = Time.current.iso8601
+        true
+      else
+        false
+      end
+
+    rescue => e
+      Rails.logger.error "Error uploading replacement document: #{e.message}"
+      false
+    end
+  end
+
+  def cleanup_temp_document
+    return unless temp_document.attached?
+
+    Rails.logger.info "Cleaning up temporary document for NCR #{hal_ncr_number}"
+    temp_document.purge_later
   end
 
   def log_creation

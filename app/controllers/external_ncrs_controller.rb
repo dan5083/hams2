@@ -59,7 +59,7 @@ class ExternalNcrsController < ApplicationController
     @external_ncr.created_by = Current.user
     @external_ncr.respondent = Current.user
 
-    # Handle file upload
+    # Handle file upload - the model now handles this in before_create callback
     if params[:external_ncr][:temp_document].present?
       @external_ncr.temp_document = params[:external_ncr][:temp_document]
     end
@@ -83,28 +83,22 @@ class ExternalNcrsController < ApplicationController
   def update
     # Handle document replacement for draft NCRs
     if params[:external_ncr][:temp_document].present? && @external_ncr.can_replace_document?
-      # Delete old document from Dropbox if it exists
-      if @external_ncr.has_document?
-        begin
-          DropboxNcrService.delete_document(@external_ncr.dropbox_file_path)
-        rescue => e
-          Rails.logger.error "Failed to delete old Dropbox document for NCR #{@external_ncr.hal_ncr_number}: #{e.message}"
-          # Continue with update even if Dropbox deletion fails
-        end
+      # Use the model's replace_document! method instead of manual handling
+      new_file = params[:external_ncr][:temp_document]
+
+      # Remove temp_document from params to avoid validation issues
+      update_params = external_ncr_params
+
+      if @external_ncr.update(update_params) && @external_ncr.replace_document!(new_file)
+        redirect_to @external_ncr, notice: "External NCR #{@external_ncr.display_name} was successfully updated with new document."
+        return
+      else
+        render :edit, status: :unprocessable_entity
+        return
       end
-
-      # Clear existing document data
-      @external_ncr.dropbox_file_path = nil
-      @external_ncr.original_filename = nil
-      @external_ncr.file_size_bytes = nil
-      @external_ncr.content_type = nil
-      @external_ncr.document_uploaded_at = nil
-
-      # Attach new temporary file
-      @external_ncr.temp_document = params[:external_ncr][:temp_document]
     end
 
-    # Regular update
+    # Regular update without document replacement
     if @external_ncr.update(external_ncr_params)
       redirect_to @external_ncr, notice: "External NCR #{@external_ncr.display_name} was successfully updated."
     else
@@ -115,7 +109,7 @@ class ExternalNcrsController < ApplicationController
   def destroy
     if @external_ncr.status == 'draft'
       # Delete document from Dropbox if it exists
-      if @external_ncr.has_document?
+      if @external_ncr.dropbox_file_path.present?
         begin
           DropboxNcrService.delete_document(@external_ncr.dropbox_file_path)
         rescue => e
@@ -218,6 +212,7 @@ class ExternalNcrsController < ApplicationController
       :reject_quantity,
       :description_of_non_conformance, :investigation_root_cause_analysis,
       :root_cause_identified, :containment_corrective_action, :preventive_action
+      # Note: temp_document is handled separately in create/update actions
     )
   end
 
