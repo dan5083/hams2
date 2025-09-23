@@ -64,8 +64,9 @@ class ExternalNcr < ApplicationRecord
   before_validation :set_ncr_number, if: :new_record?
   before_validation :set_defaults, if: :new_record?
 
-  # Changed from after_create to before_create to ensure file is available
-  before_create :upload_document_to_dropbox, if: -> { temp_document.attached? }
+  # Store file data before create so it's available in after_create callback
+  before_create :store_temp_file_data, if: -> { temp_document.attached? }
+  after_create :upload_document_to_dropbox, if: -> { @temp_file_data.present? }
   after_create :cleanup_temp_document, if: -> { temp_document.attached? }
   after_create :log_creation
   after_update :log_status_change, if: :saved_change_to_status?
@@ -282,24 +283,54 @@ class ExternalNcr < ApplicationRecord
     self.respondent = created_by if created_by.present?
   end
 
-  def upload_document_to_dropbox
-    return true unless temp_document.attached?
+  def store_temp_file_data
+    return unless temp_document.attached?
 
-    Rails.logger.info "Uploading document to Dropbox for NCR #{hal_ncr_number || 'new'}"
+    Rails.logger.info "Storing temporary file data for NCR upload"
+
+    # Get the attachment changes to access the uploaded file
+    attachment_changes = temp_document.attachment_changes
+    if attachment_changes.present? && attachment_changes['temp_document']
+      uploaded_file = attachment_changes['temp_document'].attachable
+
+      # Read and store the file content in memory
+      @temp_file_data = {
+        content: uploaded_file.tempfile.read,
+        filename: uploaded_file.original_filename,
+        size: uploaded_file.size,
+        content_type: uploaded_file.content_type
+      }
+
+      # Reset file position in case something else needs to read it
+      uploaded_file.tempfile.rewind
+
+      Rails.logger.info "Stored #{@temp_file_data[:size]} bytes for upload"
+    end
+  rescue => e
+    Rails.logger.error "Error storing temp file data: #{e.message}"
+    @temp_file_data = nil
+  end
+
+  def upload_document_to_dropbox
+    return true unless @temp_file_data.present?
+
+    Rails.logger.info "Uploading document to Dropbox for NCR #{hal_ncr_number}"
 
     begin
-      # Get the uploaded file directly from the attachment
-      blob = temp_document.attachment.blob
-
-      # Store file metadata first
-      self.original_filename = blob.filename.to_s
-      self.file_size_bytes = blob.byte_size
-      self.content_type = blob.content_type
+      # Store file metadata
+      self.original_filename = @temp_file_data[:filename]
+      self.file_size_bytes = @temp_file_data[:size]
+      self.content_type = @temp_file_data[:content_type]
 
       # Create a wrapper that the service can work with
       file_wrapper = OpenStruct.new(
-        blob: blob,
-        filename: blob.filename
+        blob: OpenStruct.new(
+          filename: @temp_file_data[:filename],
+          byte_size: @temp_file_data[:size],
+          content_type: @temp_file_data[:content_type],
+          download: -> { @temp_file_data[:content] }
+        ),
+        filename: @temp_file_data[:filename]
       )
 
       # Upload to Dropbox
@@ -308,19 +339,22 @@ class ExternalNcr < ApplicationRecord
       if file_path
         self.dropbox_file_path = file_path
         self.document_uploaded_at = Time.current.iso8601
-        Rails.logger.info "Successfully prepared NCR document for Dropbox: #{file_path}"
+        save! # Save the updated metadata
+
+        Rails.logger.info "Successfully uploaded NCR #{hal_ncr_number} document to Dropbox: #{file_path}"
         true
       else
-        Rails.logger.error "Failed to upload NCR document to Dropbox"
-        errors.add(:temp_document, "could not be uploaded to Dropbox")
-        throw(:abort)
+        Rails.logger.error "Failed to upload NCR #{hal_ncr_number} document to Dropbox"
+        false
       end
 
     rescue => e
-      Rails.logger.error "Error uploading NCR document: #{e.message}"
+      Rails.logger.error "Error uploading NCR #{hal_ncr_number} document: #{e.message}"
       Rails.logger.error e.backtrace.join("\n")
-      errors.add(:temp_document, "upload failed: #{e.message}")
-      throw(:abort)
+      false
+    ensure
+      # Clear the stored file data to free memory
+      @temp_file_data = nil
     end
   end
 
