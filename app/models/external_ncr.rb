@@ -49,17 +49,7 @@ class ExternalNcr < ApplicationRecord
   validates :reject_quantity, numericality: { greater_than: 0 }, allow_blank: true
   validates :estimated_cost, numericality: { greater_than_or_equal_to: 0 }, allow_blank: true
 
-  # Custom validation: reject quantity shouldn't exceed total release note quantity
-  validate :reject_quantity_within_bounds, if: -> { reject_quantity.present? && release_note.present? }
-
   private
-
-  def reject_quantity_within_bounds
-    total_quantity = release_note.quantity_accepted + release_note.quantity_rejected
-    if reject_quantity > total_quantity
-      errors.add(:reject_quantity, "cannot exceed total release note quantity (#{total_quantity})")
-    end
-  end
 
   # Validate temp document for new records
   validates :temp_document, presence: true, on: :create, unless: :has_document?
