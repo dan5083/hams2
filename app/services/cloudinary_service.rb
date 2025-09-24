@@ -68,7 +68,7 @@ def self.upload_file(uploaded_file, folder_path, filename_prefix: nil, resource_
   end
 end
 
- def self.generate_download_url(public_id, options = {})
+def self.generate_download_url(public_id, options = {})
   raise ArgumentError, "Public ID is required" if public_id.blank?
 
   begin
@@ -79,39 +79,28 @@ end
                       'image'
                     end
 
-    # For raw files, try to get the direct URL first without transformations
+    # Build the URL manually for maximum reliability
+    cloud_name = Cloudinary.config.cloud_name
+
     if resource_type == 'raw'
-      # Get the basic secure URL for raw files
-      url = Cloudinary::Utils.cloudinary_url(
-        public_id,
-        {
-          resource_type: 'raw',
-          secure: true,
-          type: 'upload'
-        }
-      )
-
-      # Try adding attachment as a query parameter instead of a flag
-      url += "?fl_attachment"
-
-      Rails.logger.info "Generated Cloudinary download URL for #{public_id}: #{url}"
-      url
+      # For raw files, use the simple secure URL without any transformations
+      # This should work reliably for PDFs and documents
+      url = "https://res.cloudinary.com/#{cloud_name}/raw/upload/#{public_id}"
     else
-      # For images, use the signed URL approach
+      # For images, we can use transformations
       url = Cloudinary::Utils.cloudinary_url(
         public_id,
         {
           resource_type: 'image',
           secure: true,
-          sign_url: true,
           flags: 'attachment',
           type: 'upload'
         }.merge(options)
       )
-
-      Rails.logger.info "Generated Cloudinary download URL for #{public_id}: #{url}"
-      url
     end
+
+    Rails.logger.info "Generated Cloudinary download URL for #{public_id}: #{url}"
+    url
 
   rescue => e
     Rails.logger.error "Error generating Cloudinary download URL for #{public_id}: #{e.message}"
