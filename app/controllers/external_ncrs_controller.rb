@@ -212,31 +212,45 @@ def download_document
   if @external_ncr.has_document?
     begin
       Rails.logger.info "Starting download for NCR #{@external_ncr.hal_ncr_number}"
-      Rails.logger.info "Public ID: #{@external_ncr.cloudinary_public_id}"
 
-      # Generate a signed URL that allows access
+      # Use Cloudinary API to get the file content directly
       resource_type = @external_ncr.cloudinary_public_id.match?(/\.(pdf|doc|docx)$/i) ? 'raw' : 'image'
-      Rails.logger.info "Using resource type: #{resource_type}"
 
-      # Use Cloudinary's signed URL for secure access
-      signed_url = Cloudinary::Utils.cloudinary_url(
-        @external_ncr.cloudinary_public_id,
-        {
-          resource_type: resource_type,
-          secure: true,
-          sign_url: true,
-          flags: 'attachment'
-        }
+      # Download file content using Cloudinary API
+      file_content = Cloudinary::Api.resource(@external_ncr.cloudinary_public_id,
+        resource_type: resource_type,
+        max_results: 1
       )
 
-      Rails.logger.info "Generated signed URL"
+      # Get the secure URL from the API response
+      download_url = file_content['secure_url']
 
-      # Redirect to the signed URL instead of proxying
-      redirect_to signed_url, allow_other_host: true
+      # Use Net::HTTP with proper authentication headers
+      require 'net/http'
+      require 'uri'
+
+      uri = URI(download_url)
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = true
+
+      request = Net::HTTP::Get.new(uri)
+      # Add authentication if needed
+      request.basic_auth(Cloudinary.config.api_key, Cloudinary.config.api_secret) if download_url.include?('cloudinary.com')
+
+      response = http.request(request)
+
+      if response.code == '200'
+        send_data response.body,
+                  filename: @external_ncr.document_filename,
+                  type: @external_ncr.content_type || 'application/pdf',
+                  disposition: 'attachment'
+      else
+        Rails.logger.error "Download failed with code: #{response.code}"
+        redirect_to @external_ncr, alert: 'Unable to download document. Please try again.'
+      end
 
     rescue => e
       Rails.logger.error "Download error: #{e.class} - #{e.message}"
-      Rails.logger.error e.backtrace.join("\n")
       redirect_to @external_ncr, alert: "Download failed: #{e.message}"
     end
   else
