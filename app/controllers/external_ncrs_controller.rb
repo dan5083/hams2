@@ -32,7 +32,7 @@ class ExternalNcrsController < ApplicationController
   end
 
   def show
-    @download_url = @external_ncr.generate_dropbox_download_url if @external_ncr.has_document?
+    @download_url = @external_ncr.generate_cloudinary_download_url if @external_ncr.has_document?
   end
 
   def new
@@ -64,18 +64,18 @@ class ExternalNcrsController < ApplicationController
 
     if uploaded_file.present?
       begin
-        # Upload to Dropbox
-        folder_path = "/NCRs/#{@external_ncr.date.year}/#{@external_ncr.date.strftime('%m')}"
+        # Upload to Cloudinary
+        folder_path = "NCRs/#{@external_ncr.date.year}/#{@external_ncr.date.strftime('%m')}"
         filename_prefix = "NCR#{@external_ncr.hal_ncr_number || 'TEMP'}"
 
-        upload_result = DropboxService.upload_file(uploaded_file, folder_path, filename_prefix: filename_prefix)
+        upload_result = CloudinaryService.upload_file(uploaded_file, folder_path, filename_prefix: filename_prefix)
 
         # Store document metadata
         @external_ncr.store_document_metadata(upload_result)
 
-        Rails.logger.info "Successfully uploaded document for NCR: #{upload_result[:path]}"
+        Rails.logger.info "Successfully uploaded document for NCR: #{upload_result[:public_id]}"
 
-      rescue DropboxService::DropboxError => e
+      rescue CloudinaryService::CloudinaryError => e
         Rails.logger.error "Failed to upload document: #{e.message}"
         @external_ncr.errors.add(:temp_document, "could not be uploaded: #{e.message}")
         prepare_form_data
@@ -94,9 +94,9 @@ class ExternalNcrsController < ApplicationController
       redirect_to @external_ncr, notice: "External NCR #{@external_ncr.display_name} was successfully created."
     else
       # If save failed and we uploaded a file, clean up
-      if @external_ncr.dropbox_file_path.present?
+      if @external_ncr.cloudinary_public_id.present?
         begin
-          DropboxService.delete_file(@external_ncr.dropbox_file_path)
+          CloudinaryService.delete_file(@external_ncr.cloudinary_public_id)
         rescue => e
           Rails.logger.error "Failed to cleanup uploaded file: #{e.message}"
         end
@@ -121,18 +121,18 @@ class ExternalNcrsController < ApplicationController
 
     if uploaded_file.present? && @external_ncr.can_replace_document?
       begin
-        # Upload new file to Dropbox
-        folder_path = "/NCRs/#{@external_ncr.date.year}/#{@external_ncr.date.strftime('%m')}"
+        # Upload new file to Cloudinary
+        folder_path = "NCRs/#{@external_ncr.date.year}/#{@external_ncr.date.strftime('%m')}"
         filename_prefix = "NCR#{@external_ncr.hal_ncr_number}"
 
-        upload_result = DropboxService.upload_file(uploaded_file, folder_path, filename_prefix: filename_prefix)
+        upload_result = CloudinaryService.upload_file(uploaded_file, folder_path, filename_prefix: filename_prefix)
 
         # Replace the document
         @external_ncr.replace_document!(upload_result)
 
         Rails.logger.info "Successfully replaced document for NCR #{@external_ncr.hal_ncr_number}"
 
-      rescue DropboxService::DropboxError => e
+      rescue CloudinaryService::CloudinaryError => e
         Rails.logger.error "Failed to replace document: #{e.message}"
         redirect_to edit_external_ncr_path(@external_ncr), alert: "Failed to replace document: #{e.message}"
         return
@@ -149,13 +149,13 @@ class ExternalNcrsController < ApplicationController
 
   def destroy
     if @external_ncr.status == 'draft'
-      # Delete document from Dropbox if it exists
-      if @external_ncr.dropbox_file_path.present?
+      # Delete document from Cloudinary if it exists
+      if @external_ncr.cloudinary_public_id.present?
         begin
-          DropboxService.delete_file(@external_ncr.dropbox_file_path)
+          CloudinaryService.delete_file(@external_ncr.cloudinary_public_id)
         rescue => e
-          Rails.logger.error "Failed to delete Dropbox document for NCR #{@external_ncr.hal_ncr_number}: #{e.message}"
-          # Continue with NCR deletion even if Dropbox deletion fails
+          Rails.logger.error "Failed to delete Cloudinary document for NCR #{@external_ncr.hal_ncr_number}: #{e.message}"
+          # Continue with NCR deletion even if Cloudinary deletion fails
         end
       end
 
@@ -211,7 +211,7 @@ class ExternalNcrsController < ApplicationController
   # Download document endpoint
   def download_document
     if @external_ncr.has_document?
-      download_url = @external_ncr.generate_dropbox_download_url
+      download_url = @external_ncr.generate_cloudinary_download_url
 
       if download_url
         redirect_to download_url

@@ -28,8 +28,9 @@ class ExternalNcr < ApplicationRecord
     :preventive_action,
     :completed_by_user_id,
 
-    # Dropbox document storage
-    :dropbox_file_path,
+    # Cloudinary document storage
+    :cloudinary_public_id,
+    :cloudinary_url,
     :original_filename,
     :file_size_bytes,
     :content_type,
@@ -51,8 +52,8 @@ class ExternalNcr < ApplicationRecord
   scope :by_status, ->(status) { where(status: status) }
   scope :for_customer, ->(customer) { joins(:customer).where(customer: customer) }
   scope :recent, -> { order(created_at: :desc) }
-  scope :with_documents, -> { where.not(ncr_data: { dropbox_file_path: [nil, ''] }) }
-  scope :missing_documents, -> { where(ncr_data: { dropbox_file_path: [nil, ''] }) }
+  scope :with_documents, -> { where.not(ncr_data: { cloudinary_public_id: [nil, ''] }) }
+  scope :missing_documents, -> { where(ncr_data: { cloudinary_public_id: [nil, ''] }) }
 
   # Callbacks
   before_validation :set_ncr_number, if: :new_record?
@@ -108,7 +109,7 @@ class ExternalNcr < ApplicationRecord
 
   # Document management methods
   def has_document?
-    dropbox_file_path.present?
+    cloudinary_public_id.present?
   end
 
   def document_filename
@@ -139,9 +140,9 @@ class ExternalNcr < ApplicationRecord
     return nil unless has_document?
 
     begin
-      DropboxService.generate_download_link(dropbox_file_path)
+      CloudinaryService.generate_download_url(cloudinary_public_id)
     rescue => e
-      Rails.logger.error "Failed to generate Dropbox download URL for NCR #{hal_ncr_number}: #{e.message}"
+      Rails.logger.error "Failed to generate Cloudinary download URL for NCR #{hal_ncr_number}: #{e.message}"
       nil
     end
   end
@@ -152,7 +153,8 @@ class ExternalNcr < ApplicationRecord
 
   # Store document metadata after successful upload
   def store_document_metadata(upload_result)
-    self.dropbox_file_path = upload_result[:path]
+    self.cloudinary_public_id = upload_result[:public_id]
+    self.cloudinary_url = upload_result[:secure_url]
     self.original_filename = upload_result[:filename]
     self.file_size_bytes = upload_result[:size]
     self.content_type = upload_result[:content_type]
@@ -235,12 +237,12 @@ class ExternalNcr < ApplicationRecord
   def replace_document!(new_upload_result)
     raise "Cannot replace document for non-draft NCR" unless can_replace_document?
 
-    # Delete old document from Dropbox if it exists
-    if dropbox_file_path.present?
+    # Delete old document from Cloudinary if it exists
+    if cloudinary_public_id.present?
       begin
-        DropboxService.delete_file(dropbox_file_path)
+        CloudinaryService.delete_file(cloudinary_public_id)
       rescue => e
-        Rails.logger.error "Failed to delete old Dropbox document: #{e.message}"
+        Rails.logger.error "Failed to delete old Cloudinary document: #{e.message}"
         # Continue with replacement even if deletion fails
       end
     end
