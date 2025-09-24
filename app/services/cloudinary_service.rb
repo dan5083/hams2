@@ -3,67 +3,71 @@ class CloudinaryService
   class CloudinaryError < StandardError; end
 
   # Generic file upload method
-  def self.upload_file(uploaded_file, folder_path, filename_prefix: nil, resource_type: 'auto')
-    raise ArgumentError, "Uploaded file is required" unless uploaded_file
-    raise ArgumentError, "Folder path is required" if folder_path.blank?
+ # Updated upload_file method for app/services/cloudinary_service.rb
+def self.upload_file(uploaded_file, folder_path, filename_prefix: nil, resource_type: 'auto')
+  raise ArgumentError, "Uploaded file is required" unless uploaded_file
+  raise ArgumentError, "Folder path is required" if folder_path.blank?
 
-    begin
-      # Generate unique public_id
-      original_name = if uploaded_file.respond_to?(:original_filename)
-                        uploaded_file.original_filename
-                      else
-                        uploaded_file.filename.to_s
-                      end
+  begin
+    # Generate unique public_id
+    original_name = if uploaded_file.respond_to?(:original_filename)
+                      uploaded_file.original_filename
+                    else
+                      uploaded_file.filename.to_s
+                    end
 
-      sanitized_name = sanitize_filename(File.basename(original_name, File.extname(original_name)))
-      timestamp = Time.current.strftime("%Y%m%d_%H%M%S")
+    # Get the file extension and preserve it
+    file_extension = File.extname(original_name)
+    sanitized_name = sanitize_filename(File.basename(original_name, file_extension))
+    timestamp = Time.current.strftime("%Y%m%d_%H%M%S")
 
-      public_id = if filename_prefix.present?
-                    "#{folder_path}/#{filename_prefix}_#{timestamp}_#{sanitized_name}"
-                  else
-                    "#{folder_path}/#{timestamp}_#{sanitized_name}"
-                  end
+    # Include file extension in public_id
+    public_id = if filename_prefix.present?
+                  "#{folder_path}/#{filename_prefix}_#{timestamp}_#{sanitized_name}#{file_extension}"
+                else
+                  "#{folder_path}/#{timestamp}_#{sanitized_name}#{file_extension}"
+                end
 
-      # Get file content
-      file_content = if uploaded_file.respond_to?(:tempfile)
-                       uploaded_file.tempfile
-                     elsif uploaded_file.respond_to?(:path)
-                       uploaded_file.path
-                     else
-                       uploaded_file
-                     end
+    # Get file content
+    file_content = if uploaded_file.respond_to?(:tempfile)
+                     uploaded_file.tempfile
+                   elsif uploaded_file.respond_to?(:path)
+                     uploaded_file.path
+                   else
+                     uploaded_file
+                   end
 
-      # Upload to Cloudinary
-      result = Cloudinary::Uploader.upload(
-        file_content,
-        public_id: public_id,
-        resource_type: resource_type,
-        overwrite: true,
-        unique_filename: false,
-        use_filename: false
-      )
+    # Upload to Cloudinary
+    result = Cloudinary::Uploader.upload(
+      file_content,
+      public_id: public_id,
+      resource_type: resource_type,
+      overwrite: true,
+      unique_filename: false,
+      use_filename: false
+    )
 
-      Rails.logger.info "Successfully uploaded file to Cloudinary: #{result['public_id']}"
+    Rails.logger.info "Successfully uploaded file to Cloudinary: #{result['public_id']}"
 
-      {
-        public_id: result['public_id'],
-        secure_url: result['secure_url'],
-        url: result['url'],
-        filename: original_name,
-        size: result['bytes'],
-        content_type: uploaded_file.content_type,
-        format: result['format'],
-        version: result['version']
-      }
+    {
+      public_id: result['public_id'],
+      secure_url: result['secure_url'],
+      url: result['url'],
+      filename: original_name,
+      size: result['bytes'],
+      content_type: uploaded_file.content_type,
+      format: result['format'],
+      version: result['version']
+    }
 
-    rescue Cloudinary::Api::Error => e
-      Rails.logger.error "Cloudinary API error uploading file: #{e.message}"
-      raise CloudinaryError, "Failed to upload to Cloudinary: #{e.message}"
-    rescue => e
-      Rails.logger.error "Unexpected error uploading file: #{e.message}"
-      raise CloudinaryError, "Upload failed: #{e.message}"
-    end
+  rescue Cloudinary::Api::Error => e
+    Rails.logger.error "Cloudinary API error uploading file: #{e.message}"
+    raise CloudinaryError, "Failed to upload to Cloudinary: #{e.message}"
+  rescue => e
+    Rails.logger.error "Unexpected error uploading file: #{e.message}"
+    raise CloudinaryError, "Upload failed: #{e.message}"
   end
+end
 
   # Generate download URL with optional transformations
   def self.generate_download_url(public_id, options = {})
