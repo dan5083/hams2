@@ -304,7 +304,9 @@ class ExternalNcr < ApplicationRecord
       # Reset file position in case something else needs to read it
       uploaded_file.tempfile.rewind
 
-      Rails.logger.info "Stored #{@temp_file_data[:size]} bytes for upload"
+      Rails.logger.info "Stored #{@temp_file_data[:size]} bytes for upload: #{@temp_file_data[:filename]}"
+    else
+      Rails.logger.warn "No attachment changes found for temp_document"
     end
   rescue => e
     Rails.logger.error "Error storing temp file data: #{e.message}"
@@ -394,7 +396,14 @@ class ExternalNcr < ApplicationRecord
     return unless temp_document.attached?
 
     Rails.logger.info "Cleaning up temporary document for NCR #{hal_ncr_number}"
-    temp_document.purge_later
+
+    # Since we stored the file content in memory and don't need the ActiveStorage attachment,
+    # we can just detach it without purging (since it was never persisted to storage anyway)
+    begin
+      temp_document.detach
+    rescue => e
+      Rails.logger.warn "Could not detach temp document (this is usually harmless): #{e.message}"
+    end
   end
 
   def log_creation
