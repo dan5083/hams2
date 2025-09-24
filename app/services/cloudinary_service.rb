@@ -93,37 +93,37 @@ def self.upload_file(uploaded_file, folder_path, filename_prefix: nil, resource_
   end
 end
 
-  # Replace the generate_download_url method in app/services/cloudinary_service.rb
-  def self.generate_download_url(public_id, options = {})
-    raise ArgumentError, "Public ID is required" if public_id.blank?
+ # Replace the generate_download_url method in app/services/cloudinary_service.rb
+def self.generate_download_url(public_id, options = {})
+  raise ArgumentError, "Public ID is required" if public_id.blank?
 
-    begin
-      # Determine resource type based on file extension
-      resource_type = if public_id.match?(/\.(pdf|doc|docx)$/i)
-                        'raw'
-                      else
-                        'image'
-                      end
+  begin
+    # Determine resource type based on file extension
+    resource_type = if public_id.match?(/\.(pdf|doc|docx)$/i)
+                      'raw'
+                    else
+                      'image'
+                    end
 
-      # Get the resource info to get the version
-      resource_info = Cloudinary::Api.resource(public_id, resource_type: resource_type)
-      version = resource_info['version']
+    # Get the resource info to get the direct secure URL
+    resource_info = Cloudinary::Api.resource(public_id, resource_type: resource_type)
 
-      # Generate URL with download flag, correct resource type, and version
-      Cloudinary::Utils.cloudinary_url(
-        public_id,
-        {
-          flags: 'attachment',
-          secure: true,
-          resource_type: resource_type,
-          version: version
-        }.merge(options)
-      )
-    rescue => e
-      Rails.logger.error "Error generating Cloudinary download URL for #{public_id}: #{e.message}"
-      nil
+    # Check if there's already a derived resource with attachment flag
+    derived_with_attachment = resource_info['derived']&.find { |d| d['transformation']&.include?('fl_attachment') }
+
+    if derived_with_attachment
+      # Use the pre-generated attachment URL
+      derived_with_attachment['secure_url']
+    else
+      # Use the direct secure URL - browsers will typically download PDFs anyway
+      resource_info['secure_url']
     end
+
+  rescue => e
+    Rails.logger.error "Error generating Cloudinary download URL for #{public_id}: #{e.message}"
+    nil
   end
+end
 
   # Generate view URL (for displaying in browser)
   def self.generate_view_url(public_id, options = {})
