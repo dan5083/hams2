@@ -224,9 +224,9 @@ def response_pdf
     format.html { render layout: false }
     format.pdf do
       begin
-        Rails.logger.info "About to create PDF with same syntax as Release Notes"
+        Rails.logger.info "About to create PDF using exact Release Notes pattern"
 
-        # Use the exact same syntax as Release Notes
+        # Copy the exact pattern from Release Notes, including the begin/rescue structure
         pdf = Grover.new(
           render_to_string(
             template: 'external_ncrs/response',
@@ -247,7 +247,20 @@ def response_pdf
 
       rescue => e
         Rails.logger.error "PDF generation failed: #{e.class} - #{e.message}"
-        render plain: "PDF generation failed: #{e.message}", status: 500, content_type: 'text/plain'
+
+        # Instead of returning an error, let's try falling back to a simpler approach
+        Rails.logger.info "Attempting fallback with minimal options"
+
+        begin
+          simple_pdf = Grover.new(render_to_string(template: 'external_ncrs/response', layout: false)).to_pdf
+          send_data simple_pdf,
+                    filename: "NCR_Response_#{@external_ncr.hal_ncr_number}.pdf",
+                    type: 'application/pdf',
+                    disposition: 'inline'
+        rescue => fallback_error
+          Rails.logger.error "Fallback also failed: #{fallback_error.message}"
+          render plain: "PDF generation failed: #{e.message}", status: 500, content_type: 'text/plain'
+        end
       end
     end
   end
