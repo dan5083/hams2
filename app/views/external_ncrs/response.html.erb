@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <style>
+      body {
+        font-family: sans-serif;
+        font-size: 9pt;
+        margin: 0;
+        padding: 1cm;
+        --standard-border-width: 1pt;
+        --standard-border-color: black;
+        --standard-border-style: solid;
+        box-sizing: border-box;
+      }
+
+      @page {
+        size: A4 portrait;
+        margin: 1cm;
+      }
+
+      .logo-header {
+        text-align: left;
+        margin-bottom: 1rem;
+      }
+
+      .logo-header img {
+        max-width: 250px;
+        height: auto;
+      }
+
+      /* Company contact info styling */
+      .company-contact {
+        text-align: right;
+        font-size: 8pt;
+        color: #555;
+        margin-top: 0.5rem;
+        line-height: 1.2;
+      }
+
+      .company-contact a {
+        color: #555;
+        text-decoration: none;
+      }
+
+      .company-contact a:hover {
+        text-decoration: underline;
+      }
+
+      h1 {
+        text-align: center;
+        margin: 0.75rem 0;
+        font-size: 1.3em;
+      }
+
+      h2 {
+        font-size: 0.95em;
+        margin: 0.75rem 0 0.4rem 0;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 0.75rem;
+      }
+
+      th, td {
+        border-color: var(--standard-border-color);
+        border-style: var(--standard-border-style);
+        border-width: var(--standard-border-width);
+        padding: 0.4rem;
+        vertical-align: top;
+      }
+
+      th {
+        background-color: #f8f9fa;
+        font-weight: bold;
+        text-align: left;
+        width: 30%;
+      }
+
+      .addresses {
+        table-layout: fixed;
+        margin-bottom: 1rem;
+      }
+
+      .address {
+        width: 50%;
+        vertical-align: top;
+        padding: 0.4rem;
+      }
+
+      .address h2 {
+        font-size: 0.9em;
+        margin: 0 0 0.4rem 0;
+        text-decoration: underline;
+      }
+
+      .address p {
+        margin: 0;
+        line-height: 1.3;
+      }
+
+      .header-table {
+        margin-bottom: 1rem;
+      }
+
+      .detail-table {
+        margin-top: 0.75rem;
+        margin-bottom: 1rem;
+      }
+
+      .response-section {
+        margin: 1rem 0;
+        padding: 0.75rem;
+        border: 1pt solid #ccc;
+        background-color: #f8f9fa;
+      }
+
+      .response-section h3 {
+        margin: 0 0 0.5rem 0;
+        font-size: 0.9em;
+        font-weight: bold;
+      }
+
+      .response-section p {
+        margin: 0;
+        line-height: 1.4;
+        white-space: pre-wrap;
+      }
+
+      .signature-block {
+        margin-top: 1.5rem;
+        text-align: center;
+      }
+
+      .signature-name {
+        font-family: 'Times New Roman', serif;
+        font-size: 1.1em;
+        font-style: italic;
+        font-weight: bold;
+      }
+
+      p {
+        margin: 0.4rem 0;
+        line-height: 1.3;
+      }
+
+      /* Compact spacing */
+      .compact {
+        margin-bottom: 0.5rem;
+      }
+
+      /* Company footer styling */
+      .company-footer {
+        margin-top: 2rem;
+        padding-top: 1rem;
+        border-top: 1pt solid #ccc;
+        text-align: center;
+        font-size: 8pt;
+        color: #666;
+        line-height: 1.3;
+      }
+
+      .company-footer a {
+        color: #666;
+        text-decoration: none;
+      }
+
+      .company-footer a:hover {
+        text-decoration: underline;
+      }
+
+      .ncr-status {
+        display: inline-block;
+        padding: 0.2rem 0.5rem;
+        border: 1pt solid #28a745;
+        background-color: #d4edda;
+        color: #155724;
+        font-weight: bold;
+        border-radius: 3pt;
+      }
+
+      .reference-info {
+        background-color: #e9ecef;
+        padding: 0.5rem;
+        margin: 0.5rem 0;
+        border-left: 3pt solid #007bff;
+      }
+
+      .reference-info h3 {
+        margin: 0 0 0.3rem 0;
+        font-size: 0.85em;
+        color: #495057;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Logo Header -->
+    <div class="logo-header">
+      <%= image_tag(asset_path("logo-with-company-name.png"), alt: "Hard Anodising Surface Treatments Ltd") %>
+      <!-- Company contact info in header -->
+      <div class="company-contact">
+        Firs Industrial Estate, Rickets Close, Kidderminster DY11 7QN<br/>
+        Tel: 01562 747100 | <a href="https://www.hard-anodising.co.uk/">www.hard-anodising.co.uk</a>
+      </div>
+    </div>
+
+    <h1>Non-Conformance Report Response</h1>
+
+    <!-- NCR Header Information -->
+    <table class="header-table compact">
+      <tbody>
+        <tr>
+          <th>NCR Number</th>
+          <td>NCR<%= @external_ncr.hal_ncr_number %></td>
+        </tr>
+        <tr>
+          <th>Date</th>
+          <td><%= @external_ncr.date.strftime("%d/%m/%Y") %></td>
+        </tr>
+        <tr>
+          <th>Status</th>
+          <td><span class="ncr-status"><%= @external_ncr.status.humanize %></span></td>
+        </tr>
+        <tr>
+          <th>Handled by</th>
+          <td><%= @external_ncr.respondent&.full_name || "Unassigned" %></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Customer Address -->
+    <table class="addresses compact">
+      <tbody>
+        <tr>
+          <td class="address">
+            <h2>Customer</h2>
+            <p>
+              <%= @external_ncr.customer_name %><br/>
+              <%= simple_format(@external_ncr.customer.pdf_address) if @external_ncr.customer.respond_to?(:pdf_address) %>
+            </p>
+          </td>
+          <td class="address">
+            <!-- Empty space for balance -->
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Reference Information -->
+    <div class="reference-info">
+      <h3>Reference Information</h3>
+      <p>
+        <strong>Release Note:</strong> <%= @external_ncr.release_note_number %><br/>
+        <strong>Works Order:</strong> <%= @external_ncr.works_order_number %><br/>
+        <strong>Customer Order:</strong> <%= @external_ncr.customer_po_number_from_works_order || "Not specified" %><br/>
+        <% if @external_ncr.customer_ncr_number.present? %>
+          <strong>Customer NCR Number:</strong> <%= @external_ncr.customer_ncr_number %><br/>
+        <% end %>
+        <% if @external_ncr.concession_number.present? %>
+          <strong>Concession Number:</strong> <%= @external_ncr.concession_number %><br/>
+        <% end %>
+      </p>
+    </div>
+
+    <!-- Part and Quantity Details -->
+    <table class="detail-table compact">
+      <tbody>
+        <tr>
+          <th>Part Number</th>
+          <td><%= @external_ncr.part_number %>-<%= @external_ncr.part_issue %></td>
+        </tr>
+        <tr>
+          <th>Part Description</th>
+          <td><%= @external_ncr.part_description %></td>
+        </tr>
+        <tr>
+          <th>Batch Quantity</th>
+          <td><%= @external_ncr.batch_quantity_from_release_note %></td>
+        </tr>
+        <% if @external_ncr.reject_quantity.present? %>
+          <tr>
+            <th>NCR Reject Quantity</th>
+            <td><%= @external_ncr.reject_quantity %></td>
+          </tr>
+        <% end %>
+        <% if @external_ncr.estimated_cost.present? %>
+          <tr>
+            <th>Estimated Cost</th>
+            <td>£<%= sprintf("%.2f", @external_ncr.estimated_cost) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+
+    <!-- Non-Conformance Description -->
+    <% if @external_ncr.description_of_non_conformance.present? %>
+      <div class="response-section">
+        <h3>Description of Non-Conformance</h3>
+        <p><%= @external_ncr.description_of_non_conformance %></p>
+      </div>
+    <% end %>
+
+    <!-- Investigation/Root Cause Analysis -->
+    <% if @external_ncr.investigation_root_cause_analysis.present? %>
+      <div class="response-section">
+        <h3>Investigation/Root Cause Analysis</h3>
+        <p><%= @external_ncr.investigation_root_cause_analysis %></p>
+      </div>
+    <% end %>
+
+    <!-- Root Cause Identified -->
+    <% if @external_ncr.root_cause_identified.present? %>
+      <div class="response-section">
+        <h3>Root Cause Identified</h3>
+        <p><%= @external_ncr.root_cause_identified %></p>
+      </div>
+    <% end %>
+
+    <!-- Containment/Corrective Action -->
+    <% if @external_ncr.containment_corrective_action.present? %>
+      <div class="response-section">
+        <h3>Containment/Corrective Action</h3>
+        <p><%= @external_ncr.containment_corrective_action %></p>
+      </div>
+    <% end %>
+
+    <!-- Preventive Action -->
+    <% if @external_ncr.preventive_action.present? %>
+      <div class="response-section">
+        <h3>Preventive Action</h3>
+        <p><%= @external_ncr.preventive_action %></p>
+      </div>
+    <% end %>
+
+    <!-- Signature Block -->
+    <div class="signature-block">
+      <p>
+        <span class="signature-name"><%= @external_ncr.respondent&.full_name || "Hard Anodising Surface Treatments Ltd" %></span><br/>
+        For and on behalf of Hard Anodising Surface Treatments Ltd<br/>
+        <strong>Date:</strong> <%= Date.current.strftime("%d/%m/%Y") %>
+      </p>
+    </div>
+
+    <!-- Company Footer -->
+    <div class="company-footer">
+      <strong>Hard Anodising Surface Treatments Ltd</strong><br/>
+      Firs Industrial Estate, Rickets Close, Kidderminster DY11 7QN<br/>
+      Tel: 01562 747100 | <a href="https://www.hard-anodising.co.uk/">www.hard-anodising.co.uk</a><br/>
+      <em>This document constitutes our formal response to the referenced non-conformance report.</em>
+    </div>
+  </body>
+</html>

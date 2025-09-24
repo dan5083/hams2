@@ -57,6 +57,7 @@
               </div>
               <div class="flex items-center space-x-2">
                 <%= link_to download_document_external_ncr_path(@external_ncr),
+                    target: "_blank",
                     class: "inline-flex items-center px-3 py-1 border border-gray-300 rounded-md text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
                   <svg class="-ml-1 mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -144,9 +145,9 @@
                 class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
           </div>
 
-          <!-- Respondent (Auto-assigned, Read-only) -->
+          <!-- Handled by (Auto-assigned, Read-only) -->
           <div>
-            <label class="block text-sm font-medium text-gray-700">Respondent</label>
+            <label class="block text-sm font-medium text-gray-700">Handled by</label>
             <div class="mt-1 p-3 bg-gray-50 rounded-md">
               <p class="text-sm text-gray-900">
                 <%= @external_ncr.persisted? ? @external_ncr.respondent&.full_name : Current.user.full_name %>

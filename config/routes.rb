@@ -95,6 +95,7 @@ Rails.application.routes.draw do
     member do
       patch :advance_status
       get :download_document
+      get :response_pdf
     end
     collection do
       get :release_note_details  # AJAX endpoint for dynamic form updates

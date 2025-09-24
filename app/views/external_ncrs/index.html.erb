@@ -162,7 +162,7 @@
                     <%= ncr.status.humanize %>
                   </span>
                   <div class="text-xs text-gray-500">
-                    Respondent: <%= ncr.respondent&.full_name || "Unassigned" %>
+                    Handled by: <%= ncr.respondent&.full_name || "Unassigned" %>
                   </div>
                   <% if ncr.can_advance_status? %>
                     <span class="inline-flex px-2 py-0.5 text-xs font-medium rounded bg-yellow-100 text-yellow-800">
@@ -184,6 +184,7 @@
                   <% end %>
                   <% if ncr.has_document? %>
                     <%= link_to download_document_external_ncr_path(ncr),
+                        target: "_blank",
                         class: "text-indigo-600 hover:text-indigo-900" do %>
                       <svg class="h-4 w-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -253,20 +254,4 @@
     </div>
   <% end %>
 
-  <!-- Info Box -->
-  <div class="mt-6 bg-blue-50 border border-blue-200 rounded-md p-4">
-    <div class="flex">
-      <div class="flex-shrink-0">
-        <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
-        </svg>
-      </div>
-      <div class="ml-3">
-        <h3 class="text-sm font-medium text-blue-800">External NCR Management</h3>
-        <div class="mt-2 text-sm text-blue-700">
-          <p>External NCRs track non-conformance reports received from customers against our release notes. Each NCR requires the original document and includes our formal response with corrective and preventive actions. The respondent (assigned automatically to the creator) is responsible for completing all required fields and advancing the NCR through to completion.</p>
-        </div>
-      </div>
-    </div>
-  </div>
 </div>
