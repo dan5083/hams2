@@ -34,6 +34,7 @@ def self.upload_file(uploaded_file, folder_path, filename_prefix: nil, resource_
                   "#{folder_path}/#{timestamp}_#{sanitized_name}"
                 end
 
+    Rails.logger.info "About to upload with public_id: #{public_id}"
     # Get file content
     file_content = if uploaded_file.respond_to?(:tempfile)
                      uploaded_file.tempfile
