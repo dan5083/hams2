@@ -27,7 +27,7 @@ def self.upload_file(uploaded_file, folder_path, filename_prefix: nil, resource_
                                'auto'
                              end
 
-    # For raw files, DON'T include file extension in public_id
+    # DON'T include file extension in public_id for raw files
     public_id = if filename_prefix.present?
                   "#{folder_path}/#{filename_prefix}_#{timestamp}_#{sanitized_name}"
                 else
