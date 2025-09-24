@@ -23,7 +23,7 @@
       <% end %>
       <% if @external_ncr.can_advance_status? %>
         <%= link_to advance_status_external_ncr_path(@external_ncr),
-            method: :patch,
+            data: { turbo_method: :patch },
             class: "bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded" do %>
           Advance to <%= @external_ncr.next_status.humanize %>
         <% end %>
