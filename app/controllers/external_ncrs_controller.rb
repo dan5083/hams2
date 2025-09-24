@@ -211,11 +211,24 @@ class ExternalNcrsController < ApplicationController
   # Download document endpoint
   def download_document
     if @external_ncr.has_document?
-      download_url = @external_ncr.generate_cloudinary_download_url
+      begin
+        # Generate a new download URL with attachment flag using the correct resource type
+        resource_type = @external_ncr.cloudinary_public_id.match?(/\.(pdf|doc|docx)$/i) ? 'raw' : 'image'
 
-      if download_url
-        redirect_to download_url, allow_other_host: true
-      else
+        download_url = Cloudinary::Utils.cloudinary_url(
+          @external_ncr.cloudinary_public_id,
+          resource_type: resource_type,
+          secure: true,
+          flags: 'attachment'
+        )
+
+        if download_url
+          redirect_to download_url, allow_other_host: true
+        else
+          redirect_to @external_ncr, alert: 'Unable to generate download link. Please try again.'
+        end
+      rescue => e
+        Rails.logger.error "Failed to generate download URL for NCR #{@external_ncr.hal_ncr_number}: #{e.message}"
         redirect_to @external_ncr, alert: 'Unable to generate download link. Please try again.'
       end
     else
