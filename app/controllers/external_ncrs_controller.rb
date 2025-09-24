@@ -5,27 +5,11 @@ class ExternalNcrsController < ApplicationController
 
   def index
     @external_ncrs = ExternalNcr.includes(:release_note, :customer, :created_by, :respondent)
-                                .active
-                                .recent
+                                .recent  # Removed .active scope
 
-    # Search functionality
+    # Search functionality (keep this)
     if params[:search].present?
       @external_ncrs = @external_ncrs.search(params[:search])
-    end
-
-    # Status filtering
-    if params[:status].present? && params[:status] != 'all'
-      @external_ncrs = @external_ncrs.by_status(params[:status])
-    end
-
-    # Document status filtering
-    if params[:document_status].present?
-      case params[:document_status]
-      when 'with_documents'
-        @external_ncrs = @external_ncrs.with_documents
-      when 'missing_documents'
-        @external_ncrs = @external_ncrs.missing_documents
-      end
     end
 
     @external_ncrs = @external_ncrs.page(params[:page]).per(20)
