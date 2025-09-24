@@ -222,7 +222,26 @@ class ExternalNcrsController < ApplicationController
       file_url = resource_info['secure_url']
       Rails.logger.info "Cloudinary URL: #{file_url}"
 
-      # ... rest of the method
+      # Fetch the file from Cloudinary and serve it through Rails
+      require 'net/http'
+      require 'uri'
+
+      uri = URI(file_url)
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = true
+
+      request = Net::HTTP::Get.new(uri)
+      response = http.request(request)
+
+      if response.code == '200'
+        send_data response.body,
+                  filename: @external_ncr.document_filename,
+                  type: @external_ncr.content_type || 'application/pdf',
+                  disposition: 'attachment'
+      else
+        redirect_to @external_ncr, alert: 'Unable to download document. Please try again.'
+      end
+
     rescue => e
       Rails.logger.error "Download error: #{e.class} - #{e.message}"
       Rails.logger.error e.backtrace.join("\n")
