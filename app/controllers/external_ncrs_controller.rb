@@ -220,15 +220,25 @@ end
 def response_pdf
   @external_ncr = ExternalNcr.find(params[:id])
 
+  Rails.logger.info "=== NCR PDF DEBUG ==="
+  Rails.logger.info "External NCR ID: #{@external_ncr.id}"
+  Rails.logger.info "External NCR Number: #{@external_ncr.hal_ncr_number}"
+  Rails.logger.info "Chrome path exists: #{File.exist?('/app/.apt/usr/bin/google-chrome')}"
+  Rails.logger.info "Grover options from config: #{Grover.configuration.options}"
+
   respond_to do |format|
     format.html { render layout: false }
     format.pdf do
+      Rails.logger.info "About to call Grover.new..."
+
       pdf = Grover.new(
         render_to_string(
           template: 'external_ncrs/response',
           layout: false
         )
       ).to_pdf
+
+      Rails.logger.info "Grover PDF generated successfully"
 
       send_data pdf,
                 filename: "NCR_Response_#{@external_ncr.hal_ncr_number}.pdf",
