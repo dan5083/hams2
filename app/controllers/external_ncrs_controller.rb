@@ -208,42 +208,30 @@ class ExternalNcrsController < ApplicationController
     render json: { error: 'Release note not found' }, status: :not_found
   end
 
-  def download_document
-    if @external_ncr.has_document?
-      begin
-        # Get the direct secure URL from Cloudinary (without attachment flag)
-        resource_type = @external_ncr.cloudinary_public_id.match?(/\.(pdf|doc|docx)$/i) ? 'raw' : 'image'
-        resource_info = Cloudinary::Api.resource(@external_ncr.cloudinary_public_id, resource_type: resource_type)
-        file_url = resource_info['secure_url']
+ def download_document
+  if @external_ncr.has_document?
+    begin
+      Rails.logger.info "Starting download for NCR #{@external_ncr.hal_ncr_number}"
+      Rails.logger.info "Public ID: #{@external_ncr.cloudinary_public_id}"
 
-        # Fetch the file from Cloudinary and serve it through Rails
-        require 'net/http'
-        require 'uri'
+      # Get the direct secure URL from Cloudinary (without attachment flag)
+      resource_type = @external_ncr.cloudinary_public_id.match?(/\.(pdf|doc|docx)$/i) ? 'raw' : 'image'
+      Rails.logger.info "Using resource type: #{resource_type}"
 
-        uri = URI(file_url)
-        http = Net::HTTP.new(uri.host, uri.port)
-        http.use_ssl = true
+      resource_info = Cloudinary::Api.resource(@external_ncr.cloudinary_public_id, resource_type: resource_type)
+      file_url = resource_info['secure_url']
+      Rails.logger.info "Cloudinary URL: #{file_url}"
 
-        request = Net::HTTP::Get.new(uri)
-        response = http.request(request)
-
-        if response.code == '200'
-          send_data response.body,
-                    filename: @external_ncr.document_filename,
-                    type: @external_ncr.content_type || 'application/pdf',
-                    disposition: 'attachment'
-        else
-          redirect_to @external_ncr, alert: 'Unable to download document. Please try again.'
-        end
-
-      rescue => e
-        Rails.logger.error "Failed to download file for NCR #{@external_ncr.hal_ncr_number}: #{e.message}"
-        redirect_to @external_ncr, alert: 'Unable to download document. Please try again.'
-      end
-    else
-      redirect_to @external_ncr, alert: 'No document available for download.'
+      # ... rest of the method
+    rescue => e
+      Rails.logger.error "Download error: #{e.class} - #{e.message}"
+      Rails.logger.error e.backtrace.join("\n")
+      redirect_to @external_ncr, alert: "Download failed: #{e.message}"
     end
+  else
+    redirect_to @external_ncr, alert: 'No document available for download.'
   end
+end
 
   # Reassign respondent (for managers/admins)
   def reassign_respondent
