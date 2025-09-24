@@ -49,12 +49,18 @@ def self.upload_file(uploaded_file, folder_path, filename_prefix: nil, resource_
       file_content,
       public_id: public_id,
       resource_type: detected_resource_type,
+      type: 'upload',
+      access_mode: 'public',
       overwrite: true,
       unique_filename: false,
       use_filename: false
     )
 
     Rails.logger.info "Successfully uploaded file to Cloudinary: #{result['public_id']}"
+    Rails.logger.info "Cloudinary upload result: #{result.inspect}"
+    Rails.logger.info "Cloudinary resource_type used: #{detected_resource_type}"
+    Rails.logger.info "Cloudinary secure_url: #{result['secure_url']}"
+    Rails.logger.info "Cloudinary url: #{result['url']}"
 
     {
       public_id: result['public_id'],
