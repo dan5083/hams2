@@ -70,16 +70,25 @@ def self.upload_file(uploaded_file, folder_path, filename_prefix: nil, resource_
 end
 
   # Generate download URL
+# Replace the generate_download_url method in app/services/cloudinary_service.rb
 def self.generate_download_url(public_id, options = {})
   raise ArgumentError, "Public ID is required" if public_id.blank?
 
   begin
-    # Generate URL with download flag
+    # Determine resource type based on file extension
+    resource_type = if public_id.match?(/\.(pdf|doc|docx)$/i)
+                      'raw'
+                    else
+                      'image'
+                    end
+
+    # Generate URL with download flag and correct resource type
     Cloudinary::Utils.cloudinary_url(
       public_id,
       {
         flags: 'attachment',
-        secure: true
+        secure: true,
+        resource_type: resource_type
       }.merge(options)
     )
   rescue => e
