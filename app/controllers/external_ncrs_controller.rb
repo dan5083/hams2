@@ -229,20 +229,15 @@ def response_pdf
           layout: false
         )
 
-        Rails.logger.info "HTML rendered successfully, about to create PDF with no executable path"
+        Rails.logger.info "HTML rendered successfully, about to create PDF"
 
-        # Create Grover instance with explicit executable_path: nil to avoid Chrome detection
-        pdf = Grover.new(
-          html_content,
-          {
-            format: 'A4',
-            margin: { top: '1cm', bottom: '1cm', left: '1cm', right: '1cm' },
-            print_background: true,
-            prefer_css_page_size: true,
-            executable_path: nil,  # This should prevent Chrome path detection
-            launch_args: ['--no-sandbox', '--disable-dev-shm-usage'] # Common Heroku args
-          }
-        ).to_pdf
+        # Try with options merged into a single hash
+        pdf = Grover.new(html_content, {
+          format: 'A4',
+          margin: { top: '1cm', bottom: '1cm', left: '1cm', right: '1cm' },
+          print_background: true,
+          prefer_css_page_size: true
+        }).to_pdf
 
         Rails.logger.info "PDF generated successfully"
 
