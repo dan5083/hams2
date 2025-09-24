@@ -2,7 +2,7 @@
 class CloudinaryService
   class CloudinaryError < StandardError; end
 
-  # Generic file upload method
+# Update the upload_file method in CloudinaryService
 def self.upload_file(uploaded_file, folder_path, filename_prefix: nil, resource_type: 'auto')
   raise ArgumentError, "Uploaded file is required" unless uploaded_file
   raise ArgumentError, "Folder path is required" if folder_path.blank?
@@ -15,16 +15,23 @@ def self.upload_file(uploaded_file, folder_path, filename_prefix: nil, resource_
                       uploaded_file.filename.to_s
                     end
 
-    # Get the file extension and preserve it
+    # Get the file extension but DON'T include it in public_id for raw files
     file_extension = File.extname(original_name)
     sanitized_name = sanitize_filename(File.basename(original_name, file_extension))
     timestamp = Time.current.strftime("%Y%m%d_%H%M%S")
 
-    # Include file extension in public_id
+    # Determine resource type
+    detected_resource_type = if original_name.match?(/\.(pdf|doc|docx)$/i)
+                               'raw'
+                             else
+                               'auto'
+                             end
+
+    # For raw files, DON'T include file extension in public_id
     public_id = if filename_prefix.present?
-                  "#{folder_path}/#{filename_prefix}_#{timestamp}_#{sanitized_name}#{file_extension}"
+                  "#{folder_path}/#{filename_prefix}_#{timestamp}_#{sanitized_name}"
                 else
-                  "#{folder_path}/#{timestamp}_#{sanitized_name}#{file_extension}"
+                  "#{folder_path}/#{timestamp}_#{sanitized_name}"
                 end
 
     # Get file content
@@ -40,7 +47,7 @@ def self.upload_file(uploaded_file, folder_path, filename_prefix: nil, resource_
     result = Cloudinary::Uploader.upload(
       file_content,
       public_id: public_id,
-      resource_type: (original_name.match?(/\.(pdf|doc|docx)$/i) ? 'raw' : 'auto'),
+      resource_type: detected_resource_type,
       overwrite: true,
       unique_filename: false,
       use_filename: false
