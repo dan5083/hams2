@@ -220,40 +220,40 @@ end
 def response_pdf
   @external_ncr = ExternalNcr.find(params[:id])
 
-  # Temporarily use a Release Note for testing
-  @release_note = ReleaseNote.first  # Just grab any release note
-  @company_name = "Hard Anodising Surface Treatments Ltd"
-  @trading_address = "Firs Industrial Estate, Rickets Close\nKidderminster, DY11 7QN"
-
   respond_to do |format|
     format.html { render layout: false }
     format.pdf do
       begin
-        Rails.logger.info "Testing with Release Note template - corrected path"
+        Rails.logger.info "About to render External NCR template to string"
 
-        # Use the correct template path
+        # First, let's just try to render the template without PDF conversion
+        html_content = render_to_string(
+          template: 'external_ncrs/response',
+          layout: false,
+          formats: [:html]
+        )
+
+        Rails.logger.info "Template rendered successfully, length: #{html_content.length}"
+        Rails.logger.info "Starting PDF conversion..."
+
         pdf = Grover.new(
-          render_to_string(
-            template: 'release_notes/pdf.html.erb',  # Use full template name
-            layout: false,
-            locals: { release_note: @release_note, company_name: @company_name, trading_address: @trading_address }
-          ),
+          html_content,
           format: 'A4',
           margin: { top: '1cm', bottom: '1cm', left: '1cm', right: '1cm' },
           print_background: true,
           prefer_css_page_size: true
         ).to_pdf
 
-        Rails.logger.info "PDF generated successfully using Release Note template"
+        Rails.logger.info "PDF generated successfully"
 
         send_data pdf,
-                  filename: "TEST_NCR_Response_#{@external_ncr.hal_ncr_number}.pdf",
+                  filename: "NCR_Response_#{@external_ncr.hal_ncr_number}.pdf",
                   type: 'application/pdf',
                   disposition: 'inline'
 
       rescue => e
-        Rails.logger.error "Even Release Note template failed: #{e.message}"
-        render plain: "Test failed: #{e.message}", status: 500, content_type: 'text/plain'
+        Rails.logger.error "Failed at step: #{e.message}"
+        render plain: "Failed: #{e.message}", status: 500, content_type: 'text/plain'
       end
     end
   end
