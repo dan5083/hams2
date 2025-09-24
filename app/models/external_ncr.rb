@@ -136,7 +136,7 @@ class ExternalNcr < ApplicationRecord
     nil
   end
 
-  def generate_dropbox_download_url
+  def generate_cloudinary_download_url
     return nil unless has_document?
 
     begin
