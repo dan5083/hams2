@@ -214,7 +214,7 @@ class ExternalNcrsController < ApplicationController
       download_url = @external_ncr.generate_cloudinary_download_url
 
       if download_url
-        redirect_to download_url
+        redirect_to download_url, allow_other_host: true
       else
         redirect_to @external_ncr, alert: 'Unable to generate download link. Please try again.'
       end
