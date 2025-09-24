@@ -224,48 +224,6 @@ def response_pdf
   Rails.logger.info "External NCR ID: #{@external_ncr.id}"
   Rails.logger.info "External NCR Number: #{@external_ncr.hal_ncr_number}"
 
-  # Check various Chrome paths
-  chrome_paths = [
-    '/app/.apt/usr/bin/google-chrome',
-    '/usr/bin/google-chrome',
-    '/usr/bin/chromium-browser',
-    '/app/.apt/usr/bin/chromium-browser'
-  ]
-
-  chrome_paths.each do |path|
-    Rails.logger.info "Chrome at #{path}: #{File.exist?(path)}"
-  end
-
-  # Try to find Chrome executable anywhere
-  chrome_executable = nil
-  begin
-    chrome_executable = `which google-chrome-stable`.strip
-    chrome_executable = nil if chrome_executable.empty?
-  rescue
-    # ignore
-  end
-
-  if chrome_executable.nil?
-    begin
-      chrome_executable = `which google-chrome`.strip
-      chrome_executable = nil if chrome_executable.empty?
-    rescue
-      # ignore
-    end
-  end
-
-  if chrome_executable.nil?
-    begin
-      chrome_executable = `which chromium-browser`.strip
-      chrome_executable = nil if chrome_executable.empty?
-    rescue
-      # ignore
-    end
-  end
-
-  Rails.logger.info "Found Chrome executable: #{chrome_executable || 'None found'}"
-  Rails.logger.info "Grover options from config: #{Grover.configuration.options}"
-
   respond_to do |format|
     format.html { render layout: false }
     format.pdf do
@@ -276,8 +234,14 @@ def response_pdf
         layout: false
       )
 
-      # Try without any options first to match how Release Notes work
-      pdf = Grover.new(html_content).to_pdf
+      # Use explicit options like Release Notes instead of relying on global config
+      pdf = Grover.new(
+        html_content,
+        format: 'A4',
+        margin: { top: '1cm', bottom: '1cm', left: '1cm', right: '1cm' },
+        print_background: true,
+        prefer_css_page_size: true
+      ).to_pdf
 
       Rails.logger.info "Grover PDF generated successfully"
 
