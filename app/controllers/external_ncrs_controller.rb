@@ -226,11 +226,10 @@ def response_pdf
       begin
         Rails.logger.info "About to render External NCR template to string"
 
-        # First, let's just try to render the template without PDF conversion
         html_content = render_to_string(
           template: 'external_ncrs/response',
-          layout: false,
-          formats: [:html]
+          layout: false
+          # Remove the formats: [:html] line since you have a .pdf.erb template
         )
 
         Rails.logger.info "Template rendered successfully, length: #{html_content.length}"
