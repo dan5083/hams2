@@ -220,36 +220,31 @@ end
 def response_pdf
   @external_ncr = ExternalNcr.find(params[:id])
 
-  Rails.logger.info "=== NCR PDF DEBUG ==="
-  Rails.logger.info "External NCR ID: #{@external_ncr.id}"
-  Rails.logger.info "External NCR Number: #{@external_ncr.hal_ncr_number}"
-
   respond_to do |format|
     format.html { render layout: false }
     format.pdf do
       begin
-        Rails.logger.info "About to render HTML template..."
-
         html_content = render_to_string(
           template: 'external_ncrs/response',
           layout: false
         )
 
-        Rails.logger.info "HTML rendered successfully, length: #{html_content.length}"
-        Rails.logger.info "First 500 chars: #{html_content[0, 500]}"
+        Rails.logger.info "HTML rendered successfully, about to create PDF with no executable path"
 
-        Rails.logger.info "About to call Grover.new with explicit options..."
-
-        # Use identical options to Release Notes
+        # Create Grover instance with explicit executable_path: nil to avoid Chrome detection
         pdf = Grover.new(
           html_content,
-          format: 'A4',
-          margin: { top: '1cm', bottom: '1cm', left: '1cm', right: '1cm' },
-          print_background: true,
-          prefer_css_page_size: true
+          {
+            format: 'A4',
+            margin: { top: '1cm', bottom: '1cm', left: '1cm', right: '1cm' },
+            print_background: true,
+            prefer_css_page_size: true,
+            executable_path: nil,  # This should prevent Chrome path detection
+            launch_args: ['--no-sandbox', '--disable-dev-shm-usage'] # Common Heroku args
+          }
         ).to_pdf
 
-        Rails.logger.info "Grover PDF generated successfully"
+        Rails.logger.info "PDF generated successfully"
 
         send_data pdf,
                   filename: "NCR_Response_#{@external_ncr.hal_ncr_number}.pdf",
@@ -258,12 +253,7 @@ def response_pdf
 
       rescue => e
         Rails.logger.error "PDF generation failed: #{e.class} - #{e.message}"
-        Rails.logger.error "Full backtrace:"
-        Rails.logger.error e.backtrace.join("\n")
-
-        # Return error as text for debugging
-        render plain: "PDF generation failed: #{e.message}\n\nBacktrace:\n#{e.backtrace.join("\n")}",
-               status: 500, content_type: 'text/plain'
+        render plain: "PDF generation failed: #{e.message}", status: 500, content_type: 'text/plain'
       end
     end
   end
