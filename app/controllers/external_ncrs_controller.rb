@@ -218,6 +218,8 @@ def download_document
 end
 
 def response_pdf
+  @external_ncr = ExternalNcr.find(params[:id])
+
   respond_to do |format|
     format.html { render layout: false }
     format.pdf do
