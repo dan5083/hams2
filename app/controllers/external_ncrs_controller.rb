@@ -231,14 +231,19 @@ class ExternalNcrsController < ApplicationController
       http.use_ssl = true
 
       request = Net::HTTP::Get.new(uri)
+      Rails.logger.info "Making HTTP request to: #{uri}"
       response = http.request(request)
+      Rails.logger.info "HTTP response code: #{response.code}"
+      Rails.logger.info "HTTP response message: #{response.message}"
 
       if response.code == '200'
+        Rails.logger.info "Sending file data, size: #{response.body.bytesize} bytes"
         send_data response.body,
                   filename: @external_ncr.document_filename,
                   type: @external_ncr.content_type || 'application/pdf',
                   disposition: 'attachment'
       else
+        Rails.logger.error "HTTP request failed with code: #{response.code}"
         redirect_to @external_ncr, alert: 'Unable to download document. Please try again.'
       end
 
