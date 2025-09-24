@@ -217,25 +217,24 @@ def download_document
   end
 end
 
-  def response_pdf
-    @external_ncr = ExternalNcr.find(params[:id])
+def response_pdf
+  respond_to do |format|
+    format.html { render layout: false }
+    format.pdf do
+      pdf = Grover.new(
+        render_to_string(
+          template: 'external_ncrs/response',
+          layout: false
+        )
+      ).to_pdf
 
-    respond_to do |format|
-      format.pdf do
-        pdf = Grover.new(
-          render_to_string(
-            template: 'external_ncrs/response',
-            layout: false
-          )
-        ).to_pdf
-
-        send_data pdf,
-                  filename: "NCR_Response_#{@external_ncr.hal_ncr_number}.pdf",
-                  type: 'application/pdf',
-                  disposition: 'inline'
-      end
+      send_data pdf,
+                filename: "NCR_Response_#{@external_ncr.hal_ncr_number}.pdf",
+                type: 'application/pdf',
+                disposition: 'inline'
     end
   end
+end
 
   # Reassign respondent (for managers/admins)
   def reassign_respondent
