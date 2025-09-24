@@ -224,20 +224,19 @@ def response_pdf
     format.html { render layout: false }
     format.pdf do
       begin
-        html_content = render_to_string(
-          template: 'external_ncrs/response',
-          layout: false
-        )
+        Rails.logger.info "About to create PDF with same syntax as Release Notes"
 
-        Rails.logger.info "HTML rendered successfully, about to create PDF"
-
-        # Try with options merged into a single hash
-        pdf = Grover.new(html_content, {
+        # Use the exact same syntax as Release Notes
+        pdf = Grover.new(
+          render_to_string(
+            template: 'external_ncrs/response',
+            layout: false
+          ),
           format: 'A4',
           margin: { top: '1cm', bottom: '1cm', left: '1cm', right: '1cm' },
           print_background: true,
           prefer_css_page_size: true
-        }).to_pdf
+        ).to_pdf
 
         Rails.logger.info "PDF generated successfully"
 
