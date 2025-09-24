@@ -41,7 +41,7 @@ def self.upload_file(uploaded_file, folder_path, filename_prefix: nil, resource_
     result = Cloudinary::Uploader.upload(
       file_content,
       public_id: public_id,
-      resource_type: resource_type,
+      resource_type: (original_name.match?(/\.(pdf|doc|docx)$/i) ? 'raw' : 'auto'),
       overwrite: true,
       unique_filename: false,
       use_filename: false
