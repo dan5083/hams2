@@ -271,6 +271,11 @@ def response_pdf
     format.pdf do
       Rails.logger.info "About to call Grover.new..."
 
+      html_content = render_to_string(
+        template: 'external_ncrs/response',
+        layout: false
+      )
+
       # Build Grover options
       grover_options = {
         format: 'A4',
@@ -285,13 +290,7 @@ def response_pdf
         Rails.logger.info "Using Chrome executable: #{chrome_executable}"
       end
 
-      pdf = Grover.new(
-        render_to_string(
-          template: 'external_ncrs/response',
-          layout: false
-        ),
-        grover_options
-      ).to_pdf
+      pdf = Grover.new(html_content, grover_options).to_pdf
 
       Rails.logger.info "Grover PDF generated successfully"
 
