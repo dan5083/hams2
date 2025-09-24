@@ -2,6 +2,30 @@
 class CloudinaryService
   class CloudinaryError < StandardError; end
 
+  # Add this temporary debug method to CloudinaryService
+  def self.debug_file_info(public_id)
+    begin
+      # Try to get info as raw resource
+      raw_info = Cloudinary::Api.resource(public_id, resource_type: 'raw')
+      Rails.logger.info "Raw resource found: #{raw_info.inspect}"
+      return { found_as: 'raw', info: raw_info }
+    rescue Cloudinary::Api::NotFound
+      Rails.logger.info "Not found as raw resource"
+    end
+
+    begin
+      # Try to get info as image resource
+      image_info = Cloudinary::Api.resource(public_id, resource_type: 'image')
+      Rails.logger.info "Image resource found: #{image_info.inspect}"
+      return { found_as: 'image', info: image_info }
+    rescue Cloudinary::Api::NotFound
+      Rails.logger.info "Not found as image resource either"
+    end
+
+    Rails.logger.info "File not found in either resource type"
+    return { found_as: 'not_found', info: nil }
+  end
+
   # Generic file upload method
  # Updated upload_file method for app/services/cloudinary_service.rb
 def self.upload_file(uploaded_file, folder_path, filename_prefix: nil, resource_type: 'auto')
