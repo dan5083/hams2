@@ -227,28 +227,44 @@ def response_pdf
   respond_to do |format|
     format.html { render layout: false }
     format.pdf do
-      Rails.logger.info "About to call Grover.new..."
+      begin
+        Rails.logger.info "About to render HTML template..."
 
-      html_content = render_to_string(
-        template: 'external_ncrs/response',
-        layout: false
-      )
+        html_content = render_to_string(
+          template: 'external_ncrs/response',
+          layout: false
+        )
 
-      # Use explicit options like Release Notes instead of relying on global config
-      pdf = Grover.new(
-        html_content,
-        format: 'A4',
-        margin: { top: '1cm', bottom: '1cm', left: '1cm', right: '1cm' },
-        print_background: true,
-        prefer_css_page_size: true
-      ).to_pdf
+        Rails.logger.info "HTML rendered successfully, length: #{html_content.length}"
+        Rails.logger.info "First 500 chars: #{html_content[0, 500]}"
 
-      Rails.logger.info "Grover PDF generated successfully"
+        Rails.logger.info "About to call Grover.new with explicit options..."
 
-      send_data pdf,
-                filename: "NCR_Response_#{@external_ncr.hal_ncr_number}.pdf",
-                type: 'application/pdf',
-                disposition: 'inline'
+        # Use identical options to Release Notes
+        pdf = Grover.new(
+          html_content,
+          format: 'A4',
+          margin: { top: '1cm', bottom: '1cm', left: '1cm', right: '1cm' },
+          print_background: true,
+          prefer_css_page_size: true
+        ).to_pdf
+
+        Rails.logger.info "Grover PDF generated successfully"
+
+        send_data pdf,
+                  filename: "NCR_Response_#{@external_ncr.hal_ncr_number}.pdf",
+                  type: 'application/pdf',
+                  disposition: 'inline'
+
+      rescue => e
+        Rails.logger.error "PDF generation failed: #{e.class} - #{e.message}"
+        Rails.logger.error "Full backtrace:"
+        Rails.logger.error e.backtrace.join("\n")
+
+        # Return error as text for debugging
+        render plain: "PDF generation failed: #{e.message}\n\nBacktrace:\n#{e.backtrace.join("\n")}",
+               status: 500, content_type: 'text/plain'
+      end
     end
   end
 end
