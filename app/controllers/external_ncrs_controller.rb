@@ -276,21 +276,8 @@ def response_pdf
         layout: false
       )
 
-      # Build Grover options
-      grover_options = {
-        format: 'A4',
-        margin: { top: '1cm', bottom: '1cm', left: '1cm', right: '1cm' },
-        print_background: true,
-        prefer_css_page_size: true
-      }
-
-      # Add executable path if found
-      if chrome_executable.present?
-        grover_options[:executable_path] = chrome_executable
-        Rails.logger.info "Using Chrome executable: #{chrome_executable}"
-      end
-
-      pdf = Grover.new(html_content, grover_options).to_pdf
+      # Try without any options first to match how Release Notes work
+      pdf = Grover.new(html_content).to_pdf
 
       Rails.logger.info "Grover PDF generated successfully"
 
