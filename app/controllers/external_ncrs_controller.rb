@@ -32,7 +32,7 @@ class ExternalNcrsController < ApplicationController
   end
 
   def show
-    @download_url = @external_ncr.generate_cloudinary_download_url if @external_ncr.has_document?
+    # @download_url = @external_ncr.generate_cloudinary_download_url if @external_ncr.has_document? # Remove this line
   end
 
   def new
