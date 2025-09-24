@@ -208,28 +208,37 @@ class ExternalNcrsController < ApplicationController
     render json: { error: 'Release note not found' }, status: :not_found
   end
 
-  # Download document endpoint
   def download_document
     if @external_ncr.has_document?
       begin
-        # Generate a new download URL with attachment flag using the correct resource type
+        # Get the direct secure URL from Cloudinary (without attachment flag)
         resource_type = @external_ncr.cloudinary_public_id.match?(/\.(pdf|doc|docx)$/i) ? 'raw' : 'image'
+        resource_info = Cloudinary::Api.resource(@external_ncr.cloudinary_public_id, resource_type: resource_type)
+        file_url = resource_info['secure_url']
 
-        download_url = Cloudinary::Utils.cloudinary_url(
-          @external_ncr.cloudinary_public_id,
-          resource_type: resource_type,
-          secure: true,
-          flags: 'attachment'
-        )
+        # Fetch the file from Cloudinary and serve it through Rails
+        require 'net/http'
+        require 'uri'
 
-        if download_url
-          redirect_to download_url, allow_other_host: true
+        uri = URI(file_url)
+        http = Net::HTTP.new(uri.host, uri.port)
+        http.use_ssl = true
+
+        request = Net::HTTP::Get.new(uri)
+        response = http.request(request)
+
+        if response.code == '200'
+          send_data response.body,
+                    filename: @external_ncr.document_filename,
+                    type: @external_ncr.content_type || 'application/pdf',
+                    disposition: 'attachment'
         else
-          redirect_to @external_ncr, alert: 'Unable to generate download link. Please try again.'
+          redirect_to @external_ncr, alert: 'Unable to download document. Please try again.'
         end
+
       rescue => e
-        Rails.logger.error "Failed to generate download URL for NCR #{@external_ncr.hal_ncr_number}: #{e.message}"
-        redirect_to @external_ncr, alert: 'Unable to generate download link. Please try again.'
+        Rails.logger.error "Failed to download file for NCR #{@external_ncr.hal_ncr_number}: #{e.message}"
+        redirect_to @external_ncr, alert: 'Unable to download document. Please try again.'
       end
     else
       redirect_to @external_ncr, alert: 'No document available for download.'
