@@ -208,44 +208,31 @@ class ExternalNcrsController < ApplicationController
     render json: { error: 'Release note not found' }, status: :not_found
   end
 
- def download_document
+def download_document
   if @external_ncr.has_document?
     begin
       Rails.logger.info "Starting download for NCR #{@external_ncr.hal_ncr_number}"
       Rails.logger.info "Public ID: #{@external_ncr.cloudinary_public_id}"
 
-      # Get the direct secure URL from Cloudinary (without attachment flag)
+      # Generate a signed URL that allows access
       resource_type = @external_ncr.cloudinary_public_id.match?(/\.(pdf|doc|docx)$/i) ? 'raw' : 'image'
       Rails.logger.info "Using resource type: #{resource_type}"
 
-      resource_info = Cloudinary::Api.resource(@external_ncr.cloudinary_public_id, resource_type: resource_type)
-      file_url = resource_info['secure_url']
-      Rails.logger.info "Cloudinary URL: #{file_url}"
+      # Use Cloudinary's signed URL for secure access
+      signed_url = Cloudinary::Utils.cloudinary_url(
+        @external_ncr.cloudinary_public_id,
+        {
+          resource_type: resource_type,
+          secure: true,
+          sign_url: true,
+          flags: 'attachment'
+        }
+      )
 
-      # Fetch the file from Cloudinary and serve it through Rails
-      require 'net/http'
-      require 'uri'
+      Rails.logger.info "Generated signed URL"
 
-      uri = URI(file_url)
-      http = Net::HTTP.new(uri.host, uri.port)
-      http.use_ssl = true
-
-      request = Net::HTTP::Get.new(uri)
-      Rails.logger.info "Making HTTP request to: #{uri}"
-      response = http.request(request)
-      Rails.logger.info "HTTP response code: #{response.code}"
-      Rails.logger.info "HTTP response message: #{response.message}"
-
-      if response.code == '200'
-        Rails.logger.info "Sending file data, size: #{response.body.bytesize} bytes"
-        send_data response.body,
-                  filename: @external_ncr.document_filename,
-                  type: @external_ncr.content_type || 'application/pdf',
-                  disposition: 'attachment'
-      else
-        Rails.logger.error "HTTP request failed with code: #{response.code}"
-        redirect_to @external_ncr, alert: 'Unable to download document. Please try again.'
-      end
+      # Redirect to the signed URL instead of proxying
+      redirect_to signed_url, allow_other_host: true
 
     rescue => e
       Rails.logger.error "Download error: #{e.class} - #{e.message}"
