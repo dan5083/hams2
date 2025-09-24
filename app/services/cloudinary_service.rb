@@ -69,7 +69,7 @@ def self.upload_file(uploaded_file, folder_path, filename_prefix: nil, resource_
   end
 end
 
-  # Generate download URL with optional transformations
+  # Generate download URL
   def self.generate_download_url(public_id, options = {})
     raise ArgumentError, "Public ID is required" if public_id.blank?
 
@@ -79,7 +79,8 @@ end
         public_id,
         {
           flags: 'attachment',
-          secure: true
+          secure: true,
+          resource_type: 'auto' # This helps Cloudinary determine the correct resource type
         }.merge(options)
       )
     rescue => e
