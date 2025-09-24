@@ -229,12 +229,12 @@ def response_pdf
     format.html { render layout: false }
     format.pdf do
       begin
-        Rails.logger.info "Testing with Release Note template"
+        Rails.logger.info "Testing with Release Note template - corrected path"
 
-        # Use the exact Release Note template and approach
+        # Use the correct template path
         pdf = Grover.new(
           render_to_string(
-            template: 'release_notes/pdf',  # Use Release Note template instead
+            template: 'release_notes/pdf.html.erb',  # Use full template name
             layout: false,
             locals: { release_note: @release_note, company_name: @company_name, trading_address: @trading_address }
           ),
