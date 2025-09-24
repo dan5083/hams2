@@ -59,14 +59,49 @@ class ExternalNcrsController < ApplicationController
     @external_ncr.created_by = Current.user
     @external_ncr.respondent = Current.user
 
-    # Handle file upload - the model now handles this in before_create callback
-    if params[:external_ncr][:temp_document].present?
-      @external_ncr.temp_document = params[:external_ncr][:temp_document]
+    # Handle file upload first, then save the NCR
+    uploaded_file = params[:external_ncr][:temp_document]
+
+    if uploaded_file.present?
+      begin
+        # Upload to Dropbox
+        folder_path = "/NCRs/#{@external_ncr.date.year}/#{@external_ncr.date.strftime('%m')}"
+        filename_prefix = "NCR#{@external_ncr.hal_ncr_number || 'TEMP'}"
+
+        upload_result = DropboxService.upload_file(uploaded_file, folder_path, filename_prefix: filename_prefix)
+
+        # Store document metadata
+        @external_ncr.store_document_metadata(upload_result)
+
+        Rails.logger.info "Successfully uploaded document for NCR: #{upload_result[:path]}"
+
+      rescue DropboxService::DropboxError => e
+        Rails.logger.error "Failed to upload document: #{e.message}"
+        @external_ncr.errors.add(:temp_document, "could not be uploaded: #{e.message}")
+        prepare_form_data
+        render :new, status: :unprocessable_entity
+        return
+      end
+    elsif @external_ncr.new_record?
+      # Require document for new NCRs
+      @external_ncr.errors.add(:temp_document, "is required")
+      prepare_form_data
+      render :new, status: :unprocessable_entity
+      return
     end
 
     if @external_ncr.save
       redirect_to @external_ncr, notice: "External NCR #{@external_ncr.display_name} was successfully created."
     else
+      # If save failed and we uploaded a file, clean up
+      if @external_ncr.dropbox_file_path.present?
+        begin
+          DropboxService.delete_file(@external_ncr.dropbox_file_path)
+        rescue => e
+          Rails.logger.error "Failed to cleanup uploaded file: #{e.message}"
+        end
+      end
+
       prepare_form_data
       render :new, status: :unprocessable_entity
     end
@@ -82,23 +117,29 @@ class ExternalNcrsController < ApplicationController
 
   def update
     # Handle document replacement for draft NCRs
-    if params[:external_ncr][:temp_document].present? && @external_ncr.can_replace_document?
-      # Use the model's replace_document! method instead of manual handling
-      new_file = params[:external_ncr][:temp_document]
+    uploaded_file = params[:external_ncr][:temp_document]
 
-      # Remove temp_document from params to avoid validation issues
-      update_params = external_ncr_params
+    if uploaded_file.present? && @external_ncr.can_replace_document?
+      begin
+        # Upload new file to Dropbox
+        folder_path = "/NCRs/#{@external_ncr.date.year}/#{@external_ncr.date.strftime('%m')}"
+        filename_prefix = "NCR#{@external_ncr.hal_ncr_number}"
 
-      if @external_ncr.update(update_params) && @external_ncr.replace_document!(new_file)
-        redirect_to @external_ncr, notice: "External NCR #{@external_ncr.display_name} was successfully updated with new document."
-        return
-      else
-        render :edit, status: :unprocessable_entity
+        upload_result = DropboxService.upload_file(uploaded_file, folder_path, filename_prefix: filename_prefix)
+
+        # Replace the document
+        @external_ncr.replace_document!(upload_result)
+
+        Rails.logger.info "Successfully replaced document for NCR #{@external_ncr.hal_ncr_number}"
+
+      rescue DropboxService::DropboxError => e
+        Rails.logger.error "Failed to replace document: #{e.message}"
+        redirect_to edit_external_ncr_path(@external_ncr), alert: "Failed to replace document: #{e.message}"
         return
       end
     end
 
-    # Regular update without document replacement
+    # Regular update
     if @external_ncr.update(external_ncr_params)
       redirect_to @external_ncr, notice: "External NCR #{@external_ncr.display_name} was successfully updated."
     else
@@ -111,7 +152,7 @@ class ExternalNcrsController < ApplicationController
       # Delete document from Dropbox if it exists
       if @external_ncr.dropbox_file_path.present?
         begin
-          DropboxNcrService.delete_document(@external_ncr.dropbox_file_path)
+          DropboxService.delete_file(@external_ncr.dropbox_file_path)
         rescue => e
           Rails.logger.error "Failed to delete Dropbox document for NCR #{@external_ncr.hal_ncr_number}: #{e.message}"
           # Continue with NCR deletion even if Dropbox deletion fails
@@ -212,7 +253,7 @@ class ExternalNcrsController < ApplicationController
       :reject_quantity,
       :description_of_non_conformance, :investigation_root_cause_analysis,
       :root_cause_identified, :containment_corrective_action, :preventive_action
-      # Note: temp_document is handled separately in create/update actions
+      # Note: temp_document is handled separately
     )
   end
 

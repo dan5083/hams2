@@ -1,5 +1,5 @@
-# app/services/dropbox_ncr_service.rb
-class DropboxNcrService
+# app/services/dropbox_service.rb
+class DropboxService
   class DropboxError < StandardError; end
 
   def self.client
@@ -8,45 +8,68 @@ class DropboxNcrService
     @client ||= DropboxApi::Client.new(token)
   end
 
-  def self.upload_document(external_ncr, file_attachment)
-    raise ArgumentError, "ExternalNcr is required" unless external_ncr
-    raise ArgumentError, "File attachment is required" unless file_attachment
+  # Generic file upload method
+  def self.upload_file(uploaded_file, folder_path, filename_prefix: nil)
+    raise ArgumentError, "Uploaded file is required" unless uploaded_file
+    raise ArgumentError, "Folder path is required" if folder_path.blank?
 
     begin
-      # Create folder structure: /NCRs/YYYY/MM/
-      folder_path = "/NCRs/#{external_ncr.date.year}/#{external_ncr.date.strftime('%m')}"
+      # Ensure folder exists
       ensure_folder_exists(folder_path)
 
       # Generate unique filename
-      original_name = file_attachment.blob.filename.to_s
+      original_name = if uploaded_file.respond_to?(:original_filename)
+                        uploaded_file.original_filename
+                      else
+                        uploaded_file.filename.to_s
+                      end
+
       sanitized_name = sanitize_filename(original_name)
       timestamp = Time.current.strftime("%Y%m%d_%H%M%S")
-      filename = "NCR#{external_ncr.hal_ncr_number}_#{timestamp}_#{sanitized_name}"
+
+      filename = if filename_prefix.present?
+                   "#{filename_prefix}_#{timestamp}_#{sanitized_name}"
+                 else
+                   "#{timestamp}_#{sanitized_name}"
+                 end
+
       full_path = "#{folder_path}/#{filename}"
 
       # Read file content
-      file_content = file_attachment.blob.download
+      file_content = if uploaded_file.respond_to?(:tempfile)
+                       uploaded_file.tempfile.read
+                     elsif uploaded_file.respond_to?(:read)
+                       uploaded_file.read
+                     else
+                       uploaded_file.blob.download
+                     end
 
       # Upload to Dropbox
       client.upload(full_path, file_content, mode: :overwrite)
 
       Rails.logger.info "Successfully uploaded file to Dropbox: #{full_path}"
-      full_path
+
+      {
+        path: full_path,
+        filename: original_name,
+        size: file_content.bytesize,
+        content_type: uploaded_file.content_type
+      }
 
     rescue DropboxApi::Errors::BasicError => e
-      Rails.logger.error "Dropbox API error uploading NCR #{external_ncr.hal_ncr_number}: #{e.message}"
+      Rails.logger.error "Dropbox API error uploading file: #{e.message}"
       raise DropboxError, "Failed to upload to Dropbox: #{e.message}"
     rescue => e
-      Rails.logger.error "Unexpected error uploading NCR #{external_ncr.hal_ncr_number}: #{e.message}"
+      Rails.logger.error "Unexpected error uploading file: #{e.message}"
       raise DropboxError, "Upload failed: #{e.message}"
     end
   end
 
+  # Generate temporary download link (4 hours by default)
   def self.generate_download_link(dropbox_path, expires_at: 4.hours.from_now)
     raise ArgumentError, "Dropbox path is required" if dropbox_path.blank?
 
     begin
-      # Generate a temporary link (valid for 4 hours by default)
       response = client.get_temporary_link(dropbox_path)
       response.link
 
@@ -62,7 +85,8 @@ class DropboxNcrService
     end
   end
 
-  def self.delete_document(dropbox_path)
+  # Delete file from Dropbox
+  def self.delete_file(dropbox_path)
     raise ArgumentError, "Dropbox path is required" if dropbox_path.blank?
 
     begin
@@ -82,6 +106,7 @@ class DropboxNcrService
     end
   end
 
+  # Get file metadata
   def self.get_file_metadata(dropbox_path)
     raise ArgumentError, "Dropbox path is required" if dropbox_path.blank?
 
@@ -103,15 +128,10 @@ class DropboxNcrService
     end
   end
 
-  def self.list_ncr_documents(year = Date.current.year, month = nil)
-    folder_path = if month
-                    "/NCRs/#{year}/#{month.to_s.rjust(2, '0')}"
-                  else
-                    "/NCRs/#{year}"
-                  end
-
+  # List files in a folder
+  def self.list_files(folder_path, recursive: false)
     begin
-      entries = client.list_folder(folder_path, recursive: month.nil?)
+      entries = client.list_folder(folder_path, recursive: recursive)
       entries.entries.map do |entry|
         {
           name: entry.name,
@@ -129,6 +149,26 @@ class DropboxNcrService
       []
     end
   end
+
+  # Test connection
+  def self.connection_test
+    begin
+      account_info = client.get_current_account
+      {
+        success: true,
+        account_name: "#{account_info.name.given_name} #{account_info.name.surname}",
+        email: account_info.email,
+        account_id: account_info.account_id
+      }
+    rescue => e
+      {
+        success: false,
+        error: e.message
+      }
+    end
+  end
+
+  private
 
   def self.ensure_folder_exists(folder_path)
     begin
@@ -150,37 +190,5 @@ class DropboxNcrService
     filename.gsub(/[^a-zA-Z0-9\-_\.]/, '_')
             .gsub(/_{2,}/, '_')
             .gsub(/^_+|_+$/, '')
-  end
-
-  def self.validate_file_type(content_type, allowed_types = nil)
-    allowed_types ||= [
-      'application/pdf',
-      'image/jpeg',
-      'image/jpg',
-      'image/png',
-      'image/tiff',
-      'image/tif',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    ]
-
-    allowed_types.include?(content_type)
-  end
-
-  def self.connection_test
-    begin
-      account_info = client.get_current_account
-      {
-        success: true,
-        account_name: "#{account_info.name.given_name} #{account_info.name.surname}",
-        email: account_info.email,
-        account_id: account_info.account_id
-      }
-    rescue => e
-      {
-        success: false,
-        error: e.message
-      }
-    end
   end
 end
