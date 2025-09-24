@@ -213,40 +213,15 @@ def download_document
     begin
       Rails.logger.info "Starting download for NCR #{@external_ncr.hal_ncr_number}"
 
-      # Use Cloudinary API to get the file content directly
-      resource_type = @external_ncr.cloudinary_public_id.match?(/\.(pdf|doc|docx)$/i) ? 'raw' : 'image'
+      # Generate a signed URL with attachment flag for download
+      download_url = CloudinaryService.generate_download_url(@external_ncr.cloudinary_public_id)
 
-      # Download file content using Cloudinary API
-      file_content = Cloudinary::Api.resource(@external_ncr.cloudinary_public_id,
-        resource_type: resource_type,
-        max_results: 1
-      )
-
-      # Get the secure URL from the API response
-      download_url = file_content['secure_url']
-
-      # Use Net::HTTP with proper authentication headers
-      require 'net/http'
-      require 'uri'
-
-      uri = URI(download_url)
-      http = Net::HTTP.new(uri.host, uri.port)
-      http.use_ssl = true
-
-      request = Net::HTTP::Get.new(uri)
-      # Add authentication if needed
-      request.basic_auth(Cloudinary.config.api_key, Cloudinary.config.api_secret) if download_url.include?('cloudinary.com')
-
-      response = http.request(request)
-
-      if response.code == '200'
-        send_data response.body,
-                  filename: @external_ncr.document_filename,
-                  type: @external_ncr.content_type || 'application/pdf',
-                  disposition: 'attachment'
+      if download_url
+        Rails.logger.info "Generated download URL, redirecting to Cloudinary"
+        redirect_to download_url, allow_other_host: true
       else
-        Rails.logger.error "Download failed with code: #{response.code}"
-        redirect_to @external_ncr, alert: 'Unable to download document. Please try again.'
+        Rails.logger.error "Failed to generate download URL"
+        redirect_to @external_ncr, alert: 'Unable to generate download link. Please try again.'
       end
 
     rescue => e

@@ -80,19 +80,20 @@ def self.generate_download_url(public_id, options = {})
                       'image'
                     end
 
-    # Get the resource info to get the direct secure URL
-    resource_info = Cloudinary::Api.resource(public_id, resource_type: resource_type)
+    # Generate a signed URL with attachment flag to force download
+    url = Cloudinary::Utils.cloudinary_url(
+      public_id,
+      {
+        resource_type: resource_type,
+        secure: true,
+        sign_url: true,
+        flags: 'attachment',
+        type: 'upload'
+      }.merge(options)
+    )
 
-    # Check if there's already a derived resource with attachment flag
-    derived_with_attachment = resource_info['derived']&.find { |d| d['transformation']&.include?('fl_attachment') }
-
-    if derived_with_attachment
-      # Use the pre-generated attachment URL
-      derived_with_attachment['secure_url']
-    else
-      # Use the direct secure URL - browsers will typically download PDFs anyway
-      resource_info['secure_url']
-    end
+    Rails.logger.info "Generated Cloudinary download URL for #{public_id}: #{url}"
+    url
 
   rescue => e
     Rails.logger.error "Error generating Cloudinary download URL for #{public_id}: #{e.message}"
