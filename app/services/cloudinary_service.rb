@@ -70,24 +70,23 @@ def self.upload_file(uploaded_file, folder_path, filename_prefix: nil, resource_
 end
 
   # Generate download URL
-  def self.generate_download_url(public_id, options = {})
-    raise ArgumentError, "Public ID is required" if public_id.blank?
+def self.generate_download_url(public_id, options = {})
+  raise ArgumentError, "Public ID is required" if public_id.blank?
 
-    begin
-      # Generate URL with download flag
-      Cloudinary::Utils.cloudinary_url(
-        public_id,
-        {
-          flags: 'attachment',
-          secure: true,
-          resource_type: 'auto' # This helps Cloudinary determine the correct resource type
-        }.merge(options)
-      )
-    rescue => e
-      Rails.logger.error "Error generating Cloudinary download URL for #{public_id}: #{e.message}"
-      nil
-    end
+  begin
+    # Generate URL with download flag
+    Cloudinary::Utils.cloudinary_url(
+      public_id,
+      {
+        flags: 'attachment',
+        secure: true
+      }.merge(options)
+    )
+  rescue => e
+    Rails.logger.error "Error generating Cloudinary download URL for #{public_id}: #{e.message}"
+    nil
   end
+end
 
   # Generate view URL (for displaying in browser)
   def self.generate_view_url(public_id, options = {})
