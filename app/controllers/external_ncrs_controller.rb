@@ -223,7 +223,19 @@ def response_pdf
   Rails.logger.info "=== NCR PDF DEBUG ==="
   Rails.logger.info "External NCR ID: #{@external_ncr.id}"
   Rails.logger.info "External NCR Number: #{@external_ncr.hal_ncr_number}"
-  Rails.logger.info "Chrome path exists: #{File.exist?('/app/.apt/usr/bin/google-chrome')}"
+
+  # Check various Chrome paths
+  chrome_paths = [
+    '/app/.apt/usr/bin/google-chrome',
+    '/usr/bin/google-chrome',
+    '/usr/bin/chromium-browser',
+    '/app/.apt/usr/bin/chromium-browser'
+  ]
+
+  chrome_paths.each do |path|
+    Rails.logger.info "Chrome at #{path}: #{File.exist?(path)}"
+  end
+
   Rails.logger.info "Grover options from config: #{Grover.configuration.options}"
 
   respond_to do |format|
@@ -231,11 +243,16 @@ def response_pdf
     format.pdf do
       Rails.logger.info "About to call Grover.new..."
 
+      # Try to match exactly how Release Notes work - with explicit options
       pdf = Grover.new(
         render_to_string(
           template: 'external_ncrs/response',
           layout: false
-        )
+        ),
+        format: 'A4',
+        margin: { top: '1cm', bottom: '1cm', left: '1cm', right: '1cm' },
+        print_background: true,
+        prefer_css_page_size: true
       ).to_pdf
 
       Rails.logger.info "Grover PDF generated successfully"
