@@ -4,11 +4,11 @@
 
   <% if @works_order.part&.locked_for_editing? %>
     <% @works_order.part.locked_operations.each do |operation| %>
-      <div class="border p-4 mb-4 <%= operation_signed_off?(operation) ? 'bg-green-50' : 'bg-gray-50' %>">
+      <div class="border p-4 mb-4 <%= operation_signed_off?(@works_order, operation) ? 'bg-green-50' : 'bg-gray-50' %>">
         <h3>Op <%= operation["position"] %>: <%= operation["display_name"] %></h3>
         <p><%= operation["operation_text"] %></p>
 
-        <% if operation_signed_off?(operation) %>
+        <% if operation_signed_off?(@works_order, operation) %>
           <span class="text-green-600">✓ Signed off</span>
         <% else %>
           <%= button_to "Sign Off",
