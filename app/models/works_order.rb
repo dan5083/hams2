@@ -371,7 +371,34 @@ class WorksOrder < ApplicationRecord
     release_notes.joins(:external_ncrs).exists?
   end
 
+  def ecard
+    # @works_order already set by before_action
+  end
+
+  def sign_off_operation
+    position = params[:operation_position].to_i
+
+    # Initialize customised_process_data if blank
+    @works_order.customised_process_data ||= { "operations" => {} }
+
+    # Sign off the operation
+    @works_order.customised_process_data["operations"][position.to_s] = {
+      "signed_off_by" => Current.user.id,
+      "signed_off_at" => Time.current.iso8601
+    }
+
+    if @works_order.save
+      redirect_to ecard_works_order_path(@works_order), notice: "Operation signed off"
+    else
+      redirect_to ecard_works_order_path(@works_order), alert: "Failed to sign off"
+    end
+  end
+
   private
+
+  def operation_signed_off?(operation)
+    @works_order.customised_process_data.dig("operations", operation["position"].to_s, "signed_off_at").present?
+  end
 
   def set_defaults
     self.is_open = true if is_open.nil?

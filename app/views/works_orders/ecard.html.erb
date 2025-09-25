@@ -1,0 +1,21 @@
+# views/works_orders/ecard.html.erb
+<div class="container mx-auto px-4 py-6">
+  <h1>E-Card: WO<%= @works_order.number %></h1>
+
+  <% @works_order.locked_operations.each do |operation| %>
+    <div class="border p-4 mb-4 <%= operation_signed_off?(operation) ? 'bg-green-50' : 'bg-gray-50' %>">
+      <h3>Op <%= operation["position"] %>: <%= operation["display_name"] %></h3>
+      <p><%= operation["operation_text"] %></p>
+
+      <% if operation_signed_off?(operation) %>
+        <span class="text-green-600">✓ Signed off</span>
+      <% else %>
+        <%= button_to "Sign Off",
+            sign_off_operation_works_order_path(@works_order),
+            params: { operation_position: operation["position"] },
+            method: :patch,
+            class: "bg-blue-500 text-white px-4 py-2 rounded" %>
+      <% end %>
+    </div>
+  <% end %>
+</div>

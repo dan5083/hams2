@@ -1,7 +1,6 @@
 # app/controllers/works_orders_controller.rb - Fixed pricing parameter handling and route card operations
 class WorksOrdersController < ApplicationController
-  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :create_invoice, :void]
-
+  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :ecard, :sign_off_operation, :create_invoice, :void]
 
  def index
     @works_orders = WorksOrder.includes(:customer_order, :part, :release_level, :transport_method, customer: [])
@@ -240,6 +239,42 @@ class WorksOrdersController < ApplicationController
 
       redirect_to @works_order,
                   alert: "❌ Failed to stage invoice: #{e.message}. Please try again or contact support."
+    end
+  end
+
+  def ecard
+    # Restrict to specific demo customers
+    demo_customers = ["24 Locks"]
+
+    unless demo_customers.include?(@works_order.customer.name)
+      redirect_to @works_order, alert: "E-Cards are currently in beta testing for select customers."
+      return
+    end
+  end
+
+  def sign_off_operation
+    # Restrict to demo customers
+    demo_customers = ["24 Locks"]
+    unless demo_customers.include?(@works_order.customer.name)
+      redirect_to @works_order, alert: "E-Cards are currently in beta testing for select customers."
+      return
+    end
+
+    position = params[:operation_position].to_i
+
+    # Initialize customised_process_data if blank
+    @works_order.customised_process_data ||= { "operations" => {} }
+
+    # Sign off the operation
+    @works_order.customised_process_data["operations"][position.to_s] = {
+      "signed_off_by" => Current.user.id,
+      "signed_off_at" => Time.current.iso8601
+    }
+
+    if @works_order.save
+      redirect_to ecard_works_order_path(@works_order), notice: "Operation signed off"
+    else
+      redirect_to ecard_works_order_path(@works_order), alert: "Failed to sign off"
     end
   end
 

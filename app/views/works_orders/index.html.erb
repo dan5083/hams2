@@ -146,7 +146,7 @@
               <% end %>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-              <div class="flex space-x-2">
+              <div class="flex flex-wrap gap-2">
                 <%= link_to "View", works_order, class: "text-blue-600 hover:text-blue-900" %>
                 <% unless works_order.voided %>
                   <%= link_to "Edit", edit_works_order_path(works_order), class: "text-yellow-600 hover:text-yellow-900" %>
@@ -154,6 +154,9 @@
                       "javascript:void(0)",
                       onclick: "printRouteCard('#{route_card_works_order_path(works_order)}')",
                       class: "text-green-600 hover:text-green-900" %>
+                  <%= link_to "E-Card",
+                      ecard_works_order_path(works_order),
+                      class: "text-purple-600 hover:text-purple-900" %>
                   <%
                     # Check if this customer order has any uninvoiced release notes
                     customer_order_has_uninvoiced = ReleaseNote.joins(:works_order)

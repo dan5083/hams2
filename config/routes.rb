@@ -53,14 +53,16 @@ Rails.application.routes.draw do
       get :search_customers
     end
 
-    # 3. Works Orders nested under customer orders for creation flow
-    resources :works_orders, only: [:new, :create], shallow: true
+  # 3. Works Orders nested under customer orders for creation flow
+  resources :works_orders, only: [:new, :create], shallow: true
   end
 
   # 3. Works Orders routes (main CRUD) - Updated to reference parts directly
   resources :works_orders do
     member do
       get :route_card
+      get :ecard
+      patch :sign_off_operation
       patch :void
       patch :create_invoice
       patch :create_invoice_with_charges
