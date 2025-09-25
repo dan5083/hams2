@@ -1,0 +1,68 @@
+# views/works_orders/_ecard_header.html.erb
+<div class="bg-white border-2 border-gray-300 mb-6" data-controller="ecard-header">
+  <div class="bg-gray-50 px-4 py-2 border-b border-gray-300 flex justify-between items-center">
+    <h1 class="text-xl font-bold">E-Card: WO<%= works_order.number %></h1>
+    <div class="text-sm text-gray-600">
+      Generated <%= Time.current.strftime("%d/%m/%Y %H:%M") %>
+    </div>
+  </div>
+
+  <div class="p-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+      <!-- Left Column -->
+      <div class="space-y-2">
+        <div class="flex">
+          <span class="font-semibold w-24 bg-gray-50 px-2 py-1 border">Customer:</span>
+          <span class="px-2 py-1 border flex-1"><%= works_order.customer.name %></span>
+        </div>
+        <div class="flex">
+          <span class="font-semibold w-24 bg-gray-50 px-2 py-1 border">Order:</span>
+          <span class="px-2 py-1 border flex-1"><%= works_order.customer_order.number %></span>
+        </div>
+        <div class="flex">
+          <span class="font-semibold w-24 bg-gray-50 px-2 py-1 border">Part:</span>
+          <span class="px-2 py-1 border flex-1"><%= works_order.part_number %></span>
+        </div>
+        <div class="flex">
+          <span class="font-semibold w-24 bg-gray-50 px-2 py-1 border">Material:</span>
+          <span class="px-2 py-1 border flex-1"><%= works_order.part&.material.presence || "Not specified" %></span>
+        </div>
+      </div>
+
+      <!-- Right Column -->
+      <div class="space-y-2">
+        <div class="flex">
+          <span class="font-semibold w-24 bg-gray-50 px-2 py-1 border">Qty:</span>
+          <span class="px-2 py-1 border flex-1"><%= works_order.quantity %></span>
+        </div>
+        <div class="flex">
+          <span class="font-semibold w-24 bg-gray-50 px-2 py-1 border">Issue:</span>
+          <span class="px-2 py-1 border flex-1"><%= works_order.part_issue %></span>
+        </div>
+        <div class="flex">
+          <span class="font-semibold w-24 bg-gray-50 px-2 py-1 border">Created:</span>
+          <span class="px-2 py-1 border flex-1"><%= works_order.created_at.strftime("%d/%m/%Y") %></span>
+        </div>
+        <div class="flex">
+          <span class="font-semibold w-24 bg-gray-50 px-2 py-1 border">Thickness:</span>
+          <span class="px-2 py-1 border flex-1"><%= works_order.part&.specified_thicknesses.presence || "Not specified" %></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Full width fields -->
+    <div class="mt-4 space-y-2">
+      <div class="flex">
+        <span class="font-semibold w-24 bg-gray-50 px-2 py-1 border">Spec:</span>
+        <span class="px-2 py-1 border flex-1"><%= works_order.specification.presence || "No specification" %></span>
+      </div>
+
+      <% if works_order.special_instructions.present? %>
+      <div class="flex">
+        <span class="font-semibold w-24 bg-gray-50 px-2 py-1 border">Instructions:</span>
+        <span class="px-2 py-1 border flex-1 text-red-600 font-medium"><%= works_order.special_instructions %></span>
+      </div>
+      <% end %>
+    </div>
+  </div>
+</div>

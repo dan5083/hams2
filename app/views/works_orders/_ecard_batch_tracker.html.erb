@@ -1,0 +1,89 @@
+# views/works_orders/_ecard_batch_tracker.html.erb
+<div data-controller="batch-tracker"
+     data-batch-tracker-operation-position-value="<%= operation['position'] %>"
+     data-batch-tracker-works-order-id-value="<%= works_order.id %>">
+
+  <div class="mb-3 flex justify-between items-center">
+    <h4 class="font-semibold text-gray-700">Batch Tracking</h4>
+    <button type="button"
+            class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm font-medium"
+            data-action="click->batch-tracker#addBatch">
+      + Add Batch
+    </button>
+  </div>
+
+  <!-- Batch Headers -->
+  <div class="border border-gray-300 bg-gray-50">
+    <div class="grid grid-cols-12 gap-1 p-2 text-xs font-semibold text-gray-700">
+      <div class="col-span-1">Batch</div>
+      <div class="col-span-2">Date</div>
+      <div class="col-span-2">Time</div>
+      <div class="col-span-2">Qty</div>
+      <div class="col-span-2">Operator</div>
+      <div class="col-span-2">Notes</div>
+      <div class="col-span-1">Actions</div>
+    </div>
+  </div>
+
+  <!-- Batch Rows Container -->
+  <div class="border-l border-r border-b border-gray-300 min-h-[100px]"
+       data-batch-tracker-target="batchContainer">
+
+    <!-- Default empty state -->
+    <div class="p-4 text-center text-gray-500 text-sm"
+         data-batch-tracker-target="emptyState">
+      No batches recorded yet. Click "Add Batch" to start tracking.
+    </div>
+  </div>
+
+  <!-- Hidden Template for New Batch Row -->
+  <template data-batch-tracker-target="batchTemplate">
+    <div class="grid grid-cols-12 gap-1 p-2 border-b border-gray-200 bg-white"
+         data-batch-tracker-target="batchRow">
+      <div class="col-span-1">
+        <span class="text-sm font-medium" data-batch-tracker-target="batchNumber"></span>
+      </div>
+      <div class="col-span-2">
+        <input type="date"
+               class="w-full text-xs border border-gray-300 rounded px-1 py-1"
+               data-batch-tracker-target="dateInput"
+               data-action="input->batch-tracker#handleInput">
+      </div>
+      <div class="col-span-2">
+        <input type="time"
+               class="w-full text-xs border border-gray-300 rounded px-1 py-1"
+               data-batch-tracker-target="timeInput"
+               data-action="input->batch-tracker#handleInput">
+      </div>
+      <div class="col-span-2">
+        <input type="number"
+               class="w-full text-xs border border-gray-300 rounded px-1 py-1"
+               placeholder="Qty"
+               data-batch-tracker-target="qtyInput"
+               data-action="input->batch-tracker#handleInput">
+      </div>
+      <div class="col-span-2">
+        <input type="text"
+               class="w-full text-xs border border-gray-300 rounded px-1 py-1"
+               placeholder="Operator"
+               data-batch-tracker-target="operatorInput"
+               data-action="input->batch-tracker#handleInput">
+      </div>
+      <div class="col-span-2">
+        <input type="text"
+               class="w-full text-xs border border-gray-300 rounded px-1 py-1"
+               placeholder="Notes"
+               data-batch-tracker-target="notesInput"
+               data-action="input->batch-tracker#handleInput">
+      </div>
+      <div class="col-span-1 flex justify-center">
+        <button type="button"
+                class="text-red-500 hover:text-red-700 text-xs font-medium"
+                data-action="click->batch-tracker#removeBatch"
+                data-batch-tracker-target="removeButton">
+          ×
+        </button>
+      </div>
+    </div>
+  </template>
+</div>
