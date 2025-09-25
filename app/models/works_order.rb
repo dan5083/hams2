@@ -23,7 +23,6 @@ class WorksOrder < ApplicationRecord
 
   validate :validate_quantity_released
   validate :validate_each_price_when_required
-  validate :validate_part_matches
 
   scope :active, -> { where(voided: false) }
   scope :voided, -> { where(voided: true) }
@@ -438,18 +437,6 @@ class WorksOrder < ApplicationRecord
   def validate_each_price_when_required
     if price_type == 'each' && each_price.blank?
       errors.add(:each_price, "is required when price type is 'each'")
-    end
-  end
-
-  def validate_part_matches
-    return unless part && part_number && part_issue
-
-    if part.part_number != part_number.upcase.strip
-      errors.add(:part, "number does not match selected part")
-    end
-
-    if part.part_issue != part_issue.upcase.strip
-      errors.add(:part, "issue does not match selected part")
     end
   end
 
