@@ -361,13 +361,17 @@ class WorksOrdersController < ApplicationController
     if params[:customer_order_id].present?
       @customer_order = CustomerOrder.find(params[:customer_order_id])
       @customer_orders = [@customer_order]
-    elsif @works_order.customer_order.present?
+    elsif @works_order&.customer_order.present?  # Add & operator here
       @customer_order = @works_order.customer_order
       @customer_orders = [@customer_order]
     else
       @customer_order = nil
       @customer_orders = CustomerOrder.active.includes(:customer).order(created_at: :desc)
     end
+
+    # Safety fallback - ensure @customer_orders is never nil
+    @customer_orders ||= []
+
     load_reference_data
   end
 

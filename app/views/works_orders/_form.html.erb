@@ -35,11 +35,14 @@
           <p class="mt-1 text-xs text-gray-500">Pre-selected from the customer order you came from</p>
         <% else %>
           <%= form.select :customer_order_id,
-              options_for_select([['Select Customer Order', '']] + @customer_orders.map { |co| ["#{co.customer.name} - #{co.number}", co.id] }, works_order.customer_order_id),
+              options_for_select(
+                [['Select Customer Order', '']] +
+                (@customer_orders&.map { |co| ["#{co.customer.name} - #{co.number}", co.id] } || []),
+                works_order.customer_order_id
+              ),
               {},
               {
-                class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
-                required: true
+                class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               } %>
         <% end %>
       </div>
