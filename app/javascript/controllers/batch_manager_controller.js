@@ -238,15 +238,27 @@ export default class extends Controller {
 
   // Event dispatching to notify other controllers
   notifyBatchAdded(batch) {
-    this.dispatch('batchAdded', { detail: batch })
+    const event = new CustomEvent('batch-manager:batchAdded', {
+      detail: batch,
+      bubbles: true
+    })
+    document.dispatchEvent(event)
   }
 
   notifyBatchRemoved(batchId) {
-    this.dispatch('batchRemoved', { detail: { batchId } })
+    const event = new CustomEvent('batch-manager:batchRemoved', {
+      detail: { batchId },
+      bubbles: true
+    })
+    document.dispatchEvent(event)
   }
 
   notifyBatchUpdated(batch) {
-    this.dispatch('batchUpdated', { detail: batch })
+    const event = new CustomEvent('batch-manager:batchUpdated', {
+      detail: batch,
+      bubbles: true
+    })
+    document.dispatchEvent(event)
   }
 
   // Save batches to server (placeholder)

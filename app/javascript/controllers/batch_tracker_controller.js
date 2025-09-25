@@ -19,16 +19,16 @@ export default class extends Controller {
   }
 
   setupBatchListener() {
-    // Listen for batch manager events
-    this.element.addEventListener('batch-manager:batchAdded', (event) => {
+    // Listen for batch manager events on the document level
+    document.addEventListener('batch-manager:batchAdded', (event) => {
       this.handleBatchAdded(event.detail)
     })
 
-    this.element.addEventListener('batch-manager:batchUpdated', (event) => {
+    document.addEventListener('batch-manager:batchUpdated', (event) => {
       this.handleBatchUpdated(event.detail)
     })
 
-    this.element.addEventListener('batch-manager:batchRemoved', (event) => {
+    document.addEventListener('batch-manager:batchRemoved', (event) => {
       this.handleBatchRemoved(event.detail)
     })
   }
