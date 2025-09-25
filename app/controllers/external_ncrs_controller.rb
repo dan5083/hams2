@@ -221,40 +221,7 @@ def response_pdf
   @external_ncr = ExternalNcr.find(params[:id])
 
   respond_to do |format|
-    format.html { render layout: false }
-    format.pdf do
-      begin
-        Rails.logger.info "About to render External NCR template to string"
-
-        html_content = render_to_string(
-          template: 'external_ncrs/response',
-          layout: false
-          # Remove the formats: [:html] line since you have a .pdf.erb template
-        )
-
-        Rails.logger.info "Template rendered successfully, length: #{html_content.length}"
-        Rails.logger.info "Starting PDF conversion..."
-
-        pdf = Grover.new(
-          html_content,
-          format: 'A4',
-          margin: { top: '1cm', bottom: '1cm', left: '1cm', right: '1cm' },
-          print_background: true,
-          prefer_css_page_size: true
-        ).to_pdf
-
-        Rails.logger.info "PDF generated successfully"
-
-        send_data pdf,
-                  filename: "NCR_Response_#{@external_ncr.hal_ncr_number}.pdf",
-                  type: 'application/pdf',
-                  disposition: 'inline'
-
-      rescue => e
-        Rails.logger.error "Failed at step: #{e.message}"
-        render plain: "Failed: #{e.message}", status: 500, content_type: 'text/plain'
-      end
-    end
+    format.html { render layout: false }  # Remove PDF format entirely
   end
 end
 

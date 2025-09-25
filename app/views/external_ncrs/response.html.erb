@@ -2,6 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8">
+    <title>NCR Response - <%= @external_ncr.display_name %></title>
     <style>
       body {
         font-family: sans-serif;
@@ -17,6 +18,51 @@
       @page {
         size: A4 portrait;
         margin: 1cm;
+      }
+
+      @media print {
+        body { margin: 0; }
+        .no-print { display: none !important; }
+      }
+
+      .no-print {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 10px;
+        border-radius: 5px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      }
+
+      .print-button {
+        background: #3b82f6;
+        color: white;
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        margin-right: 8px;
+      }
+
+      .print-button:hover {
+        background: #2563eb;
+      }
+
+      .close-button {
+        background: #6b7280;
+        color: white;
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+
+      .close-button:hover {
+        background: #4b5563;
       }
 
       .logo-header {
@@ -196,6 +242,16 @@
     </style>
   </head>
   <body>
+    <!-- Print Controls (hidden when printing) -->
+    <div class="no-print">
+      <button class="print-button" onclick="window.print()">
+        Print Document
+      </button>
+      <button class="close-button" onclick="window.close()">
+        Close
+      </button>
+    </div>
+
     <!-- Logo Header -->
     <div class="logo-header">
       <%= image_tag(asset_path("logo-with-company-name.png"), alt: "Hard Anodising Surface Treatments Ltd") %>
@@ -350,5 +406,20 @@
       Tel: 01562 747100 | <a href="https://www.hard-anodising.co.uk/">www.hard-anodising.co.uk</a><br/>
       <em>This document constitutes our formal response to the referenced non-conformance report.</em>
     </div>
+
+    <script>
+      // Auto-focus for better UX when opening in new tab
+      window.addEventListener('load', function() {
+        document.body.focus();
+      });
+
+      // Keyboard shortcut for printing
+      document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+          e.preventDefault();
+          window.print();
+        }
+      });
+    </script>
   </body>
 </html>
