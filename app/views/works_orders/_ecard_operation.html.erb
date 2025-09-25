@@ -1,0 +1,33 @@
+<div class="bg-white border-2 border-gray-300 <%= operation_signed_off?(works_order, operation) ? 'bg-green-50' : '' %>">
+  <!-- Operation Header -->
+  <div class="bg-gray-100 px-4 py-2 border-b border-gray-300 flex justify-between items-center">
+    <h3 class="font-bold">Op <%= operation["position"] %>: <%= operation["display_name"] %></h3>
+    <% if operation_signed_off?(works_order, operation) %>
+      <span class="text-green-600 font-semibold">✓ Signed Off</span>
+    <% else %>
+      <%= button_to "Sign Off Operation",
+          sign_off_operation_works_order_path(works_order),
+          params: { operation_position: operation["position"] },
+          method: :patch,
+          class: "bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm font-medium",
+          data: { confirm: "Sign off this operation?" } %>
+    <% end %>
+  </div>
+
+  <!-- Operation Content -->
+  <div class="p-4">
+    <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+      <p class="text-sm leading-relaxed"><%= operation["operation_text"] %></p>
+    </div>
+
+    <!-- Basic batch tracking for now -->
+    <div class="border border-gray-300">
+      <div class="bg-gray-50 px-4 py-2 border-b border-gray-300">
+        <h4 class="font-semibold text-gray-700">Batch Tracking</h4>
+      </div>
+      <div class="p-4 text-sm text-gray-500">
+        Batch tracking functionality coming soon...
+      </div>
+    </div>
+  </div>
+</div>
