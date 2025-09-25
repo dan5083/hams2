@@ -485,8 +485,11 @@ class WorksOrder < ApplicationRecord
   end
 
   def should_sync_part_details?
-    # Sync when part_id changes or when part details are blank
-    part_id_changed? || part_number.blank? || part_issue.blank?
+    part_id_changed? ||
+    part_number.blank? ||
+    part_issue.blank? ||
+    (part && part.part_number != part_number) ||
+    (part && part.part_issue != part_issue)
   end
 
   def set_part_details_from_relationship
