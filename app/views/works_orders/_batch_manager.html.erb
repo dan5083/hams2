@@ -1,0 +1,80 @@
+<%# app/views/works_orders/_batch_manager.html.erb %>
+<div class="bg-white border-2 border-blue-300 mb-6"
+     data-controller="batch-manager"
+     data-batch-manager-works-order-id-value="<%= works_order.id %>"
+     data-batch-manager-total-quantity-value="<%= works_order.quantity %>"
+     data-batch-manager-batches-value="[]"
+     data-total-operations="<%= works_order.part.locked_operations.count %>">
+
+  <!-- Header -->
+  <div class="bg-blue-50 px-4 py-2 border-b border-blue-300 flex justify-between items-center">
+    <h3 class="font-bold text-blue-800">Batch Management</h3>
+    <div class="text-sm text-blue-600">
+      Work Order: <%= works_order.quantity %> parts total
+    </div>
+  </div>
+
+  <div class="p-4">
+    <!-- Batch Summary -->
+    <div class="mb-4 grid grid-cols-3 gap-4 text-sm">
+      <div class="bg-gray-50 border rounded p-2 text-center">
+        <div class="font-semibold text-gray-700">Total WO Quantity</div>
+        <div class="text-lg font-bold text-gray-900"><%= works_order.quantity %></div>
+      </div>
+      <div class="bg-blue-50 border border-blue-200 rounded p-2 text-center">
+        <div class="font-semibold text-blue-700">Assigned to Batches</div>
+        <div class="text-lg font-bold text-blue-900" data-batch-manager-target="totalAssigned">0</div>
+      </div>
+      <div class="bg-green-50 border border-green-200 rounded p-2 text-center">
+        <div class="font-semibold text-green-700">Remaining</div>
+        <div class="text-lg font-bold" data-batch-manager-target="totalRemaining"><%= works_order.quantity %></div>
+      </div>
+    </div>
+
+    <!-- Warning Message -->
+    <div class="mb-4 p-2 bg-orange-50 border border-orange-200 rounded text-sm text-orange-700 hidden"
+         data-batch-manager-target="warningMessage">
+      <!-- Warning text will be inserted here -->
+    </div>
+
+    <!-- Add New Batch Form -->
+    <div class="mb-4 p-3 bg-gray-50 border border-gray-200 rounded">
+      <div class="flex items-center space-x-3">
+        <label class="text-sm font-medium text-gray-700">Add New Batch:</label>
+        <input type="number"
+               placeholder="Quantity"
+               class="border border-gray-300 rounded px-3 py-1 w-24 text-sm"
+               data-batch-manager-target="newBatchQuantity">
+        <button type="button"
+                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1 rounded text-sm font-medium"
+                data-action="click->batch-manager#addBatch">
+          Add Batch
+        </button>
+      </div>
+      <div class="mt-2 text-xs text-gray-600">
+        Batch size is typically limited by vat capacity and part dimensions
+      </div>
+    </div>
+
+    <!-- Current Batches List -->
+    <div class="space-y-2" data-batch-manager-target="batchList">
+      <!-- Batches will be rendered here -->
+      <div class="text-center text-gray-500 py-4 text-sm">
+        No batches created yet. Add a batch to start processing.
+      </div>
+    </div>
+
+    <!-- Batch Instructions -->
+    <div class="mt-4 pt-4 border-t border-gray-200">
+      <div class="text-xs text-gray-600">
+        <div class="font-medium mb-1">How batches work:</div>
+        <ul class="list-disc list-inside space-y-1">
+          <li>Create batches based on vat capacity and part sizes</li>
+          <li>Each operation processes the entire batch before moving to the next</li>
+          <li>Multiple batches can be active at different stages</li>
+          <li>Operations sign off when their current batch is complete</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
