@@ -78,11 +78,6 @@
         </p>
       </div>
 
-      <!-- Hidden fields to store part details -->
-      <%= form.hidden_field :part_number %>
-      <%= form.hidden_field :part_issue %>
-      <%= form.hidden_field :part_description %>
-
       <!-- Quantity -->
       <div>
         <%= form.label :quantity, class: "block text-sm font-medium text-gray-700 mb-1" %>
@@ -332,35 +327,20 @@ function formatCurrency(input) {
   }
 }
 
-// ENHANCED Part selection handler - now includes auto-pricing
+// Simplified Part selection handler - only handles pricing
 function updatePartDetails(selectElement) {
   const partId = selectElement.value;
-  const partNumberField = document.getElementById('works_order_part_number');
-  const partIssueField = document.getElementById('works_order_part_issue');
-  const partDescriptionField = document.getElementById('works_order_part_description');
   const eachPriceField = document.getElementById('each_price_input');
 
   if (partId && window.partsData) {
     const part = window.partsData[partId];
-    if (part) {
-      partNumberField.value = part.part_number;
-      partIssueField.value = part.part_issue;
-      partDescriptionField.value = part.description || `${part.part_number} component`;
-
-      // AUTO-POPULATE EACH PRICE from part standard pricing
-      if (part.each_price && parseFloat(part.each_price) > 0) {
-        eachPriceField.value = parseFloat(part.each_price).toFixed(2);
-        recalculateTotalPrice();
-
-        // Optional: Show a subtle notification that price was auto-populated
-        showPriceAutoPopulatedNotification(part.each_price);
-      }
+    if (part && part.each_price && parseFloat(part.each_price) > 0) {
+      eachPriceField.value = parseFloat(part.each_price).toFixed(2);
+      recalculateTotalPrice();
+      showPriceAutoPopulatedNotification(part.each_price);
     }
   } else {
-    // Clear fields if no part selected
-    partNumberField.value = '';
-    partIssueField.value = '';
-    partDescriptionField.value = '';
+    // Clear price if no part selected
     eachPriceField.value = '';
     recalculateTotalPrice();
   }

@@ -34,6 +34,7 @@ class WorksOrder < ApplicationRecord
   before_validation :calculate_lot_price_from_each_price, if: :should_calculate_lot_price?
   before_validation :set_part_details, if: :part_changed?
   before_validation :set_works_order_number, if: :new_record?
+  before_validation :set_part_details_from_relationship, if: :should_sync_part_details?
   after_initialize :set_defaults, if: :new_record?
   after_update :update_open_status
   after_create :update_part_pricing, if: :should_update_part_pricing_on_create?
@@ -494,5 +495,18 @@ class WorksOrder < ApplicationRecord
 
   def should_update_part_pricing_on_create?
     price_type == 'each' && each_price.present? && each_price > 0
+  end
+
+  def should_sync_part_details?
+    # Sync when part_id changes or when part details are blank
+    part_id_changed? || part_number.blank? || part_issue.blank?
+  end
+
+  def set_part_details_from_relationship
+    return unless part
+
+    self.part_number = part.part_number
+    self.part_issue = part.part_issue
+    self.part_description = part.description.presence || "#{part.part_number}-#{part.part_issue}"
   end
 end

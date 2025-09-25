@@ -94,8 +94,8 @@ class WorksOrdersController < ApplicationController
       @works_order.customer_order_id = params[:customer_order_id]
     end
 
-    # Set up the part automatically
-    if setup_part(@works_order)
+    # Validate part is properly configured
+    if validate_part_configuration(@works_order)
       if @works_order.save
         redirect_to @works_order, notice: 'Works order was successfully created.'
       else
@@ -114,15 +114,10 @@ class WorksOrdersController < ApplicationController
   end
 
   def update
-    # For updates, we might need to update the part if part details changed
-    if part_details_changed?
-      setup_part(@works_order)
-    end
-
     if @works_order.update(works_order_params)
       redirect_to @works_order, notice: 'Works order was successfully updated.'
     else
-      load_reference_data
+      load_form_data_for_errors
       render :edit, status: :unprocessable_entity
     end
   end
@@ -280,7 +275,6 @@ class WorksOrdersController < ApplicationController
 
   private
 
-
   def add_additional_charges_to_invoice(invoice, charge_ids, custom_amounts)
     charge_ids.reject(&:blank?).each do |charge_id|
       charge = AdditionalChargePreset.find(charge_id)
@@ -303,12 +297,11 @@ class WorksOrdersController < ApplicationController
     @works_order = WorksOrder.find(params[:id])
   end
 
-  # UPDATED: Smart parameter filtering based on price_type and additional charges
+  # UPDATED: Removed part detail fields since they're handled by model callback
   def works_order_params
     # Always allow these core parameters
     permitted_params = [
       :customer_order_id, :part_id, :quantity, :price_type,
-      :part_number, :part_issue, :part_description,
       :release_level_id, :transport_method_id
     ]
 
@@ -327,12 +320,11 @@ class WorksOrdersController < ApplicationController
     when 'lot'
       permitted_params << :lot_price
     else
-      # Default case - allow both for backward compatibility, but log warning
+      # Default case - allow both for backward compatibility
       permitted_params += [:each_price, :lot_price]
     end
 
     filtered_params = params.require(:works_order).permit(*permitted_params)
-
     filtered_params
   end
 
@@ -342,7 +334,6 @@ class WorksOrdersController < ApplicationController
     @additional_charge_presets = AdditionalChargePreset.enabled.ordered
 
     if @customer_order.present?
-
       @parts = Part.enabled
                   .for_customer(@customer_order.customer)
                   .includes(:customer)
@@ -361,7 +352,7 @@ class WorksOrdersController < ApplicationController
     if params[:customer_order_id].present?
       @customer_order = CustomerOrder.find(params[:customer_order_id])
       @customer_orders = [@customer_order]
-    elsif @works_order&.customer_order.present?  # Add & operator here
+    elsif @works_order&.customer_order.present?
       @customer_order = @works_order.customer_order
       @customer_orders = [@customer_order]
     else
@@ -375,18 +366,13 @@ class WorksOrdersController < ApplicationController
     load_reference_data
   end
 
-  def setup_part(works_order)
+  # SIMPLIFIED: Just validate part configuration, don't manually set part details
+  def validate_part_configuration(works_order)
     return false unless works_order.customer_order && works_order.part_id.present?
-
-    customer = works_order.customer_order.customer
 
     begin
       # Get the selected part
       part = Part.find(works_order.part_id)
-      works_order.part = part
-      works_order.part_number = part.part_number
-      works_order.part_issue = part.part_issue
-      works_order.part_description = part.description || "#{part.part_number} component"
 
       # Check if part has processing instructions configured
       if part.customisation_data.blank? || part.customisation_data.dig("operation_selection", "treatments").blank?
@@ -396,14 +382,8 @@ class WorksOrdersController < ApplicationController
 
       return true
     rescue => e
-      works_order.errors.add(:base, "Error setting up part: #{e.message}")
+      works_order.errors.add(:base, "Error validating part: #{e.message}")
       return false
     end
   end
-
-  def part_details_changed?
-    @works_order.part_number_changed? || @works_order.part_issue_changed?
-  end
-
-
 end
