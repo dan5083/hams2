@@ -1,9 +1,38 @@
-<div class="container mx-auto px-4 py-6 max-w-4xl">
+<%# app/views/works_orders/ecard.html.erb %>
+<% total_ops = @works_order.part.locked_operations.count %>
+
+<div class="container mx-auto px-4 py-6 max-w-4xl"
+     data-controller="ecard"
+     data-ecard-works-order-id-value="<%= @works_order.id %>"
+     data-ecard-total-operations-value="<%= total_ops %>"
+     data-ecard-auto-refresh-value="true">
+
+  <!-- E-Card Controls -->
+  <div class="mb-4 flex justify-between items-center">
+    <div class="text-sm text-gray-600">
+      <span class="font-medium">E-Card System</span> - Real-time Manufacturing Tracking
+    </div>
+
+    <div class="space-x-2">
+      <button type="button"
+              class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm"
+              data-action="click->ecard#manualRefresh"
+              title="Refresh e-card">
+        Refresh
+      </button>
+
+      <%= link_to "Back to Work Order", @works_order,
+          class: "bg-gray-400 hover:bg-gray-500 text-white px-3 py-1 rounded text-sm" %>
+    </div>
+  </div>
+
   <!-- Header Section -->
-  <%= render 'ecard_header', works_order: @works_order %>
+  <div data-ecard-target="header">
+    <%= render 'ecard_header', works_order: @works_order %>
+  </div>
 
   <!-- Operations Section -->
-  <div class="space-y-4">
+  <div class="space-y-4" data-ecard-target="operations">
     <% @works_order.part.locked_operations.each_with_index do |operation, index| %>
       <%= render 'ecard_operation',
           works_order: @works_order,
@@ -13,5 +42,71 @@
   </div>
 
   <!-- Footer Section -->
-  <%= render 'ecard_footer', works_order: @works_order %>
+  <div data-ecard-target="footer">
+    <%= render 'ecard_footer', works_order: @works_order %>
+  </div>
+
+  <!-- Hidden data for JavaScript controllers -->
+  <script type="application/json" data-ecard-config>
+    {
+      "worksOrderNumber": "<%= @works_order.number %>",
+      "customerName": "<%= @works_order.customer.name %>",
+      "partNumber": "<%= @works_order.part_number %>",
+      "totalOperations": <%= total_ops %>,
+      "autoSaveInterval": 30000,
+      "enableNotifications": true
+    }
+  </script>
 </div>
+
+<!-- Additional Styles for E-Card Specific Elements -->
+<style>
+  /* Animation for operation completion */
+  @keyframes operationComplete {
+    0% { background-color: white; }
+    50% { background-color: #dcfce7; }
+    100% { background-color: #f0fdf4; }
+  }
+
+  .operation-completed {
+    animation: operationComplete 1s ease-in-out;
+  }
+
+  /* Notification animation */
+  .notification-enter {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+
+  .notification-enter-active {
+    transform: translateX(0);
+    opacity: 1;
+    transition: all 0.3s ease-out;
+  }
+
+  .notification-exit {
+    transform: translateX(0);
+    opacity: 1;
+  }
+
+  .notification-exit-active {
+    transform: translateX(100%);
+    opacity: 0;
+    transition: all 0.3s ease-in;
+  }
+
+  /* Prevent printing */
+  @media print {
+    .container {
+      display: none !important;
+    }
+    body::before {
+      content: "E-Cards are not available for printing. Please use the system interface.";
+      display: block;
+      text-align: center;
+      font-size: 18px;
+      padding: 50px;
+      color: #666;
+    }
+  }
+</style>
