@@ -6,8 +6,7 @@ export default class extends Controller {
     "batchList",
     "addBatchForm",
     "newBatchQuantity",
-    "totalAssigned",
-    "totalRemaining",
+    "batchSuggestion",
     "warningMessage"
   ]
 
@@ -19,7 +18,44 @@ export default class extends Controller {
 
   connect() {
     this.initializeBatches()
-    this.updateTotals()
+    this.updateDisplay()
+    this.setupBatchSuggestionListener()
+  }
+
+  setupBatchSuggestionListener() {
+    // Listen for input in batch quantity field to show suggestions
+    if (this.hasNewBatchQuantityTarget) {
+      this.newBatchQuantityTarget.addEventListener('input', () => {
+        this.updateBatchSuggestion()
+      })
+    }
+  }
+
+  updateBatchSuggestion() {
+    if (!this.hasBatchSuggestionTarget || !this.hasNewBatchQuantityTarget) return
+
+    const batchSize = parseInt(this.newBatchQuantityTarget.value)
+    if (!batchSize || batchSize <= 0) {
+      this.batchSuggestionTarget.textContent = ''
+      return
+    }
+
+    const totalQuantity = this.totalQuantityValue
+    const numberOfBatches = Math.ceil(totalQuantity / batchSize)
+    const lastBatchQuantity = totalQuantity - (batchSize * (numberOfBatches - 1))
+
+    if (numberOfBatches === 1) {
+      this.batchSuggestionTarget.textContent = `Suggested: 1 batch of ${totalQuantity} parts`
+    } else {
+      const regularBatches = numberOfBatches - 1
+      this.batchSuggestionTarget.textContent =
+        `Suggested: ${numberOfBatches} batches (${regularBatches}×${batchSize} + 1×${lastBatchQuantity})`
+    }
+  }
+
+  updateDisplay() {
+    this.renderBatches()
+    this.updateQuantityCheck()
   }
 
   initializeBatches() {
@@ -38,9 +74,50 @@ export default class extends Controller {
       return
     }
 
+    this.createSingleBatch(quantity)
+  }
+
+  createSuggestedBatches() {
+    const batchSize = parseInt(this.newBatchQuantityTarget.value)
+
+    if (!batchSize || batchSize <= 0) {
+      this.showWarning("Please enter a batch size first")
+      return
+    }
+
+    // Calculate suggested batches
+    const totalQuantity = this.totalQuantityValue
+    const numberOfBatches = Math.ceil(totalQuantity / batchSize)
+    const lastBatchQuantity = totalQuantity - (batchSize * (numberOfBatches - 1))
+
+    // Confirm before creating multiple batches
+    const confirmMessage = numberOfBatches === 1
+      ? `Create 1 batch of ${totalQuantity} parts?`
+      : `Create ${numberOfBatches} batches (${numberOfBatches - 1}×${batchSize} + 1×${lastBatchQuantity})?`
+
+    if (!confirm(confirmMessage)) {
+      return
+    }
+
+    // Clear existing batches first
+    this.batchesValue = []
+
+    // Create regular batches
+    for (let i = 1; i < numberOfBatches; i++) {
+      this.createSingleBatch(batchSize, i)
+    }
+
+    // Create final batch
+    this.createSingleBatch(lastBatchQuantity, numberOfBatches)
+
+    this.newBatchQuantityTarget.value = ''
+    this.updateDisplay()
+  }
+
+  createSingleBatch(quantity, batchNumber = null) {
     const newBatch = {
-      id: `batch_${Date.now()}`,
-      number: this.batchesValue.length + 1,
+      id: `batch_${Date.now()}_${Math.random()}`,
+      number: batchNumber || (this.batchesValue.length + 1),
       quantity: quantity,
       status: 'active',
       createdAt: new Date().toISOString(),
@@ -48,11 +125,13 @@ export default class extends Controller {
     }
 
     this.batchesValue = [...this.batchesValue, newBatch]
-    this.newBatchQuantityTarget.value = ''
-
-    this.renderBatches()
-    this.updateTotals()
     this.notifyBatchAdded(newBatch)
+
+    // Don't call updateDisplay here if called from createSuggestedBatches
+    if (batchNumber === null) {
+      this.newBatchQuantityTarget.value = ''
+      this.updateDisplay()
+    }
   }
 
   removeBatch(event) {
@@ -64,8 +143,7 @@ export default class extends Controller {
     }
 
     this.batchesValue = this.batchesValue.filter(batch => batch.id !== batchId)
-    this.renderBatches()
-    this.updateTotals()
+    this.updateDisplay()
     this.notifyBatchRemoved(batchId)
   }
 

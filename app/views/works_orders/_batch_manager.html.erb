@@ -37,7 +37,7 @@
     <!-- Add New Batch Form -->
     <div class="mb-4 p-3 bg-gray-50 border border-gray-200 rounded">
       <div class="flex items-center space-x-3">
-        <label class="text-sm font-medium text-gray-700">Add New Batch:</label>
+        <label class="text-sm font-medium text-gray-700">Batch Size:</label>
         <input type="number"
                placeholder="Quantity"
                class="border border-gray-300 rounded px-3 py-1 w-24 text-sm"
@@ -45,7 +45,13 @@
         <button type="button"
                 class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1 rounded text-sm font-medium"
                 data-action="click->batch-manager#addBatch">
-          Add Batch
+          Add Single Batch
+        </button>
+        <button type="button"
+                class="bg-green-500 hover:bg-green-600 text-white px-4 py-1 rounded text-sm font-medium"
+                data-action="click->batch-manager#createSuggestedBatches"
+                data-batch-manager-target="createAllButton">
+          Create All Suggested
         </button>
       </div>
     </div>
