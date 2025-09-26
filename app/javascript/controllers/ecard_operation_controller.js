@@ -2,7 +2,7 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["signOffButton", "operationContent", "batchSection"]
+  static targets = ["signOffButton", "statusBadge", "currentBatch", "batchQuantity"]
   static values = {
     position: Number,
     worksOrderId: String,
@@ -11,165 +11,158 @@ export default class extends Controller {
   }
 
   connect() {
-    this.loadOperationState()
-    this.setupOperationSpecificBehavior()
-  }
-
-  loadOperationState() {
-    // Update UI based on signed-off status
+    this.setupBatchTracking()
     if (this.signedOffValue) {
       this.markAsSignedOff()
     }
   }
 
-  setupOperationSpecificBehavior() {
-    // Special behavior for contract review operations
-    if (this.displayNameValue && this.displayNameValue.toLowerCase().includes('contract review')) {
-      this.setupContractReviewBehavior()
+  setupBatchTracking() {
+    // Only set up batch tracking for non-contract review operations
+    if (!this.isContractReview()) {
+      this.updateCurrentBatch()
+      this.setupBatchListener()
     }
   }
 
-  setupContractReviewBehavior() {
-    // Contract review operations may not need batch tracking
-    // Hide batch section if present
-    if (this.hasBatchSectionTarget) {
-      const batchTracker = this.batchSectionTarget.querySelector('[data-controller*="batch-tracker"]')
-      if (batchTracker) {
-        batchTracker.style.display = 'none'
+  setupBatchListener() {
+    document.addEventListener('batch-manager:batchAdded', () => this.updateCurrentBatch())
+    document.addEventListener('batch-manager:batchUpdated', () => this.updateCurrentBatch())
+    document.addEventListener('batch-manager:batchRemoved', () => this.updateCurrentBatch())
+  }
+
+  updateCurrentBatch() {
+    const batchManager = this.getBatchManagerController()
+    if (!batchManager) return
+
+    const activeBatches = batchManager.getActiveBatches()
+    const currentBatch = this.getCurrentBatchForOperation(activeBatches)
+
+    this.displayBatchInfo(currentBatch)
+    this.updateOperationStatus(currentBatch)
+  }
+
+  displayBatchInfo(currentBatch) {
+    if (this.hasCurrentBatchTarget && this.hasBatchQuantityTarget) {
+      if (currentBatch) {
+        this.currentBatchTarget.innerHTML = `<span class="font-medium text-blue-600">B${currentBatch.number}</span>`
+        this.batchQuantityTarget.innerHTML = `<span class="font-medium">${currentBatch.quantity}</span>`
+      } else {
+        this.currentBatchTarget.innerHTML = `<span class="text-gray-400">-</span>`
+        this.batchQuantityTarget.innerHTML = `<span class="text-gray-400">-</span>`
+      }
+    }
+  }
+
+  updateOperationStatus(currentBatch) {
+    if (this.hasStatusBadgeTarget && this.hasSignOffButtonTarget) {
+      if (currentBatch) {
+        this.statusBadgeTarget.textContent = 'Ready to Process'
+        this.statusBadgeTarget.className = 'inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800'
+        this.signOffButtonTarget.disabled = false
+        this.signOffButtonTarget.classList.remove('opacity-50', 'cursor-not-allowed')
+      } else {
+        this.statusBadgeTarget.textContent = 'Waiting for Batch'
+        this.statusBadgeTarget.className = 'inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-600'
+        this.signOffButtonTarget.disabled = true
+        this.signOffButtonTarget.classList.add('opacity-50', 'cursor-not-allowed')
       }
     }
   }
 
   beforeSignOff(event) {
-    // Prevent default form submission temporarily
-    event.preventDefault()
-
-    // Special handling for contract review
-    if (this.displayNameValue && this.displayNameValue.toLowerCase().includes('contract review')) {
+    if (this.isContractReview()) {
       return this.handleContractReviewSignOff(event)
     }
-
-    // For regular operations, validate batch tracking
     return this.handleRegularOperationSignOff(event)
   }
 
   handleContractReviewSignOff(event) {
-    const confirmation = confirm(
-      `Sign off Contract Review for Operation ${this.positionValue}?\n\nThis confirms that contract requirements have been reviewed and understood.`
-    )
-
-    if (confirmation) {
-      this.showLoadingState()
-      // Allow the form to submit
-      event.target.closest('form').submit()
-    }
-
-    return confirmation
+    // Contract review can always be signed off
+    return true
   }
 
   handleRegularOperationSignOff(event) {
-    // Find associated batch tracker controller
-    const batchTrackerElement = this.element.querySelector('[data-controller*="batch-tracker"]')
-    let batchValidation = true
-
-    if (batchTrackerElement) {
-      // Get the batch tracker controller instance
-      const batchController = this.application.getControllerForElementAndIdentifier(
-        batchTrackerElement,
-        'batch-tracker'
-      )
-
-      if (batchController && typeof batchController.validateBeforeSignOff === 'function') {
-        batchValidation = batchController.validateBeforeSignOff()
-      }
-    }
-
-    if (!batchValidation) {
+    const batchManager = this.getBatchManagerController()
+    if (!batchManager) {
+      alert('Batch management system not available. Please refresh the page.')
+      event.preventDefault()
       return false
     }
 
-    // Final confirmation
-    const confirmation = confirm(
-      `Are you sure you want to sign off Operation ${this.positionValue}: ${this.displayNameValue}?\n\nThis action cannot be undone.`
-    )
+    const activeBatches = batchManager.getActiveBatches()
+    const currentBatch = this.getCurrentBatchForOperation(activeBatches)
 
-    if (confirmation) {
-      this.showLoadingState()
-      // Allow the form to submit
-      event.target.closest('form').submit()
-      return true
+    if (!currentBatch) {
+      alert('No active batch found for this operation. Please create a batch first.')
+      event.preventDefault()
+      return false
     }
 
-    return false
+    // Update batch progress when signed off
+    this.updateBatchProgress(batchManager, currentBatch)
+    return true
   }
 
-  showLoadingState() {
-    if (this.hasSignOffButtonTarget) {
-      this.signOffButtonTarget.disabled = true
-      this.signOffButtonTarget.textContent = "Signing off..."
-      this.signOffButtonTarget.classList.add("opacity-50", "cursor-not-allowed")
-    }
+  isContractReview() {
+    return this.displayNameValue && this.displayNameValue.toLowerCase().includes('contract review')
+  }
 
-    // Show loading indicator on the entire operation
-    this.element.classList.add("opacity-75")
+  getCurrentBatchForOperation(activeBatches) {
+    return activeBatches.find(batch =>
+      (batch.currentOperation || 1) <= this.positionValue
+    )
+  }
+
+  updateBatchProgress(batchManager, batch) {
+    if (batchManager && typeof batchManager.updateBatchProgress === 'function') {
+      batchManager.updateBatchProgress(batch.id, this.positionValue)
+    }
+  }
+
+  getBatchManagerController() {
+    const batchManagerElement = document.querySelector('[data-controller*="batch-manager"]')
+    if (batchManagerElement) {
+      return this.application.getControllerForElementAndIdentifier(
+        batchManagerElement,
+        'batch-manager'
+      )
+    }
+    return null
   }
 
   markAsSignedOff() {
-    // Visual changes when operation is signed off
-    this.element.classList.add("bg-green-50", "border-green-300")
+    // Update the row styling
+    this.element.classList.add("bg-green-50")
 
-    // Update any status indicators
-    const statusElements = this.element.querySelectorAll('[data-operation-status]')
-    statusElements.forEach(element => {
-      element.textContent = "✓ Signed Off"
-      element.classList.add("text-green-600", "font-semibold")
-    })
+    // Update status badge
+    if (this.hasStatusBadgeTarget) {
+      this.statusBadgeTarget.textContent = "✓ Complete"
+      this.statusBadgeTarget.className = "inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800"
+    }
 
-    // Disable interactive elements
-    const interactiveElements = this.element.querySelectorAll('input, button, select, textarea')
-    interactiveElements.forEach(element => {
-      if (!element.classList.contains('keep-enabled')) {
-        element.disabled = true
-      }
-    })
-  }
-
-  // Method to expand/collapse operation details
-  toggleDetails() {
-    if (this.hasOperationContentTarget) {
-      const isExpanded = !this.operationContentTarget.classList.contains('hidden')
-
-      if (isExpanded) {
-        this.operationContentTarget.classList.add('hidden')
-        this.element.querySelector('[data-toggle-text]').textContent = 'Show Details'
-      } else {
-        this.operationContentTarget.classList.remove('hidden')
-        this.element.querySelector('[data-toggle-text]').textContent = 'Hide Details'
+    // Replace sign off button with checkmark
+    if (this.hasSignOffButtonTarget) {
+      const buttonCell = this.signOffButtonTarget.parentElement
+      if (buttonCell) {
+        buttonCell.innerHTML = '<span class="text-green-600 text-xs">✓</span>'
       }
     }
   }
 
-  // Method to save operation notes (if implemented)
-  saveNotes() {
-    const notesElement = this.element.querySelector('[data-operation-notes]')
-    if (notesElement && notesElement.value.trim()) {
-      // Could implement AJAX save of operation notes
-      console.log(`Saving notes for operation ${this.positionValue}:`, notesElement.value)
-    }
-  }
+  // Method called after successful sign-off
+  operationSignedOff() {
+    this.signedOffValue = true
+    this.markAsSignedOff()
 
-  // Method called when batch tracker updates
-  onBatchUpdate(event) {
-    // Could update operation-level summaries based on batch data
-    if (event.detail && event.detail.totalQuantity) {
-      this.updateQuantitySummary(event.detail.totalQuantity)
-    }
-  }
-
-  updateQuantitySummary(totalQuantity) {
-    const summaryElement = this.element.querySelector('[data-quantity-summary]')
-    if (summaryElement) {
-      summaryElement.textContent = `Total processed: ${totalQuantity}`
-    }
+    // Notify the main ecard controller
+    const ecardEvent = new CustomEvent('ecard:operationSignedOff', {
+      detail: {
+        operationPosition: this.positionValue,
+        operationName: this.displayNameValue
+      },
+      bubbles: true
+    })
+    this.element.dispatchEvent(ecardEvent)
   }
 }
