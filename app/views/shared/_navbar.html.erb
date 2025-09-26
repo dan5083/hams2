@@ -1,51 +1,73 @@
-<!-- Navigation Bar with logo -->
-<nav style="background-color: #2563eb; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-  <div style="max-width: 80rem; margin: 0 auto; padding: 0 1rem;">
-    <div style="display: flex; justify-content: space-between; align-items: center; height: 4rem;">
-
+<!-- app/views/shared/_navbar.html.erb -->
+<nav class="bg-blue-600 shadow-lg sticky top-0 z-50" data-controller="navbar">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex justify-between h-16">
       <!-- Logo/Brand -->
-      <div style="display: flex; align-items: center;">
-        <%= link_to root_path, style: "display: flex; align-items: center; color: white; text-decoration: none;" do %>
-          <%= image_tag "logo.svg", alt: "HAMS 2.0", style: "height: 2rem; width: auto; margin-right: 0.75rem;" %>
-          <span style="font-size: 1.25rem; font-weight: bold;">HAMS 2.0</span>
+      <div class="flex items-center">
+        <%= link_to root_path, class: "flex items-center text-white hover:text-blue-100" do %>
+          <%= image_tag "logo.svg", alt: "HAMS 2.0", class: "h-8 w-auto mr-3" %>
+          <span class="text-xl font-bold">HAMS 2.0</span>
         <% end %>
       </div>
 
-      <!-- Main Navigation Links -->
-      <div style="display: flex; gap: 2rem;">
+      <!-- Desktop Navigation -->
+      <div class="hidden md:flex items-center space-x-4">
         <%= link_to "Home", root_path,
-            style: "color: white; padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; text-decoration: none; #{current_page?(root_path) ? 'background-color: rgba(29, 78, 216, 1);' : ''}" %>
-
-        <%= link_to "Customer Orders", customer_orders_path,
-            style: "color: white; padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; text-decoration: none; #{current_page?(customer_orders_path) ? 'background-color: rgba(29, 78, 216, 1);' : ''}" %>
-
-        <%= link_to "Works Orders", works_orders_path,
-            style: "color: white; padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; text-decoration: none; #{current_page?(works_orders_path) ? 'background-color: rgba(29, 78, 216, 1);' : ''}" %>
-
-        <%= link_to "Release Notes", release_notes_path,
-            style: "color: white; padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; text-decoration: none; #{current_page?(release_notes_path) ? 'background-color: rgba(29, 78, 216, 1);' : ''}" %>
-
+            class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(root_path)}" %>
+        <%= link_to "Orders", customer_orders_path,
+            class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(customer_orders_path)}" %>
+        <%= link_to "Works", works_orders_path,
+            class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(works_orders_path)}" %>
+        <%= link_to "Releases", release_notes_path,
+            class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(release_notes_path)}" %>
         <%= link_to "NCRs", external_ncrs_path,
-            style: "color: white; padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; text-decoration: none; #{current_page?(external_ncrs_path) ? 'background-color: rgba(29, 78, 216, 1);' : ''}" %>
-
-        <%= link_to "Parts", parts_path,
-            style: "color: white; padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; text-decoration: none; #{current_page?(parts_path) ? 'background-color: rgba(29, 78, 216, 1);' : ''}" %>
-
-        <%= link_to "Artifacts", artifacts_path,
-            style: "color: white; padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; text-decoration: none; #{current_page?(artifacts_path) ? 'background-color: rgba(29, 78, 216, 1);' : ''}" %>
+            class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(external_ncrs_path)}" %>
       </div>
 
-      <!-- User Menu -->
-      <div style="display: flex; align-items: center; gap: 1rem;">
+      <!-- Mobile menu button -->
+      <div class="md:hidden flex items-center">
+        <button type="button"
+                class="text-white hover:text-blue-100 hover:bg-blue-500 p-2 rounded-md"
+                data-action="click->navbar#toggleMenu"
+                data-navbar-target="toggleButton">
+          <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- User menu (desktop) -->
+      <div class="hidden md:flex items-center">
         <% if Current.user %>
-          <span style="color: white; font-size: 0.875rem;">Welcome, <%= Current.user.display_name %></span>
+          <span class="text-white text-sm mr-4">Hi, <%= Current.user.display_name %></span>
           <%= link_to "Logout", session_path, method: :delete,
-              style: "color: white; padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; text-decoration: none;" %>
-        <% else %>
-          <%= link_to "Login", new_session_path,
-              style: "color: white; padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 500; text-decoration: none;" %>
+              class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium" %>
         <% end %>
       </div>
+    </div>
+  </div>
+
+  <!-- Mobile menu -->
+  <div class="md:hidden hidden" data-navbar-target="mobileMenu">
+    <div class="px-2 pt-2 pb-3 space-y-1 bg-blue-700">
+      <%= link_to "Home", root_path,
+          class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(root_path)}" %>
+      <%= link_to "Customer Orders", customer_orders_path,
+          class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(customer_orders_path)}" %>
+      <%= link_to "Works Orders", works_orders_path,
+          class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(works_orders_path)}" %>
+      <%= link_to "Release Notes", release_notes_path,
+          class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(release_notes_path)}" %>
+      <%= link_to "NCRs", external_ncrs_path,
+          class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(external_ncrs_path)}" %>
+
+      <% if Current.user %>
+        <div class="border-t border-blue-600 pt-4">
+          <div class="text-white text-sm px-3 py-2">Logged in as <%= Current.user.display_name %></div>
+          <%= link_to "Logout", session_path, method: :delete,
+              class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium" %>
+        </div>
+      <% end %>
     </div>
   </div>
 </nav>
