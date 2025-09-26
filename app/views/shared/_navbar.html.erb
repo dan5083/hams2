@@ -1,4 +1,4 @@
-<!-- app/views/shared/_navbar.html.erb -->
+<!-- app/views/shared/_navbar.html.erb - COMPLETE VERSION -->
 <nav class="bg-blue-600 shadow-lg sticky top-0 z-50" data-controller="navbar">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex justify-between h-16">
@@ -14,14 +14,18 @@
       <div class="hidden md:flex items-center space-x-4">
         <%= link_to "Home", root_path,
             class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(root_path)}" %>
-        <%= link_to "Orders", customer_orders_path,
+        <%= link_to "Customer Orders", customer_orders_path,
             class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(customer_orders_path)}" %>
-        <%= link_to "Works", works_orders_path,
+        <%= link_to "Works Orders", works_orders_path,
             class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(works_orders_path)}" %>
-        <%= link_to "Releases", release_notes_path,
+        <%= link_to "Release Notes", release_notes_path,
             class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(release_notes_path)}" %>
         <%= link_to "NCRs", external_ncrs_path,
             class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(external_ncrs_path)}" %>
+        <%= link_to "Parts", parts_path,
+            class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(parts_path)}" %>
+        <%= link_to "Artifacts", artifacts_path,
+            class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(artifacts_path)}" %>
       </div>
 
       <!-- Mobile menu button -->
@@ -42,6 +46,9 @@
           <span class="text-white text-sm mr-4">Hi, <%= Current.user.display_name %></span>
           <%= link_to "Logout", session_path, method: :delete,
               class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium" %>
+        <% else %>
+          <%= link_to "Login", new_session_path,
+              class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium" %>
         <% end %>
       </div>
     </div>
@@ -60,11 +67,20 @@
           class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(release_notes_path)}" %>
       <%= link_to "NCRs", external_ncrs_path,
           class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(external_ncrs_path)}" %>
+      <%= link_to "Parts", parts_path,
+          class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(parts_path)}" %>
+      <%= link_to "Artifacts", artifacts_path,
+          class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(artifacts_path)}" %>
 
       <% if Current.user %>
         <div class="border-t border-blue-600 pt-4">
           <div class="text-white text-sm px-3 py-2">Logged in as <%= Current.user.display_name %></div>
           <%= link_to "Logout", session_path, method: :delete,
+              class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium" %>
+        </div>
+      <% else %>
+        <div class="border-t border-blue-600 pt-4">
+          <%= link_to "Login", new_session_path,
               class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium" %>
         </div>
       <% end %>
