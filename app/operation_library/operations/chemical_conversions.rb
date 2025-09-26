@@ -19,12 +19,20 @@ module OperationLibrary
           operation_text: 'Convert in Iridite NCP at 28-45°C for 4-5 mins'
         ),
 
-        # Alochrom 1200 Chemical Conversion
+        # Alochrom 1200 Chemical Conversion - Class 1A (Corrosion Resistance)
         Operation.new(
-          id: 'ALOCHROM_1200',
+          id: 'ALOCHROM_1200_CLASS_1A',
           process_type: 'chemical_conversion',
-          specifications: 'MIL-DTL-5541 Type I Class 1A and Class 3, Def Stan 03-18 Code C',
-          operation_text: 'Chromate convert in Alochrom 1200 at 18-27°C for 2-5 mins'
+          specifications: 'MIL-DTL-5541 Type I Class 1A, Def Stan 03-18 Code C (FOR MAXIMUM CORROSION RESISTANCE)',
+          operation_text: 'Chromate convert in Alochrom 1200 at 18-27°C for 4-5 mins (FOR MAXIMUM CORROSION RESISTANCE)'
+        ),
+
+        # Alochrom 1200 Chemical Conversion - Class 3 (Electrical Conductivity)
+        Operation.new(
+          id: 'ALOCHROM_1200_CLASS_3',
+          process_type: 'chemical_conversion',
+          specifications: 'MIL-DTL-5541 Type I Class 3, Def Stan 03-18 Code C (FOR MAXIMUM ELECTRICAL CONDUCTIVITY)',
+          operation_text: 'Chromate convert in Alochrom 1200 at 18-27°C for 2-3 mins (FOR MAXIMUM ELECTRICAL CONDUCTIVITY)'
         ),
 
         # SurTec 650V Chemical Conversion
@@ -40,7 +48,11 @@ module OperationLibrary
           id: 'IRIDITE_15',
           process_type: 'chemical_conversion',
           specifications: 'MIL-DTL-5541F Type II (comprising non-hexavalent chromium conversion coatings)',
-          operation_text: "1. Keycote 245 at 35-80°C for 30 to 60 secs\n2. Chromic etch for 4 secs\n3. Treat in Iridite 15 at 18-27°C for 1-3 mins"
+          operation_text: <<~TEXT
+            1. Keycote 245 at 35-80°C for 30 to 60 secs
+            2. Chromic etch for 4 secs
+            3. Treat in Iridite 15 at 18-27°C for 1-3 mins
+          TEXT
         )
       ]
     end
