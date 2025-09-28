@@ -1,13 +1,12 @@
-<%# app/views/works_orders/_ecard_operation.html.erb - Updated with batch-based sign-offs %>
+<%# app/views/works_orders/_ecard_operation.html.erb - Fixed layout and indentation %>
 <div class="bg-white border-2 border-gray-300">
   <!-- Table Header -->
   <div class="bg-gray-50 border-b border-gray-300">
     <div class="flex p-3 font-semibold text-gray-700 text-sm">
       <div class="w-16 flex-shrink-0">Op #</div>
-      <div class="flex-1 min-w-0">Operation Details</div>
+      <div class="flex-1 min-w-0 pr-4">Operation Details</div>
       <div class="batch-signoffs flex-shrink-0" data-batch-manager-target="batchSignoffHeader">
-        <!-- Batch sign-off headers will be populated by JavaScript -->
-        <div class="text-center text-gray-500 text-xs">No Batches</div>
+        <div class="text-center text-gray-500 text-xs py-2">No Batches</div>
       </div>
     </div>
   </div>
@@ -30,16 +29,17 @@
 
         <!-- Operation Number -->
         <div class="w-16 flex-shrink-0">
-          <span class="font-bold text-lg"><%= operation["position"] %></span>
+          <span class="font-bold text-lg text-blue-600"><%= operation["position"] %></span>
         </div>
 
         <!-- Operation Details -->
         <div class="flex-1 min-w-0 pr-4">
+          <!-- Operation Title -->
           <div class="font-medium text-gray-900 mb-2">
             <%= operation["display_name"] %>
           </div>
 
-          <!-- Enhanced operation text with underscore inputs -->
+          <!-- Operation Text - FIXED: Remove indentation, improve formatting -->
           <div class="text-sm text-gray-700 leading-relaxed mb-2"
                data-controller="operation-text-inputs"
                data-operation-text-inputs-works-order-id-value="<%= works_order.id %>"
@@ -48,19 +48,20 @@
             <% operation_text = operation["operation_text"] || "" %>
             <% if operation_text.include?("_") %>
               <!-- Process text with underscores as inputs -->
-              <div data-operation-text-inputs-target="textContainer">
+              <div data-operation-text-inputs-target="textContainer" class="leading-relaxed">
                 <%= render_operation_text_with_inputs(operation_text, works_order, operation['position']) %>
               </div>
             <% else %>
-              <!-- Regular text display -->
-              <div class="whitespace-pre-wrap break-words">
-                <%= operation_text %>
+              <!-- Regular text display - FIXED: Remove whitespace-pre-wrap that was causing indentation -->
+              <div class="break-words leading-relaxed">
+                <%= simple_format(operation_text.strip, {}, sanitize: false) %>
               </div>
             <% end %>
           </div>
 
+          <!-- Specifications -->
           <% if operation["specifications"].present? %>
-            <div class="text-xs text-blue-600 mt-1">
+            <div class="text-xs text-blue-600 mt-1 font-medium">
               Spec: <%= operation["specifications"] %>
             </div>
           <% end %>
@@ -75,25 +76,32 @@
           <% if is_batch_independent %>
             <!-- Single sign-off for batch-independent operations -->
             <div class="flex justify-center">
-              <%= form_with url: sign_off_operation_works_order_path(works_order),
-                            method: :patch,
-                            local: true,
-                            class: "inline" do |form| %>
-                <%= form.hidden_field :operation_position, value: operation["position"] %>
-                <%= form.hidden_field :batch_id, value: "independent" %>
-                <%= form.submit "",
-                    class: "w-10 h-10 rounded-full bg-green-500 hover:bg-green-600 text-white font-bold text-xs border-2 border-green-600 transition-colors duration-200",
-                    title: "Sign off #{operation['display_name']}",
-                    data: {
-                      "ecard-operation-target": "signOffButton",
-                      action: "click->ecard-operation#beforeSignOff",
-                      confirm: "Sign off #{operation['display_name']}?"
-                    } %>
+              <% if operation_signed_off?(works_order, operation) %>
+                <div class="w-12 h-12 rounded-full bg-green-500 border-2 border-green-600 flex items-center justify-center">
+                  <span class="text-white text-lg font-bold">✓</span>
+                </div>
+              <% else %>
+                <%= form_with url: sign_off_operation_works_order_path(works_order),
+                              method: :patch,
+                              local: true,
+                              class: "inline" do |form| %>
+                  <%= form.hidden_field :operation_position, value: operation["position"] %>
+                  <%= form.hidden_field :batch_id, value: "independent" %>
+                  <%= form.submit "",
+                      class: "w-12 h-12 rounded-full bg-blue-500 hover:bg-green-600 text-white font-bold text-xs border-2 border-blue-600 hover:border-green-600 transition-all duration-200 cursor-pointer",
+                      title: "Sign off #{operation['display_name']}",
+                      value: "✓",
+                      data: {
+                        "ecard-operation-target": "signOffButton",
+                        action: "click->ecard-operation#beforeSignOff",
+                        confirm: "Sign off #{operation['display_name']}?"
+                      } %>
+                <% end %>
               <% end %>
             </div>
           <% else %>
             <!-- Placeholder for batch-dependent operations - populated by JavaScript -->
-            <div class="text-center text-gray-400 text-xs py-3">
+            <div class="text-center text-gray-400 text-xs py-3" style="min-width: 120px;">
               Create batches<br>to sign off
             </div>
           <% end %>
@@ -102,39 +110,3 @@
     </div>
   <% end %>
 </div>
-
-<!-- Helper method for rendering operation text with input fields -->
-<%
-def render_operation_text_with_inputs(text, works_order, operation_position)
-  # Split text by underscores and create input fields
-  parts = text.split('_')
-  result = []
-
-  parts.each_with_index do |part, index|
-    # Add the text part
-    result << h(part) unless part.empty?
-
-    # Add input field between parts (except after the last part)
-    if index < parts.length - 1
-      input_id = "op_#{operation_position}_input_#{index}"
-      saved_value = works_order.customised_process_data.dig("operation_inputs", operation_position.to_s, index.to_s) || ""
-
-      result << content_tag(:input, nil,
-        type: "text",
-        id: input_id,
-        name: "operation_inputs[#{operation_position}][#{index}]",
-        value: saved_value,
-        class: "inline-block w-20 px-1 py-0 text-xs border border-gray-300 rounded mx-1 focus:outline-none focus:ring-1 focus:ring-blue-500",
-        placeholder: "___",
-        data: {
-          "operation-text-inputs-target": "input",
-          "input-index": index,
-          action: "blur->operation-text-inputs#saveInput"
-        }
-      )
-    end
-  end
-
-  result.join.html_safe
-end
-%>

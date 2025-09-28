@@ -1,6 +1,6 @@
 # app/controllers/works_orders_controller.rb - Fixed pricing parameter handling and route card operations
 class WorksOrdersController < ApplicationController
-  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :ecard, :sign_off_operation, :create_invoice, :void]
+  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :ecard, :sign_off_operation, :save_batches, :create_invoice, :void]
 
  def index
     @works_orders = WorksOrder.includes(:customer_order, :part, :release_level, :transport_method, customer: [])
@@ -247,29 +247,48 @@ class WorksOrdersController < ApplicationController
     end
   end
 
-  def sign_off_operation
+  def save_batches
     # Restrict to demo customers
     demo_customers = ["24 Locks"]
     unless demo_customers.include?(@works_order.customer.name)
-      redirect_to @works_order, alert: "E-Cards are currently in beta testing for select customers."
+      render json: { success: false, error: "E-Cards are currently in beta testing for select customers." }
       return
     end
 
-    position = params[:operation_position].to_i
+    batches_data = params[:batches] || []
+
+    # Validate batch data
+    unless batches_data.is_a?(Array)
+      render json: { success: false, error: "Invalid batch data format" }
+      return
+    end
 
     # Initialize customised_process_data if blank
-    @works_order.customised_process_data ||= { "operations" => {} }
+    @works_order.customised_process_data ||= {}
 
-    # Sign off the operation
-    @works_order.customised_process_data["operations"][position.to_s] = {
-      "signed_off_by" => Current.user.id,
-      "signed_off_at" => Time.current.iso8601
-    }
+    # Store batches data
+    @works_order.customised_process_data["batches"] = batches_data.map do |batch|
+      {
+        "id" => batch["id"],
+        "number" => batch["number"].to_i,
+        "quantity" => batch["quantity"].to_i,
+        "status" => batch["status"],
+        "createdAt" => batch["createdAt"],
+        "currentOperation" => batch["currentOperation"].to_i
+      }
+    end
 
     if @works_order.save
-      redirect_to ecard_works_order_path(@works_order), notice: "Operation signed off"
+      render json: {
+        success: true,
+        message: "Batches saved successfully",
+        batches: @works_order.customised_process_data["batches"]
+      }
     else
-      redirect_to ecard_works_order_path(@works_order), alert: "Failed to sign off"
+      render json: {
+        success: false,
+        error: "Failed to save batches: #{@works_order.errors.full_messages.join(', ')}"
+      }
     end
   end
 

@@ -1,28 +1,51 @@
-<%# app/views/works_orders/_batch_manager.html.erb %>
+<%# app/views/works_orders/_batch_manager.html.erb - Fixed with persistence %>
 <div class="bg-white border-2 border-blue-300 mb-6"
      data-controller="batch-manager"
      data-batch-manager-works-order-id-value="<%= works_order.id %>"
      data-batch-manager-total-quantity-value="<%= works_order.quantity %>"
-     data-batch-manager-batches-value="[]"
+     data-batch-manager-batches-value="<%= (works_order.customised_process_data['batches'] || []).to_json %>"
      data-total-operations="<%= works_order.part.locked_operations.count %>">
 
-  <!-- Header -->
-  <div class="bg-blue-50 px-4 py-2 border-b border-blue-300 flex justify-between items-center">
-    <h3 class="font-bold text-blue-800">Batch Management</h3>
-    <div class="text-sm text-blue-600">
-      Work Order: <%= works_order.quantity %> parts total
+  <!-- Header with Work Order Details -->
+  <div class="bg-blue-50 px-4 py-2 border-b border-blue-300">
+    <div class="flex justify-between items-center">
+      <h3 class="font-bold text-blue-800">Batch Management</h3>
+      <div class="text-sm text-blue-600">
+        WO<%= works_order.number %> - <%= works_order.customer.name %> - <%= works_order.part_number %>
+      </div>
+    </div>
+    <div class="text-sm text-blue-600 mt-1">
+      Total Quantity: <%= works_order.quantity %> parts |
+      Customer Order: <%= works_order.customer_order.number %>
     </div>
   </div>
 
   <div class="p-4">
-    <!-- Smart Batch Calculator -->
-    <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
-      <div class="flex items-center justify-between">
-        <div class="text-sm">
-          <span class="font-medium text-blue-700">Work Order:</span>
-          <span class="text-blue-900"><%= works_order.quantity %> parts</span>
-        </div>
-        <div class="text-xs text-blue-600" data-batch-manager-target="batchSuggestion">
+    <!-- Batch Creation Controls -->
+    <div class="mb-4 p-3 bg-gray-50 border border-gray-200 rounded">
+      <div class="flex items-center space-x-3 flex-wrap gap-2">
+        <label class="text-sm font-medium text-gray-700">Batch Size:</label>
+        <input type="number"
+               placeholder="Quantity"
+               min="1"
+               max="<%= works_order.quantity %>"
+               class="border border-gray-300 rounded px-3 py-1 w-24 text-sm"
+               data-batch-manager-target="newBatchQuantity">
+
+        <button type="button"
+                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1 rounded text-sm font-medium"
+                data-action="click->batch-manager#addBatch">
+          Add Batch
+        </button>
+
+        <button type="button"
+                class="bg-green-500 hover:bg-green-600 text-white px-4 py-1 rounded text-sm font-medium"
+                data-action="click->batch-manager#createSuggestedBatches"
+                data-batch-manager-target="createAllButton">
+          Create Equal Batches
+        </button>
+
+        <div class="text-xs text-blue-600 ml-auto" data-batch-manager-target="batchSuggestion">
           <!-- Smart suggestions will appear here -->
         </div>
       </div>
@@ -34,31 +57,51 @@
       <!-- Warning text will be inserted here -->
     </div>
 
-    <!-- Add New Batch Form -->
-    <div class="mb-4 p-3 bg-gray-50 border border-gray-200 rounded">
-      <div class="flex items-center space-x-3">
-        <label class="text-sm font-medium text-gray-700">Batch Size:</label>
-        <input type="number"
-               placeholder="Quantity"
-               class="border border-gray-300 rounded px-3 py-1 w-24 text-sm"
-               data-batch-manager-target="newBatchQuantity">
-        <button type="button"
-                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-1 rounded text-sm font-medium"
-                data-action="click->batch-manager#addBatch">
-          Add Single Batch
-        </button>
-        <button type="button"
-                class="bg-green-500 hover:bg-green-600 text-white px-4 py-1 rounded text-sm font-medium"
-                data-action="click->batch-manager#createSuggestedBatches"
-                data-batch-manager-target="createAllButton">
-          Create All Suggested
-        </button>
+    <!-- Horizontal Batch Table -->
+    <div data-batch-manager-target="batchContainer">
+      <div class="hidden" data-batch-manager-target="emptyState">
+        <div class="text-center text-gray-500 py-8 text-sm">
+          <div class="font-medium">No batches created yet</div>
+          <div class="text-xs mt-1">Create batches to enable operation sign-offs</div>
+        </div>
+      </div>
+
+      <!-- Batch Table Header (when batches exist) -->
+      <div class="hidden" data-batch-manager-target="batchTableHeader">
+        <div class="border border-gray-300 bg-gray-50 rounded-t">
+          <div class="grid grid-cols-12 gap-2 p-3 text-sm font-semibold text-gray-700">
+            <div class="col-span-2">Batch ID</div>
+            <div class="col-span-2">Quantity</div>
+            <div class="col-span-2">Status</div>
+            <div class="col-span-3">Progress</div>
+            <div class="col-span-2">Created</div>
+            <div class="col-span-1">Actions</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Batch Rows Container -->
+      <div data-batch-manager-target="batchRows">
+        <!-- Batch rows will be rendered here -->
       </div>
     </div>
 
-    <!-- Current Batches List -->
-    <div class="space-y-2" data-batch-manager-target="batchList">
-      <!-- Batches will be rendered here -->
+    <!-- Batch Summary -->
+    <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded" data-batch-manager-target="batchSummary">
+      <div class="grid grid-cols-3 gap-4 text-sm">
+        <div class="text-center">
+          <div class="font-semibold text-blue-800" data-batch-manager-target="totalBatches">0</div>
+          <div class="text-blue-600">Total Batches</div>
+        </div>
+        <div class="text-center">
+          <div class="font-semibold text-blue-800" data-batch-manager-target="assignedQuantity">0</div>
+          <div class="text-blue-600">Assigned Parts</div>
+        </div>
+        <div class="text-center">
+          <div class="font-semibold text-blue-800" data-batch-manager-target="remainingQuantity"><%= works_order.quantity %></div>
+          <div class="text-blue-600">Remaining Parts</div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
