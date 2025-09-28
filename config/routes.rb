@@ -63,6 +63,7 @@ Rails.application.routes.draw do
       get :route_card
       get :ecard
       patch :sign_off_operation
+      patch :save_operation_input
       patch :void
       patch :create_invoice
       patch :create_invoice_with_charges

@@ -7,7 +7,9 @@ export default class extends Controller {
     "addBatchForm",
     "newBatchQuantity",
     "batchSuggestion",
-    "warningMessage"
+    "warningMessage",
+    "batchSignoffHeader",
+    "operationSignoffs"
   ]
 
   static values = {
@@ -23,7 +25,6 @@ export default class extends Controller {
   }
 
   setupBatchSuggestionListener() {
-    // Listen for input in batch quantity field to show suggestions
     if (this.hasNewBatchQuantityTarget) {
       this.newBatchQuantityTarget.addEventListener('input', () => {
         this.updateBatchSuggestion()
@@ -56,10 +57,10 @@ export default class extends Controller {
   updateDisplay() {
     this.renderBatches()
     this.updateQuantityCheck()
+    this.updateBatchSignoffHeaders()
   }
 
   initializeBatches() {
-    // If no batches exist, start with empty array
     if (!this.batchesValue || this.batchesValue.length === 0) {
       this.batchesValue = []
     }
@@ -85,12 +86,10 @@ export default class extends Controller {
       return
     }
 
-    // Calculate suggested batches
     const totalQuantity = this.totalQuantityValue
     const numberOfBatches = Math.ceil(totalQuantity / batchSize)
     const lastBatchQuantity = totalQuantity - (batchSize * (numberOfBatches - 1))
 
-    // Confirm before creating multiple batches
     const confirmMessage = numberOfBatches === 1
       ? `Create 1 batch of ${totalQuantity} parts?`
       : `Create ${numberOfBatches} batches (${numberOfBatches - 1}×${batchSize} + 1×${lastBatchQuantity})?`
@@ -99,15 +98,12 @@ export default class extends Controller {
       return
     }
 
-    // Clear existing batches first
     this.batchesValue = []
 
-    // Create regular batches
     for (let i = 1; i < numberOfBatches; i++) {
       this.createSingleBatch(batchSize, i)
     }
 
-    // Create final batch
     this.createSingleBatch(lastBatchQuantity, numberOfBatches)
 
     this.newBatchQuantityTarget.value = ''
@@ -127,7 +123,6 @@ export default class extends Controller {
     this.batchesValue = [...this.batchesValue, newBatch]
     this.notifyBatchAdded(newBatch)
 
-    // Don't call updateDisplay here if called from createSuggestedBatches
     if (batchNumber === null) {
       this.newBatchQuantityTarget.value = ''
       this.updateDisplay()
@@ -198,6 +193,104 @@ export default class extends Controller {
     `
   }
 
+  // NEW: Update batch sign-off headers in operations table
+  updateBatchSignoffHeaders() {
+    if (this.hasBatchSignoffHeaderTarget) {
+      if (this.batchesValue.length === 0) {
+        this.batchSignoffHeaderTarget.innerHTML = `
+          <div class="text-center text-gray-500 text-xs">No Batches</div>
+        `
+      } else {
+        const headersHtml = this.batchesValue.map(batch =>
+          `<div class="text-center px-2 py-1 min-w-[3rem] text-xs font-medium">B${batch.number}</div>`
+        ).join('')
+
+        this.batchSignoffHeaderTarget.innerHTML = `
+          <div class="flex gap-1">
+            ${headersHtml}
+          </div>
+        `
+      }
+    }
+
+    // Update all operation sign-off areas
+    this.updateOperationSignoffs()
+  }
+
+  // NEW: Update sign-off buttons for all operations
+  updateOperationSignoffs() {
+    const operationSignoffElements = this.operationSignoffsTargets ||
+      document.querySelectorAll('[data-batch-manager-target="operationSignoffs"]')
+
+    operationSignoffElements.forEach(element => {
+      const operationPosition = element.dataset.operationPosition
+      const isBatchIndependent = element.closest('[data-ecard-operation-batch-independent-value="true"]')
+
+      if (isBatchIndependent) {
+        // Skip batch-independent operations
+        return
+      }
+
+      if (this.batchesValue.length === 0) {
+        element.innerHTML = `
+          <div class="text-center text-gray-400 text-xs py-3">
+            Create batches<br>to sign off
+          </div>
+        `
+      } else {
+        const signoffButtonsHtml = this.batchesValue.map(batch =>
+          this.renderBatchSignoffButton(batch, operationPosition)
+        ).join('')
+
+        element.innerHTML = `
+          <div class="flex gap-1">
+            ${signoffButtonsHtml}
+          </div>
+        `
+      }
+    })
+  }
+
+  // NEW: Render individual batch sign-off button
+  renderBatchSignoffButton(batch, operationPosition) {
+    const isSignedOff = this.isBatchOperationSignedOff(batch.id, operationPosition)
+
+    if (isSignedOff) {
+      return `
+        <div class="w-10 h-10 rounded-full bg-green-500 border-2 border-green-600 flex items-center justify-center">
+          <span class="text-white text-lg font-bold">✓</span>
+        </div>
+      `
+    } else {
+      return `
+        <form action="/works_orders/${this.worksOrderIdValue}/sign_off_operation" method="post" class="inline">
+          <input type="hidden" name="_method" value="patch">
+          <input type="hidden" name="authenticity_token" value="${this.getCSRFToken()}">
+          <input type="hidden" name="operation_position" value="${operationPosition}">
+          <input type="hidden" name="batch_id" value="${batch.id}">
+          <button type="submit"
+                  class="w-10 h-10 rounded-full bg-gray-200 hover:bg-green-400 border-2 border-gray-300 hover:border-green-500 transition-all duration-200"
+                  title="Sign off Operation ${operationPosition} for Batch ${batch.number}"
+                  onclick="return confirm('Sign off Operation ${operationPosition} for Batch ${batch.number}?')">
+          </button>
+        </form>
+      `
+    }
+  }
+
+  // NEW: Check if a specific batch/operation combination is signed off
+  isBatchOperationSignedOff(batchId, operationPosition) {
+    // This would check against the works order's customised_process_data
+    // For now, return false - this will be implemented with server-side data
+    return false
+  }
+
+  // NEW: Get CSRF token for forms
+  getCSRFToken() {
+    const token = document.querySelector('meta[name="csrf-token"]')
+    return token ? token.getAttribute('content') : ''
+  }
+
   getBatchStatusClass(status) {
     switch (status) {
       case 'active': return 'bg-blue-50 border-blue-200'
@@ -225,31 +318,11 @@ export default class extends Controller {
     }
   }
 
-  updateTotals() {
+  updateQuantityCheck() {
     const totalAssigned = this.batchesValue.reduce((sum, batch) => sum + batch.quantity, 0)
     const remaining = this.totalQuantityValue - totalAssigned
 
-    if (this.hasTotalAssignedTarget) {
-      this.totalAssignedTarget.textContent = totalAssigned
-    }
-
-    if (this.hasTotalRemainingTarget) {
-      this.totalRemainingTarget.textContent = remaining
-
-      // Color code the remaining quantity
-      if (remaining < 0) {
-        this.totalRemainingTarget.classList.add('text-orange-600', 'font-medium')
-        this.totalRemainingTarget.classList.remove('text-green-600', 'text-gray-600')
-      } else if (remaining === 0) {
-        this.totalRemainingTarget.classList.add('text-green-600', 'font-medium')
-        this.totalRemainingTarget.classList.remove('text-orange-600', 'text-gray-600')
-      } else {
-        this.totalRemainingTarget.classList.add('text-gray-600')
-        this.totalRemainingTarget.classList.remove('text-orange-600', 'text-green-600')
-      }
-    }
-
-    // Show warning if quantities don't match
+    // Color code the remaining quantity and show warnings
     this.checkQuantityWarning(totalAssigned, remaining)
   }
 
@@ -277,27 +350,23 @@ export default class extends Controller {
       this.warningMessageTarget.textContent = message
       this.warningMessageTarget.classList.remove('hidden')
 
-      // Auto-hide after 5 seconds
       setTimeout(() => {
         this.warningMessageTarget.classList.add('hidden')
       }, 5000)
     }
   }
 
-  // Get current active batches (for operations to process)
   getActiveBatches() {
     return this.batchesValue.filter(batch =>
       batch.status === 'active' || batch.status === 'processing'
     )
   }
 
-  // Update batch status when operations are signed off
   updateBatchProgress(batchId, operationPosition) {
     const batch = this.batchesValue.find(b => b.id === batchId)
     if (batch) {
       batch.currentOperation = Math.max(batch.currentOperation || 1, operationPosition + 1)
 
-      // Update status based on progress
       if (batch.currentOperation > this.getTotalOperations()) {
         batch.status = 'complete'
       } else {
@@ -305,16 +374,16 @@ export default class extends Controller {
       }
 
       this.renderBatches()
+      this.updateOperationSignoffs()
       this.notifyBatchUpdated(batch)
     }
   }
 
   getTotalOperations() {
-    // This should come from the work order data
     return parseInt(this.element.dataset.totalOperations) || 10
   }
 
-  // Event dispatching to notify other controllers
+  // Event dispatching
   notifyBatchAdded(batch) {
     const event = new CustomEvent('batch-manager:batchAdded', {
       detail: batch,
@@ -339,10 +408,8 @@ export default class extends Controller {
     document.dispatchEvent(event)
   }
 
-  // Save batches to server (placeholder)
   async saveBatches() {
     try {
-      // Could POST to server to save batch configuration
       console.log('Saving batches:', this.batchesValue)
     } catch (error) {
       console.error('Failed to save batches:', error)

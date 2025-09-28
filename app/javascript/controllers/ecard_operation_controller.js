@@ -2,12 +2,13 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["signOffButton", "statusBadge", "currentBatch", "batchQuantity"]
+  static targets = ["signOffButton", "batchSignoffs"]
   static values = {
     position: Number,
     worksOrderId: String,
     signedOff: Boolean,
-    displayName: String
+    displayName: String,
+    batchIndependent: Boolean
   }
 
   connect() {
@@ -18,71 +19,40 @@ export default class extends Controller {
   }
 
   setupBatchTracking() {
-    // Only set up batch tracking for non-contract review operations
-    if (!this.isContractReview()) {
-      this.updateCurrentBatch()
-      this.setupBatchListener()
+    if (this.batchIndependentValue) {
+      // Batch-independent operations (Contract Review, Final Inspection, Pack)
+      // Don't need batch tracking
+      return
     }
+
+    // Set up batch tracking for regular operations
+    this.setupBatchListener()
   }
 
   setupBatchListener() {
-    document.addEventListener('batch-manager:batchAdded', () => this.updateCurrentBatch())
-    document.addEventListener('batch-manager:batchUpdated', () => this.updateCurrentBatch())
-    document.addEventListener('batch-manager:batchRemoved', () => this.updateCurrentBatch())
+    document.addEventListener('batch-manager:batchAdded', () => this.updateBatchSignoffs())
+    document.addEventListener('batch-manager:batchUpdated', () => this.updateBatchSignoffs())
+    document.addEventListener('batch-manager:batchRemoved', () => this.updateBatchSignoffs())
   }
 
-  updateCurrentBatch() {
-    const batchManager = this.getBatchManagerController()
-    if (!batchManager) return
-
-    const activeBatches = batchManager.getActiveBatches()
-    const currentBatch = this.getCurrentBatchForOperation(activeBatches)
-
-    this.displayBatchInfo(currentBatch)
-    this.updateOperationStatus(currentBatch)
-  }
-
-  displayBatchInfo(currentBatch) {
-    if (this.hasCurrentBatchTarget && this.hasBatchQuantityTarget) {
-      if (currentBatch) {
-        this.currentBatchTarget.innerHTML = `<span class="font-medium text-blue-600">B${currentBatch.number}</span>`
-        this.batchQuantityTarget.innerHTML = `<span class="font-medium">${currentBatch.quantity}</span>`
-      } else {
-        this.currentBatchTarget.innerHTML = `<span class="text-gray-400">-</span>`
-        this.batchQuantityTarget.innerHTML = `<span class="text-gray-400">-</span>`
-      }
-    }
-  }
-
-  updateOperationStatus(currentBatch) {
-    if (this.hasStatusBadgeTarget && this.hasSignOffButtonTarget) {
-      if (currentBatch) {
-        this.statusBadgeTarget.textContent = 'Ready to Process'
-        this.statusBadgeTarget.className = 'inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800'
-        this.signOffButtonTarget.disabled = false
-        this.signOffButtonTarget.classList.remove('opacity-50', 'cursor-not-allowed')
-      } else {
-        this.statusBadgeTarget.textContent = 'Waiting for Batch'
-        this.statusBadgeTarget.className = 'inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-600'
-        this.signOffButtonTarget.disabled = true
-        this.signOffButtonTarget.classList.add('opacity-50', 'cursor-not-allowed')
-      }
-    }
+  updateBatchSignoffs() {
+    // This is now handled by the batch manager controller
+    // which updates all operation sign-offs when batches change
   }
 
   beforeSignOff(event) {
-    if (this.isContractReview()) {
-      return this.handleContractReviewSignOff(event)
+    if (this.batchIndependentValue) {
+      return this.handleBatchIndependentSignOff(event)
     }
-    return this.handleRegularOperationSignOff(event)
+    return this.handleBatchDependentSignOff(event)
   }
 
-  handleContractReviewSignOff(event) {
-    // Contract review can always be signed off
+  handleBatchIndependentSignOff(event) {
+    // Contract review, final inspection, and pack can always be signed off
     return true
   }
 
-  handleRegularOperationSignOff(event) {
+  handleBatchDependentSignOff(event) {
     const batchManager = this.getBatchManagerController()
     if (!batchManager) {
       alert('Batch management system not available. Please refresh the page.')
@@ -91,33 +61,23 @@ export default class extends Controller {
     }
 
     const activeBatches = batchManager.getActiveBatches()
-    const currentBatch = this.getCurrentBatchForOperation(activeBatches)
-
-    if (!currentBatch) {
-      alert('No active batch found for this operation. Please create a batch first.')
+    if (activeBatches.length === 0) {
+      alert('No batches found. Please create batches first.')
       event.preventDefault()
       return false
     }
 
-    // Update batch progress when signed off
-    this.updateBatchProgress(batchManager, currentBatch)
-    return true
-  }
+    // For batch-dependent operations, the batch ID should be included in the form
+    const form = event.target.closest('form')
+    const batchId = form ? form.querySelector('input[name="batch_id"]')?.value : null
 
-  isContractReview() {
-    return this.displayNameValue && this.displayNameValue.toLowerCase().includes('contract review')
-  }
-
-  getCurrentBatchForOperation(activeBatches) {
-    return activeBatches.find(batch =>
-      (batch.currentOperation || 1) <= this.positionValue
-    )
-  }
-
-  updateBatchProgress(batchManager, batch) {
-    if (batchManager && typeof batchManager.updateBatchProgress === 'function') {
-      batchManager.updateBatchProgress(batch.id, this.positionValue)
+    if (!batchId) {
+      alert('No batch specified for this operation.')
+      event.preventDefault()
+      return false
     }
+
+    return true
   }
 
   getBatchManagerController() {
@@ -135,34 +95,45 @@ export default class extends Controller {
     // Update the row styling
     this.element.classList.add("bg-green-50")
 
-    // Update status badge
-    if (this.hasStatusBadgeTarget) {
-      this.statusBadgeTarget.textContent = "✓ Complete"
-      this.statusBadgeTarget.className = "inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800"
-    }
-
-    // Replace sign off button with checkmark
-    if (this.hasSignOffButtonTarget) {
-      const buttonCell = this.signOffButtonTarget.parentElement
-      if (buttonCell) {
-        buttonCell.innerHTML = '<span class="text-green-600 text-xs">✓</span>'
+    // For batch-independent operations, replace the single button
+    if (this.batchIndependentValue && this.hasSignOffButtonTarget) {
+      const buttonContainer = this.signOffButtonTarget.parentElement
+      if (buttonContainer) {
+        buttonContainer.innerHTML = `
+          <div class="w-10 h-10 rounded-full bg-green-500 border-2 border-green-600 flex items-center justify-center">
+            <span class="text-white text-lg font-bold">✓</span>
+          </div>
+        `
       }
     }
   }
 
   // Method called after successful sign-off
-  operationSignedOff() {
+  operationSignedOff(batchId = null) {
     this.signedOffValue = true
-    this.markAsSignedOff()
+
+    if (this.batchIndependentValue) {
+      this.markAsSignedOff()
+    }
 
     // Notify the main ecard controller
     const ecardEvent = new CustomEvent('ecard:operationSignedOff', {
       detail: {
         operationPosition: this.positionValue,
-        operationName: this.displayNameValue
+        operationName: this.displayNameValue,
+        batchId: batchId,
+        batchIndependent: this.batchIndependentValue
       },
       bubbles: true
     })
     this.element.dispatchEvent(ecardEvent)
+
+    // Update batch progress if this is a batch-dependent operation
+    if (!this.batchIndependentValue && batchId) {
+      const batchManager = this.getBatchManagerController()
+      if (batchManager) {
+        batchManager.updateBatchProgress(batchId, this.positionValue)
+      }
+    }
   }
 }

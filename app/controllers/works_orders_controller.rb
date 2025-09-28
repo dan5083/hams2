@@ -273,6 +273,74 @@ class WorksOrdersController < ApplicationController
     end
   end
 
+  def save_operation_input
+  # Restrict to demo customers
+  demo_customers = ["24 Locks"]
+  unless demo_customers.include?(@works_order.customer.name)
+    render json: { success: false, error: "E-Cards are currently in beta testing for select customers." }
+    return
+  end
+
+  operation_position = params[:operation_position].to_s
+  input_index = params[:input_index].to_s
+  value = params[:value].to_s
+
+  # Initialize customised_process_data structure if needed
+  @works_order.customised_process_data ||= {}
+  @works_order.customised_process_data["operation_inputs"] ||= {}
+  @works_order.customised_process_data["operation_inputs"][operation_position] ||= {}
+
+  # Save the input value
+  @works_order.customised_process_data["operation_inputs"][operation_position][input_index] = value
+
+  if @works_order.save
+    render json: { success: true }
+  else
+    render json: { success: false, error: "Failed to save input" }
+  end
+end
+
+# Also update the sign_off_operation method to handle batch-based sign-offs:
+
+def sign_off_operation
+  # Restrict to demo customers
+  demo_customers = ["24 Locks"]
+  unless demo_customers.include?(@works_order.customer.name)
+    redirect_to @works_order, alert: "E-Cards are currently in beta testing for select customers."
+    return
+  end
+
+  position = params[:operation_position].to_i
+  batch_id = params[:batch_id]
+
+  # Initialize customised_process_data if blank
+  @works_order.customised_process_data ||= {}
+
+  if batch_id == "independent"
+    # Batch-independent operation (Contract Review, Final Inspection, Pack)
+    @works_order.customised_process_data["operations"] ||= {}
+    @works_order.customised_process_data["operations"][position.to_s] = {
+      "signed_off_by" => Current.user.id,
+      "signed_off_at" => Time.current.iso8601
+    }
+  else
+    # Batch-dependent operation
+    @works_order.customised_process_data["batch_operations"] ||= {}
+    @works_order.customised_process_data["batch_operations"][batch_id] ||= {}
+    @works_order.customised_process_data["batch_operations"][batch_id][position.to_s] = {
+      "signed_off_by" => Current.user.id,
+      "signed_off_at" => Time.current.iso8601,
+      "batch_id" => batch_id
+    }
+  end
+
+  if @works_order.save
+    redirect_to ecard_works_order_path(@works_order), notice: "Operation signed off"
+  else
+    redirect_to ecard_works_order_path(@works_order), alert: "Failed to sign off"
+  end
+end
+
   private
 
   def add_additional_charges_to_invoice(invoice, charge_ids, custom_amounts)
