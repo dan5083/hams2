@@ -62,44 +62,6 @@
       <!-- User menu (desktop) -->
       <div class="hidden md:flex items-center">
         <% if Current.user %>
-          <!-- User role indicator -->
-          <span class="text-blue-100 text-xs mr-3">
-            <% case Current.user.email_address %>
-            <% when 'chris@hardanodisingstl.com', 'quality@hardanodisingstl.com' %>
-              Quality
-            <% when 'chris.bayliss@hardanodisingstl.com' %>
-              Management
-            <% when 'daniel@hardanodisingstl.com' %>
-              Developer
-            <% when 'julia@hardanodisingstl.com' %>
-              Order Processing
-            <% when 'phil@hardanodisingstl.com' %>
-              Managing Director
-            <% when 'sophie@hardanodisingstl.com' %>
-              Admin
-            <% when 'tariq@hardanodisingstl.com' %>
-              Senior Mgmt
-            <% when 'adrian@hardanodisingstl.com', 'ben@hardanodisingstl.com' %>
-              VAT 9&12
-            <% when 'brian@hardanodisingstl.com' %>
-              VAT 1-3
-            <% when 'gary@hardanodisingstl.com' %>
-              VAT 5&6
-            <% when 'ross@hardanodisingstl.com' %>
-              Chromic
-            <% when 'alan@hardanodisingstl.com' %>
-              Lab
-            <% when 'elena@hardanodisingstl.com' %>
-              Inspector
-            <% when 'nigel@hardanodisingstl.com' %>
-              Contract
-            <% when 'dave@hardanodisingstl.com' %>
-              Maintenance
-            <% else %>
-              User
-            <% end %>
-          </span>
-
           <span class="text-white text-sm mr-4">Hi, <%= Current.user.display_name %></span>
           <%= link_to "Logout", session_path, method: :delete,
               class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium" %>
@@ -145,38 +107,6 @@
         <div class="border-t border-blue-600 pt-4">
           <div class="text-white text-sm px-3 py-2">
             Logged in as <%= Current.user.display_name %>
-            <% case Current.user.email_address %>
-            <% when 'chris@hardanodisingstl.com', 'quality@hardanodisingstl.com' %>
-              <span class="text-blue-200">(Quality)</span>
-            <% when 'chris.bayliss@hardanodisingstl.com' %>
-              <span class="text-blue-200">(Management)</span>
-            <% when 'daniel@hardanodisingstl.com' %>
-              <span class="text-blue-200">(Developer)</span>
-            <% when 'julia@hardanodisingstl.com' %>
-              <span class="text-blue-200">(Order Processing)</span>
-            <% when 'phil@hardanodisingstl.com' %>
-              <span class="text-blue-200">(Managing Director)</span>
-            <% when 'sophie@hardanodisingstl.com' %>
-              <span class="text-blue-200">(Admin)</span>
-            <% when 'tariq@hardanodisingstl.com' %>
-              <span class="text-blue-200">(Senior Mgmt)</span>
-            <% when 'adrian@hardanodisingstl.com', 'ben@hardanodisingstl.com' %>
-              <span class="text-blue-200">(VAT 9&12)</span>
-            <% when 'brian@hardanodisingstl.com' %>
-              <span class="text-blue-200">(VAT 1-3)</span>
-            <% when 'gary@hardanodisingstl.com' %>
-              <span class="text-blue-200">(VAT 5&6)</span>
-            <% when 'ross@hardanodisingstl.com' %>
-              <span class="text-blue-200">(Chromic)</span>
-            <% when 'alan@hardanodisingstl.com' %>
-              <span class="text-blue-200">(Lab)</span>
-            <% when 'elena@hardanodisingstl.com' %>
-              <span class="text-blue-200">(Inspector)</span>
-            <% when 'nigel@hardanodisingstl.com' %>
-              <span class="text-blue-200">(Contract)</span>
-            <% when 'dave@hardanodisingstl.com' %>
-              <span class="text-blue-200">(Maintenance)</span>
-            <% end %>
           </div>
           <%= link_to "Logout", session_path, method: :delete,
               class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium" %>
