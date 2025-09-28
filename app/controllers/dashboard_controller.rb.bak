@@ -90,7 +90,7 @@ class DashboardController < ApplicationController
 
   def xero_connected?
     # Check if user has active Xero session/tokens
-    session[:xero_token_set].present? && session[:xero_tenant_id].present?
+    session[:xero_access_token].present? && session[:xero_tenant_id].present?
   end
 
   def load_ecard_metrics
