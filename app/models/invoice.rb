@@ -18,7 +18,7 @@ class Invoice < ApplicationRecord
   scope :recent, -> { order(date: :desc) }
 
   # For dashboard compatibility - treat all as "draft" until synced like Mike did
-  scope :draft, -> { all }
+  scope :draft, -> { where(xero_id: nil) }
 
   before_validation :set_defaults, if: :new_record?
   before_validation :assign_next_number, if: :new_record?  # MOVED: Now runs before validation
