@@ -1,4 +1,4 @@
-<!-- app/views/shared/_navbar.html.erb - COMPLETE VERSION -->
+<!-- app/views/shared/_navbar.html.erb - RBAC VERSION -->
 <nav class="bg-blue-600 shadow-lg sticky top-0 z-50" data-controller="navbar">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex justify-between h-16">
@@ -12,20 +12,39 @@
 
       <!-- Desktop Navigation -->
       <div class="hidden md:flex items-center space-x-4">
+        <!-- Home - Always visible -->
         <%= link_to "Home", root_path,
             class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(root_path)}" %>
+
+        <!-- Customer Orders - Always visible -->
         <%= link_to "Customer Orders", customer_orders_path,
             class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(customer_orders_path)}" %>
+
+        <!-- Works Orders - Always visible -->
         <%= link_to "Works Orders", works_orders_path,
             class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(works_orders_path)}" %>
+
+        <!-- Release Notes - Always visible -->
         <%= link_to "Release Notes", release_notes_path,
             class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(release_notes_path)}" %>
-        <%= link_to "NCRs", external_ncrs_path,
-            class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(external_ncrs_path)}" %>
-        <%= link_to "Parts", parts_path,
-            class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(parts_path)}" %>
-        <%= link_to "Artifacts", artifacts_path,
-            class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(artifacts_path)}" %>
+
+        <!-- NCRs - Quality staff and management -->
+        <% if Current.user.email_address.in?(['chris@hardanodisingstl.com', 'quality@hardanodisingstl.com', 'phil@hardanodisingstl.com', 'tariq@hardanodisingstl.com', 'daniel@hardanodisingstl.com']) %>
+          <%= link_to "NCRs", external_ncrs_path,
+              class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(external_ncrs_path)}" %>
+        <% end %>
+
+        <!-- Parts - Office staff, quality, and management -->
+        <% if Current.user.email_address.in?(['chris@hardanodisingstl.com', 'chris.bayliss@hardanodisingstl.com', 'daniel@hardanodisingstl.com', 'julia@hardanodisingstl.com', 'phil@hardanodisingstl.com', 'quality@hardanodisingstl.com', 'sophie@hardanodisingstl.com', 'tariq@hardanodisingstl.com']) %>
+          <%= link_to "Parts", parts_path,
+              class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(parts_path)}" %>
+        <% end %>
+
+        <!-- Artifacts - Developer only -->
+        <% if Current.user.email_address == 'daniel@hardanodisingstl.com' %>
+          <%= link_to "Artifacts", artifacts_path,
+              class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(artifacts_path)}" %>
+        <% end %>
       </div>
 
       <!-- Mobile menu button -->
@@ -43,6 +62,44 @@
       <!-- User menu (desktop) -->
       <div class="hidden md:flex items-center">
         <% if Current.user %>
+          <!-- User role indicator -->
+          <span class="text-blue-100 text-xs mr-3">
+            <% case Current.user.email_address %>
+            <% when 'chris@hardanodisingstl.com', 'quality@hardanodisingstl.com' %>
+              Quality
+            <% when 'chris.bayliss@hardanodisingstl.com' %>
+              Management
+            <% when 'daniel@hardanodisingstl.com' %>
+              Developer
+            <% when 'julia@hardanodisingstl.com' %>
+              Order Processing
+            <% when 'phil@hardanodisingstl.com' %>
+              Managing Director
+            <% when 'sophie@hardanodisingstl.com' %>
+              Admin
+            <% when 'tariq@hardanodisingstl.com' %>
+              Senior Mgmt
+            <% when 'adrian@hardanodisingstl.com', 'ben@hardanodisingstl.com' %>
+              VAT 9&12
+            <% when 'brian@hardanodisingstl.com' %>
+              VAT 1-3
+            <% when 'gary@hardanodisingstl.com' %>
+              VAT 5&6
+            <% when 'ross@hardanodisingstl.com' %>
+              Chromic
+            <% when 'alan@hardanodisingstl.com' %>
+              Lab
+            <% when 'elena@hardanodisingstl.com' %>
+              Inspector
+            <% when 'nigel@hardanodisingstl.com' %>
+              Contract
+            <% when 'dave@hardanodisingstl.com' %>
+              Maintenance
+            <% else %>
+              User
+            <% end %>
+          </span>
+
           <span class="text-white text-sm mr-4">Hi, <%= Current.user.display_name %></span>
           <%= link_to "Logout", session_path, method: :delete,
               class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium" %>
@@ -57,6 +114,7 @@
   <!-- Mobile menu -->
   <div class="md:hidden hidden" data-navbar-target="mobileMenu">
     <div class="px-2 pt-2 pb-3 space-y-1 bg-blue-700">
+      <!-- Always visible mobile links -->
       <%= link_to "Home", root_path,
           class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(root_path)}" %>
       <%= link_to "Customer Orders", customer_orders_path,
@@ -65,16 +123,61 @@
           class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(works_orders_path)}" %>
       <%= link_to "Release Notes", release_notes_path,
           class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(release_notes_path)}" %>
-      <%= link_to "NCRs", external_ncrs_path,
-          class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(external_ncrs_path)}" %>
-      <%= link_to "Parts", parts_path,
-          class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(parts_path)}" %>
-      <%= link_to "Artifacts", artifacts_path,
-          class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(artifacts_path)}" %>
 
+      <!-- Role-based mobile links -->
+      <% if Current.user.email_address.in?(['chris@hardanodisingstl.com', 'quality@hardanodisingstl.com', 'phil@hardanodisingstl.com', 'tariq@hardanodisingstl.com', 'daniel@hardanodisingstl.com']) %>
+        <%= link_to "NCRs", external_ncrs_path,
+            class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(external_ncrs_path)}" %>
+      <% end %>
+
+      <% if Current.user.email_address.in?(['chris@hardanodisingstl.com', 'chris.bayliss@hardanodisingstl.com', 'daniel@hardanodisingstl.com', 'julia@hardanodisingstl.com', 'phil@hardanodisingstl.com', 'quality@hardanodisingstl.com', 'sophie@hardanodisingstl.com', 'tariq@hardanodisingstl.com']) %>
+        <%= link_to "Parts", parts_path,
+            class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(parts_path)}" %>
+      <% end %>
+
+      <% if Current.user.email_address == 'daniel@hardanodisingstl.com' %>
+        <%= link_to "Artifacts", artifacts_path,
+            class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(artifacts_path)}" %>
+      <% end %>
+
+      <!-- User section in mobile -->
       <% if Current.user %>
         <div class="border-t border-blue-600 pt-4">
-          <div class="text-white text-sm px-3 py-2">Logged in as <%= Current.user.display_name %></div>
+          <div class="text-white text-sm px-3 py-2">
+            Logged in as <%= Current.user.display_name %>
+            <% case Current.user.email_address %>
+            <% when 'chris@hardanodisingstl.com', 'quality@hardanodisingstl.com' %>
+              <span class="text-blue-200">(Quality)</span>
+            <% when 'chris.bayliss@hardanodisingstl.com' %>
+              <span class="text-blue-200">(Management)</span>
+            <% when 'daniel@hardanodisingstl.com' %>
+              <span class="text-blue-200">(Developer)</span>
+            <% when 'julia@hardanodisingstl.com' %>
+              <span class="text-blue-200">(Order Processing)</span>
+            <% when 'phil@hardanodisingstl.com' %>
+              <span class="text-blue-200">(Managing Director)</span>
+            <% when 'sophie@hardanodisingstl.com' %>
+              <span class="text-blue-200">(Admin)</span>
+            <% when 'tariq@hardanodisingstl.com' %>
+              <span class="text-blue-200">(Senior Mgmt)</span>
+            <% when 'adrian@hardanodisingstl.com', 'ben@hardanodisingstl.com' %>
+              <span class="text-blue-200">(VAT 9&12)</span>
+            <% when 'brian@hardanodisingstl.com' %>
+              <span class="text-blue-200">(VAT 1-3)</span>
+            <% when 'gary@hardanodisingstl.com' %>
+              <span class="text-blue-200">(VAT 5&6)</span>
+            <% when 'ross@hardanodisingstl.com' %>
+              <span class="text-blue-200">(Chromic)</span>
+            <% when 'alan@hardanodisingstl.com' %>
+              <span class="text-blue-200">(Lab)</span>
+            <% when 'elena@hardanodisingstl.com' %>
+              <span class="text-blue-200">(Inspector)</span>
+            <% when 'nigel@hardanodisingstl.com' %>
+              <span class="text-blue-200">(Contract)</span>
+            <% when 'dave@hardanodisingstl.com' %>
+              <span class="text-blue-200">(Maintenance)</span>
+            <% end %>
+          </div>
           <%= link_to "Logout", session_path, method: :delete,
               class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium" %>
         </div>

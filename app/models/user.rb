@@ -63,9 +63,198 @@ class User < ApplicationRecord
     user
   end
 
+  # ============================================================================
+  # ROLE-BASED ACCESS CONTROL
+  # ============================================================================
+
+  # Main permission methods
+  def sees_xero_integration?
+    case email_address
+    when 'chris.bayliss@hardanodisingstl.com',
+         'daniel@hardanodisingstl.com',
+         'julia@hardanodisingstl.com',
+         'phil@hardanodisingstl.com',
+         'sophie@hardanodisingstl.com',
+         'tariq@hardanodisingstl.com'
+      true
+    else
+      false
+    end
+  end
+
+  def sees_ecards?
+    case email_address
+    when 'judy@hardanodisingstl.com'
+      false # Judy won't use the app
+    when 'chris.bayliss@hardanodisingstl.com',
+         'julia@hardanodisingstl.com',
+         'sophie@hardanodisingstl.com'
+      false # Office staff - no e-cards
+    else
+      true
+    end
+  end
+
+  # Returns filtering criteria for e-cards based on user role
+  def ecard_filter_criteria
+    return {} unless sees_ecards?
+
+    case email_address
+    when 'adrian@hardanodisingstl.com'
+      adrian_bishop_filter
+    when 'alan@hardanodisingstl.com'
+      alan_vaughan_filter
+    when 'ben@hardanodisingstl.com'
+      ben_mcgowan_filter
+    when 'brian@hardanodisingstl.com'
+      brian_benton_filter
+    when 'chris@hardanodisingstl.com'
+      chris_connon_filter
+    when 'daniel@hardanodisingstl.com'
+      daniel_bayliss_filter
+    when 'dave@hardanodisingstl.com'
+      dave_bennett_filter
+    when 'elena@hardanodisingstl.com'
+      elena_oprea_filter
+    when 'gary@hardanodisingstl.com'
+      gary_rickets_filter
+    when 'quality@hardanodisingstl.com'
+      jim_ledger_filter
+    when 'nigel@hardanodisingstl.com'
+      nigel_harrington_filter
+    when 'phil@hardanodisingstl.com'
+      phil_bayliss_filter
+    when 'ross@hardanodisingstl.com'
+      ross_wilson_filter
+    when 'tariq@hardanodisingstl.com'
+      tariq_anwar_filter
+    else
+      {} # No filtering for unrecognized users
+    end
+  end
+
+  # Helper method to check if user prioritizes aerospace work
+  def aerospace_priority?
+    email_address.in?(['chris@hardanodisingstl.com', 'quality@hardanodisingstl.com'])
+  end
+
   private
 
   def set_defaults
     self.enabled = true if enabled.nil?
+  end
+
+  # ============================================================================
+  # INDIVIDUAL USER FILTER METHODS
+  # ============================================================================
+
+  # Adrian Bishop - VAT 9 & 12 work
+  def adrian_bishop_filter
+    {
+      vat_numbers: [9, 12],
+      description: "VAT 9 & 12 work"
+    }
+  end
+
+  # Alan Vaughan - Lab work (sees all since testing is rare)
+  def alan_vaughan_filter
+    {
+      description: "Lab work - sees all work since testing is rare"
+    }
+  end
+
+  # Ben McGowan - VAT 9 & 12 work
+  def ben_mcgowan_filter
+    {
+      vat_numbers: [9, 12],
+      description: "VAT 9 & 12 work"
+    }
+  end
+
+  # Brian Benton - General work, VATs 1-3, no ENP
+  def brian_benton_filter
+    {
+      vat_numbers: [1, 2, 3],
+      exclude_process_types: ['electroless_nickel_plating'],
+      description: "General work, VATs 1-3, no ENP"
+    }
+  end
+
+  # Chris Connon - Quality/NCRs (e-cards with aerospace priority)
+  def chris_connon_filter
+    {
+      aerospace_priority: true,
+      description: "Quality/NCRs - aerospace priority work"
+    }
+  end
+
+  # Daniel Bayliss - Developer (sees everything - both Xero and all e-cards)
+  def daniel_bayliss_filter
+    {
+      description: "Developer - sees all work and systems"
+    }
+  end
+
+  # Dave Bennett - Maintenance (basic access)
+  def dave_bennett_filter
+    {
+      basic_access_only: true,
+      description: "Maintenance - basic access"
+    }
+  end
+
+  # Elena Oprea - Quality inspector (sees all e-cards)
+  def elena_oprea_filter
+    {
+      description: "Quality inspector - sees all e-cards"
+    }
+  end
+
+  # Gary Rickets - VAT 5 & 6 (hard/standard anodising), no ENP
+  def gary_rickets_filter
+    {
+      vat_numbers: [5, 6],
+      process_types: ['hard_anodising', 'standard_anodising'],
+      exclude_process_types: ['electroless_nickel_plating'],
+      description: "VAT 5 & 6 hard/standard anodising, no ENP"
+    }
+  end
+
+  # Jim Ledger - Quality/NCRs (e-cards with aerospace priority)
+  def jim_ledger_filter
+    {
+      aerospace_priority: true,
+      description: "Quality/NCRs - aerospace priority work"
+    }
+  end
+
+  # Nigel Harrington - Contract reviewer (sees all e-cards)
+  def nigel_harrington_filter
+    {
+      description: "Contract reviewer - sees all e-cards"
+    }
+  end
+
+  # Phil Bayliss - Managing Director (sees all e-cards)
+  def phil_bayliss_filter
+    {
+      description: "Managing Director - sees all e-cards"
+    }
+  end
+
+  # Ross Wilson - Chromic acid anodising and chemical conversion priority
+  def ross_wilson_filter
+    {
+      process_types: ['chromic_anodising', 'chemical_conversion'],
+      priority_process_types: ['chromic_anodising', 'chemical_conversion'],
+      description: "Chromic acid anodising and chemical conversion priority"
+    }
+  end
+
+  # Tariq Anwar - Senior Management (sees all e-cards)
+  def tariq_anwar_filter
+    {
+      description: "Senior Management - sees all e-cards"
+    }
   end
 end

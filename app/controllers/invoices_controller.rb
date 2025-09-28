@@ -1,5 +1,6 @@
 # app/controllers/invoices_controller.rb
 class InvoicesController < ApplicationController
+  before_action :require_xero_access
   before_action :set_invoice, only: [:show, :edit, :update, :destroy, :void]
 
   def index

@@ -1,5 +1,7 @@
 # app/controllers/artifacts_controller.rb
 class ArtifactsController < ApplicationController
+  before_action :require_artifacts_access
+
   def index
     # Load counts for all artifact types
     @release_levels_count = ReleaseLevel.count
@@ -14,4 +16,3 @@ class ArtifactsController < ApplicationController
     @additional_charge_presets_count = AdditionalChargePreset.count
     @enabled_additional_charge_presets_count = AdditionalChargePreset.enabled.count
   end
-end

@@ -1,9 +1,15 @@
-# app/controllers/works_orders_controller.rb - Fixed pricing parameter handling and route card operations
+# app/controllers/works_orders_controller.rb - Fixed pricing parameter handling and route card operations with RBAC
 class WorksOrdersController < ApplicationController
   before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :ecard, :sign_off_operation, :save_batches, :create_invoice, :void]
+  before_action :require_ecard_access, only: [:ecard, :sign_off_operation, :save_batches, :save_operation_input]
 
  def index
     @works_orders = WorksOrder.includes(:customer_order, :part, :release_level, :transport_method, customer: [])
+
+    # Apply user-specific e-card filtering if user sees e-cards
+    if Current.user.sees_ecards?
+      @works_orders = apply_ecard_filtering(@works_orders)
+    end
 
     # Search functionality - supports multiple search types
     if params[:search].present?
@@ -238,9 +244,21 @@ class WorksOrdersController < ApplicationController
   end
 
   def ecard
-    # Restrict to specific demo customers
-    demo_customers = ["24 Locks"]
+    # Check user access (already handled by before_action, but add extra logging)
+    unless Current.user.sees_ecards?
+      Rails.logger.warn "Unauthorized e-card access attempt by #{Current.user.email_address}"
+      redirect_to @works_order, alert: "You don't have permission to access e-cards."
+      return
+    end
 
+    # Check if this specific work order matches user's filter criteria
+    unless user_can_see_work_order?(@works_order)
+      redirect_to works_orders_path, alert: "This work order is outside your assigned work area."
+      return
+    end
+
+    # Original demo customer restriction can be removed or kept as additional filter
+    demo_customers = ["24 Locks"]
     unless demo_customers.include?(@works_order.customer.name)
       redirect_to @works_order, alert: "E-Cards are currently in beta testing for select customers."
       return
@@ -248,10 +266,9 @@ class WorksOrdersController < ApplicationController
   end
 
   def save_batches
-    # Restrict to demo customers
-    demo_customers = ["24 Locks"]
-    unless demo_customers.include?(@works_order.customer.name)
-      render json: { success: false, error: "E-Cards are currently in beta testing for select customers." }
+    # Permission check handled by before_action
+    unless user_can_see_work_order?(@works_order)
+      render json: { success: false, error: "This work order is outside your assigned work area." }
       return
     end
 
@@ -293,72 +310,68 @@ class WorksOrdersController < ApplicationController
   end
 
   def save_operation_input
-  # Restrict to demo customers
-  demo_customers = ["24 Locks"]
-  unless demo_customers.include?(@works_order.customer.name)
-    render json: { success: false, error: "E-Cards are currently in beta testing for select customers." }
-    return
+    # Permission check handled by before_action
+    unless user_can_see_work_order?(@works_order)
+      render json: { success: false, error: "This work order is outside your assigned work area." }
+      return
+    end
+
+    operation_position = params[:operation_position].to_s
+    input_index = params[:input_index].to_s
+    value = params[:value].to_s
+
+    # Initialize customised_process_data structure if needed
+    @works_order.customised_process_data ||= {}
+    @works_order.customised_process_data["operation_inputs"] ||= {}
+    @works_order.customised_process_data["operation_inputs"][operation_position] ||= {}
+
+    # Save the input value
+    @works_order.customised_process_data["operation_inputs"][operation_position][input_index] = value
+
+    if @works_order.save
+      render json: { success: true }
+    else
+      render json: { success: false, error: "Failed to save input" }
+    end
   end
 
-  operation_position = params[:operation_position].to_s
-  input_index = params[:input_index].to_s
-  value = params[:value].to_s
+  def sign_off_operation
+    # Permission check handled by before_action
+    unless user_can_see_work_order?(@works_order)
+      redirect_to @works_order, alert: "This work order is outside your assigned work area."
+      return
+    end
 
-  # Initialize customised_process_data structure if needed
-  @works_order.customised_process_data ||= {}
-  @works_order.customised_process_data["operation_inputs"] ||= {}
-  @works_order.customised_process_data["operation_inputs"][operation_position] ||= {}
+    position = params[:operation_position].to_i
+    batch_id = params[:batch_id]
 
-  # Save the input value
-  @works_order.customised_process_data["operation_inputs"][operation_position][input_index] = value
+    # Initialize customised_process_data if blank
+    @works_order.customised_process_data ||= {}
 
-  if @works_order.save
-    render json: { success: true }
-  else
-    render json: { success: false, error: "Failed to save input" }
+    if batch_id == "independent"
+      # Batch-independent operation (Contract Review, Final Inspection, Pack)
+      @works_order.customised_process_data["operations"] ||= {}
+      @works_order.customised_process_data["operations"][position.to_s] = {
+        "signed_off_by" => Current.user.id,
+        "signed_off_at" => Time.current.iso8601
+      }
+    else
+      # Batch-dependent operation
+      @works_order.customised_process_data["batch_operations"] ||= {}
+      @works_order.customised_process_data["batch_operations"][batch_id] ||= {}
+      @works_order.customised_process_data["batch_operations"][batch_id][position.to_s] = {
+        "signed_off_by" => Current.user.id,
+        "signed_off_at" => Time.current.iso8601,
+        "batch_id" => batch_id
+      }
+    end
+
+    if @works_order.save
+      redirect_to ecard_works_order_path(@works_order), notice: "Operation signed off"
+    else
+      redirect_to ecard_works_order_path(@works_order), alert: "Failed to sign off"
+    end
   end
-end
-
-# Also update the sign_off_operation method to handle batch-based sign-offs:
-
-def sign_off_operation
-  # Restrict to demo customers
-  demo_customers = ["24 Locks"]
-  unless demo_customers.include?(@works_order.customer.name)
-    redirect_to @works_order, alert: "E-Cards are currently in beta testing for select customers."
-    return
-  end
-
-  position = params[:operation_position].to_i
-  batch_id = params[:batch_id]
-
-  # Initialize customised_process_data if blank
-  @works_order.customised_process_data ||= {}
-
-  if batch_id == "independent"
-    # Batch-independent operation (Contract Review, Final Inspection, Pack)
-    @works_order.customised_process_data["operations"] ||= {}
-    @works_order.customised_process_data["operations"][position.to_s] = {
-      "signed_off_by" => Current.user.id,
-      "signed_off_at" => Time.current.iso8601
-    }
-  else
-    # Batch-dependent operation
-    @works_order.customised_process_data["batch_operations"] ||= {}
-    @works_order.customised_process_data["batch_operations"][batch_id] ||= {}
-    @works_order.customised_process_data["batch_operations"][batch_id][position.to_s] = {
-      "signed_off_by" => Current.user.id,
-      "signed_off_at" => Time.current.iso8601,
-      "batch_id" => batch_id
-    }
-  end
-
-  if @works_order.save
-    redirect_to ecard_works_order_path(@works_order), notice: "Operation signed off"
-  else
-    redirect_to ecard_works_order_path(@works_order), alert: "Failed to sign off"
-  end
-end
 
   private
 
@@ -472,5 +485,91 @@ end
       works_order.errors.add(:base, "Error validating part: #{e.message}")
       return false
     end
+  end
+
+  # ============================================================================
+  # ROLE-BASED ACCESS CONTROL METHODS
+  # ============================================================================
+
+  def require_ecard_access
+    unless Current.user&.sees_ecards?
+      Rails.logger.warn "Unauthorized e-card access attempt by #{Current.user&.email_address || 'unknown user'}"
+      redirect_to root_path, alert: "You don't have permission to access e-cards."
+    end
+  end
+
+  # Check if current user can see a specific work order based on their filter criteria
+  def user_can_see_work_order?(work_order)
+    return true unless Current.user.sees_ecards? # If they can't see e-cards, don't filter
+
+    filter_criteria = Current.user.ecard_filter_criteria
+    return true if filter_criteria.blank? # No filtering = see everything
+
+    part = work_order.part
+    return true unless part # If no part, allow access
+
+    operations = part.get_operations_with_auto_ops
+    customisation_data = part.customisation_data || {}
+
+    # Check basic access restriction (for maintenance staff)
+    if filter_criteria[:basic_access_only]
+      return false # Maintenance gets basic access only, no e-card filtering
+    end
+
+    # Aerospace priority filtering
+    if filter_criteria[:aerospace_priority] && part.aerospace_defense?
+      return true # Quality staff see aerospace work first
+    end
+
+    # VAT number filtering
+    if filter_criteria[:vat_numbers].present?
+      operation_vats = operations.flat_map(&:vat_numbers).uniq
+      return false if operation_vats.any? && (operation_vats & filter_criteria[:vat_numbers]).empty?
+    end
+
+    # Process type filtering (include specific types)
+    if filter_criteria[:process_types].present?
+      operation_process_types = operations.map(&:process_type).uniq
+      return false if (operation_process_types & filter_criteria[:process_types]).empty?
+    end
+
+    # Process type exclusion filtering
+    if filter_criteria[:exclude_process_types].present?
+      operation_process_types = operations.map(&:process_type).uniq
+      return false if (operation_process_types & filter_criteria[:exclude_process_types]).any?
+    end
+
+    # Priority process types (show these first, but don't exclude others)
+    if filter_criteria[:priority_process_types].present?
+      operation_process_types = operations.map(&:process_type).uniq
+      # This would be used for sorting, not filtering
+    end
+
+    true # Default to allowing access
+  end
+
+  # Apply user-specific filtering to the works orders collection
+  def apply_ecard_filtering(works_orders)
+    return works_orders unless Current.user.sees_ecards?
+
+    filter_criteria = Current.user.ecard_filter_criteria
+    return works_orders if filter_criteria.blank?
+
+    # For basic access only (maintenance), return empty collection
+    if filter_criteria[:basic_access_only]
+      return works_orders.none
+    end
+
+    # If user sees everything (management, quality inspectors, contract reviewers)
+    if filter_criteria[:description]&.include?("sees all")
+      return works_orders
+    end
+
+    # Apply filtering based on parts and operations
+    filtered_ids = works_orders.includes(:part).select do |work_order|
+      user_can_see_work_order?(work_order)
+    end.map(&:id)
+
+    works_orders.where(id: filtered_ids)
   end
 end

@@ -1,5 +1,6 @@
 class PartsController < ApplicationController
-before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled, :insert_operation, :reorder_operation, :delete_operation, :update_locked_operation]
+  before_action :require_parts_access
+  before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled, :insert_operation, :reorder_operation, :delete_operation, :update_locked_operation]
 
   def index
     @parts = Part.includes(:customer, :works_orders)

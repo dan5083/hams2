@@ -1,5 +1,6 @@
 # app/controllers/external_ncrs_controller.rb
 class ExternalNcrsController < ApplicationController
+  before_action :require_quality_access
   before_action :set_external_ncr, only: [:show, :edit, :update, :destroy, :advance_status, :download_document]
   before_action :set_release_note, only: [:new, :create], if: -> { params[:release_note_id].present? }
 
