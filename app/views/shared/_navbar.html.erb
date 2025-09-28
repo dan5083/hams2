@@ -29,19 +29,19 @@
             class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(release_notes_path)}" %>
 
         <!-- NCRs - Quality staff and management -->
-        <% if Current.user.email_address.in?(['chris@hardanodisingstl.com', 'quality@hardanodisingstl.com', 'phil@hardanodisingstl.com', 'tariq@hardanodisingstl.com', 'daniel@hardanodisingstl.com']) %>
+        <% if Current.user&.email_address&.in?(['chris@hardanodisingstl.com', 'quality@hardanodisingstl.com', 'phil@hardanodisingstl.com', 'tariq@hardanodisingstl.com', 'daniel@hardanodisingstl.com']) %>
           <%= link_to "NCRs", external_ncrs_path,
               class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(external_ncrs_path)}" %>
         <% end %>
 
         <!-- Parts - Office staff, quality, and management -->
-        <% if Current.user.email_address.in?(['chris@hardanodisingstl.com', 'chris.bayliss@hardanodisingstl.com', 'daniel@hardanodisingstl.com', 'julia@hardanodisingstl.com', 'phil@hardanodisingstl.com', 'quality@hardanodisingstl.com', 'sophie@hardanodisingstl.com', 'tariq@hardanodisingstl.com']) %>
+        <% if Current.user&.email_address&.in?(['chris@hardanodisingstl.com', 'chris.bayliss@hardanodisingstl.com', 'daniel@hardanodisingstl.com', 'julia@hardanodisingstl.com', 'phil@hardanodisingstl.com', 'quality@hardanodisingstl.com', 'sophie@hardanodisingstl.com', 'tariq@hardanodisingstl.com']) %>
           <%= link_to "Parts", parts_path,
               class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(parts_path)}" %>
         <% end %>
 
         <!-- Artifacts - Developer only -->
-        <% if Current.user.email_address == 'daniel@hardanodisingstl.com' %>
+        <% if Current.user&.email_address == 'daniel@hardanodisingstl.com' %>
           <%= link_to "Artifacts", artifacts_path,
               class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(artifacts_path)}" %>
         <% end %>
@@ -87,17 +87,17 @@
           class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(release_notes_path)}" %>
 
       <!-- Role-based mobile links -->
-      <% if Current.user.email_address.in?(['chris@hardanodisingstl.com', 'quality@hardanodisingstl.com', 'phil@hardanodisingstl.com', 'tariq@hardanodisingstl.com', 'daniel@hardanodisingstl.com']) %>
+      <% if Current.user&.email_address&.in?(['chris@hardanodisingstl.com', 'quality@hardanodisingstl.com', 'phil@hardanodisingstl.com', 'tariq@hardanodisingstl.com', 'daniel@hardanodisingstl.com']) %>
         <%= link_to "NCRs", external_ncrs_path,
             class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(external_ncrs_path)}" %>
       <% end %>
 
-      <% if Current.user.email_address.in?(['chris@hardanodisingstl.com', 'chris.bayliss@hardanodisingstl.com', 'daniel@hardanodisingstl.com', 'julia@hardanodisingstl.com', 'phil@hardanodisingstl.com', 'quality@hardanodisingstl.com', 'sophie@hardanodisingstl.com', 'tariq@hardanodisingstl.com']) %>
+      <% if Current.user&.email_address&.in?(['chris@hardanodisingstl.com', 'chris.bayliss@hardanodisingstl.com', 'daniel@hardanodisingstl.com', 'julia@hardanodisingstl.com', 'phil@hardanodisingstl.com', 'quality@hardanodisingstl.com', 'sophie@hardanodisingstl.com', 'tariq@hardanodisingstl.com']) %>
         <%= link_to "Parts", parts_path,
             class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(parts_path)}" %>
       <% end %>
 
-      <% if Current.user.email_address == 'daniel@hardanodisingstl.com' %>
+      <% if Current.user&.email_address == 'daniel@hardanodisingstl.com' %>
         <%= link_to "Artifacts", artifacts_path,
             class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(artifacts_path)}" %>
       <% end %>
