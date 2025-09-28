@@ -1,5 +1,5 @@
 class XeroAuthController < ApplicationController
-  before_action :require_xero_access
+  before_action :require_xero_access, except: [:authorize, :callback]
   allow_unauthenticated_access only: [:authorize, :callback]
 
   def authorize
