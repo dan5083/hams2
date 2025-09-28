@@ -118,51 +118,36 @@ export default class extends Controller {
   }
 
   renderBatchRow(batch) {
-    const statusClass = this.getBatchStatusClass(batch.status)
-    const progressText = this.getBatchProgressText(batch)
-
     return `
       <div class="border-l border-r border-b border-gray-300 bg-white hover:bg-gray-50">
-        <div class="grid grid-cols-12 gap-2 p-3 text-sm items-center">
+        <div class="grid grid-cols-12 gap-3 p-3 text-sm items-center">
           <!-- Batch ID -->
-          <div class="col-span-2">
+          <div class="col-span-3">
             <span class="font-bold text-lg text-blue-600">B${batch.number}</span>
           </div>
 
           <!-- Editable Quantity -->
-          <div class="col-span-2">
+          <div class="col-span-3">
             <input type="number"
                    value="${batch.quantity}"
                    min="1"
                    max="${this.totalQuantityValue}"
-                   class="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                   class="w-full border border-gray-300 rounded px-3 py-2 text-sm"
                    data-batch-id="${batch.id}"
                    data-action="change->batch-manager#updateBatchQuantity">
           </div>
 
-          <!-- Status -->
-          <div class="col-span-2">
-            <span class="px-2 py-1 rounded text-xs font-medium ${this.getStatusBadgeClass(batch.status)}">
-              ${this.getBatchStatusText(batch.status)}
-            </span>
-          </div>
-
-          <!-- Progress -->
-          <div class="col-span-3">
-            <div class="text-xs text-gray-600">${progressText}</div>
-          </div>
-
           <!-- Created Date -->
-          <div class="col-span-2">
-            <div class="text-xs text-gray-500">
-              ${new Date(batch.createdAt).toLocaleDateString()}
+          <div class="col-span-4">
+            <div class="text-sm text-gray-600">
+              ${new Date(batch.createdAt).toLocaleDateString()} ${new Date(batch.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
             </div>
           </div>
 
           <!-- Actions -->
-          <div class="col-span-1">
+          <div class="col-span-2">
             <button type="button"
-                    class="text-red-500 hover:text-red-700 text-sm font-medium"
+                    class="text-red-500 hover:text-red-700 text-sm font-medium px-3 py-1 rounded hover:bg-red-50 transition-colors"
                     data-batch-id="${batch.id}"
                     data-batch-number="${batch.number}"
                     data-action="click->batch-manager#removeBatch">
@@ -174,38 +159,7 @@ export default class extends Controller {
     `
   }
 
-  getBatchProgressText(batch) {
-    const totalOps = parseInt(this.element.dataset.totalOperations) || 10
-    const currentOp = batch.currentOperation || 1
-    return `Op ${currentOp}/${totalOps}`
-  }
 
-  getBatchStatusClass(status) {
-    switch (status) {
-      case 'active': return 'bg-blue-50 border-blue-200'
-      case 'processing': return 'bg-yellow-50 border-yellow-200'
-      case 'complete': return 'bg-green-50 border-green-200'
-      default: return 'bg-gray-50 border-gray-200'
-    }
-  }
-
-  getBatchStatusText(status) {
-    switch (status) {
-      case 'active': return 'Ready'
-      case 'processing': return 'In Progress'
-      case 'complete': return 'Complete'
-      default: return 'Unknown'
-    }
-  }
-
-  getStatusBadgeClass(status) {
-    switch (status) {
-      case 'active': return 'bg-blue-100 text-blue-800'
-      case 'processing': return 'bg-yellow-100 text-yellow-800'
-      case 'complete': return 'bg-green-100 text-green-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
-  }
 
   updateSummary() {
     const totalBatches = this.batchesValue.length
