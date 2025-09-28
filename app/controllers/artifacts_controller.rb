@@ -16,3 +16,4 @@ class ArtifactsController < ApplicationController
     @additional_charge_presets_count = AdditionalChargePreset.count
     @enabled_additional_charge_presets_count = AdditionalChargePreset.enabled.count
   end
+end
