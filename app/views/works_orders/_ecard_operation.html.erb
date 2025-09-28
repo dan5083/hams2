@@ -25,8 +25,8 @@
          data-ecard-operation-display-name-value="<%= operation['display_name'] %>"
          data-ecard-operation-batch-independent-value="<%= is_batch_independent %>">
 
-      <div class="flex p-3 items-start text-sm min-h-[80px]">
-
+      <!-- Desktop/Tablet Layout -->
+      <div class="hidden lg:flex p-3 items-start text-sm min-h-[80px]">
         <!-- Operation Number -->
         <div class="w-16 flex-shrink-0">
           <span class="font-bold text-lg text-blue-600"><%= operation["position"] %></span>
@@ -39,7 +39,7 @@
             <%= operation["display_name"] %>
           </div>
 
-          <!-- Operation Text - FIXED: Remove indentation, improve formatting -->
+          <!-- Operation Text -->
           <div class="text-sm text-gray-700 leading-relaxed mb-2"
                data-controller="operation-text-inputs"
                data-operation-text-inputs-works-order-id-value="<%= works_order.id %>"
@@ -47,12 +47,10 @@
 
             <% operation_text = operation["operation_text"] || "" %>
             <% if operation_text.include?("_") %>
-              <!-- Process text with underscores as inputs -->
               <div data-operation-text-inputs-target="textContainer" class="leading-relaxed">
                 <%= render_operation_text_with_inputs(operation_text, works_order, operation['position']) %>
               </div>
             <% else %>
-              <!-- Regular text display - FIXED: Remove whitespace-pre-wrap that was causing indentation -->
               <div class="break-words leading-relaxed">
                 <%= simple_format(operation_text.strip, {}, sanitize: false) %>
               </div>
@@ -67,14 +65,13 @@
           <% end %>
         </div>
 
-        <!-- Batch Sign-off Buttons -->
+        <!-- Batch Sign-off Buttons (Desktop) -->
         <div class="batch-signoffs flex-shrink-0"
              data-ecard-operation-target="batchSignoffs"
              data-batch-manager-target="operationSignoffs"
              data-operation-position="<%= operation['position'] %>">
 
           <% if is_batch_independent %>
-            <!-- Single sign-off for batch-independent operations -->
             <div class="flex justify-center">
               <% if operation_signed_off?(works_order, operation) %>
                 <div class="w-12 h-12 rounded-full bg-green-500 border-2 border-green-600 flex items-center justify-center">
@@ -100,11 +97,96 @@
               <% end %>
             </div>
           <% else %>
-            <!-- Placeholder for batch-dependent operations - populated by JavaScript -->
             <div class="text-center text-gray-400 text-xs py-3" style="min-width: 120px;">
               Create batches<br>to sign off
             </div>
           <% end %>
+        </div>
+      </div>
+
+      <!-- Mobile Layout -->
+      <div class="lg:hidden">
+        <!-- Operation Content (Full Width) -->
+        <div class="p-3">
+          <div class="flex items-start gap-3 mb-3">
+            <!-- Operation Number -->
+            <div class="flex-shrink-0">
+              <span class="font-bold text-lg text-blue-600"><%= operation["position"] %></span>
+            </div>
+
+            <!-- Operation Title and Details -->
+            <div class="flex-1 min-w-0">
+              <div class="font-medium text-gray-900 mb-2">
+                <%= operation["display_name"] %>
+              </div>
+
+              <!-- Operation Text (Full Width on Mobile) -->
+              <div class="text-sm text-gray-700 leading-relaxed mb-2"
+                   data-controller="operation-text-inputs"
+                   data-operation-text-inputs-works-order-id-value="<%= works_order.id %>"
+                   data-operation-text-inputs-operation-position-value="<%= operation['position'] %>">
+
+                <% operation_text = operation["operation_text"] || "" %>
+                <% if operation_text.include?("_") %>
+                  <div data-operation-text-inputs-target="textContainer" class="leading-relaxed">
+                    <%= render_operation_text_with_inputs(operation_text, works_order, operation['position']) %>
+                  </div>
+                <% else %>
+                  <div class="break-words leading-relaxed">
+                    <%= simple_format(operation_text.strip, {}, sanitize: false) %>
+                  </div>
+                <% end %>
+              </div>
+
+              <!-- Specifications -->
+              <% if operation["specifications"].present? %>
+                <div class="text-xs text-blue-600 mt-1 font-medium">
+                  Spec: <%= operation["specifications"] %>
+                </div>
+              <% end %>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mobile Batch Sign-offs (Stacked Below) -->
+        <div class="px-3 pb-3 border-t border-gray-100">
+          <div class="batch-signoffs-mobile"
+               data-ecard-operation-target="batchSignoffs"
+               data-batch-manager-target="operationSignoffs"
+               data-operation-position="<%= operation['position'] %>">
+
+            <% if is_batch_independent %>
+              <!-- Single sign-off for batch-independent operations -->
+              <div class="flex justify-center pt-2">
+                <% if operation_signed_off?(works_order, operation) %>
+                  <div class="w-16 h-12 rounded bg-green-500 border-2 border-green-600 flex items-center justify-center">
+                    <span class="text-white text-lg font-bold">✓</span>
+                  </div>
+                <% else %>
+                  <%= form_with url: sign_off_operation_works_order_path(works_order),
+                                method: :patch,
+                                local: true,
+                                class: "inline" do |form| %>
+                    <%= form.hidden_field :operation_position, value: operation["position"] %>
+                    <%= form.hidden_field :batch_id, value: "independent" %>
+                    <%= form.submit "Sign Off",
+                        class: "w-24 h-12 rounded bg-blue-500 hover:bg-green-600 text-white font-bold text-sm border-2 border-blue-600 hover:border-green-600 transition-all duration-200 cursor-pointer",
+                        data: {
+                          "ecard-operation-target": "signOffButton",
+                          action: "click->ecard-operation#beforeSignOff",
+                          confirm: "Sign off #{operation['display_name']}?"
+                        } %>
+                  <% end %>
+                <% end %>
+              </div>
+            <% else %>
+              <!-- Batch-dependent operations mobile placeholder -->
+              <div class="text-center text-gray-400 text-xs py-2">
+                <div class="text-xs font-medium mb-1">Batch Sign-offs</div>
+                <div>Create batches to sign off</div>
+              </div>
+            <% end %>
+          </div>
         </div>
       </div>
     </div>

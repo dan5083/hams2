@@ -251,11 +251,12 @@ export default class extends Controller {
     }
   }
 
-  // FIXED: Update operation headers with horizontal batch columns
+  // Update operation headers for both desktop and mobile layouts
   updateOperationHeaders() {
     const headerElements = document.querySelectorAll('[data-batch-manager-target="batchSignoffHeader"]')
     const operationElements = document.querySelectorAll('[data-batch-manager-target="operationSignoffs"]')
 
+    // Update desktop headers
     headerElements.forEach(element => {
       if (this.batchesValue.length === 0) {
         element.innerHTML = `
@@ -278,35 +279,89 @@ export default class extends Controller {
       }
     })
 
-    // Update operation sign-off buttons
+    // Update operation sign-off buttons for both desktop and mobile
     operationElements.forEach(element => {
       const operationPosition = element.dataset.operationPosition
       const isBatchIndependent = element.closest('[data-ecard-operation-batch-independent-value="true"]')
+      const isMobile = element.classList.contains('batch-signoffs-mobile')
 
       if (isBatchIndependent) {
         return // Skip batch-independent operations
       }
 
       if (this.batchesValue.length === 0) {
-        element.innerHTML = `
-          <div class="text-center text-gray-400 text-xs py-3">
-            Create batches<br>to sign off
-          </div>
-        `
-        element.style.minWidth = '120px'
+        if (isMobile) {
+          element.innerHTML = `
+            <div class="text-center text-gray-400 text-xs py-2">
+              <div class="text-xs font-medium mb-1">Batch Sign-offs</div>
+              <div>Create batches to sign off</div>
+            </div>
+          `
+        } else {
+          element.innerHTML = `
+            <div class="text-center text-gray-400 text-xs py-3">
+              Create batches<br>to sign off
+            </div>
+          `
+          element.style.minWidth = '120px'
+        }
       } else {
-        const buttonsHtml = this.batchesValue.map(batch =>
-          this.renderBatchSignoffButton(batch, operationPosition)
-        ).join('')
+        if (isMobile) {
+          // Mobile layout: Horizontal scrollable row
+          const buttonsHtml = this.batchesValue.map(batch =>
+            this.renderMobileBatchSignoffButton(batch, operationPosition)
+          ).join('')
 
-        element.innerHTML = `
-          <div class="flex border border-gray-300 rounded overflow-hidden">
-            ${buttonsHtml}
-          </div>
-        `
-        element.style.minWidth = `${this.batchesValue.length * 55}px`
+          element.innerHTML = `
+            <div class="py-2">
+              <div class="text-xs font-medium text-gray-600 mb-2">Batch Sign-offs:</div>
+              <div class="flex gap-2 overflow-x-auto pb-1">
+                ${buttonsHtml}
+              </div>
+            </div>
+          `
+        } else {
+          // Desktop layout: Compact horizontal buttons
+          const buttonsHtml = this.batchesValue.map(batch =>
+            this.renderBatchSignoffButton(batch, operationPosition)
+          ).join('')
+
+          element.innerHTML = `
+            <div class="flex border border-gray-300 rounded overflow-hidden">
+              ${buttonsHtml}
+            </div>
+          `
+          element.style.minWidth = `${this.batchesValue.length * 55}px`
+        }
       }
     })
+  }
+
+  renderMobileBatchSignoffButton(batch, operationPosition) {
+    const isSignedOff = this.isBatchOperationSignedOff(batch.id, operationPosition)
+
+    if (isSignedOff) {
+      return `
+        <div class="flex-shrink-0 w-20 h-10 bg-green-500 border-2 border-green-600 rounded flex items-center justify-center">
+          <span class="text-white text-sm font-bold">B${batch.number} ✓</span>
+        </div>
+      `
+    } else {
+      return `
+        <form action="/works_orders/${this.worksOrderIdValue}/sign_off_operation" method="post" class="inline flex-shrink-0">
+          <input type="hidden" name="_method" value="patch">
+          <input type="hidden" name="authenticity_token" value="${this.getCSRFToken()}">
+          <input type="hidden" name="operation_position" value="${operationPosition}">
+          <input type="hidden" name="batch_id" value="${batch.id}">
+          <button type="submit"
+                  class="w-20 h-10 bg-gray-100 hover:bg-green-400 border-2 border-gray-300 hover:border-green-500 rounded transition-all duration-200 flex items-center justify-center"
+                  title="Sign off Op ${operationPosition} for Batch ${batch.number}"
+                  onclick="return confirm('Sign off Operation ${operationPosition} for Batch ${batch.number}?')">
+            <span class="text-gray-600 hover:text-white text-xs font-medium">B${batch.number}</span>
+          </button>
+        </form>
+      `
+    }
   }
 
   renderBatchSignoffButton(batch, operationPosition) {
