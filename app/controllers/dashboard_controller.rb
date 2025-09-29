@@ -138,7 +138,6 @@ class DashboardController < ApplicationController
       @open_customer_orders = CustomerOrder.active.count
       @works_orders_pending_release = WorksOrder.with_unreleased_quantity.count
       @overdue_works_orders = WorksOrder.active.where('created_at < ?', 2.weeks.ago).count
-      @capacity_utilization = calculate_capacity_utilization
     end
   end
 
