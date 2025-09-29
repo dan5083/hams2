@@ -198,15 +198,6 @@ class DashboardController < ApplicationController
     ((completed_works_orders.to_f / total_works_orders) * 100).round(1)
   end
 
-  def calculate_capacity_utilization
-    # Simplified capacity calculation - could be more sophisticated
-    total_vats = 12
-    active_work_orders = WorksOrder.active.count
-    max_capacity = total_vats * 2 # Assuming 2 jobs per vat on average
-
-    ((active_work_orders.to_f / max_capacity) * 100).round(1)
-  end
-
   def get_database_size
     # Get approximate database size (PostgreSQL specific)
     result = ActiveRecord::Base.connection.execute(

@@ -1,6 +1,7 @@
 class PartsController < ApplicationController
-  before_action :require_parts_access
-  before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled, :insert_operation, :reorder_operation, :delete_operation, :update_locked_operation]
+ before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled,
+                                    :insert_operation, :reorder_operation, :delete_operation,
+                                    :update_locked_operation, :upload_drawing, :delete_drawing]
 
   def index
     @parts = Part.includes(:customer, :works_orders)
@@ -646,6 +647,27 @@ end
         success: false,
         error: 'An error occurred while copying operations'
       }, status: :internal_server_error
+    end
+  end
+
+    def upload_drawing
+    if params[:drawing].present?
+      if @part.upload_drawing(params[:drawing])
+        redirect_to @part, notice: 'Technical drawing uploaded successfully.'
+      else
+        redirect_to @part, alert: "Failed to upload drawing: #{@part.errors.full_messages.join(', ')}"
+      end
+    else
+      redirect_to @part, alert: 'Please select a file to upload.'
+    end
+  end
+
+  # Delete technical drawing
+  def delete_drawing
+    if @part.delete_drawing
+      redirect_to @part, notice: 'Technical drawing deleted successfully.'
+    else
+      redirect_to @part, alert: "Failed to delete drawing: #{@part.errors.full_messages.join(', ')}"
     end
   end
 

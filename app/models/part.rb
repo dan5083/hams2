@@ -7,6 +7,7 @@ class Part < ApplicationRecord
   has_many :replaced_by, class_name: 'Part', foreign_key: :replaces_id, dependent: :nullify
 
   validates :part_number, presence: true
+  validates :drawing_filename, length: { maximum: 255 }, allow_nil: true
   validates :part_issue, presence: true
   validates :each_price, numericality: { greater_than_or_equal_to: 0 }, allow_nil: true
   validates :part_number, uniqueness: {
@@ -651,6 +652,71 @@ class Part < ApplicationRecord
   # Check if part has operations that can be copied
   def has_copyable_operations?
     get_operations_with_auto_ops.any?
+  end
+
+    # Check if part has operations that can be copied
+  def has_copyable_operations?
+    get_operations_with_auto_ops.any?
+  end
+
+  # Technical Drawing Methods
+  def has_drawing?
+    drawing_cloudinary_public_id.present?
+  end
+
+  def drawing_view_url
+    return nil unless has_drawing?
+    CloudinaryService.generate_view_url(drawing_cloudinary_public_id)
+  end
+
+  def drawing_download_url
+    return nil unless has_drawing?
+    CloudinaryService.generate_download_url(drawing_cloudinary_public_id)
+  end
+
+  def upload_drawing(uploaded_file)
+    return false unless uploaded_file
+
+    begin
+      delete_drawing if has_drawing?
+
+      result = CloudinaryService.upload_file(
+        uploaded_file,
+        "parts/#{customer.name.parameterize}/#{part_number}",
+        filename_prefix: 'drawing',
+        resource_type: 'auto'
+      )
+
+      update(
+        drawing_cloudinary_public_id: result[:public_id],
+        drawing_filename: result[:filename]
+      )
+
+      true
+    rescue CloudinaryService::CloudinaryError => e
+      errors.add(:base, "Failed to upload drawing: #{e.message}")
+      false
+    end
+  end
+
+  def delete_drawing
+    return false unless has_drawing?
+
+    begin
+      resource_type = drawing_cloudinary_public_id.match?(/\.(pdf|doc|docx)$/i) ? 'raw' : 'auto'
+
+      CloudinaryService.delete_file(drawing_cloudinary_public_id, resource_type: resource_type)
+
+      update(
+        drawing_cloudinary_public_id: nil,
+        drawing_filename: nil
+      )
+
+      true
+    rescue CloudinaryService::CloudinaryError => e
+      errors.add(:base, "Failed to delete drawing: #{e.message}")
+      false
+    end
   end
 
   private
