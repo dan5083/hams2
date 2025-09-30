@@ -93,38 +93,88 @@ module OperationLibrary
 
     private
 
-    # Calculate voltage monitoring intervals for anodising operations (every 5 minutes)
-    def self.calculate_voltage_monitoring_intervals(anodising_operation)
-      # Extract time duration from operation text (e.g., "15V-->20V over 2 minutes" -> 2)
-      time_match = anodising_operation.operation_text.match(/over (\d+) minutes/)
-      total_minutes = time_match ? time_match[1].to_i : 20 # Default to 20 minutes
+   # In ocv.rb, modify the calculate_voltage_monitoring_intervals method:
 
-      # Calculate number of 5-minute intervals
-      intervals = (total_minutes / 5.0).ceil
+def self.calculate_voltage_monitoring_intervals(anodising_operation)
+  # Special handling for chromic anodising with known voltage stages
+  if anodising_operation.process_type == 'chromic_anodising'
+    return calculate_chromic_voltage_intervals(anodising_operation)
+  end
 
-      {
-        total_minutes: total_minutes,
-        intervals: intervals,
-        temperature: calculate_temperature_for_anodising(anodising_operation)
-      }
-    end
+  # Existing logic for standard/hard anodising (5-minute intervals)
+  time_match = anodising_operation.operation_text.match(/over (\d+) minutes/)
+  total_minutes = time_match ? time_match[1].to_i : 20
+  intervals = (total_minutes / 5.0).ceil
 
-    # Build voltage monitoring text with proper intervals
-    def self.build_voltage_monitoring_text(voltage_data)
-      intervals = voltage_data[:intervals]
+  {
+    total_minutes: total_minutes,
+    intervals: intervals,
+    temperature: calculate_temperature_for_anodising(anodising_operation)
+  }
+end
 
-      text_lines = []
-      (1..3).each do |batch|
-        interval_texts = []
-        (1..intervals).each do |interval|
-          time_mark = interval * 5
-          interval_texts << "#{time_mark}min: ___V"
-        end
-        text_lines << "Batch ___: Temp ___°C [#{interval_texts.join(' | ')}]"
+def self.calculate_chromic_voltage_intervals(chromic_operation)
+  case chromic_operation.id
+  when 'CAA_40_50V_40MIN'
+    # Check at key transition points: 10min (40V reached), 30min (before ramp), 35min (50V reached), 40min (end)
+    {
+      chromic: true,
+      checkpoints: [
+        { time: 10, label: '10min (40V)' },
+        { time: 30, label: '30min (40V held)' },
+        { time: 35, label: '35min (50V)' },
+        { time: 40, label: '40min (end)' }
+      ]
+    }
+  when 'CAA_22V_37MIN'
+    # Check at: 7min (22V reached), 20min (mid-hold), 37min (end)
+    {
+      chromic: true,
+      checkpoints: [
+        { time: 7, label: '7min (22V)' },
+        { time: 20, label: '20min (held)' },
+        { time: 37, label: '37min (end)' }
+      ]
+    }
+  else
+    # Fallback for unknown chromic processes
+    {
+      chromic: true,
+      checkpoints: [
+        { time: 10, label: '10min' },
+        { time: 20, label: '20min' },
+        { time: 30, label: '30min' }
+      ]
+    }
+  end
+end
+
+def self.build_voltage_monitoring_text(voltage_data)
+  if voltage_data[:chromic]
+    # Build text for chromic with specific checkpoints
+    text_lines = []
+    (1..3).each do |batch|
+      checkpoint_texts = voltage_data[:checkpoints].map do |cp|
+        "#{cp[:label]}: ___V"
       end
-
-      text_lines.join("\n")
+      text_lines << "Batch ___: Temp ___°C [#{checkpoint_texts.join(' | ')}]"
     end
+    text_lines.join("\n")
+  else
+    # Existing logic for standard/hard (5-minute intervals)
+    intervals = voltage_data[:intervals]
+    text_lines = []
+    (1..3).each do |batch|
+      interval_texts = []
+      (1..intervals).each do |interval|
+        time_mark = interval * 5
+        interval_texts << "#{time_mark}min: ___V"
+      end
+      text_lines << "Batch ___: Temp ___°C [#{interval_texts.join(' | ')}]"
+    end
+    text_lines.join("\n")
+  end
+end
 
     # Calculate appropriate temperature for anodising operation
     def self.calculate_temperature_for_anodising(anodising_operation)
