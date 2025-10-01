@@ -402,7 +402,7 @@ class WorksOrdersController < ApplicationController
     # Always allow these core parameters
     permitted_params = [
       :customer_order_id, :part_id, :quantity, :price_type,
-      :release_level_id, :transport_method_id
+      :release_level_id, :transport_method_id, :customer_reference
     ]
 
     # Add additional charges parameters

@@ -21,7 +21,7 @@ module OperationLibrary
         Operation.new(
           id: 'FINAL_INSPECT',
           process_type: 'final_inspect',
-          operation_text: '**Final inspection** - Check 100% of qty for uniform film appearance and film thickness, print out to be attached to release notes. **Check for Foreign Object Debris (FOD).'
+          operation_text: '**Final inspection** - Check 100% of qty for uniform film appearance and film thickness, if qty wrong pls detail here ___ and inform an A stampholder, print out to be attached to release notes. **Check for Foreign Object Debris (FOD).'
         )
       ]
     end

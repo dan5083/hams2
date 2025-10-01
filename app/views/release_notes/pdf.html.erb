@@ -1,493 +1,277 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <style>
-      body {
-        font-family: sans-serif;
-        font-size: 9pt;
-        margin: 0;
-        padding: 1cm;
-        --standard-border-width: 1pt;
-        --standard-border-color: black;
-        --standard-border-style: solid;
-        box-sizing: border-box;
-      }
+<h1>Advice Note</h1>
 
-      @page {
-        size: A4 portrait;
-        margin: 1cm;
-      }
+  <!-- Header Information -->
+  <table class="header-table compact">
+    <tbody>
+      <tr>
+        <th>Release Note Number</th>
+        <td>RN<%= @release_note.number %></td>
+      </tr>
+      <tr>
+        <th>Date</th>
+        <td><%= @release_note.date.strftime("%d/%m/%Y") %></td>
+      </tr>
+    </tbody>
+  </table>
 
-      /* Force Advice Note to print on right side (odd page) and single sided */
-      .advice-note {
-        page-break-before: right;
-        page-break-after: always;
-        max-height: calc(100vh - 2cm);
-        overflow: hidden;
-      }
-
-      /* Certificate starts on next sheet, can use both sides */
-      .certificate-page {
-        page-break-before: right;
-      }
-
-      /* Allow certificate content to flow across pages */
-      .certificate-content {
-        max-height: none;
-        overflow: visible;
-      }
-
-      .logo-header {
-        text-align: left;
-        margin-bottom: 1rem;
-      }
-
-      .logo-header img {
-        max-width: 250px;
-        height: auto;
-      }
-
-      /* Company contact info styling */
-      .company-contact {
-        text-align: right;
-        font-size: 8pt;
-        color: #555;
-        margin-top: 0.5rem;
-        line-height: 1.2;
-      }
-
-      .company-contact a {
-        color: #555;
-        text-decoration: none;
-      }
-
-      .company-contact a:hover {
-        text-decoration: underline;
-      }
-
-      h1 {
-        text-align: center;
-        margin: 0.75rem 0;
-        font-size: 1.3em;
-      }
-
-      h2 {
-        font-size: 0.95em;
-        margin: 0.75rem 0 0.4rem 0;
-      }
-
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 0.75rem;
-      }
-
-      th, td {
-        border-color: var(--standard-border-color);
-        border-style: var(--standard-border-style);
-        border-width: var(--standard-border-width);
-        padding: 0.4rem;
-        vertical-align: top;
-      }
-
-      th {
-        background-color: #f8f9fa;
-        font-weight: bold;
-        text-align: left;
-        width: 30%;
-      }
-
-      .addresses {
-        table-layout: fixed;
-        margin-bottom: 1rem;
-      }
-
-      .address {
-        width: 50%;
-        vertical-align: top;
-        padding: 0.4rem;
-      }
-
-      .address h2 {
-        font-size: 0.9em;
-        margin: 0 0 0.4rem 0;
-        text-decoration: underline;
-      }
-
-      .address p {
-        margin: 0;
-        line-height: 1.3;
-      }
-
-      .header-table {
-        margin-bottom: 1rem;
-      }
-
-      .detail-table {
-        margin-top: 0.75rem;
-        margin-bottom: 1rem;
-      }
-
-      .signature-table {
-        table-layout: fixed;
-        margin-top: 1rem;
-      }
-
-      .signature-table th {
-        width: 25%;
-      }
-
-      .signature-table td {
-        height: 2.5rem;
-      }
-
-      .signature-name {
-        font-family: 'Times New Roman', serif;
-        font-size: 1.1em;
-        font-style: italic;
-        font-weight: bold;
-      }
-
-      .statement {
-        margin: 1rem 0;
-        padding: 0.75rem;
-        border: 1pt solid #ccc;
-        background-color: #f8f9fa;
-      }
-
-      .signature-block {
-        margin-top: 1.5rem;
-        text-align: center;
-      }
-
-      .thickness-table {
-        margin-top: 0.5rem;
-        margin-bottom: 0.75rem;
-      }
-
-      .thickness-table th {
-        width: 50%;
-      }
-
-      .thickness-group {
-        margin-bottom: 0.75rem;
-      }
-
-      .thickness-group-header {
-        background-color: #e9ecef;
-        font-weight: bold;
-        padding: 0.2rem 0.4rem;
-        border-bottom: 2pt solid #ccc;
-      }
-
-      p {
-        margin: 0.4rem 0;
-        line-height: 1.3;
-      }
-
-      /* Compact spacing */
-      .compact {
-        margin-bottom: 0.5rem;
-      }
-
-      /* Company footer styling */
-      .company-footer {
-        margin-top: 2rem;
-        padding-top: 1rem;
-        border-top: 1pt solid #ccc;
-        text-align: center;
-        font-size: 8pt;
-        color: #666;
-        line-height: 1.3;
-      }
-
-      .company-footer a {
-        color: #666;
-        text-decoration: none;
-      }
-
-      .company-footer a:hover {
-        text-decoration: underline;
-      }
-    </style>
-  </head>
-  <body>
-    <!-- Page 1: Advice Note (Single sided) -->
-    <div class="advice-note">
-      <!-- Logo Header -->
-      <div class="logo-header">
-        <%= image_tag(asset_path("logo-with-company-name.png"), alt: "Hard Anodising Surface Treatments Ltd") %>
-        <!-- Company contact info in header -->
-        <div class="company-contact">
-          Firs Industrial Estate, Rickets Close, Kidderminster DY11 7QN<br/>
-          Tel: 01562 747100 | <a href="https://www.hard-anodising.co.uk/">www.hard-anodising.co.uk</a>
-        </div>
-      </div>
-
-      <h1>Advice Note</h1>
-
-      <!-- Header Information -->
-      <table class="header-table compact">
-        <tbody>
-          <tr>
-            <th>Release Note Number</th>
-            <td>RN<%= @release_note.number %></td>
-          </tr>
-          <tr>
-            <th>Date</th>
-            <td><%= @release_note.date.strftime("%d/%m/%Y") %></td>
-          </tr>
-        </tbody>
-      </table>
-
-      <!-- Invoice Address Only (removed deliver to) -->
-      <table class="addresses compact">
-        <tbody>
-          <tr>
-            <td class="address">
-              <h2>Invoice To</h2>
-              <p>
-                <%= @release_note.works_order.customer_order.customer.display_name %><br/>
-                <%= simple_format(@release_note.works_order.customer_order.customer.pdf_address) %>
-              </p>
-            </td>
-            <td class="address">
-              <!-- Empty space for balance -->
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-
-      <!-- Release Note Details -->
-      <table class="detail-table compact">
-        <tbody>
-          <tr>
-            <th>Customer Order</th>
-            <td>
-              <%= @release_note.works_order.customer_order.number %>
-              <% if @release_note.works_order.respond_to?(:customer_order_line) && @release_note.works_order.customer_order_line.present? %>
-                (line <%= @release_note.works_order.customer_order_line %>)
-              <% end %>
-            </td>
-          </tr>
-          <tr>
-            <th>Part Number</th>
-            <td><%= @release_note.works_order.part_number %></td>
-          </tr>
-          <tr>
-            <th>Issue</th>
-            <td><%= @release_note.works_order.part_issue %></td>
-          </tr>
-          <tr>
-            <th>Description</th>
-            <td><%= @release_note.works_order.part_description %></td>
-          </tr>
-          <tr>
-            <th>Quantity Accepted</th>
-            <td><%= @release_note.quantity_accepted %></td>
-          </tr>
-          <tr>
-            <th>Quantity Rejected</th>
-            <td><%= @release_note.quantity_rejected %></td>
-          </tr>
-          <tr>
-            <th>Our Works Order Number</th>
-            <td>WO<%= @release_note.works_order.number %></td>
-          </tr>
-        </tbody>
-      </table>
-
-      <!-- Thickness Measurements (if present) - Simplified -->
-      <% if @release_note.has_thickness_measurements? %>
-        <h2>Thickness Measurements</h2>
-        <% measurements_by_type = @release_note.thickness_measurements_by_type %>
-        <% measurements_by_type.each do |process_type, measurements| %>
-          <div class="thickness-group">
-            <div class="thickness-group-header">
-              <%= process_type.humanize.gsub('_', ' ').titleize %>
-            </div>
-            <table class="thickness-table">
-              <thead>
-                <tr>
-                  <th>Treatment</th>
-                  <th>Measured (μm)</th>
-                </tr>
-              </thead>
-              <tbody>
-                <% measurements.each do |measurement| %>
-                  <tr>
-                    <td><%= measurement['display_name'] || measurement['process_type'].humanize.titleize %></td>
-                    <td><%= measurement['measured_thickness'] %></td>
-                  </tr>
-                <% end %>
-              </tbody>
-            </table>
-          </div>
-        <% end %>
-      <% end %>
-
-      <!-- Proof of Collection/Delivery -->
-      <h2>Proof of Collection/Delivery</h2>
-      <table class="signature-table">
-        <tbody>
-          <tr>
-            <th>Signature</th>
-            <td></td>
-          </tr>
-          <tr>
-            <th>Name</th>
-            <td></td>
-          </tr>
-          <tr>
-            <th>Date/Time</th>
-            <td></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Page 2+: Certificate of Conformity (Can use multiple sides) -->
-    <div class="certificate-page">
-      <div class="certificate-content">
-        <!-- Logo Header -->
-        <div class="logo-header">
-          <%= image_tag("logo-with-company-name.png", alt: "Hard Anodising Surface Treatments Ltd") %>
-          <!-- Company contact info in header -->
-          <div class="company-contact">
-            Firs Industrial Estate, Rickets Close, Kidderminster DY11 7QN<br/>
-            Tel: 01562 747100 | <a href="https://www.hard-anodising.co.uk/">www.hard-anodising.co.uk</a>
-          </div>
-        </div>
-
-        <h1>Certificate of Conformity</h1>
-
-        <!-- Header Information -->
-        <table class="header-table compact">
-          <tbody>
-            <tr>
-              <th>Release Note Number</th>
-              <td>RN<%= @release_note.number %></td>
-            </tr>
-            <tr>
-              <th>Date</th>
-              <td><%= @release_note.date.strftime("%d/%m/%Y") %></td>
-            </tr>
-          </tbody>
-        </table>
-
-        <!-- Invoice Address Only (removed deliver to) -->
-        <table class="addresses compact">
-          <tbody>
-            <tr>
-              <td class="address">
-                <h2>Invoice To</h2>
-                <p>
-                  <%= @release_note.works_order.customer_order.customer.display_name %><br/>
-                  <%= simple_format(@release_note.works_order.customer_order.customer.pdf_address) %>
-                </p>
-              </td>
-              <td class="address">
-                <!-- Empty space for balance -->
-              </td>
-            </tr>
-          </tbody>
-        </table>
-
-        <!-- Release Note Details -->
-        <table class="detail-table compact">
-          <tbody>
-            <tr>
-              <th>Customer Order</th>
-              <td>
-                <%= @release_note.works_order.customer_order.number %>
-                <% if @release_note.works_order.respond_to?(:customer_order_line) && @release_note.works_order.customer_order_line.present? %>
-                  (line <%= @release_note.works_order.customer_order_line %>)
-                <% end %>
-              </td>
-            </tr>
-            <tr>
-              <th>Part Number</th>
-              <td><%= @release_note.works_order.part_number %></td>
-            </tr>
-            <tr>
-              <th>Issue</th>
-              <td><%= @release_note.works_order.part_issue %></td>
-            </tr>
-            <tr>
-              <th>Description</th>
-              <td><%= @release_note.works_order.part_description %></td>
-            </tr>
-            <tr>
-              <th>Specification</th>
-              <td><%= @release_note.specification %></td>
-            </tr>
-            <tr>
-              <th>Quantity Accepted</th>
-              <td><%= @release_note.quantity_accepted %></td>
-            </tr>
-            <tr>
-              <th>Quantity Rejected</th>
-              <td><%= @release_note.quantity_rejected %></td>
-            </tr>
-            <tr>
-              <th>Our Works Order Number</th>
-              <td>WO<%= @release_note.works_order.number %></td>
-            </tr>
-          </tbody>
-        </table>
-
-        <!-- Simplified Thickness Measurements for Certificate -->
-        <% if @release_note.has_thickness_measurements? %>
-          <h2>Certified Thickness Measurements</h2>
-          <% measurements_by_type = @release_note.thickness_measurements_by_type %>
-          <% measurements_by_type.each do |process_type, measurements| %>
-            <div class="thickness-group">
-              <div class="thickness-group-header">
-                <%= process_type.humanize.gsub('_', ' ').titleize %>
-              </div>
-              <table class="thickness-table">
-                <thead>
-                  <tr>
-                    <th>Treatment Description</th>
-                    <th>Measured Thickness (μm)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <% measurements.each do |measurement| %>
-                    <tr>
-                      <td><%= measurement['display_name'] || measurement['process_type'].humanize.titleize %></td>
-                      <td><%= measurement['measured_thickness'] %></td>
-                    </tr>
-                  <% end %>
-                </tbody>
-              </table>
-            </div>
-          <% end %>
-        <% end %>
-
-        <!-- Statement -->
-        <h2>Statement</h2>
-        <div class="statement">
-          <p><%= simple_format(@release_note.remarks) if @release_note.remarks.present? %></p>
-        </div>
-
-        <!-- Signature Block -->
-        <div class="signature-block">
+  <!-- Invoice Address Only (removed deliver to) -->
+  <table class="addresses compact">
+    <tbody>
+      <tr>
+        <td class="address">
+          <h2>Invoice To</h2>
           <p>
-            <span class="signature-name"><%= @release_note.issued_by.display_name %></span><br/>
-            For and on behalf of Hard Anodising Surface Treatments Ltd
+            <%= @release_note.works_order.customer_order.customer.display_name %><br/>
+            <%= simple_format(@release_note.works_order.customer_order.customer.pdf_address) %>
           </p>
-        </div>
+        </td>
+        <td class="address">
+          <!-- Empty space for balance -->
+        </td>
+      </tr>
+    </tbody>
+  </table>
 
-        <!-- Company Footer -->
-        <div class="company-footer">
-          <strong>Hard Anodising Surface Treatments Ltd</strong><br/>
-          Firs Industrial Estate, Rickets Close, Kidderminster DY11 7QN<br/>
-          Tel: 01562 747100 | <a href="https://www.hard-anodising.co.uk/">www.hard-anodising.co.uk</a>
+  <!-- Customer Reference (if present) - Full width row, no label -->
+  <% if @release_note.works_order.customer_reference.present? %>
+    <div class="customer-reference-row">
+      <%= @release_note.works_order.customer_reference %>
+    </div>
+  <% end %>
+
+  <!-- Release Note Details -->
+  <table class="detail-table compact">
+    <tbody>
+      <tr>
+        <th>Customer Order</th>
+        <td>
+          <%= @release_note.works_order.customer_order.number %>
+          <% if @release_note.works_order.respond_to?(:customer_order_line) && @release_note.works_order.customer_order_line.present? %>
+            (line <%= @release_note.works_order.customer_order_line %>)
+          <% end %>
+        </td>
+      </tr>
+      <tr>
+        <th>Part Number</th>
+        <td><%= @release_note.works_order.part_number %></td>
+      </tr>
+      <tr>
+        <th>Issue</th>
+        <td><%= @release_note.works_order.part_issue %></td>
+      </tr>
+      <tr>
+        <th>Description</th>
+        <td><%= @release_note.works_order.part_description %></td>
+      </tr>
+      <tr>
+        <th>Quantity Accepted</th>
+        <td><%= @release_note.quantity_accepted %></td>
+      </tr>
+      <tr>
+        <th>Quantity Rejected</th>
+        <td><%= @release_note.quantity_rejected %></td>
+      </tr>
+      <tr>
+        <th>Our Works Order Number</th>
+        <td>WO<%= @release_note.works_order.number %></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Thickness Measurements (if present) - Simplified -->
+  <% if @release_note.has_thickness_measurements? %>
+    <h2>Thickness Measurements</h2>
+    <% measurements_by_type = @release_note.thickness_measurements_by_type %>
+    <% measurements_by_type.each do |process_type, measurements| %>
+      <div class="thickness-group">
+        <div class="thickness-group-header">
+          <%= process_type.humanize.gsub('_', ' ').titleize %>
         </div>
+        <table class="thickness-table">
+          <thead>
+            <tr>
+              <th>Treatment</th>
+              <th>Measured (μm)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% measurements.each do |measurement| %>
+              <tr>
+                <td><%= measurement['display_name'] || measurement['process_type'].humanize.titleize %></td>
+                <td><%= measurement['measured_thickness'] %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
+  <% end %>
+
+  <!-- Proof of Collection/Delivery -->
+  <h2>Proof of Collection/Delivery</h2>
+  <table class="signature-table">
+    <tbody>
+      <tr>
+        <th>Signature</th>
+        <td></td>
+      </tr>
+      <tr>
+        <th>Name</th>
+        <td></td>
+      </tr>
+      <tr>
+        <th>Date/Time</th>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Page 2+: Certificate of Conformity (Can use multiple sides) -->
+<div class="certificate-page">
+  <div class="certificate-content">
+    <!-- Logo Header -->
+    <div class="logo-header">
+      <%= image_tag("logo-with-company-name.png", alt: "Hard Anodising Surface Treatments Ltd") %>
+      <!-- Company contact info in header -->
+      <div class="company-contact">
+        Firs Industrial Estate, Rickets Close, Kidderminster DY11 7QN<br/>
+        Tel: 01562 747100 | <a href="https://www.hard-anodising.co.uk/">www.hard-anodising.co.uk</a>
       </div>
     </div>
-  </body>
-</html>
+
+    <h1>Certificate of Conformity</h1>
+
+    <!-- Header Information -->
+    <table class="header-table compact">
+      <tbody>
+        <tr>
+          <th>Release Note Number</th>
+          <td>RN<%= @release_note.number %></td>
+        </tr>
+        <tr>
+          <th>Date</th>
+          <td><%= @release_note.date.strftime("%d/%m/%Y") %></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Invoice Address Only (removed deliver to) -->
+    <table class="addresses compact">
+      <tbody>
+        <tr>
+          <td class="address">
+            <h2>Invoice To</h2>
+            <p>
+              <%= @release_note.works_order.customer_order.customer.display_name %><br/>
+              <%= simple_format(@release_note.works_order.customer_order.customer.pdf_address) %>
+            </p>
+          </td>
+          <td class="address">
+            <!-- Empty space for balance -->
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Customer Reference (if present) - Full width row, no label -->
+    <% if @release_note.works_order.customer_reference.present? %>
+      <div class="customer-reference-row">
+        <%= @release_note.works_order.customer_reference %>
+      </div>
+    <% end %>
+
+    <!-- Release Note Details -->
+    <table class="detail-table compact">
+      <tbody>
+        <tr>
+          <th>Customer Order</th>
+          <td>
+            <%= @release_note.works_order.customer_order.number %>
+            <% if @release_note.works_order.respond_to?(:customer_order_line) && @release_note.works_order.customer_order_line.present? %>
+              (line <%= @release_note.works_order.customer_order_line %>)
+            <% end %>
+          </td>
+        </tr>
+        <tr>
+          <th>Part Number</th>
+          <td><%= @release_note.works_order.part_number %></td>
+        </tr>
+        <tr>
+          <th>Issue</th>
+          <td><%= @release_note.works_order.part_issue %></td>
+        </tr>
+        <tr>
+          <th>Description</th>
+          <td><%= @release_note.works_order.part_description %></td>
+        </tr>
+        <tr>
+          <th>Specification</th>
+          <td><%= @release_note.specification %></td>
+        </tr>
+        <tr>
+          <th>Quantity Accepted</th>
+          <td><%= @release_note.quantity_accepted %></td>
+        </tr>
+        <tr>
+          <th>Quantity Rejected</th>
+          <td><%= @release_note.quantity_rejected %></td>
+        </tr>
+        <tr>
+          <th>Our Works Order Number</th>
+          <td>WO<%= @release_note.works_order.number %></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Simplified Thickness Measurements for Certificate -->
+    <% if @release_note.has_thickness_measurements? %>
+      <h2>Certified Thickness Measurements</h2>
+      <% measurements_by_type = @release_note.thickness_measurements_by_type %>
+      <% measurements_by_type.each do |process_type, measurements| %>
+        <div class="thickness-group">
+          <div class="thickness-group-header">
+            <%= process_type.humanize.gsub('_', ' ').titleize %>
+          </div>
+          <table class="thickness-table">
+            <thead>
+              <tr>
+                <th>Treatment Description</th>
+                <th>Measured Thickness (μm)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% measurements.each do |measurement| %>
+                <tr>
+                  <td><%= measurement['display_name'] || measurement['process_type'].humanize.titleize %></td>
+                  <td><%= measurement['measured_thickness'] %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% end %>
+    <% end %>
+
+    <!-- Statement -->
+    <h2>Statement</h2>
+    <div class="statement">
+      <p><%= simple_format(@release_note.remarks) if @release_note.remarks.present? %></p>
+    </div>
+
+    <!-- Signature Block -->
+    <div class="signature-block">
+      <p>
+        <span class="signature-name"><%= @release_note.issued_by.display_name %></span><br/>
+        For and on behalf of Hard Anodising Surface Treatments Ltd
+      </p>
+    </div>
+
+    <!-- Company Footer -->
+    <div class="company-footer">
+      <strong>Hard Anodising Surface Treatments Ltd</strong><br/>
+      Firs Industrial Estate, Rickets Close, Kidderminster DY11 7QN<br/>
+      Tel: 01562 747100 | <a href="https://www.hard-anodising.co.uk/">www.hard-anodising.co.uk</a>
+    </div>
+  </div>
+</div>

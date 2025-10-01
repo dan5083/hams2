@@ -42,6 +42,13 @@
     </div>
   </div>
 
+    <% if @works_order.customer_reference.present? %>
+    <div>
+      <dt class="text-sm font-medium text-gray-500">Customer Reference</dt>
+      <dd class="text-sm text-gray-900"><%= @works_order.customer_reference %></dd>
+    </div>
+  <% end %>
+
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <!-- Basic Details -->
     <div class="bg-white shadow rounded-lg p-6">

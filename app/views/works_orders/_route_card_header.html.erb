@@ -29,6 +29,21 @@
       </div>
     </div>
 
+    <!-- Customer Reference (if present) -->
+    <% if works_order.customer_reference.present? %>
+      <div class="header-row">
+        <div class="header-row-inner">
+          <div class="header-row-inner2">
+            <!-- Full width for customer reference -->
+            <div class="header-field-label">Customer Ref</div>
+            <div class="header-field-value header-field-value-wide">
+              <%= works_order.customer_reference %>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% end %>
+
     <div class="header-row">
       <div class="header-row-inner">
         <div class="header-row-inner2">

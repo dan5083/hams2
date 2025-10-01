@@ -20,6 +20,8 @@ class WorksOrder < ApplicationRecord
   validates :lot_price, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validates :price_type, inclusion: { in: ['lot', 'each'] }
   validates :each_price, numericality: { greater_than_or_equal_to: 0 }, allow_nil: true
+  validates :customer_reference, length: { maximum: 100 }, allow_blank: true
+
 
   validate :validate_quantity_released
   validate :validate_each_price_when_required
