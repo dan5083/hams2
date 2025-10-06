@@ -219,6 +219,17 @@
     </style>
   </head>
   <body>
+    <%
+      # Determine if customer is Lufthansa
+      is_lufthansa = @release_note.works_order.customer_order.customer.name == 'Lufthansa Technik Landing Gear Services UK'
+
+      # Build specification text with customer reference appended if Lufthansa
+      specification_text = @release_note.specification
+      if is_lufthansa && @release_note.works_order.customer_reference.present?
+        specification_text = "#{specification_text} #{@release_note.works_order.customer_reference}".strip
+      end
+    %>
+
     <!-- Page 1: Advice Note (Single sided) -->
     <div class="advice-note">
       <!-- Logo Header -->
@@ -265,8 +276,8 @@
         </tbody>
       </table>
 
-      <!-- Customer Reference (if present) - Full width row, no label -->
-      <% if @release_note.works_order.customer_reference.present? %>
+      <!-- Customer Reference (if present AND not Lufthansa) - Full width row, no label -->
+      <% if @release_note.works_order.customer_reference.present? && !is_lufthansa %>
         <div class="customer-reference-row">
           <%= @release_note.works_order.customer_reference %>
         </div>
@@ -407,8 +418,8 @@
           </tbody>
         </table>
 
-        <!-- Customer Reference (if present) - Full width row, no label -->
-        <% if @release_note.works_order.customer_reference.present? %>
+        <!-- Customer Reference (if present AND not Lufthansa) - Full width row, no label -->
+        <% if @release_note.works_order.customer_reference.present? && !is_lufthansa %>
           <div class="customer-reference-row">
             <%= @release_note.works_order.customer_reference %>
           </div>
@@ -440,7 +451,7 @@
             </tr>
             <tr>
               <th>Specification</th>
-              <td><%= @release_note.specification %></td>
+              <td><%= specification_text %></td>
             </tr>
             <tr>
               <th>Quantity Accepted</th>
