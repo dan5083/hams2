@@ -29,78 +29,78 @@ class Operation
   end
 
  def self.load_all_operations(target_thickness = nil, aerospace_defense = nil)
-  Rails.logger.info "🔍 Operation.load_all_operations called with aerospace_defense: #{aerospace_defense.inspect}"
+      Rails.logger.info "🔍 Operation.load_all_operations called with aerospace_defense: #{aerospace_defense.inspect}"
 
-  operations = []
-  operations += OperationLibrary::ContractReviewOperations.operations if defined?(OperationLibrary::ContractReviewOperations)
-  operations += OperationLibrary::InspectFinalInspectVatInspect.operations if defined?(OperationLibrary::InspectFinalInspectVatInspect)
+    operations = []
+    operations += OperationLibrary::ContractReviewOperations.operations if defined?(OperationLibrary::ContractReviewOperations)
+    operations += OperationLibrary::InspectFinalInspectVatInspect.operations if defined?(OperationLibrary::InspectFinalInspectVatInspect)
 
-  # Add foil verification operations
-  operations += OperationLibrary::FoilVerification.operations if defined?(OperationLibrary::FoilVerification)
+    # Add foil verification operations
+    operations += OperationLibrary::FoilVerification.operations if defined?(OperationLibrary::FoilVerification)
 
-  # Add pretreatments
-  operations += OperationLibrary::Pretreatments.operations(aerospace_defense: aerospace_defense) if defined?(OperationLibrary::Pretreatments)
+    # Add pretreatments
+    operations += OperationLibrary::Pretreatments.operations if defined?(OperationLibrary::Pretreatments)
 
-  operations += OperationLibrary::JigUnjig.operations if defined?(OperationLibrary::JigUnjig)
-  operations += OperationLibrary::DegreaseOperations.operations if defined?(OperationLibrary::DegreaseOperations)
+    operations += OperationLibrary::JigUnjig.operations if defined?(OperationLibrary::JigUnjig)
+    operations += OperationLibrary::DegreaseOperations.operations if defined?(OperationLibrary::DegreaseOperations)
 
-  # Add water break test operations
-  operations += OperationLibrary::WaterBreakOperations.operations if defined?(OperationLibrary::WaterBreakOperations)
+    # Add water break test operations
+    operations += OperationLibrary::WaterBreakOperations.operations if defined?(OperationLibrary::WaterBreakOperations)
 
-  # Add OCV operations
-  operations += OperationLibrary::Ocv.operations if defined?(OperationLibrary::Ocv)
+    # Add OCV operations
+    operations += OperationLibrary::Ocv.operations if defined?(OperationLibrary::Ocv)
 
-  operations += OperationLibrary::AnodisingStandard.operations(aerospace_defense) if defined?(OperationLibrary::AnodisingStandard)
-  operations += OperationLibrary::AnodisingHard.operations(aerospace_defense) if defined?(OperationLibrary::AnodisingHard)
-  operations += OperationLibrary::AnodisingChromic.operations(aerospace_defense) if defined?(OperationLibrary::AnodisingChromic)
-  operations += OperationLibrary::ChemicalConversions.operations(aerospace_defense) if defined?(OperationLibrary::ChemicalConversions)
+    operations += OperationLibrary::AnodisingStandard.operations(aerospace_defense) if defined?(OperationLibrary::AnodisingStandard)
+    operations += OperationLibrary::AnodisingHard.operations(aerospace_defense) if defined?(OperationLibrary::AnodisingHard)
+    operations += OperationLibrary::AnodisingChromic.operations(aerospace_defense) if defined?(OperationLibrary::AnodisingChromic)
+    operations += OperationLibrary::ChemicalConversions.operations(aerospace_defense) if defined?(OperationLibrary::ChemicalConversions)
 
-  # Pass thickness to ENP operations for time interpolation
-  if defined?(OperationLibrary::ElectrolessNickelPlate)
-    operations += OperationLibrary::ElectrolessNickelPlate.operations(target_thickness)
+    # Pass thickness to ENP operations for time interpolation
+    if defined?(OperationLibrary::ElectrolessNickelPlate)
+      operations += OperationLibrary::ElectrolessNickelPlate.operations(target_thickness)
+    end
+
+    # Add ENP heat treatments
+    operations += OperationLibrary::EnpHeatTreatments.operations if defined?(OperationLibrary::EnpHeatTreatments)
+
+    # Add ENP Strip Mask operations (default to nitric strip type)
+    if defined?(OperationLibrary::EnpStripMask)
+      operations += OperationLibrary::EnpStripMask.operations('nitric')
+      operations += OperationLibrary::EnpStripMask.operations('metex_dekote')
+    end
+
+    # Add stripping operations (updated for E28) - all types and methods
+    if defined?(OperationLibrary::Stripping)
+      operations += OperationLibrary::Stripping.operations('general_stripping', 'E28')
+      operations += OperationLibrary::Stripping.operations('general_stripping', 'chromic_phosphoric')
+      operations += OperationLibrary::Stripping.operations('general_stripping', 'nitric')
+      operations += OperationLibrary::Stripping.operations('general_stripping', 'metex_dekote')
+      operations += OperationLibrary::Stripping.operations('anodising_stripping', 'chromic_phosphoric')
+      operations += OperationLibrary::Stripping.operations('anodising_stripping', 'E28')
+      operations += OperationLibrary::Stripping.operations('enp_stripping', 'nitric')
+      operations += OperationLibrary::Stripping.operations('enp_stripping', 'metex_dekote')
+    end
+
+    # Add dye operations
+    operations += OperationLibrary::Dye.operations if defined?(OperationLibrary::Dye)
+
+    # Add PTFE operations
+    operations += OperationLibrary::Ptfe.operations if defined?(OperationLibrary::Ptfe)
+
+    # Add sealing operations
+    operations += OperationLibrary::Sealing.operations if defined?(OperationLibrary::Sealing)
+
+    # Add local treatment operations
+    operations += OperationLibrary::LocalTreatment.operations if defined?(OperationLibrary::LocalTreatment)
+
+    operations += OperationLibrary::RinseOperations.operations if defined?(OperationLibrary::RinseOperations)
+    operations += OperationLibrary::PackOperations.operations if defined?(OperationLibrary::PackOperations)
+
+    # Add masking operations (including removal operations)
+    operations += OperationLibrary::Masking.operations if defined?(OperationLibrary::Masking)
+
+    operations
   end
-
-  # Add ENP heat treatments
-  operations += OperationLibrary::EnpHeatTreatments.operations if defined?(OperationLibrary::EnpHeatTreatments)
-
-  # Add ENP Strip Mask operations (default to nitric strip type)
-  if defined?(OperationLibrary::EnpStripMask)
-    operations += OperationLibrary::EnpStripMask.operations('nitric')
-    operations += OperationLibrary::EnpStripMask.operations('metex_dekote')
-  end
-
-  # Add stripping operations (updated for E28) - all types and methods
-  if defined?(OperationLibrary::Stripping)
-    operations += OperationLibrary::Stripping.operations('general_stripping', 'E28', aerospace_defense: aerospace_defense)
-    operations += OperationLibrary::Stripping.operations('general_stripping', 'chromic_phosphoric', aerospace_defense: aerospace_defense)
-    operations += OperationLibrary::Stripping.operations('general_stripping', 'nitric', aerospace_defense: aerospace_defense)
-    operations += OperationLibrary::Stripping.operations('general_stripping', 'metex_dekote', aerospace_defense: aerospace_defense)
-    operations += OperationLibrary::Stripping.operations('anodising_stripping', 'chromic_phosphoric', aerospace_defense: aerospace_defense)
-    operations += OperationLibrary::Stripping.operations('anodising_stripping', 'E28', aerospace_defense: aerospace_defense)
-    operations += OperationLibrary::Stripping.operations('enp_stripping', 'nitric', aerospace_defense: aerospace_defense)
-    operations += OperationLibrary::Stripping.operations('enp_stripping', 'metex_dekote', aerospace_defense: aerospace_defense)
-  end
-
-  # Add dye operations
-  operations += OperationLibrary::Dye.operations if defined?(OperationLibrary::Dye)
-
-  # Add PTFE operations
-  operations += OperationLibrary::Ptfe.operations if defined?(OperationLibrary::Ptfe)
-
-  # Add sealing operations
-  operations += OperationLibrary::Sealing.operations if defined?(OperationLibrary::Sealing)
-
-  # Add local treatment operations
-  operations += OperationLibrary::LocalTreatment.operations if defined?(OperationLibrary::LocalTreatment)
-
-  operations += OperationLibrary::RinseOperations.operations if defined?(OperationLibrary::RinseOperations)
-  operations += OperationLibrary::PackOperations.operations if defined?(OperationLibrary::PackOperations)
-
-  # Add masking operations (including removal operations)
-  operations += OperationLibrary::Masking.operations if defined?(OperationLibrary::Masking)
-
-  operations
-end
 
   # Filter operations by criteria (excluding auto-inserted operations from normal filtering)
   def self.find_matching(process_type: nil, alloy: nil, target_thickness: nil, anodic_class: nil, enp_type: nil)
