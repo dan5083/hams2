@@ -24,6 +24,12 @@ module OperationLibrary
 
       operation_text = base_text + ending_text
 
+      # Append OCV monitoring for aerospace/defense (chromic has special checkpoints)
+      if aerospace_defense
+        ocv_text = build_chromic_voltage_monitoring_text(data[:id])
+        operation_text += "\n\n**OCV Monitoring:**\n#{ocv_text}"
+      end
+
       Operation.new(
         id: data[:id],
         alloys: data[:alloys],
@@ -33,6 +39,44 @@ module OperationLibrary
         vat_numbers: data[:vat_numbers],
         operation_text: operation_text
       )
+    end
+
+    def self.build_chromic_voltage_monitoring_text(operation_id)
+      checkpoints = case operation_id
+      when 'CAA_40_50V_40MIN'
+        # Check at key transition points: 10min (40V reached), 30min (before ramp), 35min (50V reached), 40min (end)
+        [
+          { time: 10, label: '10min (40V)' },
+          { time: 30, label: '30min (40V held)' },
+          { time: 35, label: '35min (50V)' },
+          { time: 40, label: '40min (end)' }
+        ]
+      when 'CAA_22V_37MIN'
+        # Check at: 7min (22V reached), 20min (mid-hold), 37min (end)
+        [
+          { time: 7, label: '7min (22V)' },
+          { time: 20, label: '20min (held)' },
+          { time: 37, label: '37min (end)' }
+        ]
+      else
+        # Fallback for unknown chromic processes
+        [
+          { time: 10, label: '10min' },
+          { time: 20, label: '20min' },
+          { time: 30, label: '30min' }
+        ]
+      end
+
+      # Build monitoring text for 3 batches with chromic-specific checkpoints
+      text_lines = []
+      (1..3).each do |batch|
+        checkpoint_texts = checkpoints.map do |cp|
+          "#{cp[:label]}: ___V"
+        end
+        text_lines << "Batch ___: Temp ___°C [#{checkpoint_texts.join(' | ')}]"
+      end
+
+      text_lines.join("\n")
     end
 
     def self.base_operations

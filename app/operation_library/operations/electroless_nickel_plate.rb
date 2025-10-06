@@ -1,84 +1,92 @@
 # app/operation_library/operations/electroless_nickel_plate.rb
 module OperationLibrary
   class ElectrolessNickelPlate
-    def self.operations(target_thickness_um = nil)
+    def self.operations(target_thickness_um = nil, aerospace_defense: false)
       base_operations = [
         # High Phosphorous - Vandalloy 4100
-        Operation.new(
+        {
           id: 'HIGH_PHOS_VANDALLOY_4100',
           alloys: ['steel', 'stainless_steel', '316_stainless_steel', 'aluminium', 'copper', '2000_series_alloys', 'brass', 'stainless_steel_with_oxides', 'copper_sans_electrical_contact', 'cope_rolled_aluminium', 'mclaren_sta142_procedure_d'],
           process_type: 'electroless_nickel_plating',
           enp_type: 'high_phosphorous',
-          target_thickness: nil, # Calculated based on time
-          deposition_rate_range: [12.0, 14.1], # μm/hour
+          target_thickness: nil,
+          deposition_rate_range: [12.0, 14.1],
           vat_numbers: [7, 8],
           operation_text: "Electroless nickel plate in Vandalloy 4100 (High Phos) at 82-91°C. Deposition rate: 12.0-14.1 μm/hour. Time for {THICKNESS}μm: {TIME_RANGE}"
-        ),
+        },
 
         # Medium Phosphorous - Nicklad 767
-        Operation.new(
+        {
           id: 'MEDIUM_PHOS_NICKLAD_767',
           alloys: ['steel', 'stainless_steel', '316_stainless_steel', 'aluminium', 'copper', '2000_series_alloys', 'brass', 'stainless_steel_with_oxides', 'copper_sans_electrical_contact', 'cope_rolled_aluminium', 'mclaren_sta142_procedure_d'],
           process_type: 'electroless_nickel_plating',
           enp_type: 'medium_phosphorous',
-          target_thickness: nil, # Calculated based on time
-          deposition_rate_range: [18.0, 23.0], # μm/hour
+          target_thickness: nil,
+          deposition_rate_range: [18.0, 23.0],
           vat_numbers: [7, 8],
           operation_text: "Electroless nickel plate in Nicklad 767 (Medium Phos) at 82-91°C. Deposition rate: 18.0-23.0 μm/hour. Time for {THICKNESS}μm: {TIME_RANGE}"
-        ),
+        },
 
         # Low Phosphorous - Nicklad ELV 824
-        Operation.new(
+        {
           id: 'LOW_PHOS_NICKLAD_ELV_824',
           alloys: ['steel', 'stainless_steel', '316_stainless_steel', 'aluminium', 'copper', '2000_series_alloys', 'brass', 'stainless_steel_with_oxides', 'copper_sans_electrical_contact', 'cope_rolled_aluminium', 'mclaren_sta142_procedure_d'],
           process_type: 'electroless_nickel_plating',
           enp_type: 'low_phosphorous',
-          target_thickness: nil, # Calculated based on time
-          deposition_rate_range: [6.8, 18.2], # μm/hour (wide range due to process variability)
+          target_thickness: nil,
+          deposition_rate_range: [6.8, 18.2],
           vat_numbers: [7, 8],
           operation_text: "Electroless nickel plate in Nicklad ELV 824 (Low Phos) at 82-91°C. Deposition rate: 6.8-18.2 μm/hour. Time for {THICKNESS}μm: {TIME_RANGE}"
-        ),
+        },
 
         # PTFE Composite - Nicklad Ice
-        Operation.new(
+        {
           id: 'PTFE_NICKLAD_ICE',
           alloys: ['steel', 'stainless_steel', '316_stainless_steel', 'aluminium', 'copper', '2000_series_alloys', 'brass', 'stainless_steel_with_oxides', 'copper_sans_electrical_contact', 'cope_rolled_aluminium', 'mclaren_sta142_procedure_d'],
           process_type: 'electroless_nickel_plating',
           enp_type: 'ptfe_composite',
-          target_thickness: nil, # Calculated based on time
-          deposition_rate_range: [5.0, 11.0], # μm/hour
+          target_thickness: nil,
+          deposition_rate_range: [5.0, 11.0],
           vat_numbers: [7, 8],
           operation_text: "Electroless nickel plate in Nicklad Ice (PTFE composite) at 82-88°C. Deposition rate: 5.0-11.0 μm/hour. Time for {THICKNESS}μm: {TIME_RANGE}"
-        )
+        }
       ]
 
       # Interpolate thickness and time into template placeholders
-      if target_thickness_um.present? && target_thickness_um > 0
-        base_operations.map do |operation|
-          enhanced_operation = operation.dup
-
-          time_data = calculate_plating_time(operation.id, target_thickness_um)
+      base_operations.map do |operation_data|
+        operation_text = if target_thickness_um.present? && target_thickness_um > 0
+          time_data = calculate_plating_time(operation_data[:id], target_thickness_um)
           if time_data
-            enhanced_operation.operation_text = operation.operation_text
+            operation_data[:operation_text]
               .gsub('{THICKNESS}', target_thickness_um.to_s)
               .gsub('{TIME_RANGE}', time_data[:formatted_time_range])
           else
             # Fallback if time calculation fails
-            enhanced_operation.operation_text = operation.operation_text
+            operation_data[:operation_text]
               .gsub('{THICKNESS}', target_thickness_um.to_s)
               .gsub('{TIME_RANGE}', 'calculation unavailable')
           end
+        else
+          # If no thickness provided, remove template placeholders
+          operation_data[:operation_text].gsub('. Time for {THICKNESS}μm: {TIME_RANGE}', '')
+        end
 
-          enhanced_operation
+        # Append OCV monitoring for aerospace/defense
+        if aerospace_defense
+          ocv_text = build_time_temp_monitoring_text
+          operation_text += "\n\n**OCV Monitoring:**\n#{ocv_text}"
         end
-      else
-        # If no thickness provided, remove template placeholders
-        base_operations.map do |operation|
-          fallback_operation = operation.dup
-          fallback_operation.operation_text = operation.operation_text
-            .gsub('. Time for {THICKNESS}μm: {TIME_RANGE}', '')
-          fallback_operation
-        end
+
+        Operation.new(
+          id: operation_data[:id],
+          alloys: operation_data[:alloys],
+          process_type: operation_data[:process_type],
+          enp_type: operation_data[:enp_type],
+          target_thickness: operation_data[:target_thickness],
+          deposition_rate_range: operation_data[:deposition_rate_range],
+          vat_numbers: operation_data[:vat_numbers],
+          operation_text: operation_text
+        )
       end
     end
 
@@ -111,6 +119,15 @@ module OperationLibrary
         max_minutes: max_time_minutes,
         formatted_time_range: "#{format_time(min_time_hours)} - #{format_time(max_time_hours)}"
       }
+    end
+
+    # Build time/temp monitoring text (no voltage for ENP)
+    def self.build_time_temp_monitoring_text
+      text_lines = []
+      (1..3).each do |batch|
+        text_lines << "Batch ___: Time ___m ___s    Temp ___°C"
+      end
+      text_lines.join("\n")
     end
 
     private

@@ -1,13 +1,21 @@
 # app/operation_library/operations/degrease_operations.rb
 module OperationLibrary
   class DegreaseOperations
-    def self.operations
+    def self.operations(aerospace_defense: false)
+      operation_text = 'Clean in Oxidite C-8 at 65-70°C for 5-10 mins'
+
+      # Append OCV monitoring for aerospace/defense
+      if aerospace_defense
+        ocv_text = build_time_temp_monitoring_text
+        operation_text += "\n\n**OCV Monitoring:**\n#{ocv_text}"
+      end
+
       [
         # Universal degreasing operation for all materials and processes
         Operation.new(
           id: 'OXIDITE_C8_DEGREASE',
           process_type: 'degrease',
-          operation_text: 'Clean in Oxidite C-8 at 65-70°C for 5-10 mins',
+          operation_text: operation_text,
           time: 7
         )
       ]
@@ -47,8 +55,17 @@ module OperationLibrary
     end
 
     # Get the degreasing operation
-    def self.get_degrease_operation
-      operations.first
+    def self.get_degrease_operation(aerospace_defense: false)
+      operations(aerospace_defense: aerospace_defense).first
+    end
+
+    # Build time/temp monitoring text (no voltage for degrease)
+    def self.build_time_temp_monitoring_text
+      text_lines = []
+      (1..3).each do |batch|
+        text_lines << "Batch ___: Time ___m ___s    Temp ___°C"
+      end
+      text_lines.join("\n")
     end
   end
 end

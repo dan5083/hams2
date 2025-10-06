@@ -24,6 +24,12 @@ module OperationLibrary
 
       operation_text = base_text + ending_text
 
+      # Append OCV monitoring for aerospace/defense
+      if aerospace_defense
+        ocv_text = build_voltage_monitoring_text(data[:operation_text])
+        operation_text += "\n\n**OCV Monitoring:**\n#{ocv_text}"
+      end
+
       Operation.new(
         id: data[:id],
         alloys: data[:alloys],
@@ -33,6 +39,28 @@ module OperationLibrary
         vat_numbers: data[:vat_numbers],
         operation_text: operation_text
       )
+    end
+
+    def self.build_voltage_monitoring_text(operation_text)
+      # Extract total minutes from operation text
+      time_match = operation_text.match(/over (\d+) minutes/)
+      total_minutes = time_match ? time_match[1].to_i : 20
+
+      # Calculate 5-minute intervals
+      intervals = (total_minutes / 5.0).ceil
+
+      # Build monitoring text for 3 batches
+      text_lines = []
+      (1..3).each do |batch|
+        interval_texts = []
+        (1..intervals).each do |interval|
+          time_mark = interval * 5
+          interval_texts << "#{time_mark}min: ___V"
+        end
+        text_lines << "Batch ___: Temp ___°C [#{interval_texts.join(' | ')}]"
+      end
+
+      text_lines.join("\n")
     end
 
     def self.base_operations

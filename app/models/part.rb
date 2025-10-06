@@ -356,7 +356,7 @@ class Part < ApplicationRecord
     selected_enp_pre_heat_treatment.present? && selected_enp_pre_heat_treatment != 'none'
   end
 
-  # Main method - get operations with correct ordering including water break test, foil verification, OCV, and ENP heat treatments
+  # Main method - get operations with correct ordering including water break test, foil verification, and ENP heat treatments
   def get_operations_with_auto_ops
     # If locked, return the locked operations as Operation-like objects
     if locked_for_editing? && customisation_data.dig("operation_selection", "locked_operations").present?
@@ -412,14 +412,6 @@ class Part < ApplicationRecord
     # 5. Insert water break test if required (after degrease operations)
     if defined?(OperationLibrary::WaterBreakOperations)
       sequence = OperationLibrary::WaterBreakOperations.insert_water_break_test_if_required(
-        sequence,
-        aerospace_defense: aerospace_defense?
-      )
-    end
-
-    # 6. Insert OCV operations if required (after rinses that follow non-water chemical treatments)
-    if defined?(OperationLibrary::Ocv)
-      sequence = OperationLibrary::Ocv.insert_ocv_if_required(
         sequence,
         aerospace_defense: aerospace_defense?
       )
@@ -760,7 +752,7 @@ class Part < ApplicationRecord
     stripping_method = treatment_data["stripping_method"] || "E28"
 
     # Get the stripping operation text
-    stripping_operation = OperationLibrary::Stripping.get_stripping_operation(stripping_type, stripping_method)
+    stripping_operation = OperationLibrary::Stripping.get_stripping_operation(stripping_type, stripping_method, aerospace_defense: aerospace_defense?)
     return nil unless stripping_operation
 
     # Create a mock operation for strip-only treatments
@@ -821,7 +813,7 @@ class Part < ApplicationRecord
     return unless enp_pre_heat_treatment_selected?
     return unless defined?(OperationLibrary::EnpHeatTreatments)
 
-    pre_heat_treatment = OperationLibrary::EnpHeatTreatments.get_heat_treatment_operation(selected_enp_pre_heat_treatment)
+    pre_heat_treatment = OperationLibrary::EnpHeatTreatments.get_heat_treatment_operation(selected_enp_pre_heat_treatment, aerospace_defense: aerospace_defense?)
     if pre_heat_treatment
       # Create a duplicate with modified text to indicate it's pre-heat
       pre_heat_op = Operation.new(
@@ -840,7 +832,7 @@ class Part < ApplicationRecord
     return unless enp_heat_treatment_selected?
     return unless defined?(OperationLibrary::EnpHeatTreatments)
 
-    heat_treatment = OperationLibrary::EnpHeatTreatments.get_heat_treatment_operation(selected_enp_heat_treatment)
+    heat_treatment = OperationLibrary::EnpHeatTreatments.get_heat_treatment_operation(selected_enp_heat_treatment, aerospace_defense: aerospace_defense?)
     if heat_treatment
       # Create a duplicate with modified text to indicate it's post-heat
       post_heat_op = Operation.new(
@@ -874,13 +866,13 @@ class Part < ApplicationRecord
 
     # Handle strip-only treatments
     if op.process_type == 'stripping_only'
-      add_strip_only_cycle(sequence, op, treatment_data, treatment_jig_type, masking)
+      add_strip_only_cycle(sequence, op, treatment_data, treatment_jig_type, masking, aerospace_defense)
       return
     end
 
     # ENP has special workflow - no masking/stripping/dye/PTFE modifiers
     if op.process_type == 'electroless_nickel_plating'
-      add_enp_cycle(sequence, op, treatment_data, treatment_jig_type)
+      add_enp_cycle(sequence, op, treatment_data, treatment_jig_type, aerospace_defense)
       return
     end
 
@@ -901,14 +893,14 @@ class Part < ApplicationRecord
 
     # 4. Degrease + rinse (conditional based on alloy for ENP)
     if needs_degrease?(op, selected_alloy)
-      degrease = OperationLibrary::DegreaseOperations.get_degrease_operation
+      degrease = OperationLibrary::DegreaseOperations.get_degrease_operation(aerospace_defense: aerospace_defense)
       safe_add_to_sequence(sequence, degrease, "Degrease")
       safe_add_to_sequence(sequence, get_rinse(degrease, has_enp, masking), "Rinse after Degrease")
     end
 
     # 5. Stripping + rinse (MOVED BEFORE PRETREATMENTS for anodising cycles)
     if stripping[:enabled] && stripping[:type].present? && stripping[:method].present? && is_anodising?(op)
-      strip_op = OperationLibrary::Stripping.get_stripping_operation(stripping[:type], stripping[:method])
+      strip_op = OperationLibrary::Stripping.get_stripping_operation(stripping[:type], stripping[:method], aerospace_defense: aerospace_defense)
       safe_add_to_sequence(sequence, strip_op, "Stripping")
       safe_add_to_sequence(sequence, get_rinse(strip_op, has_enp, masking), "Rinse after Stripping")
     end
@@ -917,7 +909,7 @@ class Part < ApplicationRecord
     if needs_pretreatment?(op)
       # Get the appropriate material for pretreatment sequence
       selected_material = get_selected_material_for_pretreatment(op, treatment_data)
-      pretreatments = OperationLibrary::Pretreatments.get_pretreatment_sequence([op], selected_material)
+      pretreatments = OperationLibrary::Pretreatments.get_pretreatment_sequence([op], selected_material, aerospace_defense: aerospace_defense)
       pretreatments.each do |pretreat|
         safe_add_to_sequence(sequence, pretreat, "Pretreatment")
         safe_add_to_sequence(sequence, get_rinse(pretreat, has_enp, masking), "Rinse after Pretreatment") unless pretreat.process_type == 'rinse'
@@ -926,7 +918,7 @@ class Part < ApplicationRecord
 
     # 7. Stripping + rinse (FOR NON-ANODISING processes - keep in original position)
     if stripping["enabled"] && stripping["type"].present? && stripping["method"].present? && !is_anodising?(op)
-      strip_op = OperationLibrary::Stripping.get_stripping_operation(stripping["type"], stripping["method"])
+      strip_op = OperationLibrary::Stripping.get_stripping_operation(stripping["type"], stripping["method"], aerospace_defense: aerospace_defense)
       safe_add_to_sequence(sequence, strip_op, "Stripping")
       safe_add_to_sequence(sequence, get_rinse(strip_op, has_enp, masking), "Rinse after Stripping")
     end
@@ -943,7 +935,7 @@ class Part < ApplicationRecord
 
     # 9. Dye + rinse (for anodising operations only)
     if dye["enabled"] && dye["color"].present? && is_anodising?(op)
-      dye_op = OperationLibrary::Dye.get_dye_operation(dye["color"])
+      dye_op = OperationLibrary::Dye.get_dye_operation(dye["color"], aerospace_defense: aerospace_defense)
       if dye_op
         safe_add_to_sequence(sequence, dye_op, "Dye")
         safe_add_to_sequence(sequence, get_rinse(dye_op, has_enp, masking), "Rinse after Dye")
@@ -990,7 +982,7 @@ class Part < ApplicationRecord
   end
 
   # Strip-only cycle - updated workflow: mask -> jig -> vat inspect -> degrease -> strip -> deox -> rinse -> unjig -> unmask
-  def add_strip_only_cycle(sequence, strip_op, treatment_data, treatment_jig_type, masking)
+  def add_strip_only_cycle(sequence, strip_op, treatment_data, treatment_jig_type, masking, aerospace_defense = false)
 
     # 1. Masking (if configured) - USE PROPER MASKING LIBRARY VALIDATION
     if OperationLibrary::Masking.masking_selected?(masking)
@@ -1012,7 +1004,7 @@ class Part < ApplicationRecord
     safe_add_to_sequence(sequence, OperationLibrary::InspectFinalInspectVatInspect.get_vat_inspection_operation, "VAT Inspection")
 
     # 4. Degrease + rinse
-    degrease = OperationLibrary::DegreaseOperations.get_degrease_operation
+    degrease = OperationLibrary::DegreaseOperations.get_degrease_operation(aerospace_defense: aerospace_defense)
     safe_add_to_sequence(sequence, degrease, "Strip Degrease")
     safe_add_to_sequence(sequence, get_rinse(degrease, false, masking), "Rinse after Strip Degrease")
 
@@ -1022,7 +1014,7 @@ class Part < ApplicationRecord
 
     # 6. DeOx pretreatment + rinse (NEW: Added for proper surface preparation after stripping)
     if defined?(OperationLibrary::Pretreatments)
-      deox_op = OperationLibrary::Pretreatments.get_simple_pretreatment_operation
+      deox_op = OperationLibrary::Pretreatments.get_simple_pretreatment_operation(aerospace_defense: aerospace_defense)
       if deox_op
         safe_add_to_sequence(sequence, deox_op, "Strip DeOx")
         safe_add_to_sequence(sequence, get_rinse(deox_op, false, masking), "Rinse after Strip DeOx")
@@ -1046,7 +1038,7 @@ class Part < ApplicationRecord
   end
 
   # ENP cycle - USE TREATMENT-SPECIFIC JIG TYPE
-  def add_enp_cycle(sequence, enp_op, treatment_data, treatment_jig_type)
+  def add_enp_cycle(sequence, enp_op, treatment_data, treatment_jig_type, aerospace_defense = false)
     # 1. Jig - USE TREATMENT-SPECIFIC JIG TYPE
     safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_jig_operation(treatment_jig_type), "ENP Jig")
 
@@ -1056,7 +1048,7 @@ class Part < ApplicationRecord
     # 3. Degrease + rinse (ONLY for aluminium-based alloys)
     selected_alloy = get_selected_enp_alloy_for_treatment_data(treatment_data)
     if OperationLibrary::DegreaseOperations.aluminium_based_alloy?(selected_alloy)
-      degrease = OperationLibrary::DegreaseOperations.get_degrease_operation
+      degrease = OperationLibrary::DegreaseOperations.get_degrease_operation(aerospace_defense: aerospace_defense)
       safe_add_to_sequence(sequence, degrease, "ENP Degrease")
       safe_add_to_sequence(sequence, get_rinse(degrease, true, {}), "ENP Rinse after Degrease")
     end
@@ -1064,7 +1056,7 @@ class Part < ApplicationRecord
     # 4. ENP pretreatments + rinses
     if defined?(OperationLibrary::Pretreatments)
       if selected_alloy
-        pretreatments = OperationLibrary::Pretreatments.get_pretreatment_sequence([enp_op], selected_alloy)
+        pretreatments = OperationLibrary::Pretreatments.get_pretreatment_sequence([enp_op], selected_alloy, aerospace_defense: aerospace_defense)
         pretreatments.each do |pretreat|
           safe_add_to_sequence(sequence, pretreat, "ENP Pretreatment")
           safe_add_to_sequence(sequence, get_rinse(pretreat, true, {}), "ENP Rinse after Pretreatment") unless pretreat.process_type == 'rinse'

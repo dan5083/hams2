@@ -25,12 +25,20 @@ module OperationLibrary
       { value: 'metex_dekote', label: 'Metex Dekote' }
     ].freeze
 
-    def self.operations(stripping_type = nil, stripping_method = nil)
+    def self.operations(stripping_type = nil, stripping_method = nil, aerospace_defense: false)
+      operation_text = build_stripping_text(stripping_type, stripping_method)
+
+      # Append OCV monitoring for aerospace/defense
+      if aerospace_defense
+        ocv_text = build_time_temp_monitoring_text
+        operation_text += "\n\n**OCV Monitoring:**\n#{ocv_text}"
+      end
+
       [
         Operation.new(
           id: 'STRIPPING',
           process_type: 'stripping',
-          operation_text: build_stripping_text(stripping_type, stripping_method)
+          operation_text: operation_text
         )
       ]
     end
@@ -71,9 +79,9 @@ module OperationLibrary
     end
 
     # Get the stripping operation with interpolated text
-    def self.get_stripping_operation(stripping_type = nil, stripping_method = nil)
-      Rails.logger.info "🔍 Stripping called with type=#{stripping_type}, method=#{stripping_method}"
-      result = operations(stripping_type, stripping_method).first
+    def self.get_stripping_operation(stripping_type = nil, stripping_method = nil, aerospace_defense: false)
+      Rails.logger.info "🔍 Stripping called with type=#{stripping_type}, method=#{stripping_method}, aerospace_defense=#{aerospace_defense}"
+      result = operations(stripping_type, stripping_method, aerospace_defense: aerospace_defense).first
       Rails.logger.info "🔍 Stripping result: #{result.inspect}"
       result
     end
@@ -81,6 +89,15 @@ module OperationLibrary
     # Check if stripping is configured
     def self.stripping_configured?(stripping_type, stripping_method)
       stripping_type.present? && stripping_method.present?
+    end
+
+    # Build time/temp monitoring text (no voltage for stripping)
+    def self.build_time_temp_monitoring_text
+      text_lines = []
+      (1..3).each do |batch|
+        text_lines << "Batch ___: Time ___m ___s    Temp ___°C"
+      end
+      text_lines.join("\n")
     end
 
     private
