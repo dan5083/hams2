@@ -13,41 +13,42 @@ module OperationLibrary
       ]
     end
 
-    # Check if degreasing is required (first main process in sequence)
-    def self.degreasing_required?(operations_sequence)
-      return false if operations_sequence.empty?
+    # Check if degreasing is required based on operation type AND alloy
+    def self.degreasing_required?(operation, selected_alloy = nil)
+      # ENP requires degrease only for aluminium-based alloys
+      if operation.process_type == 'electroless_nickel_plating'
+        return aluminium_based_alloy?(selected_alloy)
+      end
 
-      # Get the first non-rinse operation
-      first_main_operation = operations_sequence.find { |op| op.process_type != 'rinse' }
-      return false unless first_main_operation
-
-      # Degreasing is required if the first main operation is any of these surface treatments
+      # All other surface treatments require degrease
       surface_treatment_processes = %w[
         standard_anodising
         hard_anodising
         chromic_anodising
         chemical_conversion
-        electroless_nickel_plating
+        stripping_only
       ]
 
-      surface_treatment_processes.include?(first_main_operation.process_type)
+      surface_treatment_processes.include?(operation.process_type)
+    end
+
+    # Check if alloy is aluminium-based (requires degrease for ENP)
+    def self.aluminium_based_alloy?(alloy)
+      return false if alloy.blank?
+
+      aluminium_alloys = [
+        'ALUMINIUM',
+        'TWO_THOUSAND_SERIES_ALLOYS',
+        'COPE_ROLLED_ALUMINIUM',
+        'MCLAREN_STA142_PROCEDURE_D'
+      ]
+
+      aluminium_alloys.include?(alloy.upcase)
     end
 
     # Get the degreasing operation
     def self.get_degrease_operation
       operations.first
-    end
-
-    # Insert degreasing at the beginning of a sequence if required
-    def self.insert_degrease_if_required(operations_sequence)
-      return operations_sequence unless degreasing_required?(operations_sequence)
-
-      # Check if degreasing is already present
-      has_degrease = operations_sequence.any? { |op| op.process_type == 'degrease' }
-      return operations_sequence if has_degrease
-
-      # Insert degreasing at the beginning
-      [get_degrease_operation] + operations_sequence
     end
   end
 end

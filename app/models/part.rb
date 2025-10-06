@@ -868,6 +868,10 @@ class Part < ApplicationRecord
     # Get jig type for this specific treatment
     treatment_jig_type = treatment_data["selected_jig_type"]
 
+    # Get alloy for ENP treatments to determine degrease requirement
+    selected_alloy = op.process_type == 'electroless_nickel_plating' ?
+                    get_selected_enp_alloy_for_treatment_data(treatment_data) : nil
+
     # Handle strip-only treatments
     if op.process_type == 'stripping_only'
       add_strip_only_cycle(sequence, op, treatment_data, treatment_jig_type, masking)
@@ -891,12 +895,12 @@ class Part < ApplicationRecord
     safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_jig_operation(treatment_jig_type), "Jig")
 
     # 3. VAT Inspection (before degrease in each cycle)
-    if needs_degrease?(op)
+    if needs_degrease?(op, selected_alloy)
       safe_add_to_sequence(sequence, OperationLibrary::InspectFinalInspectVatInspect.get_vat_inspection_operation, "VAT Inspection")
     end
 
-    # 4. Degrease + rinse
-    if needs_degrease?(op)
+    # 4. Degrease + rinse (conditional based on alloy for ENP)
+    if needs_degrease?(op, selected_alloy)
       degrease = OperationLibrary::DegreaseOperations.get_degrease_operation
       safe_add_to_sequence(sequence, degrease, "Degrease")
       safe_add_to_sequence(sequence, get_rinse(degrease, has_enp, masking), "Rinse after Degrease")
@@ -1049,15 +1053,16 @@ class Part < ApplicationRecord
     # 2. VAT Inspection (before degrease)
     safe_add_to_sequence(sequence, OperationLibrary::InspectFinalInspectVatInspect.get_vat_inspection_operation, "VAT Inspection")
 
-    # 3. Degrease + rinse
-    degrease = OperationLibrary::DegreaseOperations.get_degrease_operation
-    safe_add_to_sequence(sequence, degrease, "ENP Degrease")
-    safe_add_to_sequence(sequence, get_rinse(degrease, true, {}), "ENP Rinse after Degrease")
+    # 3. Degrease + rinse (ONLY for aluminium-based alloys)
+    selected_alloy = get_selected_enp_alloy_for_treatment_data(treatment_data)
+    if OperationLibrary::DegreaseOperations.aluminium_based_alloy?(selected_alloy)
+      degrease = OperationLibrary::DegreaseOperations.get_degrease_operation
+      safe_add_to_sequence(sequence, degrease, "ENP Degrease")
+      safe_add_to_sequence(sequence, get_rinse(degrease, true, {}), "ENP Rinse after Degrease")
+    end
 
     # 4. ENP pretreatments + rinses
     if defined?(OperationLibrary::Pretreatments)
-      # Get the selected alloy for the ENP treatment from the treatment data
-      selected_alloy = get_selected_enp_alloy_for_treatment_data(treatment_data)
       if selected_alloy
         pretreatments = OperationLibrary::Pretreatments.get_pretreatment_sequence([enp_op], selected_alloy)
         pretreatments.each do |pretreat|
@@ -1075,8 +1080,14 @@ class Part < ApplicationRecord
     safe_add_to_sequence(sequence, OperationLibrary::JigUnjig.get_unjig_operation, "ENP Unjig")
   end
 
-  def needs_degrease?(op)
-    ['standard_anodising', 'hard_anodising', 'chromic_anodising', 'chemical_conversion', 'electroless_nickel_plating', 'stripping_only'].include?(op.process_type)
+  def needs_degrease?(op, selected_alloy = nil)
+    # ENP has conditional degrease based on alloy
+    if op.process_type == 'electroless_nickel_plating'
+      return OperationLibrary::DegreaseOperations.aluminium_based_alloy?(selected_alloy)
+    end
+
+    # All other processes require degrease
+    ['standard_anodising', 'hard_anodising', 'chromic_anodising', 'chemical_conversion', 'stripping_only'].include?(op.process_type)
   end
 
   def needs_pretreatment?(op)
