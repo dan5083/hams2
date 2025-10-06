@@ -53,8 +53,7 @@ class Operation
     operations += OperationLibrary::AnodisingStandard.operations(aerospace_defense) if defined?(OperationLibrary::AnodisingStandard)
     operations += OperationLibrary::AnodisingHard.operations(aerospace_defense) if defined?(OperationLibrary::AnodisingHard)
     operations += OperationLibrary::AnodisingChromic.operations(aerospace_defense) if defined?(OperationLibrary::AnodisingChromic)
-    operations += OperationLibrary::ChemicalConversions.operations(aerospace_defense) if defined?(OperationLibrary::ChemicalConversions)
-
+    operations += OperationLibrary::ChemicalConversions.operations(aerospace_defense: aerospace_defense) if defined?(OperationLibrary::ChemicalConversions)
     # Pass thickness to ENP operations for time interpolation
     if defined?(OperationLibrary::ElectrolessNickelPlate)
       operations += OperationLibrary::ElectrolessNickelPlate.operations(target_thickness)
