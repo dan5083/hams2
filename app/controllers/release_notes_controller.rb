@@ -1,4 +1,4 @@
-# app/controllers/release_notes_controller.rb - Updated to allow post-invoice editing
+# app/controllers/release_notes_controller.rb - Updated to allow post-invoice editing with pagination
 class ReleaseNotesController < ApplicationController
   before_action :set_release_note, only: [:show, :edit, :update, :destroy, :void, :pdf]
   before_action :set_works_order, only: [:new, :create]
@@ -32,6 +32,9 @@ class ReleaseNotesController < ApplicationController
 
     # For the filter dropdown
     @customers = Organization.customers.enabled.order(:name)
+
+    # Add pagination - 20 items per page to match customer orders
+    @release_notes = @release_notes.page(params[:page]).per(20)
   end
 
   def show
