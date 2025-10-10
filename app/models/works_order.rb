@@ -1,5 +1,7 @@
-# app/models/works_order.rb - Fixed pricing calculation and operations handling
+# app/models/works_order.rb - Fixed pricing calculation and operations handling + counter cache updates
 class WorksOrder < ApplicationRecord
+  include CustomerOrderCounterCache
+
   belongs_to :customer_order
   belongs_to :part
   belongs_to :release_level
@@ -22,7 +24,6 @@ class WorksOrder < ApplicationRecord
   validates :each_price, numericality: { greater_than_or_equal_to: 0 }, allow_nil: true
   validates :customer_reference, length: { maximum: 100 }, allow_blank: true
 
-
   validate :validate_quantity_released
   validate :validate_each_price_when_required
 
@@ -41,6 +42,10 @@ class WorksOrder < ApplicationRecord
   after_create :update_part_pricing, if: :should_update_part_pricing_on_create?
   after_update :update_part_pricing, if: :should_update_part_pricing?
 
+  # NEW: Counter cache callbacks
+  after_save :update_is_fully_released_flag
+  after_save :update_customer_order_counts, if: :saved_change_to_quantity_released_or_voided_or_is_open?
+  after_destroy :update_customer_order_counts
 
   def display_name
     "WO#{number}"
@@ -337,8 +342,6 @@ class WorksOrder < ApplicationRecord
     custom_amounts&.dig(charge_id.to_s)
   end
 
-  # Add this method to the WorksOrder model (app/models/works_order.rb)
-
   # Get available additional charges for this works order
   def available_additional_charges
     AdditionalChargePreset.enabled.ordered
@@ -500,5 +503,19 @@ class WorksOrder < ApplicationRecord
     self.part_number = part.part_number
     self.part_issue = part.part_issue
     self.part_description = part.description.presence || "#{part.part_number}-#{part.part_issue}"
+  end
+
+  # NEW: Counter cache update methods
+  def update_is_fully_released_flag
+    new_value = quantity_released >= quantity && !voided
+    if is_fully_released != new_value
+      update_column(:is_fully_released, new_value)
+      # Trigger customer order count update if this changed
+      update_customer_order_counts if saved_changes?
+    end
+  end
+
+  def saved_change_to_quantity_released_or_voided_or_is_open?
+    saved_change_to_quantity_released? || saved_change_to_voided? || saved_change_to_is_open?
   end
 end

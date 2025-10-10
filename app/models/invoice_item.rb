@@ -1,5 +1,7 @@
-# app/models/invoice_item.rb - No additional columns needed
+# app/models/invoice_item.rb - No additional columns needed + counter cache updates
 class InvoiceItem < ApplicationRecord
+  include CustomerOrderCounterCache
+
   belongs_to :invoice
   belongs_to :release_note, optional: true
 
@@ -18,6 +20,10 @@ class InvoiceItem < ApplicationRecord
   before_validation :set_position, if: :new_record?
   after_save :update_invoice_totals
   after_destroy :update_invoice_totals
+
+  # NEW: Counter cache callbacks
+  after_create :update_customer_order_uninvoiced_count, if: :main_item_with_release_note?
+  after_destroy :update_customer_order_uninvoiced_count, if: :main_item_with_release_note?
 
   scope :main_items, -> { where(kind: 'main') }
   scope :additional_items, -> { where(kind: 'additional') }
@@ -113,5 +119,23 @@ class InvoiceItem < ApplicationRecord
       "Our release note #{release_note.number} and works order #{works_order.number}."
     ]
     content_lines.join("\n\n")
+  end
+
+  # NEW: Counter cache update methods
+  def main_item_with_release_note?
+    kind == 'main' && release_note_id.present?
+  end
+
+  def update_customer_order_uninvoiced_count
+    return unless release_note&.works_order&.customer_order_id
+    update_counts_for_customer_order_id(release_note.works_order.customer_order_id)
+  end
+
+  def customer_order_id
+    release_note&.works_order&.customer_order_id
+  end
+
+  def customer_order_id_previously_was
+    nil # Invoice items don't change customer orders
   end
 end

@@ -2,82 +2,52 @@ class CustomerOrdersController < ApplicationController
   before_action :set_customer_order, only: [:show, :edit, :update, :destroy, :void, :create_invoice]
 
   def index
-    @customer_orders = CustomerOrder.includes(:customer, :works_orders)
+  @customer_orders = CustomerOrder.includes(:customer, :works_orders)
 
-    # Filter by customer if provided
-    if params[:customer_id].present?
-      @customer_orders = @customer_orders.for_customer(params[:customer_id])
-    end
-
-    # Filter by status
-    case params[:status]
-    when 'outstanding'
-      @customer_orders = @customer_orders.outstanding
-    when 'voided'
-      @customer_orders = @customer_orders.voided
-    when 'active'
-      @customer_orders = @customer_orders.active
-    end
-
-    # Search by order number or customer name
-    if params[:search].present?
-      search_term = params[:search].strip
-      @customer_orders = @customer_orders.joins(:customer)
-                                        .where(
-                                          "customer_orders.number ILIKE ? OR organizations.name ILIKE ?",
-                                          "%#{search_term}%", "%#{search_term}%"
-                                        )
-    end
-
-    # For the filter dropdown - include all enabled organizations
-    @customers = Organization.enabled.order(:name)
-
-    # Sort customer orders: ready-to-invoice first, then in-progress, then fully invoiced
-    @customer_orders = @customer_orders.sort_by do |customer_order|
-      # Check if all works orders are fully released
-      active_works_orders = customer_order.works_orders.active
-      all_fully_released = active_works_orders.any? &&
-                          active_works_orders.all? { |wo| wo.quantity_released >= wo.quantity }
-
-      # Check if has uninvoiced items
-      uninvoiced_release_notes = ReleaseNote.joins(:works_order)
-                                          .where(works_orders: { customer_order_id: customer_order.id })
-                                          .requires_invoicing
-      has_uninvoiced = uninvoiced_release_notes.sum(:quantity_accepted) > 0
-
-      # Priority: 0 = ready to invoice (all released + has uninvoiced), 1 = in progress, 2 = fully invoiced
-      if all_fully_released && has_uninvoiced
-        priority = 0  # Ready to invoice - top priority
-      elsif customer_order.works_orders.active.sum(:quantity_released) > 0 && !has_uninvoiced
-        priority = 2  # Fully invoiced - lowest priority
-      else
-        priority = 1  # In progress - middle priority
-      end
-
-      # Sort key: [priority, negative timestamp for desc order]
-      [priority, -customer_order.date_received.to_time.to_i]
-    end
-
-    # Convert back to ActiveRecord relation for pagination
-    # Get the sorted IDs and re-query in that order
-    sorted_ids = @customer_orders.map(&:id)
-
-    if sorted_ids.any?
-      # Use CASE WHEN to maintain the custom sort order
-      order_clause = sorted_ids.map.with_index do |id, index|
-        "WHEN customer_orders.id = '#{id}' THEN #{index}"
-      end.join(' ')
-
-      @customer_orders = CustomerOrder.includes(:customer, :works_orders)
-                                    .where(id: sorted_ids)
-                                    .order(Arel.sql("CASE #{order_clause} END"))
-    else
-      @customer_orders = CustomerOrder.none
-    end
-
-    # Add pagination - 20 items per page to match works orders
-    @customer_orders = @customer_orders.page(params[:page]).per(20)
+  # Filter by customer if provided
+  if params[:customer_id].present?
+    @customer_orders = @customer_orders.for_customer(params[:customer_id])
   end
+
+  # Filter by status
+  case params[:status]
+  when 'outstanding'
+    @customer_orders = @customer_orders.outstanding
+  when 'voided'
+    @customer_orders = @customer_orders.voided
+  when 'active'
+    @customer_orders = @customer_orders.active
+  end
+
+  # Search by order number or customer name
+  if params[:search].present?
+    search_term = params[:search].strip
+    @customer_orders = @customer_orders.joins(:customer)
+                                      .where(
+                                        "customer_orders.number ILIKE ? OR organizations.name ILIKE ?",
+                                        "%#{search_term}%", "%#{search_term}%"
+                                      )
+  end
+
+  # For the filter dropdown - include all enabled organizations
+  @customers = Organization.enabled.order(:name)
+
+  # OPTIMIZED: Sort using cached columns in pure SQL
+  # Priority: 0 = ready to invoice, 1 = in progress, 2 = fully invoiced
+  @customer_orders = @customer_orders.order(
+    Arel.sql("
+      CASE
+        WHEN fully_released_works_orders_count = open_works_orders_count
+             AND open_works_orders_count > 0
+             AND uninvoiced_accepted_quantity > 0 THEN 0
+        WHEN uninvoiced_accepted_quantity = 0
+             AND open_works_orders_count > 0 THEN 2
+        ELSE 1
+      END
+    "),
+    date_received: :desc
+  ).page(params[:page]).per(20)
+end
 
   def show
     @works_orders = @customer_order.works_orders

@@ -1,3 +1,4 @@
+<!-- app/views/customer_orders/index.html.erb -->
 <div class="container mx-auto px-4 py-6">
   <div class="flex justify-between items-center mb-6">
     <h1 class="text-3xl font-bold text-gray-900">Customer Orders</h1>
@@ -81,21 +82,16 @@
       <tbody class="bg-white divide-y divide-gray-200">
         <% @customer_orders.each do |customer_order| %>
           <%
-            # Check if all works orders are fully released (quantity_released >= quantity for each)
-            works_orders = customer_order.works_orders.active
-            fully_released_wo_count = works_orders.count { |wo| wo.quantity_released >= wo.quantity }
-            all_works_orders_fully_released = works_orders.any? && (fully_released_wo_count == works_orders.count)
-
-            # Calculate invoicing status for this customer order
-            uninvoiced_release_notes = ReleaseNote.joins(:works_order)
-                                                 .where(works_orders: { customer_order_id: customer_order.id })
-                                                 .requires_invoicing
-
-            uninvoiced_count = uninvoiced_release_notes.sum(:quantity_accepted)
+            # OPTIMIZED: Use cached columns instead of queries
+            all_works_orders_fully_released = customer_order.open_works_orders_count > 0 &&
+                                               customer_order.fully_released_works_orders_count == customer_order.open_works_orders_count
+            uninvoiced_count = customer_order.uninvoiced_accepted_quantity
             has_uninvoiced = uninvoiced_count > 0
-
-            # Only show "Create Invoice" if ALL works orders are fully released AND has uninvoiced items
             show_create_invoice = all_works_orders_fully_released && has_uninvoiced
+
+            # Load works_orders once for the display (already eager loaded)
+            works_orders = customer_order.works_orders.active
+            fully_released_wo_count = customer_order.fully_released_works_orders_count
           %>
           <tr class="hover:bg-gray-50 <%= 'bg-green-50' if all_works_orders_fully_released %>">
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">

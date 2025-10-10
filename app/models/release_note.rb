@@ -1,7 +1,10 @@
-# app/models/release_note.rb - Updated to allow post-invoice editing of remarks and quantities
+# app/models/release_note.rb
+# app/models/release_note.rb - Updated to allow post-invoice editing of remarks and quantities + counter cache updates
 require 'digest/sha2'
 
 class ReleaseNote < ApplicationRecord
+  include CustomerOrderCounterCache
+
   belongs_to :works_order
   belongs_to :issued_by, class_name: 'User'
   has_one :invoice_item, dependent: :nullify
@@ -36,6 +39,10 @@ class ReleaseNote < ApplicationRecord
   after_initialize :set_defaults, if: :new_record?
   after_save :update_works_order_quantity_released, unless: :invoiced? # Skip works order quantity updates for invoiced release notes
   after_destroy :update_works_order_quantity_released
+
+  # NEW: Counter cache callbacks
+  after_save :update_customer_order_uninvoiced_count, if: :saved_change_to_invoicing_status?
+  after_destroy :update_customer_order_uninvoiced_count
 
   # Process types that can have thickness measurements
   MEASURABLE_PROCESS_TYPES = %w[
@@ -297,7 +304,7 @@ class ReleaseNote < ApplicationRecord
     invoice_item.blank?
   end
 
-    # NCR management methods for release notes
+  # NCR management methods for release notes
   def can_create_ncr?
     !voided && (quantity_accepted > 0 || quantity_rejected > 0)
   end
@@ -418,5 +425,23 @@ class ReleaseNote < ApplicationRecord
     magnitude = (Math.log10(number.abs)).floor
     factor = 10.0 ** (n - 1 - magnitude)
     (number * factor).round / factor
+  end
+
+  # NEW: Counter cache update methods
+  def saved_change_to_invoicing_status?
+    saved_change_to_quantity_accepted? || saved_change_to_voided? || saved_change_to_no_invoice?
+  end
+
+  def update_customer_order_uninvoiced_count
+    return unless works_order&.customer_order_id
+    update_counts_for_customer_order_id(works_order.customer_order_id)
+  end
+
+  def customer_order_id
+    works_order&.customer_order_id
+  end
+
+  def customer_order_id_previously_was
+    nil # Release notes don't change customer orders, but method needed for concern
   end
 end
