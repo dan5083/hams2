@@ -248,3 +248,4 @@ def process_thickness_measurements
     end
   end
 end
+end
