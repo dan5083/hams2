@@ -488,12 +488,18 @@
                   min_val = readings.min
                   max_val = readings.max
                   count = readings.count
+
+                  # Only show display name if it differs from the group header
+                  group_header_text = process_type.humanize.gsub('_', ' ').titleize
+                  show_display_name = display_name != group_header_text
                 %>
 
                 <div style="margin-bottom: 0.5rem;">
-                  <div style="font-weight: bold; margin-bottom: 0.2rem; font-size: 9pt;">
-                    <%= display_name %>
-                  </div>
+                  <% if show_display_name %>
+                    <div style="font-weight: bold; margin-bottom: 0.2rem; font-size: 9pt;">
+                      <%= display_name %>
+                    </div>
+                  <% end %>
 
                   <!-- Statistics -->
                   <div class="thickness-stats">
