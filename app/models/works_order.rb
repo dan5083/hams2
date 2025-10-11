@@ -243,6 +243,9 @@ class WorksOrder < ApplicationRecord
   def calculate_quantity_released!
     total = release_notes.active.sum(:quantity_accepted) + release_notes.active.sum(:quantity_rejected)
     update_column(:quantity_released, total)
+
+    # IMPORTANT: Manually trigger flag update since update_column bypasses callbacks
+    update_is_fully_released_flag
   end
 
   # Route card information for shop floor
