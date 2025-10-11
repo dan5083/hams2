@@ -352,52 +352,6 @@
         </tbody>
       </table>
 
-      <!-- Thickness Measurements (if present) - UPDATED WITH ALL READINGS -->
-      <% if @release_note.has_thickness_measurements? %>
-        <h2>Thickness Measurements</h2>
-        <% measurements_by_type = @release_note.thickness_measurements_by_type %>
-        <% measurements_by_type.each do |process_type, measurements| %>
-          <div class="thickness-group">
-            <div class="thickness-group-header">
-              <%= process_type.humanize.gsub('_', ' ').titleize %>
-            </div>
-            <% measurements.each do |measurement| %>
-              <%
-                display_name = measurement['display_name'] || measurement['process_type'].humanize.titleize
-                readings = measurement['readings'] || []
-                next if readings.empty?
-
-                mean = (readings.sum / readings.count.to_f).round(1)
-                min_val = readings.min
-                max_val = readings.max
-                count = readings.count
-              %>
-
-              <div style="margin-bottom: 0.5rem;">
-                <div style="font-weight: bold; margin-bottom: 0.2rem; font-size: 9pt;">
-                  <%= display_name %>
-                </div>
-
-                <!-- Statistics -->
-                <div class="thickness-stats">
-                  <strong>Mean: <%= mean %> µm</strong> |
-                  Min: <%= min_val %> µm |
-                  Max: <%= max_val %> µm |
-                  Count: <%= count %>
-                </div>
-
-                <!-- All Individual Readings -->
-                <div class="readings-grid">
-                  <% readings.each do |reading| %>
-                    <div class="reading-value"><%= reading %> µm</div>
-                  <% end %>
-                </div>
-              </div>
-            <% end %>
-          </div>
-        <% end %>
-      <% end %>
-
       <!-- Proof of Collection/Delivery -->
       <h2>Proof of Collection/Delivery</h2>
       <table class="signature-table">
