@@ -40,23 +40,23 @@ def index
   # 2 = Not started yet ⚪
   # 3 = Fully invoiced ⚪
   # 4 = Voided 🔴
-  @customer_orders = @customer_orders.order(
-    Arel.sql("
-      CASE
-        WHEN voided = true THEN 4
-        WHEN fully_released_works_orders_count = open_works_orders_count
-             AND open_works_orders_count > 0
-             AND uninvoiced_accepted_quantity > 0 THEN 0
-        WHEN open_works_orders_count > 0
-             AND fully_released_works_orders_count > 0
-             AND fully_released_works_orders_count < open_works_orders_count THEN 1
-        WHEN open_works_orders_count > 0
-             AND uninvoiced_accepted_quantity = 0 THEN 3
-        ELSE 2
-      END
-    "),
-    date_received: :desc
-  ).page(params[:page]).per(20)
+@customer_orders = @customer_orders.order(
+  Arel.sql("
+    CASE
+      WHEN customer_orders.voided = true THEN 4
+      WHEN customer_orders.fully_released_works_orders_count = customer_orders.open_works_orders_count
+           AND customer_orders.open_works_orders_count > 0
+           AND customer_orders.uninvoiced_accepted_quantity > 0 THEN 0
+      WHEN customer_orders.open_works_orders_count > 0
+           AND customer_orders.fully_released_works_orders_count > 0
+           AND customer_orders.fully_released_works_orders_count < customer_orders.open_works_orders_count THEN 1
+      WHEN customer_orders.open_works_orders_count > 0
+           AND customer_orders.uninvoiced_accepted_quantity = 0 THEN 3
+      ELSE 2
+    END
+  "),
+  date_received: :desc
+).page(params[:page]).per(20)
 end
 
   def show
