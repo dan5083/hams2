@@ -471,7 +471,7 @@
 
         <!-- Certified Thickness Measurements - UPDATED WITH ALL READINGS -->
         <% if @release_note.has_thickness_measurements? %>
-          <h2>Certified Thickness Measurements</h2>
+          <h2>Calibrated Thickness Measurements</h2>
           <% measurements_by_type = @release_note.thickness_measurements_by_type %>
           <% measurements_by_type.each do |process_type, measurements| %>
             <div class="thickness-group">
