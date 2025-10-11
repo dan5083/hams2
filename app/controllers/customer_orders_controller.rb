@@ -1,7 +1,8 @@
 class CustomerOrdersController < ApplicationController
   before_action :set_customer_order, only: [:show, :edit, :update, :destroy, :void, :create_invoice]
 
-  def index
+# app/controllers/customer_orders_controller.rb
+def index
   @customer_orders = CustomerOrder.includes(:customer, :works_orders)
 
   # Filter by customer if provided
@@ -33,16 +34,25 @@ class CustomerOrdersController < ApplicationController
   @customers = Organization.enabled.order(:name)
 
   # OPTIMIZED: Sort using cached columns in pure SQL
-  # Priority: 0 = ready to invoice, 1 = in progress, 2 = fully invoiced
+  # Priority:
+  # 0 = Fully released with uninvoiced items (READY TO INVOICE) 🟢
+  # 1 = Partially released (IN PROGRESS) 🟠
+  # 2 = Not started yet ⚪
+  # 3 = Fully invoiced ⚪
+  # 4 = Voided 🔴
   @customer_orders = @customer_orders.order(
     Arel.sql("
       CASE
+        WHEN voided = true THEN 4
         WHEN fully_released_works_orders_count = open_works_orders_count
              AND open_works_orders_count > 0
              AND uninvoiced_accepted_quantity > 0 THEN 0
-        WHEN uninvoiced_accepted_quantity = 0
-             AND open_works_orders_count > 0 THEN 2
-        ELSE 1
+        WHEN open_works_orders_count > 0
+             AND fully_released_works_orders_count > 0
+             AND fully_released_works_orders_count < open_works_orders_count THEN 1
+        WHEN open_works_orders_count > 0
+             AND uninvoiced_accepted_quantity = 0 THEN 3
+        ELSE 2
       END
     "),
     date_received: :desc
