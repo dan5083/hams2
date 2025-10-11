@@ -210,7 +210,7 @@ def process_thickness_measurements
     key.to_s.start_with?('thickness_readings_') || key.to_s.start_with?('thickness_measurement_')
   }
 
-  if readings_fields.any?
+  if readings_fields.present?
     required_treatments = @release_note.get_required_treatments
     @release_note.measured_thicknesses = { 'measurements' => [] }
 
