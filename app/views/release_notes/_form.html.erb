@@ -23,7 +23,7 @@
     </div>
   <% end %>
 
-  <!-- NEW: Invoice Warning for Editing Invoiced Release Notes -->
+  <!-- Invoice Warning for Editing Invoiced Release Notes -->
   <% if @release_note.invoiced? %>
     <div class="bg-amber-50 border border-amber-200 rounded-md p-4 mb-6">
       <div class="flex">
@@ -107,7 +107,7 @@
           <% end %>
         </div>
 
-        <!-- Thickness Measurements Section (Conditional) -->
+        <!-- Thickness Measurements Section (Conditional) - UPDATED FOR ELCOMETER -->
         <% if @release_note.requires_thickness_measurements? %>
           <div class="sm:col-span-6">
             <div class="border-t border-gray-200 pt-6">
@@ -116,43 +116,105 @@
                 <span class="text-sm font-normal text-gray-500">(Required for Aerospace/Defense)</span>
               </h3>
 
-              <div class="grid grid-cols-1 gap-y-4 gap-x-4 sm:grid-cols-2">
+              <div class="space-y-6">
                 <% @release_note.get_required_treatments.each do |treatment| %>
                   <%
                     treatment_id = treatment[:treatment_id]
                     display_name = treatment[:display_name]
                     target_thickness = treatment[:target_thickness]
-                    current_value = @release_note.get_thickness_measurement(treatment_id)
+                    existing_readings = @release_note.get_thickness_readings(treatment_id)
                     field_name = "thickness_measurement_#{treatment_id}"
                   %>
-                  <div>
-                    <label for="<%= field_name %>" class="block text-sm font-medium text-gray-700">
-                      <%= display_name %> Thickness
-                      <span class="text-red-500">*</span>
-                      <% if target_thickness && target_thickness > 0 %>
-                        <span class="text-sm text-gray-500">(Target: <%= target_thickness %>μm)</span>
-                      <% end %>
-                    </label>
-                    <div class="mt-1 relative rounded-md shadow-sm">
-                      <%= text_field_tag field_name, current_value,
-                            id: field_name,
-                            pattern: "[0-9]+(\.[0-9]+)?",
-                            placeholder: target_thickness && target_thickness > 0 ? "e.g. #{target_thickness}" : "e.g. 25.4",
-                            class: "block w-full pr-12 border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
-                            required: true,
-                            data: {
-                              treatment_id: treatment_id,
-                              process_type: treatment[:process_type],
-                              target_thickness: target_thickness,
-                              display_name: display_name
-                            } %>
-                      <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                        <span class="text-gray-500 sm:text-sm">µm</span>
+
+                  <!-- Elcometer Controller Wrapper -->
+                  <div data-controller="elcometer"
+                       data-elcometer-treatment-id-value="<%= treatment_id %>"
+                       data-elcometer-process-type-value="<%= treatment[:process_type] %>"
+                       data-elcometer-target-thickness-value="<%= target_thickness %>"
+                       data-elcometer-display-name-value="<%= display_name %>"
+                       class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+
+                    <!-- Treatment Header -->
+                    <div class="flex items-center justify-between mb-4">
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700">
+                          <%= display_name %>
+                          <span class="text-red-500">*</span>
+                          <% if target_thickness && target_thickness > 0 %>
+                            <span class="text-sm text-gray-500">(Target: <%= target_thickness %>μm)</span>
+                          <% end %>
+                        </label>
+                      </div>
+                      <div class="flex gap-2">
+                        <!-- Connect Button -->
+                        <button type="button"
+                                data-elcometer-target="connectButton"
+                                data-action="click->elcometer#connectElcometer"
+                                class="inline-flex items-center px-3 py-2 border border-blue-600 rounded-md shadow-sm text-sm font-medium text-blue-600 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                          <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                          </svg>
+                          Connect Elcometer
+                        </button>
+
+                        <!-- Stop Button (hidden initially) -->
+                        <button type="button"
+                                data-elcometer-target="stopButton"
+                                data-action="click->elcometer#stopReading"
+                                class="hidden inline-flex items-center px-3 py-2 border border-red-600 rounded-md shadow-sm text-sm font-medium text-red-600 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                          <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                          </svg>
+                          Stop
+                        </button>
+
+                        <!-- Clear Button -->
+                        <button type="button"
+                                data-action="click->elcometer#clearReadings"
+                                class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                          <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                          </svg>
+                          Clear
+                        </button>
                       </div>
                     </div>
-                    <p class="mt-1 text-xs text-gray-500">
-                      Measured coating thickness (3 significant figures)
-                    </p>
+
+                    <!-- Statistics Display -->
+                    <div data-elcometer-target="statistics" class="mb-4"></div>
+
+                    <!-- Readings Display -->
+                    <div class="mb-4">
+                      <label class="block text-xs font-medium text-gray-500 mb-2">Readings:</label>
+                      <div data-elcometer-target="readingsList" class="min-h-[3rem] p-3 bg-white border border-gray-200 rounded-md">
+                        <% if existing_readings.any? %>
+                          <% existing_readings.each do |reading| %>
+                            <span class="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm mr-2 mb-2">
+                              <%= reading %> µm
+                            </span>
+                          <% end %>
+                        <% else %>
+                          <span class="text-gray-400 text-sm">No readings yet...</span>
+                        <% end %>
+                      </div>
+                    </div>
+
+                    <!-- Manual Entry Fallback -->
+                    <div data-elcometer-target="manualInput" class="<%= 'hidden' if existing_readings.any? %>">
+                      <label class="block text-xs font-medium text-gray-500 mb-1">
+                        Manual Entry (comma or newline separated):
+                      </label>
+                      <textarea
+                        placeholder="e.g., 70.5, 70.7, 69.9 or paste from spreadsheet"
+                        data-action="blur->elcometer#addManualReadings"
+                        rows="2"
+                        class="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"></textarea>
+                    </div>
+
+                    <!-- Hidden field to store readings array for form submission -->
+                    <%= hidden_field_tag "thickness_readings_#{treatment_id}",
+                                        existing_readings.to_json,
+                                        data: { elcometer_target: "readingsData" } %>
                   </div>
                 <% end %>
               </div>
@@ -166,9 +228,10 @@
                   </div>
                   <div class="ml-3 flex-1">
                     <p class="text-sm text-blue-700">
-                      <strong>Measurement Requirements:</strong>
-                      Thickness measurements are required for aerospace/defense parts with anodising or electroless nickel plating.
-                      Enter measurements to 3 significant figures. Multiple treatments of the same type may require separate measurements.
+                      <strong>Using the Elcometer 456:</strong>
+                      Click "Connect Elcometer", select your device, then take readings on the Elcometer.
+                      Each measurement will appear automatically. Click "Stop" when finished.
+                      Manual entry is available as a fallback.
                     </p>
                   </div>
                 </div>
@@ -181,7 +244,6 @@
         <div class="sm:col-span-6">
           <%= form.label :remarks, "Statement", class: "block text-sm font-medium text-gray-700" %>
           <%
-            # Pre-populate with template if this is a new record and remarks is blank
             default_statement = ""
             if @release_note.new_record? && @release_note.remarks.blank?
               if @works_order.release_level&.statement
@@ -238,60 +300,54 @@
     </div>
   </div>
 
-  <!-- JavaScript for handling thickness measurements -->
+  <!-- JavaScript for handling thickness measurements submission -->
   <% if @release_note.requires_thickness_measurements? %>
     <script>
       document.addEventListener('DOMContentLoaded', function() {
         const form = document.querySelector('form');
-        const thicknessFields = document.querySelectorAll('[data-treatment-id]');
 
         form.addEventListener('submit', function(e) {
-          // Collect thickness measurements and prepare them for submission
+          // Collect all thickness measurements from Elcometer controllers
           const measurements = [];
 
-          thicknessFields.forEach(function(field) {
-            const treatmentId = field.dataset.treatmentId;
-            const processType = field.dataset.processType;
-            const targetThickness = field.dataset.targetThickness;
-            const displayName = field.dataset.displayName;
-            const value = field.value.trim();
+          // Find all thickness readings hidden fields
+          const readingsFields = document.querySelectorAll('[name^="thickness_readings_"]');
 
-            if (value) {
+          readingsFields.forEach(function(field) {
+            // Extract treatment_id from field name: thickness_readings_abc123
+            const treatmentId = field.name.replace('thickness_readings_', '');
+
+            // Get the readings data (JSON array)
+            let readings = [];
+            try {
+              readings = JSON.parse(field.value || '[]');
+            } catch(e) {
+              console.error('Error parsing readings:', e);
+            }
+
+            if (readings.length > 0) {
+              // Get treatment info from the controller element
+              const controller = field.closest('[data-controller="elcometer"]');
+              const processType = controller.dataset.elcometerProcessTypeValue;
+              const targetThickness = parseFloat(controller.dataset.elcometerTargetThicknessValue) || 0;
+              const displayName = controller.dataset.elcometerDisplayNameValue;
+
               measurements.push({
                 treatment_id: treatmentId,
                 process_type: processType,
-                target_thickness: parseFloat(targetThickness) || 0,
+                target_thickness: targetThickness,
                 display_name: displayName,
-                measured_thickness: parseFloat(value)
+                readings: readings
               });
             }
           });
 
-          // Add hidden field with JSON data
+          // Add hidden field with JSON data for all measurements
           const hiddenField = document.createElement('input');
           hiddenField.type = 'hidden';
           hiddenField.name = 'release_note[measured_thicknesses]';
           hiddenField.value = JSON.stringify({ measurements: measurements });
           form.appendChild(hiddenField);
-        });
-
-        // Optional: Add real-time validation
-        thicknessFields.forEach(function(field) {
-          field.addEventListener('input', function(e) {
-            const value = parseFloat(e.target.value);
-            const targetThickness = parseFloat(e.target.dataset.targetThickness);
-
-            // Remove any existing validation styling
-            e.target.classList.remove('border-red-300', 'border-yellow-300');
-
-            if (isNaN(value) || value <= 0) {
-              // Invalid value
-              e.target.classList.add('border-red-300');
-            } else if (targetThickness && Math.abs(value - targetThickness) > (targetThickness * 0.2)) {
-              // More than 20% deviation from target - show warning
-              e.target.classList.add('border-yellow-300');
-            }
-          });
         });
       });
     </script>

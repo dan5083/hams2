@@ -1,4 +1,4 @@
-# app/controllers/release_notes_controller.rb - Updated to allow post-invoice editing with pagination
+# app/controllers/release_notes_controller.rb - Updated to handle Elcometer readings arrays
 class ReleaseNotesController < ApplicationController
   before_action :set_release_note, only: [:show, :edit, :update, :destroy, :void, :pdf]
   before_action :set_works_order, only: [:new, :create]
@@ -63,7 +63,6 @@ class ReleaseNotesController < ApplicationController
   end
 
   def edit
-    # NEW: Allow editing for all non-voided release notes (including invoiced ones)
     unless @release_note.can_be_edited?
       redirect_to @release_note, alert: 'Cannot edit voided release notes.'
       return
@@ -75,7 +74,6 @@ class ReleaseNotesController < ApplicationController
   end
 
   def update
-    # NEW: Allow editing for all non-voided release notes (including invoiced ones)
     unless @release_note.can_be_edited?
       redirect_to @release_note, alert: 'Cannot edit voided release notes.'
       return
@@ -182,64 +180,71 @@ class ReleaseNotesController < ApplicationController
   end
 
   def thickness_measurements_provided?
-    # Check if measurements were provided via JSON (from new form structure)
+    # Check if measurements were provided via JSON (from Elcometer or form submission)
     params[:release_note][:measured_thicknesses].present? ||
-    # Check if individual thickness fields were provided (legacy support)
+    # Check if individual thickness readings fields were provided
+    params.keys.any? { |key| key.to_s.start_with?('thickness_readings_') } ||
+    # Check if legacy individual thickness fields were provided (backward compatibility)
     params.keys.any? { |key| key.to_s.start_with?('thickness_measurement_') }
   end
 
-  def process_thickness_measurements
-    Rails.logger.info "Processing thickness measurements for release note"
+def process_thickness_measurements
+  Rails.logger.info "Processing thickness measurements for release note"
 
-    # First, try to process JSON data from the new form structure
-    if release_note_params[:measured_thicknesses].present?
-      begin
-        json_data = JSON.parse(release_note_params[:measured_thicknesses])
-        if json_data.is_a?(Hash) && json_data['measurements'].is_a?(Array)
-          Rails.logger.info "Found JSON thickness data with #{json_data['measurements'].length} measurements"
-          @release_note.measured_thicknesses = json_data
-          return
-        end
-      rescue JSON::ParserError => e
-        Rails.logger.warn "Failed to parse JSON thickness data: #{e.message}"
-        # Fall through to individual field processing
+  # Try to process JSON data from form submission first
+  if release_note_params[:measured_thicknesses].present?
+    begin
+      json_data = JSON.parse(release_note_params[:measured_thicknesses])
+      if json_data.is_a?(Hash) && json_data['measurements'].is_a?(Array)
+        Rails.logger.info "Found JSON thickness data with #{json_data['measurements'].length} measurements"
+        @release_note.measured_thicknesses = json_data
+        return
       end
+    rescue JSON::ParserError => e
+      Rails.logger.warn "Failed to parse JSON thickness data: #{e.message}"
     end
+  end
 
-    # Fall back to processing individual thickness measurement fields (for backward compatibility)
+  # Process individual thickness readings fields (both Elcometer and manual entry)
+  readings_fields = params.select { |key, _|
+    key.to_s.start_with?('thickness_readings_') || key.to_s.start_with?('thickness_measurement_')
+  }
+
+  if readings_fields.any?
     required_treatments = @release_note.get_required_treatments
-    Rails.logger.info "Required treatments for thickness: #{required_treatments.length}"
-
-    # Initialize the measurements structure
     @release_note.measured_thicknesses = { 'measurements' => [] }
 
-    # Process each thickness measurement field
-    params.each do |param_name, param_value|
-      next unless param_name.to_s.start_with?('thickness_measurement_')
+    readings_fields.each do |field_name, field_value|
+      # Extract treatment_id (works for both field name formats)
+      treatment_id = field_name.to_s.sub(/^thickness_(readings|measurement)_/, '')
 
-      # Extract treatment_id from field name (thickness_measurement_abc123def456)
-      treatment_id = param_name.to_s.sub('thickness_measurement_', '')
-
-      # Find the corresponding treatment info
       treatment_info = required_treatments.find { |t| t[:treatment_id] == treatment_id }
       next unless treatment_info
 
-      Rails.logger.info "Processing thickness measurement: #{treatment_id} = #{param_value}"
-
-      if param_value.present?
-        success = @release_note.set_thickness_measurement(treatment_id, param_value, treatment_info)
-        Rails.logger.info "Set thickness measurement for #{treatment_id}: #{success}"
-
-        unless success
-          @release_note.errors.add(:measured_thicknesses,
-            "Invalid thickness value for #{treatment_info[:display_name]}")
+      begin
+        # Parse readings - handle both JSON arrays and single values
+        readings = if field_value.is_a?(String) && field_value.strip.start_with?('[')
+          JSON.parse(field_value) # Elcometer: "[70.5, 70.7, 69.9]"
+        elsif field_value.present?
+          [field_value] # Manual entry: "25.4" -> [25.4]
+        else
+          []
         end
-      elsif @release_note.requires_thickness_measurements?
-        # If thickness is required but not provided, the model validation will catch this
-        Rails.logger.warn "Missing required thickness for treatment: #{treatment_id}"
+
+        if readings.any?
+          Rails.logger.info "Processing #{readings.count} reading(s) for treatment #{treatment_id}"
+          success = @release_note.set_thickness_measurement(treatment_id, readings, treatment_info)
+
+          unless success
+            @release_note.errors.add(:measured_thicknesses,
+              "Invalid readings for #{treatment_info[:display_name]}")
+          end
+        end
+      rescue JSON::ParserError => e
+        Rails.logger.error "Failed to parse readings for #{treatment_id}: #{e.message}"
+        @release_note.errors.add(:measured_thicknesses,
+          "Invalid data format for #{treatment_info[:display_name]}")
       end
     end
-
-    Rails.logger.info "Final measured_thicknesses: #{@release_note.measured_thicknesses}"
   end
 end

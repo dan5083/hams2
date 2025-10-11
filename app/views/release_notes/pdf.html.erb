@@ -167,7 +167,7 @@
       }
 
       .thickness-table th {
-        width: 50%;
+        width: auto;
       }
 
       .thickness-group {
@@ -179,6 +179,36 @@
         font-weight: bold;
         padding: 0.2rem 0.4rem;
         border-bottom: 2pt solid #ccc;
+      }
+
+      .thickness-stats {
+        background-color: #f8f9fa;
+        padding: 0.3rem 0.4rem;
+        margin-bottom: 0.3rem;
+        border: 1pt solid #ddd;
+        font-size: 8.5pt;
+      }
+
+      .thickness-stats strong {
+        color: #2563eb;
+      }
+
+      .readings-grid {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 0.2rem;
+        padding: 0.3rem;
+        background-color: #ffffff;
+        border: 1pt solid #ddd;
+        font-size: 8pt;
+      }
+
+      .reading-value {
+        text-align: center;
+        padding: 0.2rem;
+        background-color: #eff6ff;
+        border: 1pt solid #bfdbfe;
+        border-radius: 2pt;
       }
 
       p {
@@ -322,7 +352,7 @@
         </tbody>
       </table>
 
-      <!-- Thickness Measurements (if present) - Simplified -->
+      <!-- Thickness Measurements (if present) - UPDATED WITH ALL READINGS -->
       <% if @release_note.has_thickness_measurements? %>
         <h2>Thickness Measurements</h2>
         <% measurements_by_type = @release_note.thickness_measurements_by_type %>
@@ -331,22 +361,39 @@
             <div class="thickness-group-header">
               <%= process_type.humanize.gsub('_', ' ').titleize %>
             </div>
-            <table class="thickness-table">
-              <thead>
-                <tr>
-                  <th>Treatment</th>
-                  <th>Measured (μm)</th>
-                </tr>
-              </thead>
-              <tbody>
-                <% measurements.each do |measurement| %>
-                  <tr>
-                    <td><%= measurement['display_name'] || measurement['process_type'].humanize.titleize %></td>
-                    <td><%= measurement['measured_thickness'] %></td>
-                  </tr>
-                <% end %>
-              </tbody>
-            </table>
+            <% measurements.each do |measurement| %>
+              <%
+                display_name = measurement['display_name'] || measurement['process_type'].humanize.titleize
+                readings = measurement['readings'] || []
+                next if readings.empty?
+
+                mean = (readings.sum / readings.count.to_f).round(1)
+                min_val = readings.min
+                max_val = readings.max
+                count = readings.count
+              %>
+
+              <div style="margin-bottom: 0.5rem;">
+                <div style="font-weight: bold; margin-bottom: 0.2rem; font-size: 9pt;">
+                  <%= display_name %>
+                </div>
+
+                <!-- Statistics -->
+                <div class="thickness-stats">
+                  <strong>Mean: <%= mean %> µm</strong> |
+                  Min: <%= min_val %> µm |
+                  Max: <%= max_val %> µm |
+                  Count: <%= count %>
+                </div>
+
+                <!-- All Individual Readings -->
+                <div class="readings-grid">
+                  <% readings.each do |reading| %>
+                    <div class="reading-value"><%= reading %> µm</div>
+                  <% end %>
+                </div>
+              </div>
+            <% end %>
           </div>
         <% end %>
       <% end %>
@@ -468,7 +515,7 @@
           </tbody>
         </table>
 
-        <!-- Simplified Thickness Measurements for Certificate -->
+        <!-- Certified Thickness Measurements - UPDATED WITH ALL READINGS -->
         <% if @release_note.has_thickness_measurements? %>
           <h2>Certified Thickness Measurements</h2>
           <% measurements_by_type = @release_note.thickness_measurements_by_type %>
@@ -477,22 +524,39 @@
               <div class="thickness-group-header">
                 <%= process_type.humanize.gsub('_', ' ').titleize %>
               </div>
-              <table class="thickness-table">
-                <thead>
-                  <tr>
-                    <th>Treatment Description</th>
-                    <th>Measured Thickness (μm)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <% measurements.each do |measurement| %>
-                    <tr>
-                      <td><%= measurement['display_name'] || measurement['process_type'].humanize.titleize %></td>
-                      <td><%= measurement['measured_thickness'] %></td>
-                    </tr>
-                  <% end %>
-                </tbody>
-              </table>
+              <% measurements.each do |measurement| %>
+                <%
+                  display_name = measurement['display_name'] || measurement['process_type'].humanize.titleize
+                  readings = measurement['readings'] || []
+                  next if readings.empty?
+
+                  mean = (readings.sum / readings.count.to_f).round(1)
+                  min_val = readings.min
+                  max_val = readings.max
+                  count = readings.count
+                %>
+
+                <div style="margin-bottom: 0.5rem;">
+                  <div style="font-weight: bold; margin-bottom: 0.2rem; font-size: 9pt;">
+                    <%= display_name %>
+                  </div>
+
+                  <!-- Statistics -->
+                  <div class="thickness-stats">
+                    <strong>Mean: <%= mean %> µm</strong> |
+                    Min: <%= min_val %> µm |
+                    Max: <%= max_val %> µm |
+                    Count: <%= count %> readings
+                  </div>
+
+                  <!-- All Individual Readings -->
+                  <div class="readings-grid">
+                    <% readings.each do |reading| %>
+                      <div class="reading-value"><%= reading %> µm</div>
+                    <% end %>
+                  </div>
+                </div>
+              <% end %>
             </div>
           <% end %>
         <% end %>

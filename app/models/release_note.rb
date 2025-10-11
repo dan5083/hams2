@@ -1,5 +1,5 @@
 # app/models/release_note.rb
-# app/models/release_note.rb - Updated to allow post-invoice editing of remarks and quantities + counter cache updates
+# app/models/release_note.rb - Updated to support multiple Elcometer readings per treatment
 require 'digest/sha2'
 
 class ReleaseNote < ApplicationRecord
@@ -14,33 +14,30 @@ class ReleaseNote < ApplicationRecord
   validates :quantity_accepted, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validates :quantity_rejected, presence: true, numericality: { greater_than_or_equal_to: 0 }
   validate :total_quantity_must_be_positive
-  validate :quantity_available_for_release, unless: :invoiced? # Skip quantity validation for invoiced release notes
+  validate :quantity_available_for_release, unless: :invoiced?
   validate :validate_thickness_measurements
 
   scope :active, -> { where(voided: false) }
   scope :voided, -> { where(voided: true) }
 
-  # VERIFIED: This scope correctly identifies release notes that need invoicing
   scope :requires_invoicing, -> {
     left_joins(:invoice_item)
-      .where(invoice_items: { id: nil })          # No invoice item exists
-      .where(voided: false)                       # Not voided
-      .where('quantity_accepted > 0')             # Has accepted quantity
-      .where.not(no_invoice: true)                # Not marked as no_invoice
+      .where(invoice_items: { id: nil })
+      .where(voided: false)
+      .where('quantity_accepted > 0')
+      .where.not(no_invoice: true)
   }
 
-  # NEW: Additional useful scopes for invoicing workflow
   scope :invoiced, -> { joins(:invoice_item) }
-  scope :ready_for_invoice, -> { requires_invoicing }  # Alias for clarity
+  scope :ready_for_invoice, -> { requires_invoicing }
   scope :recent, -> { order(number: :desc) }
 
   before_validation :set_date, if: :new_record?
   before_validation :assign_next_number, if: :new_record?
   after_initialize :set_defaults, if: :new_record?
-  after_save :update_works_order_quantity_released, unless: :invoiced? # Skip works order quantity updates for invoiced release notes
+  after_save :update_works_order_quantity_released, unless: :invoiced?
   after_destroy :update_works_order_quantity_released
 
-  # NEW: Counter cache callbacks
   after_save :update_customer_order_uninvoiced_count, if: :saved_change_to_invoicing_status?
   after_destroy :update_customer_order_uninvoiced_count
 
@@ -82,7 +79,6 @@ class ReleaseNote < ApplicationRecord
   end
 
   def release_statement
-    # Always use the remarks field as the release statement
     remarks || ''
   end
 
@@ -115,20 +111,18 @@ class ReleaseNote < ApplicationRecord
     !voided && quantity_accepted > 0 && !no_invoice
   end
 
-  # NEW: Enhanced editing capabilities for invoiced release notes
   def can_be_edited?
-    !voided # Can edit as long as not voided, even if invoiced
+    !voided
   end
 
   def can_edit_quantities?
-    invoiced? # Can edit quantities only if already invoiced (to prevent invoice impact)
+    invoiced?
   end
 
   def can_edit_remarks?
-    true # Can always edit remarks (unless voided, handled by can_be_edited?)
+    true
   end
 
-  # NEW: Enhanced invoicing status methods
   def invoiced?
     invoice_item.present?
   end
@@ -154,7 +148,6 @@ class ReleaseNote < ApplicationRecord
     when 'each'
       quantity_accepted * (works_order.each_price || 0)
     when 'lot'
-      # For lot pricing, we need to calculate proportionally
       return 0 if works_order.quantity.zero?
       (quantity_accepted.to_f / works_order.quantity) * works_order.lot_price
     else
@@ -162,7 +155,6 @@ class ReleaseNote < ApplicationRecord
     end
   end
 
-  # NEW: Warning methods for post-invoice editing
   def editing_invoiced_warning
     return nil unless invoiced?
     "⚠️ This release note has been invoiced. Editing quantities will not affect the invoice amounts."
@@ -172,7 +164,7 @@ class ReleaseNote < ApplicationRecord
     invoiced? && (quantity_accepted_changed? || quantity_rejected_changed?)
   end
 
-  # NEW THICKNESS MEASUREMENT METHODS - Support multiple measurements per treatment type
+  # THICKNESS MEASUREMENT METHODS - Updated to support multiple readings
 
   def requires_thickness_measurements?
     return false unless works_order.part&.aerospace_defense?
@@ -183,15 +175,12 @@ class ReleaseNote < ApplicationRecord
     return [] unless works_order.part
 
     begin
-      # Get treatments directly from the part's stored customisation data
       treatments_data = works_order.part.send(:parse_treatments_data)
 
-      # Filter for treatments that require thickness measurements
       measurable_treatments = treatments_data.select do |treatment|
         MEASURABLE_PROCESS_TYPES.include?(treatment["type"])
       end
 
-      # Return treatment info with unique identifiers
       measurable_treatments.map.with_index do |treatment, index|
         {
           treatment_id: generate_treatment_id(treatment, index),
@@ -206,13 +195,46 @@ class ReleaseNote < ApplicationRecord
     end
   end
 
-  def get_thickness_measurement(treatment_id)
-    return nil unless measured_thicknesses.is_a?(Hash)
+  # Get thickness readings for a treatment (returns array)
+  # Handles both new format (readings array) and old format (single measured_thickness)
+  def get_thickness_readings(treatment_id)
+    return [] unless measured_thicknesses.is_a?(Hash)
     measurement = measured_thicknesses['measurements']&.find { |m| m['treatment_id'] == treatment_id }
-    measurement&.dig('measured_thickness')
+    return [] unless measurement
+
+    # New format: readings array
+    if measurement['readings'].is_a?(Array)
+      measurement['readings']
+    # Old format: single measured_thickness value - convert to array
+    elsif measurement['measured_thickness'].present?
+      [measurement['measured_thickness']]
+    else
+      []
+    end
   end
 
-  def set_thickness_measurement(treatment_id, value, treatment_info = {})
+  # Get mean thickness for a treatment (for backward compatibility and display)
+  def get_thickness_measurement(treatment_id)
+    readings = get_thickness_readings(treatment_id)
+    return nil if readings.empty?
+    calculate_mean(readings)
+  end
+
+  # Get statistics for a treatment's readings
+  def get_thickness_statistics(treatment_id)
+    readings = get_thickness_readings(treatment_id)
+    return nil if readings.empty?
+
+    {
+      count: readings.count,
+      mean: calculate_mean(readings),
+      min: readings.min,
+      max: readings.max
+    }
+  end
+
+  # Set thickness measurement - accepts either single value OR array of readings
+  def set_thickness_measurement(treatment_id, value_or_readings, treatment_info = {})
     # Initialize the structure if needed
     self.measured_thicknesses = { 'measurements' => [] } unless measured_thicknesses.is_a?(Hash)
     self.measured_thicknesses['measurements'] ||= []
@@ -222,20 +244,23 @@ class ReleaseNote < ApplicationRecord
 
     if measurement
       # Update existing measurement
-      if value.blank?
-        # Remove measurement if value is blank
+      if value_or_readings.blank? || (value_or_readings.is_a?(Array) && value_or_readings.empty?)
+        # Remove measurement if value/readings are blank
         self.measured_thicknesses['measurements'].reject! { |m| m['treatment_id'] == treatment_id }
       else
-        measurement['measured_thickness'] = process_thickness_value(value)
+        measurement['readings'] = process_thickness_readings(value_or_readings)
       end
-    elsif value.present?
+    elsif value_or_readings.present?
       # Add new measurement
+      readings = process_thickness_readings(value_or_readings)
+      return false if readings.empty?
+
       new_measurement = {
         'treatment_id' => treatment_id,
         'process_type' => treatment_info[:process_type],
         'target_thickness' => treatment_info[:target_thickness] || 0,
         'display_name' => treatment_info[:display_name],
-        'measured_thickness' => process_thickness_value(value)
+        'readings' => readings
       }
       self.measured_thicknesses['measurements'] << new_measurement
     end
@@ -248,7 +273,7 @@ class ReleaseNote < ApplicationRecord
   def has_thickness_measurements?
     return false unless measured_thicknesses.is_a?(Hash)
     measurements = measured_thicknesses['measurements']
-    measurements.present? && measurements.any? { |m| m['measured_thickness'].present? }
+    measurements.present? && measurements.any? { |m| m['readings'].present? && m['readings'].any? }
   end
 
   def thickness_measurements_summary
@@ -256,11 +281,18 @@ class ReleaseNote < ApplicationRecord
 
     measurements = measured_thicknesses['measurements'] || []
     summary_parts = measurements.filter_map do |measurement|
-      thickness = measurement['measured_thickness']
-      next unless thickness.present?
+      readings = measurement['readings']
+      next unless readings.present? && readings.any?
 
       display_name = measurement['display_name'] || measurement['process_type'].humanize.titleize
-      "#{display_name}: #{thickness} µm"
+      mean = calculate_mean(readings)
+      count = readings.count
+
+      if count == 1
+        "#{display_name}: #{readings.first} µm"
+      else
+        "#{display_name}: #{mean} µm (#{count} readings)"
+      end
     end
 
     summary_parts.join(', ')
@@ -280,7 +312,8 @@ class ReleaseNote < ApplicationRecord
 
     required_treatments = get_required_treatments
     required_treatments.all? do |treatment|
-      get_thickness_measurement(treatment[:treatment_id]).present?
+      readings = get_thickness_readings(treatment[:treatment_id])
+      readings.present? && readings.any?
     end
   end
 
@@ -290,7 +323,8 @@ class ReleaseNote < ApplicationRecord
 
     required_treatments = get_required_treatments
     required_treatments.filter_map do |treatment|
-      if get_thickness_measurement(treatment[:treatment_id]).blank?
+      readings = get_thickness_readings(treatment[:treatment_id])
+      if readings.blank? || readings.empty?
         treatment
       end
     end
@@ -304,7 +338,6 @@ class ReleaseNote < ApplicationRecord
     invoice_item.blank?
   end
 
-  # NCR management methods for release notes
   def can_create_ncr?
     !voided && (quantity_accepted > 0 || quantity_rejected > 0)
   end
@@ -343,13 +376,9 @@ class ReleaseNote < ApplicationRecord
   def quantity_available_for_release
     return unless works_order && total_quantity
 
-    # Calculate how much quantity this release note currently accounts for
     current_quantity = persisted? ? quantity_accepted_was + quantity_rejected_was : 0
-
-    # Calculate the additional quantity this release note would account for
     additional_quantity = total_quantity - current_quantity
 
-    # Only check if we're increasing the total quantity released
     if additional_quantity > 0 && additional_quantity > works_order.quantity_remaining
       errors.add(:base,
         "You are trying to release #{additional_quantity} parts, " \
@@ -364,17 +393,22 @@ class ReleaseNote < ApplicationRecord
     required_treatments = get_required_treatments
 
     required_treatments.each do |treatment|
-      thickness = get_thickness_measurement(treatment[:treatment_id])
+      readings = get_thickness_readings(treatment[:treatment_id])
 
-      if thickness.blank?
+      if readings.blank? || readings.empty?
         display_name = treatment[:display_name] || treatment[:process_type].humanize.titleize
         errors.add(:measured_thicknesses, "#{display_name} thickness measurement is required for aerospace/defense parts")
-      elsif thickness <= 0
-        display_name = treatment[:display_name] || treatment[:process_type].humanize.titleize
-        errors.add(:measured_thicknesses, "#{display_name} thickness must be greater than 0")
-      elsif thickness > 1000 # Sanity check - no coating should be > 1mm
-        display_name = treatment[:display_name] || treatment[:process_type].humanize.titleize
-        errors.add(:measured_thicknesses, "#{display_name} thickness seems unrealistically high (>1000µm)")
+      else
+        # Validate each reading
+        readings.each_with_index do |reading, index|
+          if reading <= 0
+            display_name = treatment[:display_name] || treatment[:process_type].humanize.titleize
+            errors.add(:measured_thicknesses, "#{display_name} reading #{index + 1} must be greater than 0")
+          elsif reading > 1000
+            display_name = treatment[:display_name] || treatment[:process_type].humanize.titleize
+            errors.add(:measured_thicknesses, "#{display_name} reading #{index + 1} seems unrealistically high (>1000µm)")
+          end
+        end
       end
     end
   end
@@ -385,7 +419,6 @@ class ReleaseNote < ApplicationRecord
 
   # Generate a unique treatment ID based on treatment characteristics
   def generate_treatment_id(treatment, index)
-    # Create a deterministic ID based on treatment properties
     id_components = [
       treatment["type"],
       treatment["target_thickness"],
@@ -393,7 +426,6 @@ class ReleaseNote < ApplicationRecord
       index
     ].compact
 
-    # Use a hash of the components for consistency
     Digest::SHA256.hexdigest(id_components.join('|'))[0, 12]
   end
 
@@ -409,25 +441,52 @@ class ReleaseNote < ApplicationRecord
     end
   end
 
-  # Process and validate thickness value, rounding to 3 significant figures
-  def process_thickness_value(value)
+  # Process thickness value(s) - handles both single values and arrays
+  def process_thickness_readings(value_or_readings)
+    if value_or_readings.is_a?(Array)
+      # Array of readings from Elcometer
+      value_or_readings.map { |v| process_single_reading(v) }.compact
+    elsif value_or_readings.is_a?(String)
+      # Could be JSON array string from form
+      begin
+        parsed = JSON.parse(value_or_readings)
+        if parsed.is_a?(Array)
+          parsed.map { |v| process_single_reading(v) }.compact
+        else
+          [process_single_reading(value_or_readings)].compact
+        end
+      rescue JSON::ParserError
+        # Not JSON, treat as single value
+        [process_single_reading(value_or_readings)].compact
+      end
+    else
+      # Single value (backward compatibility)
+      [process_single_reading(value_or_readings)].compact
+    end
+  end
+
+  # Process a single reading value
+  def process_single_reading(value)
     return nil if value.blank?
 
     float_value = Float(value.to_s)
     return nil if float_value <= 0
 
-    round_to_n_significant_figures(float_value, 3)
+    # Round to 1 decimal place (Elcometer precision)
+    (float_value * 10).round / 10.0
+  rescue ArgumentError, TypeError
+    nil
   end
 
-  # Helper method to round to n significant figures
-  def round_to_n_significant_figures(number, n)
-    return 0.0 if number == 0
-    magnitude = (Math.log10(number.abs)).floor
-    factor = 10.0 ** (n - 1 - magnitude)
-    (number * factor).round / factor
+  # Calculate mean from array of readings
+  def calculate_mean(readings)
+    return nil if readings.empty?
+    sum = readings.sum
+    mean = sum / readings.count.to_f
+    # Round to 1 decimal place
+    (mean * 10).round / 10.0
   end
 
-  # NEW: Counter cache update methods
   def saved_change_to_invoicing_status?
     saved_change_to_quantity_accepted? || saved_change_to_voided? || saved_change_to_no_invoice?
   end
@@ -442,6 +501,6 @@ class ReleaseNote < ApplicationRecord
   end
 
   def customer_order_id_previously_was
-    nil # Release notes don't change customer orders, but method needed for concern
+    nil
   end
 end
