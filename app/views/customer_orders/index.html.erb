@@ -131,13 +131,17 @@
                 <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
                   Ready to Invoice (<%= uninvoiced_count %> parts)
                 </span>
+              <% elsif all_works_orders_fully_released && !has_uninvoiced %>
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                  Fully invoiced
+                </span>
               <% elsif has_uninvoiced %>
                 <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
                   Partial Release (<%= uninvoiced_count %> parts)
                 </span>
               <% elsif customer_order.works_orders.active.sum(:quantity_released) > 0 %>
-                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
-                  Fully invoiced
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                  In Progress
                 </span>
               <% else %>
                 <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
