@@ -8,6 +8,8 @@ export default class extends Controller {
     "readingsList",
     "statistics",
     "manualInput",
+    "manualReadingInput",  // NEW: Single reading input
+    "bulkInput",            // NEW: Bulk paste textarea
     "readingsData"
   ]
 
@@ -30,7 +32,7 @@ export default class extends Controller {
       this.connectButtonTarget.disabled = true
     }
 
-    // Load any existing readings from the manual input field
+    // Load any existing readings from the hidden field
     this.loadExistingReadings()
   }
 
@@ -111,6 +113,72 @@ export default class extends Controller {
       if (!isNaN(reading) && reading > 0) {
         this.addReading(reading)
       }
+    }
+  }
+
+  // NEW: Handle Enter key in manual reading input
+  handleKeypress(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      this.addManualReading()
+    }
+  }
+
+  // NEW: Add a single manual reading
+  addManualReading() {
+    if (!this.hasManualReadingInputTarget) return
+
+    const input = this.manualReadingInputTarget
+    const value = parseFloat(input.value)
+
+    if (isNaN(value) || value <= 0) {
+      this.showError('Please enter a valid positive number')
+      return
+    }
+
+    // Add the reading
+    this.addReading(value)
+
+    // Clear the input and focus
+    input.value = ''
+    input.focus()
+  }
+
+  // UPDATED: Handle bulk paste from textarea
+  addBulkReadings(event) {
+    if (!this.hasBulkInputTarget) return
+
+    const textarea = this.bulkInputTarget
+    const text = textarea.value.trim()
+
+    if (!text) return
+
+    // Split by comma, newline, tab, or space (handles paste from spreadsheet)
+    const values = text.split(/[\n,\t\s]+/).map(v => v.trim()).filter(v => v)
+
+    let addedCount = 0
+    let errors = []
+
+    values.forEach(valueStr => {
+      const value = parseFloat(valueStr)
+      if (!isNaN(value) && value > 0) {
+        this.addReading(value)
+        addedCount++
+      } else if (valueStr) {
+        errors.push(valueStr)
+      }
+    })
+
+    // Clear the textarea
+    textarea.value = ''
+
+    // Show feedback
+    if (addedCount > 0) {
+      this.showSuccess(`Added ${addedCount} reading(s)`)
+    }
+
+    if (errors.length > 0) {
+      this.showError(`Could not parse: ${errors.join(', ')}`)
     }
   }
 
@@ -226,24 +294,6 @@ export default class extends Controller {
       this.updateDisplay()
       this.updateHiddenField()
       this.showSuccess("Readings cleared")
-    }
-  }
-
-  // Manual entry fallback - parse comma or newline separated values
-  addManualReadings(event) {
-    const input = event.target.value.trim()
-    if (!input) return
-
-    // Parse comma or newline separated values
-    const values = input.split(/[,\n]/)
-      .map(v => parseFloat(v.trim()))
-      .filter(v => !isNaN(v) && v > 0)
-
-    if (values.length > 0) {
-      this.readings.push(...values)
-      this.updateDisplay()
-      this.updateHiddenField()
-      event.target.value = "" // Clear input
     }
   }
 
