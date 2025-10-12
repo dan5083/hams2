@@ -432,13 +432,8 @@ class ReleaseNote < ApplicationRecord
   # Generate a display name for a treatment
   def generate_display_name(treatment)
     process_name = treatment["type"].humanize.gsub('_', ' ').titleize
-    target_thickness = treatment["target_thickness"]
-
-    if target_thickness.present? && target_thickness > 0
-      "#{process_name} #{target_thickness}μm"
-    else
-      process_name
-    end
+    # REMOVED: target thickness from display name as it's often inaccurate
+    process_name
   end
 
   # Process thickness value(s) - handles both single values and arrays
