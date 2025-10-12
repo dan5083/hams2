@@ -1,4 +1,4 @@
-<%# app/views/works_orders/_form.html.erb - Enhanced form with auto-pricing %>
+<%# app/views/works_orders/_form.html.erb - Enhanced form with auto-pricing and part browser modal %>
 <%= form_with model: works_order, local: true, class: "space-y-6" do |form| %>
   <% if works_order.errors.any? %>
     <div class="bg-red-50 border border-red-200 rounded-md p-4">
@@ -58,34 +58,58 @@
         </p>
       </div>
 
-      <!-- Part Number Selection -->
+      <!-- Part Number Selection with Modal Browser -->
       <div class="sm:col-span-2">
         <%= form.label :part_id, "Part Number", class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.select :part_id,
-            options_for_select([['Select Part Number', '']] + @parts.map { |p| ["#{p.part_number}", p.id] }, works_order.part_id),
-            {},
-            {
-              class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
-              required: true,
-              onchange: "updatePartDetails(this)"
-            } %>
+
+        <!-- Hidden field to store the actual part_id -->
+        <%= form.hidden_field :part_id, id: "selected_part_id" %>
+
+        <!-- Display field showing selected part (read-only) -->
+        <div class="flex gap-2">
+          <input type="text"
+                 id="selected_part_display"
+                 readonly
+                 placeholder="Click 'Browse Parts' to select..."
+                 value="<%= works_order.part ? "#{works_order.part.part_number} - #{works_order.part.part_issue}" : '' %>"
+                 class="flex-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-gray-50 text-gray-900 sm:text-sm cursor-default">
+
+          <!-- Browse button -->
+          <button type="button"
+                  onclick="openPartBrowserModal()"
+                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+            <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            Browse Parts
+          </button>
+
+          <!-- Clear button (only show if part is selected) -->
+          <button type="button"
+                  id="clear_part_button"
+                  onclick="clearSelectedPart()"
+                  style="<%= works_order.part_id.present? ? '' : 'display: none;' %>"
+                  class="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+            Clear
+          </button>
+        </div>
+
         <p class="mt-1 text-xs text-gray-500">
-          Select the part number to be processed (if you do not see the part
+          Select a part from the browser. You can search/filter and copy-paste part numbers.
           <% if @customer_order.present? %>
-            <%= link_to "create it here", new_part_path(customer_id: @customer_order.customer.id),
+            If you don't see the part <%= link_to "create it here", new_part_path(customer_id: @customer_order.customer.id),
                 target: "_blank",
                 class: "text-blue-600 hover:text-blue-800 underline",
                 rel: "noopener noreferrer" %>
           <% else %>
-            <%= link_to "create it here", new_part_path,
+            If you don't see the part <%= link_to "create it here", new_part_path,
                 target: "_blank",
                 class: "text-blue-600 hover:text-blue-800 underline",
                 rel: "noopener noreferrer" %>
           <% end %>
-          and then
-          <%= link_to "refresh", request.url,
+          and then <%= link_to "refresh", request.url,
               class: "text-blue-600 hover:text-blue-800 underline cursor-pointer",
-              onclick: "location.reload(); return false;" %>)
+              onclick: "location.reload(); return false;" %>
         </p>
       </div>
 
@@ -275,6 +299,65 @@
   </div>
 <% end %>
 
+<!-- Part Browser Modal -->
+<div id="partBrowserModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+  <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+    <!-- Modal Header -->
+    <div class="flex justify-between items-center pb-3 border-b">
+      <h3 class="text-xl font-semibold text-gray-900">Select Part</h3>
+      <button type="button" onclick="closePartBrowserModal()" class="text-gray-400 hover:text-gray-500">
+        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Search Box -->
+    <div class="mt-4">
+      <input type="text"
+             id="partSearchInput"
+             placeholder="Search by part number, issue, or description... (try copy-pasting)"
+             onkeyup="filterPartsList()"
+             class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+      <p class="mt-1 text-xs text-gray-500">
+        💡 Tip: You can paste a part number directly and it will filter instantly
+      </p>
+    </div>
+
+    <!-- Parts List -->
+    <div class="mt-4 border border-gray-300 rounded-md overflow-hidden">
+      <div id="partsListContainer" class="max-h-96 overflow-y-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50 sticky top-0">
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Part Number</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+              <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+            </tr>
+          </thead>
+          <tbody id="partsListBody" class="bg-white divide-y divide-gray-200">
+            <!-- Parts will be populated here by JavaScript -->
+          </tbody>
+        </table>
+      </div>
+      <div id="noPartsMessage" class="hidden p-8 text-center text-gray-500">
+        No parts found matching your search.
+      </div>
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="mt-4 flex justify-end">
+      <button type="button"
+              onclick="closePartBrowserModal()"
+              class="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-md">
+        Close
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- JavaScript -->
 <script>
 // Parts data for JavaScript - ENHANCED with pricing
@@ -282,9 +365,10 @@ window.partsData = {
   <% if defined?(@parts) && @parts %>
     <% @parts.each do |part| %>
       "<%= part.id %>": {
+        "id": "<%= part.id %>",
         "part_number": "<%= j part.part_number %>",
         "part_issue": "<%= j part.part_issue %>",
-        "description": "<%= j (part.description || "#{part.part_number} component") %>",
+        "description": "<%= j (part.description.presence || '') %>",
         "each_price": "<%= part.each_price || 0 %>"
       },
     <% end %>
@@ -305,82 +389,165 @@ window.additionalChargesData = {
   <% end %>
 };
 
-// Currency formatting function
+// Store all parts as an array for filtering
+window.allParts = Object.values(window.partsData);
+
+// ============================================================================
+// PART BROWSER MODAL FUNCTIONS
+// ============================================================================
+
+function openPartBrowserModal() {
+  const modal = document.getElementById('partBrowserModal');
+  modal.classList.remove('hidden');
+
+  // Populate the parts list
+  populatePartsList(window.allParts);
+
+  // Focus on search input
+  setTimeout(() => {
+    document.getElementById('partSearchInput').focus();
+  }, 100);
+}
+
+function closePartBrowserModal() {
+  const modal = document.getElementById('partBrowserModal');
+  modal.classList.add('hidden');
+
+  // Clear search
+  document.getElementById('partSearchInput').value = '';
+}
+
+function populatePartsList(parts) {
+  const tbody = document.getElementById('partsListBody');
+  const noPartsMessage = document.getElementById('noPartsMessage');
+
+  tbody.innerHTML = '';
+
+  if (parts.length === 0) {
+    noPartsMessage.classList.remove('hidden');
+    return;
+  } else {
+    noPartsMessage.classList.add('hidden');
+  }
+
+  parts.forEach(part => {
+    const row = document.createElement('tr');
+    row.className = 'hover:bg-gray-50 cursor-pointer';
+    row.onclick = () => selectPart(part);
+
+    row.innerHTML = `
+      <td class="px-4 py-3 text-sm font-medium text-gray-900">${part.part_number}</td>
+      <td class="px-4 py-3 text-sm text-gray-700">${part.part_issue}</td>
+      <td class="px-4 py-3 text-sm text-gray-600">${part.description || '-'}</td>
+      <td class="px-4 py-3 text-sm text-gray-700">£${parseFloat(part.each_price).toFixed(2)}</td>
+      <td class="px-4 py-3 text-right text-sm">
+        <button type="button"
+                onclick="selectPart(window.partsData['${part.id}']); event.stopPropagation();"
+                class="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+          Select
+        </button>
+      </td>
+    `;
+
+    tbody.appendChild(row);
+  });
+}
+
+function filterPartsList() {
+  const searchTerm = document.getElementById('partSearchInput').value.toUpperCase().trim();
+
+  if (searchTerm === '') {
+    populatePartsList(window.allParts);
+    return;
+  }
+
+  const filteredParts = window.allParts.filter(part => {
+    return part.part_number.toUpperCase().includes(searchTerm) ||
+           part.part_issue.toUpperCase().includes(searchTerm) ||
+           (part.description && part.description.toUpperCase().includes(searchTerm));
+  });
+
+  populatePartsList(filteredParts);
+}
+
+function selectPart(part) {
+  // Update hidden field with part ID
+  document.getElementById('selected_part_id').value = part.id;
+
+  // Update display field
+  document.getElementById('selected_part_display').value = `${part.part_number} - ${part.part_issue}`;
+
+  // Show clear button
+  document.getElementById('clear_part_button').style.display = 'inline-flex';
+
+  // Auto-populate price if available
+  const eachPriceField = document.getElementById('each_price_input');
+  if (part.each_price && parseFloat(part.each_price) > 0) {
+    eachPriceField.value = parseFloat(part.each_price).toFixed(2);
+    recalculateTotalPrice();
+    showPriceAutoPopulatedNotification();
+  }
+
+  // Close modal
+  closePartBrowserModal();
+}
+
+function clearSelectedPart() {
+  // Clear hidden field
+  document.getElementById('selected_part_id').value = '';
+
+  // Clear display field
+  document.getElementById('selected_part_display').value = '';
+
+  // Hide clear button
+  document.getElementById('clear_part_button').style.display = 'none';
+
+  // Clear price
+  document.getElementById('each_price_input').value = '';
+  recalculateTotalPrice();
+}
+
+// ============================================================================
+// PRICING FUNCTIONS
+// ============================================================================
+
 function formatCurrency(input) {
   let value = input.value;
-
-  // Remove any non-numeric characters except decimal point
   value = value.replace(/[^\d.]/g, '');
-
-  // Handle multiple decimal points
   const parts = value.split('.');
   if (parts.length > 2) {
     value = parts[0] + '.' + parts.slice(1).join('');
   }
-
-  // Convert to number and back to ensure proper formatting
   const numValue = parseFloat(value);
-
   if (!isNaN(numValue) && numValue >= 0) {
-    // Format to 2 decimal places
     input.value = numValue.toFixed(2);
   } else if (value === '' || value === '.') {
-    // Allow empty or just decimal point while typing
     input.value = '';
   } else {
-    // Invalid input, reset to 0.00
     input.value = '0.00';
   }
-
-  // Recalculate total if this is the each price field
   if (input.id === 'each_price_input') {
     recalculateTotalPrice();
   }
 }
 
-// Simplified Part selection handler - only handles pricing
-function updatePartDetails(selectElement) {
-  const partId = selectElement.value;
-  const eachPriceField = document.getElementById('each_price_input');
-
-  if (partId && window.partsData) {
-    const part = window.partsData[partId];
-    if (part && part.each_price && parseFloat(part.each_price) > 0) {
-      eachPriceField.value = parseFloat(part.each_price).toFixed(2);
-      recalculateTotalPrice();
-      showPriceAutoPopulatedNotification(part.each_price);
-    }
-  } else {
-    // Clear price if no part selected
-    eachPriceField.value = '';
-    recalculateTotalPrice();
-  }
-}
-
-// Optional: Show notification when price is auto-populated
-function showPriceAutoPopulatedNotification(price) {
+function showPriceAutoPopulatedNotification() {
   const eachPriceField = document.getElementById('each_price_input');
   const originalBorder = eachPriceField.style.borderColor;
-
-  // Briefly highlight the field to show it was auto-populated
-  eachPriceField.style.borderColor = '#10B981'; // Green border
-  eachPriceField.style.backgroundColor = '#F0FDF4'; // Light green background
-
+  eachPriceField.style.borderColor = '#10B981';
+  eachPriceField.style.backgroundColor = '#F0FDF4';
   setTimeout(() => {
     eachPriceField.style.borderColor = originalBorder;
     eachPriceField.style.backgroundColor = '';
   }, 1500);
 }
 
-// Calculate total price for 'each' pricing
 function recalculateTotalPrice() {
   const priceType = document.getElementById('works_order_price_type').value;
-
   if (priceType === 'each') {
     const quantity = parseInt(document.getElementById('works_order_quantity').value) || 0;
     const eachPrice = parseFloat(document.getElementById('each_price_input').value) || 0;
     const totalPrice = quantity * eachPrice;
-
     const totalPriceDisplay = document.getElementById('total_price_readonly');
     if (totalPriceDisplay) {
       totalPriceDisplay.value = totalPrice.toFixed(2);
@@ -388,7 +555,6 @@ function recalculateTotalPrice() {
   }
 }
 
-// Pricing field toggle
 function togglePriceFields(priceType) {
   const eachPriceField = document.getElementById('each_price_field');
   const totalPriceDisplay = document.getElementById('total_price_display');
@@ -397,57 +563,44 @@ function togglePriceFields(priceType) {
   const lotPriceInput = document.getElementById('lot_price_input');
 
   if (priceType === 'each') {
-    // Show each price fields, hide lot price field
     eachPriceField.style.display = 'block';
     totalPriceDisplay.style.display = 'block';
     lotPriceField.style.display = 'none';
-
-    // Make each price required, lot price not required
     eachPriceInput.required = true;
     lotPriceInput.required = false;
-
-    // Calculate total price
     recalculateTotalPrice();
-
   } else {
-    // Show lot price field, hide each price fields
     eachPriceField.style.display = 'none';
     totalPriceDisplay.style.display = 'none';
     lotPriceField.style.display = 'block';
-
-    // Make lot price required, each price not required
     lotPriceInput.required = true;
     eachPriceInput.required = false;
-
-    // Clear each price when switching to lot pricing
     eachPriceInput.value = '';
   }
 }
+
+// ============================================================================
+// ADDITIONAL CHARGES FUNCTIONS
+// ============================================================================
 
 function handleAdditionalChargeSelection() {
   const checkboxes = document.querySelectorAll('input[name="works_order[selected_charge_ids][]"]:checked');
   const variableSection = document.getElementById('variable_charges_section');
   const variableInputs = document.getElementById('variable_charge_inputs');
 
-  // Clear existing variable inputs
   if (variableInputs) {
     variableInputs.innerHTML = '';
   }
 
   let hasVariableCharges = false;
 
-  // Check selected checkboxes for variable charges
   checkboxes.forEach(checkbox => {
-    // Skip the hidden placeholder field
     if (checkbox.value === '') return;
-
     const chargeId = checkbox.value;
     const chargeData = window.additionalChargesData[chargeId];
 
     if (chargeData && chargeData.is_variable) {
       hasVariableCharges = true;
-
-      // Create input for variable charge
       const inputDiv = document.createElement('div');
       inputDiv.className = 'mb-3';
       inputDiv.innerHTML = `
@@ -470,14 +623,12 @@ function handleAdditionalChargeSelection() {
           Default: £${chargeData.amount} (leave blank to use default)
         </p>
       `;
-
       if (variableInputs) {
         variableInputs.appendChild(inputDiv);
       }
     }
   });
 
-  // Show/hide variable charges section
   if (variableSection) {
     if (hasVariableCharges) {
       variableSection.classList.remove('hidden');
@@ -487,14 +638,16 @@ function handleAdditionalChargeSelection() {
   }
 }
 
-// Initialize on page load
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+
 document.addEventListener('DOMContentLoaded', function() {
   const priceTypeSelect = document.querySelector('#works_order_price_type');
   if (priceTypeSelect) {
     togglePriceFields(priceTypeSelect.value);
   }
 
-  // Format existing values on page load
   const eachPriceInput = document.getElementById('each_price_input');
   const lotPriceInput = document.getElementById('lot_price_input');
 
@@ -506,10 +659,28 @@ document.addEventListener('DOMContentLoaded', function() {
     formatCurrency(lotPriceInput);
   }
 
-  // Calculate initial total price if in 'each' mode
   recalculateTotalPrice();
-
-  // Initialize additional charges handling
   handleAdditionalChargeSelection();
 });
 </script>
+
+<style>
+/* Modal styles */
+#partBrowserModal {
+  animation: fadeIn 0.2s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Make table rows feel more clickable */
+#partsListBody tr:hover {
+  background-color: #f9fafb;
+}
+</style>
