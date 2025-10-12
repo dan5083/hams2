@@ -8,8 +8,8 @@ export default class extends Controller {
     "readingsList",
     "statistics",
     "manualInput",
-    "manualReadingInput",  // NEW: Single reading input
-    "bulkInput",            // NEW: Bulk paste textarea
+    "manualReadingInput",
+    "bulkInput",
     "readingsData"
   ]
 
@@ -116,7 +116,7 @@ export default class extends Controller {
     }
   }
 
-  // NEW: Handle Enter key in manual reading input
+  // Handle Enter key in manual reading input
   handleKeypress(event) {
     if (event.key === 'Enter') {
       event.preventDefault()
@@ -124,7 +124,7 @@ export default class extends Controller {
     }
   }
 
-  // NEW: Add a single manual reading
+  // Add a single manual reading
   addManualReading() {
     if (!this.hasManualReadingInputTarget) return
 
@@ -144,12 +144,12 @@ export default class extends Controller {
     input.focus()
   }
 
-  // UPDATED: Handle bulk paste from textarea
+  // Handle bulk paste from textarea
   addBulkReadings(event) {
     if (!this.hasBulkInputTarget) return
 
-    const textarea = this.bulkInputTarget
-    const text = textarea.value.trim()
+    const input = this.bulkInputTarget
+    const text = input.value.trim()
 
     if (!text) return
 
@@ -169,8 +169,8 @@ export default class extends Controller {
       }
     })
 
-    // Clear the textarea
-    textarea.value = ''
+    // Clear the input
+    input.value = ''
 
     // Show feedback
     if (addedCount > 0) {
@@ -228,16 +228,6 @@ export default class extends Controller {
           </div>
         </div>
       `
-
-      // Show warning if mean deviates significantly from target
-      if (this.targetThicknessValue > 0) {
-        const deviation = Math.abs(stats.mean - this.targetThicknessValue)
-        const deviationPercent = (deviation / this.targetThicknessValue) * 100
-
-        if (deviationPercent > 20) {
-          this.showWarning(`Mean thickness (${stats.mean} µm) deviates ${deviationPercent.toFixed(1)}% from target (${this.targetThicknessValue} µm)`)
-        }
-      }
     } else {
       this.statisticsTarget.innerHTML = ''
     }
