@@ -44,7 +44,6 @@ class ReleaseNote < ApplicationRecord
   # Process types that can have thickness measurements
   MEASURABLE_PROCESS_TYPES = %w[
     chromic_anodising
-    electroless_nickel_plating
     hard_anodising
     standard_anodising
   ].freeze
