@@ -1,7 +1,7 @@
 class PartsController < ApplicationController
- before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled,
-                                    :insert_operation, :reorder_operation, :delete_operation,
-                                    :update_locked_operation, :upload_drawing, :delete_drawing]
+ before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled, :toggle_aerospace_defense,
+                                  :insert_operation, :reorder_operation, :delete_operation,
+                                  :update_locked_operation, :upload_drawing, :delete_drawing]
 
   def index
     @parts = Part.includes(:customer, :works_orders)
@@ -647,6 +647,22 @@ end
         success: false,
         error: 'An error occurred while copying operations'
       }, status: :internal_server_error
+    end
+  end
+
+  def toggle_aerospace_defense
+    current_status = @part.aerospace_defense?
+
+    # Update the customisation_data
+    @part.customisation_data = @part.customisation_data.dup || {}
+    @part.customisation_data["operation_selection"] ||= {}
+    @part.customisation_data["operation_selection"]["aerospace_defense"] = !current_status
+
+    if @part.save
+      status = @part.aerospace_defense? ? 'Aerospace/Defense' : 'Standard'
+      redirect_to @part, notice: "Part successfully reclassified as #{status}."
+    else
+      redirect_to @part, alert: 'Failed to update aerospace/defense classification.'
     end
   end
 

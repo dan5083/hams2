@@ -15,6 +15,7 @@ Rails.application.routes.draw do
   resources :parts do
     member do
       patch :toggle_enabled
+      patch :toggle_aerospace_defense
       post :insert_operation
       patch :reorder_operation
       delete :delete_operation

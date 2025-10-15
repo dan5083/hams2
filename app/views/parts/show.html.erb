@@ -89,12 +89,38 @@
                 Disabled
               </span>
             <% end %>
-            <% if @part.aerospace_defense? %>
-              <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 ml-2">
-                Aerospace/Defense
-              </span>
-            <% end %>
           </dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Application Type</dt>
+          <dd class="text-sm">
+            <div class="flex items-center justify-between">
+              <div>
+                <% if @part.aerospace_defense? %>
+                  <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                    Aerospace/Defense
+                  </span>
+                <% else %>
+                  <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                    Standard
+                  </span>
+                <% end %>
+              </div>
+              <%= button_to(@part.aerospace_defense? ? "Change to Standard" : "Change to Aerospace/Defense",
+                  toggle_aerospace_defense_part_path(@part),
+                  method: :patch,
+                  form: {
+                    data: {
+                      confirm: "Are you sure you want to reclassify this part as #{@part.aerospace_defense? ? 'Standard' : 'Aerospace/Defense'}? #{@part.locked_for_editing? ? 'Note: This part is in manual mode, so you may need to manually add/remove aerospace-specific operations (foil verification, water break tests, OCV checks).' : 'This will regenerate operations with the new classification.'}"
+                    }
+                  },
+                  class: "text-xs px-2 py-1 #{@part.aerospace_defense? ? 'bg-gray-100 hover:bg-gray-200 text-gray-800' : 'bg-red-100 hover:bg-red-200 text-red-800'} rounded border #{@part.aerospace_defense? ? 'border-gray-300' : 'border-red-300'} transition-colors") %>
+            </div>
+          </dd>
+          <% if @part.aerospace_defense? %>
+            <p class="mt-1 text-xs text-gray-500">Auto-includes foil verification, water break tests, and OCV operations</p>
+          <% end %>
         </div>
 
         <div>
