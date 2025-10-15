@@ -69,6 +69,7 @@ Rails.application.routes.draw do
       patch :save_operation_input
       patch :save_batches
       patch :void
+      patch :unvoid
       patch :create_invoice
       patch :create_invoice_with_charges
     end

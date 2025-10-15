@@ -84,6 +84,11 @@ class WorksOrder < ApplicationRecord
     update!(voided: true, is_open: false)
   end
 
+  def unvoid!
+    return false unless voided
+    update!(voided: false, is_open: true)
+  end
+
   def total_lot_price
     lot_price
   end

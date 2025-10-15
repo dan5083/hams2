@@ -1,6 +1,6 @@
 # app/controllers/works_orders_controller.rb - Fixed pricing parameter handling and route card operations with RBAC
 class WorksOrdersController < ApplicationController
-  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :ecard, :sign_off_operation, :save_batches, :create_invoice, :void]
+  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :ecard, :sign_off_operation, :save_batches, :create_invoice, :void, :unvoid]
   before_action :require_ecard_access, only: [:ecard, :sign_off_operation, :save_batches, :save_operation_input]
 
  def index
@@ -134,6 +134,15 @@ class WorksOrdersController < ApplicationController
       redirect_to @works_order, notice: 'Works order was successfully voided.'
     else
       redirect_to @works_order, alert: 'Cannot void works order - it has associated release notes.'
+    end
+  end
+
+  def unvoid
+    if @works_order.voided?
+      @works_order.unvoid!
+      redirect_to @works_order, notice: 'Works order was successfully unvoided and reopened.'
+    else
+      redirect_to @works_order, alert: 'Works order is not voided.'
     end
   end
 
