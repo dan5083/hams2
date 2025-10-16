@@ -253,10 +253,22 @@
       # Determine if customer is Lufthansa
       is_lufthansa = @release_note.works_order.customer_order.customer.name == 'Lufthansa Technik Landing Gear Services UK'
 
-      # Build specification text with customer reference appended if Lufthansa
-      specification_text = @release_note.specification
+      # Parse customer reference for Lufthansa orders
+      cs_order = nil
+      serial_no = nil
+
       if is_lufthansa && @release_note.works_order.customer_reference.present?
-        specification_text = "#{specification_text} #{@release_note.works_order.customer_reference}".strip
+        ref = @release_note.works_order.customer_reference
+
+        # Extract CS-Order number (format: "CS-Order: 52186350")
+        if match = ref.match(/CS-Order:\s*(\S+)/)
+          cs_order = match[1]
+        end
+
+        # Extract SerialNo if present (format: "SerialNo.: MK2501" or "SerialNo: MK2501")
+        if match = ref.match(/SerialNo\.?:\s*(.+)/)
+          serial_no = match[1].strip
+        end
       end
     %>
 
@@ -323,11 +335,19 @@
               <% if @release_note.works_order.respond_to?(:customer_order_line) && @release_note.works_order.customer_order_line.present? %>
                 (line <%= @release_note.works_order.customer_order_line %>)
               <% end %>
+              <% if cs_order.present? %>
+                / CS-Order: <%= cs_order %>
+              <% end %>
             </td>
           </tr>
           <tr>
             <th>Part Number</th>
-            <td><%= @release_note.works_order.part_number %></td>
+            <td>
+              <%= @release_note.works_order.part_number %>
+              <% if serial_no.present? %>
+                / S/N: <%= serial_no %>
+              <% end %>
+            </td>
           </tr>
           <tr>
             <th>Issue</th>
@@ -436,11 +456,19 @@
                 <% if @release_note.works_order.respond_to?(:customer_order_line) && @release_note.works_order.customer_order_line.present? %>
                   (line <%= @release_note.works_order.customer_order_line %>)
                 <% end %>
+                <% if cs_order.present? %>
+                  / CS-Order: <%= cs_order %>
+                <% end %>
               </td>
             </tr>
             <tr>
               <th>Part Number</th>
-              <td><%= @release_note.works_order.part_number %></td>
+              <td>
+                <%= @release_note.works_order.part_number %>
+                <% if serial_no.present? %>
+                  / S/N: <%= serial_no %>
+                <% end %>
+              </td>
             </tr>
             <tr>
               <th>Issue</th>
@@ -452,7 +480,7 @@
             </tr>
             <tr>
               <th>Specification</th>
-              <td><%= specification_text %></td>
+              <td><%= @release_note.specification %></td>
             </tr>
             <tr>
               <th>Quantity Accepted</th>
@@ -469,7 +497,7 @@
           </tbody>
         </table>
 
-        <!-- Certified Thickness Measurements - UPDATED WITH ALL READINGS -->
+        <!-- Calibrated Thickness Measurements - UPDATED WITH ALL READINGS -->
         <% if @release_note.has_thickness_measurements? %>
           <h2>Calibrated Thickness Measurements</h2>
           <% measurements_by_type = @release_note.thickness_measurements_by_type %>
