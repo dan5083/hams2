@@ -193,6 +193,19 @@
         color: #2563eb;
       }
 
+      .gauge-info {
+        background-color: #fffbeb;
+        border: 1pt solid #fbbf24;
+        padding: 0.4rem;
+        margin-bottom: 0.5rem;
+        font-size: 8.5pt;
+        line-height: 1.4;
+      }
+
+      .gauge-info strong {
+        color: #92400e;
+      }
+
       .readings-grid {
         display: grid;
         grid-template-columns: repeat(8, 1fr);
@@ -250,14 +263,15 @@
   </head>
   <body>
     <%
-      # Determine if customer is Lufthansa
-      is_lufthansa = @release_note.works_order.customer_order.customer.name == 'Lufthansa Technik Landing Gear Services UK'
+      # Determine if customer requires special handling (Lufthansa and 24 Locks demo)
+      customer_name = @release_note.works_order.customer_order.customer.name
+      is_special_customer = ['Lufthansa Technik Landing Gear Services UK', '24 Locks'].include?(customer_name)
 
-      # Parse customer reference for Lufthansa orders
+      # Parse customer reference for special customers (CS-Order and SerialNo)
       cs_order = nil
       serial_no = nil
 
-      if is_lufthansa && @release_note.works_order.customer_reference.present?
+      if is_special_customer && @release_note.works_order.customer_reference.present?
         ref = @release_note.works_order.customer_reference
 
         # Extract CS-Order number (format: "CS-Order: 52186350")
@@ -318,8 +332,8 @@
         </tbody>
       </table>
 
-      <!-- Customer Reference (if present AND not Lufthansa) - Full width row, no label -->
-      <% if @release_note.works_order.customer_reference.present? && !is_lufthansa %>
+      <!-- Customer Reference (if present AND not special customer) - Full width row, no label -->
+      <% if @release_note.works_order.customer_reference.present? && !is_special_customer %>
         <div class="customer-reference-row">
           <%= @release_note.works_order.customer_reference %>
         </div>
@@ -349,10 +363,12 @@
               <% end %>
             </td>
           </tr>
-          <tr>
-            <th>Issue</th>
-            <td><%= @release_note.works_order.part_issue %></td>
-          </tr>
+          <% unless is_special_customer %>
+            <tr>
+              <th>Issue</th>
+              <td><%= @release_note.works_order.part_issue %></td>
+            </tr>
+          <% end %>
           <tr>
             <th>Description</th>
             <td><%= @release_note.works_order.part_description %></td>
@@ -439,8 +455,8 @@
           </tbody>
         </table>
 
-        <!-- Customer Reference (if present AND not Lufthansa) - Full width row, no label -->
-        <% if @release_note.works_order.customer_reference.present? && !is_lufthansa %>
+        <!-- Customer Reference (if present AND not special customer) - Full width row, no label -->
+        <% if @release_note.works_order.customer_reference.present? && !is_special_customer %>
           <div class="customer-reference-row">
             <%= @release_note.works_order.customer_reference %>
           </div>
@@ -470,10 +486,12 @@
                 <% end %>
               </td>
             </tr>
-            <tr>
-              <th>Issue</th>
-              <td><%= @release_note.works_order.part_issue %></td>
-            </tr>
+            <% unless is_special_customer %>
+              <tr>
+                <th>Issue</th>
+                <td><%= @release_note.works_order.part_issue %></td>
+              </tr>
+            <% end %>
             <tr>
               <th>Description</th>
               <td><%= @release_note.works_order.part_description %></td>
@@ -497,9 +515,18 @@
           </tbody>
         </table>
 
-        <!-- Calibrated Thickness Measurements - UPDATED WITH ALL READINGS -->
+        <!-- Calibrated Thickness Measurements - WITH GAUGE INFO FOR SPECIAL CUSTOMERS -->
         <% if @release_note.has_thickness_measurements? %>
           <h2>Calibrated Thickness Measurements</h2>
+
+          <!-- Elcometer Gauge Information for Special Customers -->
+          <% if is_special_customer %>
+            <div class="gauge-info">
+              <strong>Gauge Type:</strong> Elcometer 456/4, Serial # BD10146<br/>
+              <strong>Probe Type:</strong> N1, Serial # BE23306
+            </div>
+          <% end %>
+
           <% measurements_by_type = @release_note.thickness_measurements_by_type %>
           <% measurements_by_type.each do |process_type, measurements| %>
             <div class="thickness-group">
