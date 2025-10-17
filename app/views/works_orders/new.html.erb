@@ -1,10 +1,997 @@
-<%# app/views/works_orders/new.html.erb %>
+<%# app/views/works_orders/new.html.erb - Bulk Works Order Creation %>
 <div class="container mx-auto px-4 py-6">
   <div class="flex justify-between items-center mb-6">
-    <h1 class="text-3xl font-bold text-gray-900">New Works Order</h1>
-    <%= link_to "Back to Works Orders", works_orders_path,
+    <div>
+      <h1 class="text-3xl font-bold text-gray-900">New Works Order(s)</h1>
+      <% if @customer_order.present? %>
+        <p class="mt-1 text-sm text-gray-600">
+          For: <span class="font-semibold"><%= @customer_order.customer.name %> - <%= @customer_order.number %></span>
+        </p>
+      <% end %>
+    </div>
+    <%= link_to "Back", @customer_order ? customer_order_path(@customer_order) : works_orders_path,
         class: "bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" %>
   </div>
 
-  <%= render 'form', works_order: @works_order %>
+  <!-- Pending Works Orders Summary Table -->
+  <div class="bg-white shadow rounded-lg mb-6">
+    <div class="px-6 py-4 border-b border-gray-200">
+      <h2 class="text-lg font-semibold text-gray-900">Order Lines</h2>
+      <p class="mt-1 text-sm text-gray-600">Add one or more works orders below. Click "Add Order Line" to get started.</p>
+    </div>
+
+    <div id="pendingWorksOrdersContainer" class="p-6">
+      <!-- Empty State -->
+      <div id="emptyState" class="text-center py-8">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">No order lines yet</h3>
+        <p class="mt-1 text-sm text-gray-500">Get started by adding your first order line.</p>
+      </div>
+
+      <!-- Summary Table (hidden until lines added) -->
+      <div id="summaryTableContainer" class="hidden">
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Line</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Part Number</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price Type</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Release Level</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transport</th>
+                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="summaryTableBody" class="bg-white divide-y divide-gray-200">
+              <!-- Rows will be added by JavaScript -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Total Summary -->
+        <div class="mt-4 flex justify-end">
+          <div class="bg-gray-50 rounded-lg px-4 py-3 min-w-64">
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-600">Total Lines:</span>
+              <span id="totalLines" class="font-semibold text-gray-900">0</span>
+            </div>
+            <div class="flex justify-between text-sm mt-1">
+              <span class="text-gray-600">Total Quantity:</span>
+              <span id="totalQuantity" class="font-semibold text-gray-900">0</span>
+            </div>
+            <div class="flex justify-between text-base font-semibold mt-2 pt-2 border-t border-gray-300">
+              <span class="text-gray-900">Total Value:</span>
+              <span id="totalValue" class="text-gray-900">£0.00</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Order Line Button -->
+  <div class="flex justify-center mb-6">
+    <button type="button"
+            onclick="openWorksOrderModal()"
+            class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+      <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+      </svg>
+      Add Order Line
+    </button>
+  </div>
+
+  <!-- Create Button (only shows when lines exist) -->
+  <div id="createButtonContainer" class="hidden flex justify-end space-x-3">
+    <%= link_to "Cancel", @customer_order ? customer_order_path(@customer_order) : works_orders_path,
+        class: "bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded" %>
+    <button type="button"
+            onclick="submitAllWorksOrders()"
+            class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded inline-flex items-center">
+      <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+      </svg>
+      <span id="createButtonText">Create Works Orders</span>
+    </button>
+  </div>
 </div>
+
+<!-- Works Order Modal -->
+<div id="worksOrderModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+  <div class="relative top-10 mx-auto p-5 border w-11/12 max-w-5xl shadow-lg rounded-md bg-white mb-10">
+    <!-- Modal Header -->
+    <div class="flex justify-between items-center pb-3 border-b">
+      <h3 class="text-xl font-semibold text-gray-900" id="modalTitle">Add Order Line</h3>
+      <button type="button" onclick="closeWorksOrderModal()" class="text-gray-400 hover:text-gray-500">
+        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Modal Body - Works Order Form -->
+    <div class="mt-4">
+      <form id="worksOrderForm" class="space-y-6">
+        <!-- Hidden field for edit mode -->
+        <input type="hidden" id="editingIndex" value="">
+
+        <!-- Customer Order Selection (if not pre-selected) -->
+        <% unless @customer_order.present? %>
+          <div class="bg-white border border-gray-200 rounded-lg p-4">
+            <label for="modal_customer_order_id" class="block text-sm font-medium text-gray-700 mb-1">
+              Customer Order *
+            </label>
+            <select id="modal_customer_order_id"
+                    required
+                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+              <option value="">Select Customer Order</option>
+              <% @customer_orders.each do |co| %>
+                <option value="<%= co.id %>"><%= co.customer.name %> - <%= co.number %></option>
+              <% end %>
+            </select>
+          </div>
+        <% else %>
+          <input type="hidden" id="modal_customer_order_id" value="<%= @customer_order.id %>">
+        <% end %>
+
+        <!-- Order Line Details -->
+        <div class="bg-white border border-gray-200 rounded-lg p-4">
+          <h4 class="text-md font-medium text-gray-900 mb-4">Order Line Details</h4>
+
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <!-- Part Selection -->
+            <div class="sm:col-span-2">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Part Number *</label>
+              <input type="hidden" id="modal_part_id">
+              <div class="flex gap-2">
+                <input type="text"
+                       id="modal_part_display"
+                       readonly
+                       placeholder="Click 'Browse Parts' to select..."
+                       class="flex-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-gray-50 text-gray-900 sm:text-sm cursor-default">
+                <button type="button"
+                        onclick="openPartBrowserModal()"
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                  <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  Browse Parts
+                </button>
+                <button type="button"
+                        id="modal_clear_part_button"
+                        onclick="clearModalSelectedPart()"
+                        style="display: none;"
+                        class="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            <!-- Customer Reference -->
+            <div class="sm:col-span-2">
+              <label for="modal_customer_reference" class="block text-sm font-medium text-gray-700 mb-1">
+                Customer Reference (optional)
+              </label>
+              <input type="text"
+                     id="modal_customer_reference"
+                     placeholder="e.g., PO number, line item, serial number"
+                     class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+            </div>
+
+            <!-- Quantity -->
+            <div>
+              <label for="modal_quantity" class="block text-sm font-medium text-gray-700 mb-1">Quantity *</label>
+              <input type="number"
+                     id="modal_quantity"
+                     min="1"
+                     required
+                     placeholder="Enter quantity"
+                     onchange="recalculateModalTotalPrice()"
+                     class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+            </div>
+
+            <!-- Release Level -->
+            <div>
+              <label for="modal_release_level_id" class="block text-sm font-medium text-gray-700 mb-1">Release Level *</label>
+              <select id="modal_release_level_id"
+                      required
+                      class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                <option value="">Select Release Level</option>
+                <% @release_levels.each do |rl| %>
+                  <option value="<%= rl.id %>"><%= rl.name %></option>
+                <% end %>
+              </select>
+            </div>
+
+            <!-- Transport Method -->
+            <div class="sm:col-span-2">
+              <label for="modal_transport_method_id" class="block text-sm font-medium text-gray-700 mb-1">Transport Method *</label>
+              <select id="modal_transport_method_id"
+                      required
+                      class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                <option value="">Select Transport Method</option>
+                <% @transport_methods.each do |tm| %>
+                  <option value="<%= tm.id %>"><%= tm.name %></option>
+                <% end %>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pricing -->
+        <div class="bg-white border border-gray-200 rounded-lg p-4">
+          <h4 class="text-md font-medium text-gray-900 mb-4">Pricing</h4>
+
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <!-- Price Type -->
+            <div class="sm:col-span-2">
+              <label for="modal_price_type" class="block text-sm font-medium text-gray-700 mb-1">Price Type *</label>
+              <select id="modal_price_type"
+                      required
+                      onchange="toggleModalPriceFields(this.value)"
+                      class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                <option value="each">Each (price per part)</option>
+                <option value="lot">Lot (total job price)</option>
+              </select>
+            </div>
+
+            <!-- Each Price -->
+            <div id="modal_each_price_field" class="sm:col-span-1">
+              <label for="modal_each_price" class="block text-sm font-medium text-gray-700 mb-1">Price per part (£) *</label>
+              <div class="mt-1 relative rounded-md shadow-sm">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span class="text-gray-500 sm:text-sm">£</span>
+                </div>
+                <input type="number"
+                       id="modal_each_price"
+                       step="0.01"
+                       min="0"
+                       placeholder="0.00"
+                       onchange="recalculateModalTotalPrice()"
+                       class="block w-full pl-7 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+              </div>
+            </div>
+
+            <!-- Total Price Display -->
+            <div id="modal_total_price_display" class="sm:col-span-1">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Total Job Price (calculated)</label>
+              <div class="mt-1 relative rounded-md shadow-sm">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span class="text-gray-500 sm:text-sm">£</span>
+                </div>
+                <input type="text"
+                       id="modal_total_price_readonly"
+                       readonly
+                       placeholder="0.00"
+                       class="block w-full pl-7 border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-gray-50 text-gray-900 sm:text-sm cursor-not-allowed">
+              </div>
+            </div>
+
+            <!-- Lot Price -->
+            <div id="modal_lot_price_field" class="sm:col-span-2" style="display: none;">
+              <label for="modal_lot_price" class="block text-sm font-medium text-gray-700 mb-1">Total job price (£) *</label>
+              <div class="mt-1 relative rounded-md shadow-sm">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <span class="text-gray-500 sm:text-sm">£</span>
+                </div>
+                <input type="number"
+                       id="modal_lot_price"
+                       step="0.01"
+                       min="0"
+                       placeholder="0.00"
+                       class="block w-full pl-7 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Additional Charges -->
+        <div class="bg-white border border-gray-200 rounded-lg p-4">
+          <h4 class="text-md font-medium text-gray-900 mb-4">Additional Charges (for invoicing)</h4>
+
+          <% if @additional_charge_presets.any? %>
+            <div class="space-y-2 max-h-48 overflow-y-auto border border-gray-300 rounded-md p-3 bg-white">
+              <% @additional_charge_presets.each do |preset| %>
+                <label class="flex items-start">
+                  <input type="checkbox"
+                         name="modal_selected_charge_ids"
+                         value="<%= preset.id %>"
+                         onchange="handleModalAdditionalChargeSelection()"
+                         class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-offset-0 focus:ring-blue-200 focus:ring-opacity-50 mt-0.5 flex-shrink-0">
+                  <span class="ml-2 text-sm text-gray-900 leading-tight">
+                    <strong><%= preset.name %></strong>
+                    <% if preset.is_variable? %>
+                      <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800 ml-2">Variable</span>
+                    <% else %>
+                      <span class="text-green-600 font-semibold ml-2">£<%= sprintf("%.2f", preset.amount) %></span>
+                    <% end %>
+                    <% if preset.description.present? %>
+                      <br><span class="text-gray-600 text-xs"><%= preset.description %></span>
+                    <% end %>
+                  </span>
+                </label>
+              <% end %>
+            </div>
+
+            <!-- Variable Charge Inputs -->
+            <div id="modal_variable_charges_section" class="hidden mt-4">
+              <h5 class="text-sm font-medium text-gray-700 mb-2">Variable Charge Amounts</h5>
+              <div id="modal_variable_charge_inputs" class="space-y-3">
+                <!-- Dynamic inputs added by JavaScript -->
+              </div>
+            </div>
+          <% else %>
+            <div class="border border-gray-300 rounded-md p-3 bg-gray-50 text-gray-500 text-sm">
+              No additional charges available.
+            </div>
+          <% end %>
+        </div>
+
+        <!-- Modal Actions -->
+        <div class="flex justify-end space-x-3 pt-4 border-t">
+          <button type="button"
+                  onclick="closeWorksOrderModal()"
+                  class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">
+            Cancel
+          </button>
+          <button type="submit"
+                  class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+            <span id="modal_submit_text">Add to Order</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Part Browser Modal (nested within works order modal context) -->
+<div id="partBrowserModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[60]">
+  <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+    <div class="flex justify-between items-center pb-3 border-b">
+      <h3 class="text-xl font-semibold text-gray-900">Select Part</h3>
+      <button type="button" onclick="closePartBrowserModal()" class="text-gray-400 hover:text-gray-500">
+        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+
+    <div class="mt-4">
+      <input type="text"
+             id="partSearchInput"
+             placeholder="Search by part number, issue, or description..."
+             onkeyup="filterPartsList()"
+             class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+    </div>
+
+    <div class="mt-4 border border-gray-300 rounded-md overflow-hidden">
+      <div id="partsListContainer" class="max-h-96 overflow-y-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50 sticky top-0">
+            <tr>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Part Number</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+              <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+            </tr>
+          </thead>
+          <tbody id="partsListBody" class="bg-white divide-y divide-gray-200">
+            <!-- Populated by JavaScript -->
+          </tbody>
+        </table>
+      </div>
+      <div id="noPartsMessage" class="hidden p-8 text-center text-gray-500">
+        No parts found matching your search.
+      </div>
+    </div>
+
+    <div class="mt-4 flex justify-end">
+      <button type="button"
+              onclick="closePartBrowserModal()"
+              class="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-md">
+        Close
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- JavaScript -->
+<script>
+// ============================================================================
+// DATA SETUP
+// ============================================================================
+
+// Parts data
+window.partsData = {
+  <% if defined?(@parts) && @parts %>
+    <% @parts.each do |part| %>
+      "<%= part.id %>": {
+        "id": "<%= part.id %>",
+        "part_number": "<%= j part.part_number %>",
+        "part_issue": "<%= j part.part_issue %>",
+        "description": "<%= j (part.description.presence || '') %>",
+        "each_price": "<%= part.each_price || 0 %>"
+      },
+    <% end %>
+  <% end %>
+};
+
+// Additional charges data
+window.additionalChargesData = {
+  <% if defined?(@additional_charge_presets) && @additional_charge_presets %>
+    <% @additional_charge_presets.each do |preset| %>
+      "<%= preset.id %>": {
+        "name": "<%= j preset.name %>",
+        "is_variable": <%= preset.is_variable? %>,
+        "amount": <%= preset.amount || 0 %>
+      },
+    <% end %>
+  <% end %>
+};
+
+// Release levels lookup
+window.releaseLevelsData = {
+  <% @release_levels.each do |rl| %>
+    "<%= rl.id %>": "<%= j rl.name %>",
+  <% end %>
+};
+
+// Transport methods lookup
+window.transportMethodsData = {
+  <% @transport_methods.each do |tm| %>
+    "<%= tm.id %>": "<%= j tm.name %>",
+  <% end %>
+};
+
+// Store all parts as array
+window.allParts = Object.values(window.partsData);
+
+// Pending works orders array (our state)
+window.pendingWorksOrders = [];
+
+// ============================================================================
+// WORKS ORDER MODAL FUNCTIONS
+// ============================================================================
+
+function openWorksOrderModal(editIndex = null) {
+  const modal = document.getElementById('worksOrderModal');
+  const form = document.getElementById('worksOrderForm');
+
+  // Reset form
+  form.reset();
+  clearModalSelectedPart();
+
+  if (editIndex !== null) {
+    // Editing existing line
+    document.getElementById('modalTitle').textContent = `Edit Order Line ${editIndex + 1}`;
+    document.getElementById('modal_submit_text').textContent = 'Update Order Line';
+    document.getElementById('editingIndex').value = editIndex;
+
+    // Populate form with existing data
+    const wo = window.pendingWorksOrders[editIndex];
+    populateModalForm(wo);
+  } else {
+    // Adding new line
+    document.getElementById('modalTitle').textContent = 'Add Order Line';
+    document.getElementById('modal_submit_text').textContent = 'Add to Order';
+    document.getElementById('editingIndex').value = '';
+  }
+
+  toggleModalPriceFields('each'); // Default to 'each'
+  modal.classList.remove('hidden');
+}
+
+function closeWorksOrderModal() {
+  const modal = document.getElementById('worksOrderModal');
+  modal.classList.add('hidden');
+  document.getElementById('worksOrderForm').reset();
+  document.getElementById('editingIndex').value = '';
+}
+
+function populateModalForm(wo) {
+  // Customer order
+  const customerOrderField = document.getElementById('modal_customer_order_id');
+  if (customerOrderField) {
+    customerOrderField.value = wo.customer_order_id;
+  }
+
+  // Part
+  document.getElementById('modal_part_id').value = wo.part_id;
+  document.getElementById('modal_part_display').value = wo.part_display;
+  document.getElementById('modal_clear_part_button').style.display = 'inline-flex';
+
+  // Basic fields
+  document.getElementById('modal_customer_reference').value = wo.customer_reference || '';
+  document.getElementById('modal_quantity').value = wo.quantity;
+  document.getElementById('modal_release_level_id').value = wo.release_level_id;
+  document.getElementById('modal_transport_method_id').value = wo.transport_method_id;
+
+  // Pricing
+  document.getElementById('modal_price_type').value = wo.price_type;
+  toggleModalPriceFields(wo.price_type);
+
+  if (wo.price_type === 'each') {
+    document.getElementById('modal_each_price').value = wo.each_price;
+    recalculateModalTotalPrice();
+  } else {
+    document.getElementById('modal_lot_price').value = wo.lot_price;
+  }
+
+  // Additional charges
+  if (wo.selected_charge_ids && wo.selected_charge_ids.length > 0) {
+    const checkboxes = document.querySelectorAll('input[name="modal_selected_charge_ids"]');
+    checkboxes.forEach(cb => {
+      cb.checked = wo.selected_charge_ids.includes(cb.value);
+    });
+    handleModalAdditionalChargeSelection();
+
+    // Populate custom amounts
+    if (wo.custom_amounts) {
+      Object.keys(wo.custom_amounts).forEach(chargeId => {
+        const input = document.getElementById(`modal_custom_amount_${chargeId}`);
+        if (input) {
+          input.value = wo.custom_amounts[chargeId];
+        }
+      });
+    }
+  }
+}
+
+// Handle form submission
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.getElementById('worksOrderForm');
+  if (form) {
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      // Validate form
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+
+      // Collect form data
+      const worksOrderData = collectModalFormData();
+
+      // Check if editing or adding
+      const editingIndex = document.getElementById('editingIndex').value;
+
+      if (editingIndex !== '') {
+        // Update existing
+        window.pendingWorksOrders[parseInt(editingIndex)] = worksOrderData;
+      } else {
+        // Add new
+        window.pendingWorksOrders.push(worksOrderData);
+      }
+
+      // Update display
+      updateSummaryTable();
+
+      // Close modal
+      closeWorksOrderModal();
+    });
+  }
+});
+
+function collectModalFormData() {
+  const partId = document.getElementById('modal_part_id').value;
+  const part = window.partsData[partId];
+
+  const priceType = document.getElementById('modal_price_type').value;
+  const quantity = parseInt(document.getElementById('modal_quantity').value);
+
+  let eachPrice = 0;
+  let lotPrice = 0;
+
+  if (priceType === 'each') {
+    eachPrice = parseFloat(document.getElementById('modal_each_price').value) || 0;
+    lotPrice = eachPrice * quantity;
+  } else {
+    lotPrice = parseFloat(document.getElementById('modal_lot_price').value) || 0;
+    eachPrice = quantity > 0 ? lotPrice / quantity : 0;
+  }
+
+  // Collect selected charges
+  const selectedChargeIds = [];
+  const customAmounts = {};
+
+  const chargeCheckboxes = document.querySelectorAll('input[name="modal_selected_charge_ids"]:checked');
+  chargeCheckboxes.forEach(cb => {
+    if (cb.value) {
+      selectedChargeIds.push(cb.value);
+
+      // Check for custom amount
+      const customInput = document.getElementById(`modal_custom_amount_${cb.value}`);
+      if (customInput && customInput.value) {
+        customAmounts[cb.value] = parseFloat(customInput.value);
+      }
+    }
+  });
+
+  const customerOrderField = document.getElementById('modal_customer_order_id');
+
+  return {
+    customer_order_id: customerOrderField ? customerOrderField.value : '',
+    part_id: partId,
+    part_display: `${part.part_number} - ${part.part_issue}`,
+    part_number: part.part_number,
+    part_issue: part.part_issue,
+    customer_reference: document.getElementById('modal_customer_reference').value || '',
+    quantity: quantity,
+    release_level_id: document.getElementById('modal_release_level_id').value,
+    transport_method_id: document.getElementById('modal_transport_method_id').value,
+    price_type: priceType,
+    each_price: eachPrice,
+    lot_price: lotPrice,
+    selected_charge_ids: selectedChargeIds,
+    custom_amounts: customAmounts
+  };
+}
+
+// ============================================================================
+// SUMMARY TABLE FUNCTIONS
+// ============================================================================
+
+function updateSummaryTable() {
+  const emptyState = document.getElementById('emptyState');
+  const summaryContainer = document.getElementById('summaryTableContainer');
+  const createButton = document.getElementById('createButtonContainer');
+  const tbody = document.getElementById('summaryTableBody');
+
+  if (window.pendingWorksOrders.length === 0) {
+    emptyState.classList.remove('hidden');
+    summaryContainer.classList.add('hidden');
+    createButton.classList.add('hidden');
+    return;
+  }
+
+  emptyState.classList.add('hidden');
+  summaryContainer.classList.remove('hidden');
+  createButton.classList.remove('hidden');
+
+  // Update button text
+  const buttonText = document.getElementById('createButtonText');
+  const count = window.pendingWorksOrders.length;
+  buttonText.textContent = count === 1 ? 'Create Works Order' : `Create ${count} Works Orders`;
+
+  // Build table rows
+  tbody.innerHTML = '';
+  let totalQuantity = 0;
+  let totalValue = 0;
+
+  window.pendingWorksOrders.forEach((wo, index) => {
+    totalQuantity += wo.quantity;
+    totalValue += wo.lot_price;
+
+    const row = document.createElement('tr');
+    row.className = 'hover:bg-gray-50';
+
+    const priceDisplay = wo.price_type === 'each'
+      ? `£${wo.each_price.toFixed(2)} ea`
+      : `£${wo.lot_price.toFixed(2)} lot`;
+
+    row.innerHTML = `
+      <td class="px-4 py-3 text-sm font-medium text-gray-900">${index + 1}</td>
+      <td class="px-4 py-3 text-sm text-gray-900">
+        ${wo.part_number} - ${wo.part_issue}
+        ${wo.customer_reference ? `<br><span class="text-xs text-gray-500">Ref: ${wo.customer_reference}</span>` : ''}
+      </td>
+      <td class="px-4 py-3 text-sm text-gray-700">${wo.quantity}</td>
+      <td class="px-4 py-3 text-sm text-gray-700">
+        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${wo.price_type === 'each' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}">
+          ${wo.price_type}
+        </span>
+      </td>
+      <td class="px-4 py-3 text-sm text-gray-900">
+        ${priceDisplay}
+        <br><span class="text-xs text-gray-600">Total: £${wo.lot_price.toFixed(2)}</span>
+      </td>
+      <td class="px-4 py-3 text-sm text-gray-700">${window.releaseLevelsData[wo.release_level_id] || '-'}</td>
+      <td class="px-4 py-3 text-sm text-gray-700">${window.transportMethodsData[wo.transport_method_id] || '-'}</td>
+      <td class="px-4 py-3 text-right text-sm">
+        <button type="button"
+                onclick="openWorksOrderModal(${index})"
+                class="text-blue-600 hover:text-blue-900 mr-3">
+          Edit
+        </button>
+        <button type="button"
+                onclick="deleteWorksOrder(${index})"
+                class="text-red-600 hover:text-red-900">
+          Delete
+        </button>
+      </td>
+    `;
+
+    tbody.appendChild(row);
+  });
+
+  // Update totals
+  document.getElementById('totalLines').textContent = window.pendingWorksOrders.length;
+  document.getElementById('totalQuantity').textContent = totalQuantity;
+  document.getElementById('totalValue').textContent = `£${totalValue.toFixed(2)}`;
+}
+
+function deleteWorksOrder(index) {
+  if (confirm(`Are you sure you want to remove order line ${index + 1}?`)) {
+    window.pendingWorksOrders.splice(index, 1);
+    updateSummaryTable();
+  }
+}
+
+// ============================================================================
+// SUBMIT ALL WORKS ORDERS
+// ============================================================================
+
+function submitAllWorksOrders() {
+  if (window.pendingWorksOrders.length === 0) {
+    alert('Please add at least one order line.');
+    return;
+  }
+
+  // Disable button to prevent double submission
+  const button = event.target;
+  button.disabled = true;
+  button.textContent = 'Creating...';
+
+  // Prepare data for submission
+  const formData = {
+    works_orders: window.pendingWorksOrders.map(wo => ({
+      customer_order_id: wo.customer_order_id,
+      part_id: wo.part_id,
+      customer_reference: wo.customer_reference,
+      quantity: wo.quantity,
+      release_level_id: wo.release_level_id,
+      transport_method_id: wo.transport_method_id,
+      price_type: wo.price_type,
+      each_price: wo.price_type === 'each' ? wo.each_price : null,
+      lot_price: wo.lot_price,
+      selected_charge_ids: wo.selected_charge_ids,
+      custom_amounts: wo.custom_amounts
+    }))
+  };
+
+  // Get CSRF token
+  const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+
+  // Submit via fetch
+  fetch('<%= @customer_order ? customer_order_works_orders_path(@customer_order) : works_orders_path %>', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRF-Token': csrfToken,
+      'Accept': 'application/json'
+    },
+    body: JSON.stringify(formData)
+  })
+  .then(response => {
+    if (!response.ok) {
+      return response.json().then(data => {
+        throw new Error(data.error || 'Failed to create works orders');
+      });
+    }
+    return response.json();
+  })
+  .then(data => {
+    // Success - redirect
+    window.location.href = data.redirect_url;
+  })
+  .catch(error => {
+    alert(`Error: ${error.message}`);
+    button.disabled = false;
+    button.textContent = window.pendingWorksOrders.length === 1 ? 'Create Works Order' : `Create ${window.pendingWorksOrders.length} Works Orders`;
+  });
+}
+
+// ============================================================================
+// PART BROWSER MODAL FUNCTIONS
+// ============================================================================
+
+function openPartBrowserModal() {
+  const modal = document.getElementById('partBrowserModal');
+  modal.classList.remove('hidden');
+  populatePartsList(window.allParts);
+  setTimeout(() => {
+    document.getElementById('partSearchInput').focus();
+  }, 100);
+}
+
+function closePartBrowserModal() {
+  const modal = document.getElementById('partBrowserModal');
+  modal.classList.add('hidden');
+  document.getElementById('partSearchInput').value = '';
+}
+
+function populatePartsList(parts) {
+  const tbody = document.getElementById('partsListBody');
+  const noPartsMessage = document.getElementById('noPartsMessage');
+
+  tbody.innerHTML = '';
+
+  if (parts.length === 0) {
+    noPartsMessage.classList.remove('hidden');
+    return;
+  } else {
+    noPartsMessage.classList.add('hidden');
+  }
+
+  parts.forEach(part => {
+    const row = document.createElement('tr');
+    row.className = 'hover:bg-gray-50 cursor-pointer';
+    row.onclick = () => selectModalPart(part);
+
+    row.innerHTML = `
+      <td class="px-4 py-3 text-sm font-medium text-gray-900">${part.part_number}</td>
+      <td class="px-4 py-3 text-sm text-gray-700">${part.part_issue}</td>
+      <td class="px-4 py-3 text-sm text-gray-600">${part.description || '-'}</td>
+      <td class="px-4 py-3 text-sm text-gray-700">£${parseFloat(part.each_price).toFixed(2)}</td>
+      <td class="px-4 py-3 text-right text-sm">
+        <button type="button"
+                onclick="selectModalPart(window.partsData['${part.id}']); event.stopPropagation();"
+                class="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+          Select
+        </button>
+      </td>
+    `;
+
+    tbody.appendChild(row);
+  });
+}
+
+function filterPartsList() {
+  const searchTerm = document.getElementById('partSearchInput').value.toUpperCase().trim();
+
+  if (searchTerm === '') {
+    populatePartsList(window.allParts);
+    return;
+  }
+
+  const filteredParts = window.allParts.filter(part => {
+    return part.part_number.toUpperCase().includes(searchTerm) ||
+           part.part_issue.toUpperCase().includes(searchTerm) ||
+           (part.description && part.description.toUpperCase().includes(searchTerm));
+  });
+
+  populatePartsList(filteredParts);
+}
+
+function selectModalPart(part) {
+  document.getElementById('modal_part_id').value = part.id;
+  document.getElementById('modal_part_display').value = `${part.part_number} - ${part.part_issue}`;
+  document.getElementById('modal_clear_part_button').style.display = 'inline-flex';
+
+  // Auto-populate price
+  const eachPriceField = document.getElementById('modal_each_price');
+  if (part.each_price && parseFloat(part.each_price) > 0) {
+    eachPriceField.value = parseFloat(part.each_price).toFixed(2);
+    recalculateModalTotalPrice();
+  }
+
+  closePartBrowserModal();
+}
+
+function clearModalSelectedPart() {
+  document.getElementById('modal_part_id').value = '';
+  document.getElementById('modal_part_display').value = '';
+  document.getElementById('modal_clear_part_button').style.display = 'none';
+  document.getElementById('modal_each_price').value = '';
+  recalculateModalTotalPrice();
+}
+
+// ============================================================================
+// MODAL PRICING FUNCTIONS
+// ============================================================================
+
+function toggleModalPriceFields(priceType) {
+  const eachPriceField = document.getElementById('modal_each_price_field');
+  const totalPriceDisplay = document.getElementById('modal_total_price_display');
+  const lotPriceField = document.getElementById('modal_lot_price_field');
+  const eachPriceInput = document.getElementById('modal_each_price');
+  const lotPriceInput = document.getElementById('modal_lot_price');
+
+  if (priceType === 'each') {
+    eachPriceField.style.display = 'block';
+    totalPriceDisplay.style.display = 'block';
+    lotPriceField.style.display = 'none';
+    eachPriceInput.required = true;
+    lotPriceInput.required = false;
+    recalculateModalTotalPrice();
+  } else {
+    eachPriceField.style.display = 'none';
+    totalPriceDisplay.style.display = 'none';
+    lotPriceField.style.display = 'block';
+    lotPriceInput.required = true;
+    eachPriceInput.required = false;
+  }
+}
+
+function recalculateModalTotalPrice() {
+  const priceType = document.getElementById('modal_price_type').value;
+  if (priceType === 'each') {
+    const quantity = parseInt(document.getElementById('modal_quantity').value) || 0;
+    const eachPrice = parseFloat(document.getElementById('modal_each_price').value) || 0;
+    const totalPrice = quantity * eachPrice;
+    document.getElementById('modal_total_price_readonly').value = totalPrice.toFixed(2);
+  }
+}
+
+// ============================================================================
+// MODAL ADDITIONAL CHARGES FUNCTIONS
+// ============================================================================
+
+function handleModalAdditionalChargeSelection() {
+  const checkboxes = document.querySelectorAll('input[name="modal_selected_charge_ids"]:checked');
+  const variableSection = document.getElementById('modal_variable_charges_section');
+  const variableInputs = document.getElementById('modal_variable_charge_inputs');
+
+  if (variableInputs) {
+    variableInputs.innerHTML = '';
+  }
+
+  let hasVariableCharges = false;
+
+  checkboxes.forEach(checkbox => {
+    if (!checkbox.value) return;
+
+    const chargeId = checkbox.value;
+    const chargeData = window.additionalChargesData[chargeId];
+
+    if (chargeData && chargeData.is_variable) {
+      hasVariableCharges = true;
+      const inputDiv = document.createElement('div');
+      inputDiv.innerHTML = `
+        <label for="modal_custom_amount_${chargeId}" class="block text-sm font-medium text-gray-700 mb-1">
+          ${chargeData.name} - Custom Amount (£)
+        </label>
+        <div class="relative rounded-md shadow-sm">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <span class="text-gray-500 sm:text-sm">£</span>
+          </div>
+          <input type="number"
+                 id="modal_custom_amount_${chargeId}"
+                 step="0.01"
+                 min="0"
+                 placeholder="${chargeData.amount}"
+                 class="block w-full pl-7 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+        </div>
+        <p class="mt-1 text-xs text-gray-500">Default: £${chargeData.amount} (leave blank to use default)</p>
+      `;
+      if (variableInputs) {
+        variableInputs.appendChild(inputDiv);
+      }
+    }
+  });
+
+  if (variableSection) {
+    if (hasVariableCharges) {
+      variableSection.classList.remove('hidden');
+    } else {
+      variableSection.classList.add('hidden');
+    }
+  }
+}
+</script>
+
+<style>
+/* Modal animations */
+#worksOrderModal, #partBrowserModal {
+  animation: fadeIn 0.2s ease-in;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Improve modal scrolling on smaller screens */
+@media (max-height: 800px) {
+  #worksOrderModal > div {
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+}
+</style>

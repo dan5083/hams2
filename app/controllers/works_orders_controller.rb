@@ -93,24 +93,11 @@ class WorksOrdersController < ApplicationController
   end
 
   def create
-    @works_order = WorksOrder.new(works_order_params)
-
-    # If customer_order_id is missing, try to get it from the route
-    if @works_order.customer_order_id.blank? && params[:customer_order_id].present?
-      @works_order.customer_order_id = params[:customer_order_id]
-    end
-
-    # Validate part is properly configured
-    if validate_part_configuration(@works_order)
-      if @works_order.save
-        redirect_to @works_order, notice: 'Works order was successfully created.'
-      else
-        load_form_data_for_errors
-        render :new, status: :unprocessable_entity
-      end
+    # Check if this is a bulk creation request (JSON with works_orders array)
+    if request.format.json? && params[:works_orders].present?
+      create_bulk
     else
-      load_form_data_for_errors
-      render :new, status: :unprocessable_entity
+      create_single
     end
   end
 
@@ -383,6 +370,99 @@ class WorksOrdersController < ApplicationController
   end
 
   private
+
+  def create_bulk
+    works_orders_data = params[:works_orders]
+    created_works_orders = []
+    errors = []
+
+    ActiveRecord::Base.transaction do
+      works_orders_data.each_with_index do |wo_data, index|
+        # Convert to ActionController::Parameters for safety
+        wo_params = ActionController::Parameters.new(wo_data.to_unsafe_h)
+
+        works_order = WorksOrder.new
+
+        # Manually assign attributes from params
+        works_order.customer_order_id = wo_params[:customer_order_id]
+        works_order.part_id = wo_params[:part_id]
+        works_order.customer_reference = wo_params[:customer_reference]
+        works_order.quantity = wo_params[:quantity]
+        works_order.release_level_id = wo_params[:release_level_id]
+        works_order.transport_method_id = wo_params[:transport_method_id]
+        works_order.price_type = wo_params[:price_type]
+
+        # Set pricing based on type
+        if wo_params[:price_type] == 'each'
+          works_order.each_price = wo_params[:each_price]
+          # lot_price will be calculated by before_validation callback
+        else
+          works_order.lot_price = wo_params[:lot_price]
+        end
+
+        # Set additional charges (stored in jsonb)
+        works_order.selected_charge_ids = wo_params[:selected_charge_ids] || []
+        works_order.custom_amounts = wo_params[:custom_amounts] || {}
+
+        # Validate part configuration
+        unless validate_part_configuration(works_order)
+          errors << { line: index + 1, errors: works_order.errors.full_messages }
+          raise ActiveRecord::Rollback
+        end
+
+        unless works_order.save
+          errors << { line: index + 1, errors: works_order.errors.full_messages }
+          raise ActiveRecord::Rollback
+        end
+
+        created_works_orders << works_order
+      end
+    end
+
+    # Check results and respond
+    if errors.empty? && created_works_orders.any?
+      redirect_url = if created_works_orders.first.customer_order
+        customer_order_path(created_works_orders.first.customer_order)
+      else
+        works_orders_path
+      end
+
+      render json: {
+        success: true,
+        message: "#{created_works_orders.count} works order(s) created successfully",
+        works_order_ids: created_works_orders.map(&:id),
+        redirect_url: redirect_url
+      }
+    else
+      render json: {
+        success: false,
+        error: "Failed to create works orders",
+        errors: errors
+      }, status: :unprocessable_entity
+    end
+  end
+
+  def create_single
+    @works_order = WorksOrder.new(works_order_params)
+
+    # If customer_order_id is missing, try to get it from the route
+    if @works_order.customer_order_id.blank? && params[:customer_order_id].present?
+      @works_order.customer_order_id = params[:customer_order_id]
+    end
+
+    # Validate part is properly configured
+    if validate_part_configuration(@works_order)
+      if @works_order.save
+        redirect_to @works_order, notice: 'Works order was successfully created.'
+      else
+        load_form_data_for_errors
+        render :new, status: :unprocessable_entity
+      end
+    else
+      load_form_data_for_errors
+      render :new, status: :unprocessable_entity
+    end
+  end
 
   def add_additional_charges_to_invoice(invoice, charge_ids, custom_amounts)
     charge_ids.reject(&:blank?).each do |charge_id|
