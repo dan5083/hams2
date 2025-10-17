@@ -1,4 +1,4 @@
-<%# app/views/works_orders/new.html.erb - Bulk Works Order Creation %>
+<%# app/views/works_orders/new.html.erb - Bulk Works Order Creation with Debug Logging %>
 <div class="container mx-auto px-4 py-6">
   <div class="flex justify-between items-center mb-6">
     <div>
@@ -406,6 +406,8 @@
 // DATA SETUP
 // ============================================================================
 
+console.log('🚀 Initializing works orders page...');
+
 // Parts data
 window.partsData = {
   <% if defined?(@parts) && @parts %>
@@ -421,6 +423,8 @@ window.partsData = {
   <% end %>
 };
 
+console.log('📦 Loaded parts data:', Object.keys(window.partsData).length, 'parts');
+
 // Additional charges data
 window.additionalChargesData = {
   <% if defined?(@additional_charge_presets) && @additional_charge_presets %>
@@ -433,6 +437,8 @@ window.additionalChargesData = {
     <% end %>
   <% end %>
 };
+
+console.log('💰 Loaded additional charges:', Object.keys(window.additionalChargesData).length, 'charges');
 
 // Release levels lookup
 window.releaseLevelsData = {
@@ -454,11 +460,15 @@ window.allParts = Object.values(window.partsData);
 // Pending works orders array (our state)
 window.pendingWorksOrders = [];
 
+console.log('✅ Data initialization complete');
+
 // ============================================================================
 // WORKS ORDER MODAL FUNCTIONS
 // ============================================================================
 
 function openWorksOrderModal(editIndex = null) {
+  console.log('🔵 Opening modal, editIndex:', editIndex);
+
   const modal = document.getElementById('worksOrderModal');
   const form = document.getElementById('worksOrderForm');
 
@@ -467,6 +477,7 @@ function openWorksOrderModal(editIndex = null) {
   clearModalSelectedPart();
 
   if (editIndex !== null) {
+    console.log('📝 Edit mode - loading data for line', editIndex);
     // Editing existing line
     document.getElementById('modalTitle').textContent = `Edit Order Line ${editIndex + 1}`;
     document.getElementById('modal_submit_text').textContent = 'Update Order Line';
@@ -474,8 +485,10 @@ function openWorksOrderModal(editIndex = null) {
 
     // Populate form with existing data
     const wo = window.pendingWorksOrders[editIndex];
+    console.log('📋 Loading work order data:', wo);
     populateModalForm(wo);
   } else {
+    console.log('➕ Add mode - new order line');
     // Adding new line
     document.getElementById('modalTitle').textContent = 'Add Order Line';
     document.getElementById('modal_submit_text').textContent = 'Add to Order';
@@ -484,9 +497,11 @@ function openWorksOrderModal(editIndex = null) {
 
   toggleModalPriceFields('each'); // Default to 'each'
   modal.classList.remove('hidden');
+  console.log('✅ Modal opened successfully');
 }
 
 function closeWorksOrderModal() {
+  console.log('🚪 Closing modal');
   const modal = document.getElementById('worksOrderModal');
   modal.classList.add('hidden');
   document.getElementById('worksOrderForm').reset();
@@ -494,6 +509,8 @@ function closeWorksOrderModal() {
 }
 
 function populateModalForm(wo) {
+  console.log('📋 Populating modal form with:', wo);
+
   // Customer order
   const customerOrderField = document.getElementById('modal_customer_order_id');
   if (customerOrderField) {
@@ -540,50 +557,95 @@ function populateModalForm(wo) {
       });
     }
   }
+
+  console.log('✅ Form populated successfully');
 }
 
 // Handle form submission
 document.addEventListener('DOMContentLoaded', function() {
+  console.log('🔵 DOM Content Loaded - Setting up form handler');
+
   const form = document.getElementById('worksOrderForm');
   if (form) {
+    console.log('✅ Form element found');
     form.addEventListener('submit', function(e) {
       e.preventDefault();
+      console.log('🔵 Form submitted');
 
       // Validate form
       if (!form.checkValidity()) {
+        console.log('❌ Form validation failed');
         form.reportValidity();
         return;
       }
+      console.log('✅ Form validation passed');
 
       // Collect form data
+      console.log('📦 Collecting form data...');
       const worksOrderData = collectModalFormData();
+
+      if (!worksOrderData) {
+        console.error('❌ Failed to collect form data');
+        alert('Failed to collect form data. Please check all required fields.');
+        return;
+      }
+
+      console.log('📦 Collected data:', worksOrderData);
 
       // Check if editing or adding
       const editingIndex = document.getElementById('editingIndex').value;
+      console.log('📝 Editing index:', editingIndex);
 
       if (editingIndex !== '') {
         // Update existing
+        console.log('🔄 Updating existing line', editingIndex);
         window.pendingWorksOrders[parseInt(editingIndex)] = worksOrderData;
       } else {
         // Add new
+        console.log('➕ Adding new line');
         window.pendingWorksOrders.push(worksOrderData);
       }
 
+      console.log('📊 Total pending orders:', window.pendingWorksOrders.length);
+      console.log('📊 All pending orders:', window.pendingWorksOrders);
+
       // Update display
+      console.log('🔄 Updating summary table...');
       updateSummaryTable();
 
       // Close modal
+      console.log('🚪 Closing modal');
       closeWorksOrderModal();
     });
+  } else {
+    console.error('❌ Form element not found!');
   }
 });
 
 function collectModalFormData() {
+  console.log('🔍 Starting data collection...');
+
   const partId = document.getElementById('modal_part_id').value;
+  console.log('🔍 Part ID:', partId);
+
+  if (!partId) {
+    console.error('❌ No part ID selected!');
+    alert('Please select a part');
+    return null;
+  }
+
   const part = window.partsData[partId];
+  console.log('🔍 Part data:', part);
+
+  if (!part) {
+    console.error('❌ Part not found in partsData!');
+    alert('Selected part not found in data');
+    return null;
+  }
 
   const priceType = document.getElementById('modal_price_type').value;
   const quantity = parseInt(document.getElementById('modal_quantity').value);
+  console.log('🔍 Price type:', priceType, 'Quantity:', quantity);
 
   let eachPrice = 0;
   let lotPrice = 0;
@@ -591,9 +653,11 @@ function collectModalFormData() {
   if (priceType === 'each') {
     eachPrice = parseFloat(document.getElementById('modal_each_price').value) || 0;
     lotPrice = eachPrice * quantity;
+    console.log('🔍 Each pricing - Each:', eachPrice, 'Lot:', lotPrice);
   } else {
     lotPrice = parseFloat(document.getElementById('modal_lot_price').value) || 0;
     eachPrice = quantity > 0 ? lotPrice / quantity : 0;
+    console.log('🔍 Lot pricing - Lot:', lotPrice, 'Each:', eachPrice);
   }
 
   // Collect selected charges
@@ -604,19 +668,20 @@ function collectModalFormData() {
   chargeCheckboxes.forEach(cb => {
     if (cb.value) {
       selectedChargeIds.push(cb.value);
-
-      // Check for custom amount
       const customInput = document.getElementById(`modal_custom_amount_${cb.value}`);
       if (customInput && customInput.value) {
         customAmounts[cb.value] = parseFloat(customInput.value);
       }
     }
   });
+  console.log('🔍 Selected charges:', selectedChargeIds);
 
   const customerOrderField = document.getElementById('modal_customer_order_id');
+  const customerOrderId = customerOrderField ? customerOrderField.value : '';
+  console.log('🔍 Customer Order ID:', customerOrderId);
 
-  return {
-    customer_order_id: customerOrderField ? customerOrderField.value : '',
+  const data = {
+    customer_order_id: customerOrderId,
     part_id: partId,
     part_display: `${part.part_number} - ${part.part_issue}`,
     part_number: part.part_number,
@@ -631,6 +696,9 @@ function collectModalFormData() {
     selected_charge_ids: selectedChargeIds,
     custom_amounts: customAmounts
   };
+
+  console.log('✅ Final collected data:', data);
+  return data;
 }
 
 // ============================================================================
@@ -638,18 +706,22 @@ function collectModalFormData() {
 // ============================================================================
 
 function updateSummaryTable() {
+  console.log('🔄 Updating summary table, pending orders:', window.pendingWorksOrders.length);
+
   const emptyState = document.getElementById('emptyState');
   const summaryContainer = document.getElementById('summaryTableContainer');
   const createButton = document.getElementById('createButtonContainer');
   const tbody = document.getElementById('summaryTableBody');
 
   if (window.pendingWorksOrders.length === 0) {
+    console.log('📋 No orders - showing empty state');
     emptyState.classList.remove('hidden');
     summaryContainer.classList.add('hidden');
     createButton.classList.add('hidden');
     return;
   }
 
+  console.log('📋 Showing summary table with', window.pendingWorksOrders.length, 'orders');
   emptyState.classList.add('hidden');
   summaryContainer.classList.remove('hidden');
   createButton.classList.remove('hidden');
@@ -714,11 +786,15 @@ function updateSummaryTable() {
   document.getElementById('totalLines').textContent = window.pendingWorksOrders.length;
   document.getElementById('totalQuantity').textContent = totalQuantity;
   document.getElementById('totalValue').textContent = `£${totalValue.toFixed(2)}`;
+
+  console.log('✅ Summary table updated successfully');
 }
 
 function deleteWorksOrder(index) {
+  console.log('🗑️ Deleting order line', index);
   if (confirm(`Are you sure you want to remove order line ${index + 1}?`)) {
     window.pendingWorksOrders.splice(index, 1);
+    console.log('✅ Order line deleted');
     updateSummaryTable();
   }
 }
@@ -728,10 +804,14 @@ function deleteWorksOrder(index) {
 // ============================================================================
 
 function submitAllWorksOrders() {
+  console.log('🚀 Submitting all works orders...');
+
   if (window.pendingWorksOrders.length === 0) {
     alert('Please add at least one order line.');
     return;
   }
+
+  console.log('📦 Submitting', window.pendingWorksOrders.length, 'works orders');
 
   // Disable button to prevent double submission
   const button = event.target;
@@ -755,6 +835,8 @@ function submitAllWorksOrders() {
     }))
   };
 
+  console.log('📤 Form data prepared:', formData);
+
   // Get CSRF token
   const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
 
@@ -769,18 +851,22 @@ function submitAllWorksOrders() {
     body: JSON.stringify(formData)
   })
   .then(response => {
+    console.log('📥 Response received:', response.status);
     if (!response.ok) {
       return response.json().then(data => {
+        console.error('❌ Server error:', data);
         throw new Error(data.error || 'Failed to create works orders');
       });
     }
     return response.json();
   })
   .then(data => {
+    console.log('✅ Success:', data);
     // Success - redirect
     window.location.href = data.redirect_url;
   })
   .catch(error => {
+    console.error('❌ Error:', error);
     alert(`Error: ${error.message}`);
     button.disabled = false;
     button.textContent = window.pendingWorksOrders.length === 1 ? 'Create Works Order' : `Create ${window.pendingWorksOrders.length} Works Orders`;
@@ -792,6 +878,7 @@ function submitAllWorksOrders() {
 // ============================================================================
 
 function openPartBrowserModal() {
+  console.log('🔍 Opening part browser modal');
   const modal = document.getElementById('partBrowserModal');
   modal.classList.remove('hidden');
   populatePartsList(window.allParts);
@@ -801,12 +888,14 @@ function openPartBrowserModal() {
 }
 
 function closePartBrowserModal() {
+  console.log('🚪 Closing part browser modal');
   const modal = document.getElementById('partBrowserModal');
   modal.classList.add('hidden');
   document.getElementById('partSearchInput').value = '';
 }
 
 function populatePartsList(parts) {
+  console.log('📋 Populating parts list with', parts.length, 'parts');
   const tbody = document.getElementById('partsListBody');
   const noPartsMessage = document.getElementById('noPartsMessage');
 
@@ -844,6 +933,7 @@ function populatePartsList(parts) {
 
 function filterPartsList() {
   const searchTerm = document.getElementById('partSearchInput').value.toUpperCase().trim();
+  console.log('🔍 Filtering parts list with term:', searchTerm);
 
   if (searchTerm === '') {
     populatePartsList(window.allParts);
@@ -856,10 +946,13 @@ function filterPartsList() {
            (part.description && part.description.toUpperCase().includes(searchTerm));
   });
 
+  console.log('🔍 Found', filteredParts.length, 'matching parts');
   populatePartsList(filteredParts);
 }
 
 function selectModalPart(part) {
+  console.log('✅ Part selected:', part);
+
   document.getElementById('modal_part_id').value = part.id;
   document.getElementById('modal_part_display').value = `${part.part_number} - ${part.part_issue}`;
   document.getElementById('modal_clear_part_button').style.display = 'inline-flex';
@@ -869,12 +962,14 @@ function selectModalPart(part) {
   if (part.each_price && parseFloat(part.each_price) > 0) {
     eachPriceField.value = parseFloat(part.each_price).toFixed(2);
     recalculateModalTotalPrice();
+    console.log('💰 Auto-populated price:', part.each_price);
   }
 
   closePartBrowserModal();
 }
 
 function clearModalSelectedPart() {
+  console.log('🗑️ Clearing selected part');
   document.getElementById('modal_part_id').value = '';
   document.getElementById('modal_part_display').value = '';
   document.getElementById('modal_clear_part_button').style.display = 'none';
@@ -887,6 +982,8 @@ function clearModalSelectedPart() {
 // ============================================================================
 
 function toggleModalPriceFields(priceType) {
+  console.log('💰 Toggling price fields, type:', priceType);
+
   const eachPriceField = document.getElementById('modal_each_price_field');
   const totalPriceDisplay = document.getElementById('modal_total_price_display');
   const lotPriceField = document.getElementById('modal_lot_price_field');
@@ -916,6 +1013,7 @@ function recalculateModalTotalPrice() {
     const eachPrice = parseFloat(document.getElementById('modal_each_price').value) || 0;
     const totalPrice = quantity * eachPrice;
     document.getElementById('modal_total_price_readonly').value = totalPrice.toFixed(2);
+    console.log('💰 Recalculated total:', totalPrice);
   }
 }
 
@@ -924,6 +1022,8 @@ function recalculateModalTotalPrice() {
 // ============================================================================
 
 function handleModalAdditionalChargeSelection() {
+  console.log('💰 Handling additional charge selection');
+
   const checkboxes = document.querySelectorAll('input[name="modal_selected_charge_ids"]:checked');
   const variableSection = document.getElementById('modal_variable_charges_section');
   const variableInputs = document.getElementById('modal_variable_charge_inputs');
@@ -969,11 +1069,14 @@ function handleModalAdditionalChargeSelection() {
   if (variableSection) {
     if (hasVariableCharges) {
       variableSection.classList.remove('hidden');
+      console.log('✅ Showing variable charges section');
     } else {
       variableSection.classList.add('hidden');
     }
   }
 }
+
+console.log('✅ All JavaScript initialized successfully');
 </script>
 
 <style>
