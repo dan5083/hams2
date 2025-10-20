@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .header {
+      border-bottom: 3px solid #2563eb;
+      padding-bottom: 20px;
+      margin-bottom: 30px;
+    }
+    .header h1 {
+      color: #1e40af;
+      margin: 0 0 10px 0;
+      font-size: 28px;
+    }
+    .order-details {
+      background-color: #f3f4f6;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 30px;
+    }
+    .order-details table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .order-details td {
+      padding: 8px 0;
+    }
+    .order-details td:first-child {
+      font-weight: bold;
+      width: 180px;
+      color: #4b5563;
+    }
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 30px;
+    }
+    .items-table thead {
+      background-color: #2563eb;
+      color: white;
+    }
+    .items-table th {
+      padding: 12px;
+      text-align: left;
+      font-weight: 600;
+    }
+    .items-table td {
+      padding: 12px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .items-table tbody tr:hover {
+      background-color: #f9fafb;
+    }
+    .items-table .text-right {
+      text-align: right;
+    }
+    .totals {
+      background-color: #f3f4f6;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 30px;
+    }
+    .totals table {
+      width: 100%;
+      max-width: 400px;
+      margin-left: auto;
+    }
+    .totals td {
+      padding: 8px;
+    }
+    .totals td:first-child {
+      font-weight: bold;
+      text-align: right;
+      color: #4b5563;
+    }
+    .totals td:last-child {
+      text-align: right;
+      font-size: 18px;
+    }
+    .totals .grand-total {
+      border-top: 2px solid #2563eb;
+      padding-top: 12px;
+      margin-top: 8px;
+    }
+    .totals .grand-total td {
+      font-size: 20px;
+      font-weight: bold;
+      color: #1e40af;
+    }
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 2px solid #e5e7eb;
+      font-size: 14px;
+      color: #6b7280;
+    }
+    .footer p {
+      margin: 5px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <%= image_tag('logo-with-company-name.png', alt: 'Hard Anodising Surface Treatments Ltd', style: 'max-width: 300px; margin-bottom: 20px;') %>
+    <h1>Order Acknowledgement</h1>
+    <p style="color: #6b7280; margin: 0;">Thank you for your order. Please find the details below.</p>
+  </div>
+
+  <div class="order-details">
+    <table>
+      <tr>
+        <td>Customer:</td>
+        <td><strong><%= @customer.name %></strong></td>
+      </tr>
+      <tr>
+        <td>Order Number:</td>
+        <td><strong><%= @customer_order.number %></strong></td>
+      </tr>
+      <tr>
+        <td>Order Date:</td>
+        <td><%= @customer_order.date_received.strftime("%d %B %Y") %></td>
+      </tr>
+      <% if @customer_references.any? %>
+      <tr>
+        <td>Your Reference<%= @customer_references.count > 1 ? 's' : '' %>:</td>
+        <td><%= @customer_references.join(', ') %></td>
+      </tr>
+      <% end %>
+    </table>
+  </div>
+
+  <h2 style="color: #1e40af; margin-bottom: 15px;">Order Items</h2>
+
+  <table class="items-table">
+    <thead>
+      <tr>
+        <th>Works Order</th>
+        <th>Part Number</th>
+        <th>Description</th>
+        <th class="text-right">Quantity</th>
+        <th class="text-right">Price</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @works_orders.each do |wo| %>
+      <tr>
+        <td><strong>WO<%= wo.number %></strong></td>
+        <td><%= wo.part_number %>-<%= wo.part_issue %></td>
+        <td><%= wo.part_description %></td>
+        <td class="text-right"><%= wo.quantity %></td>
+        <td class="text-right">£<%= number_with_precision(wo.lot_price, precision: 2, delimiter: ',') %></td>
+      </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <table>
+      <tr>
+        <td>Total Quantity:</td>
+        <td><%= @total_quantity %> items</td>
+      </tr>
+      <tr class="grand-total">
+        <td>Total Value:</td>
+        <td>£<%= number_with_precision(@total_value, precision: 2, delimiter: ',') %></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="footer">
+    <p><strong>Important Information:</strong></p>
+    <p>• This is an automated acknowledgement of your order.</p>
+    <p>• Orders usually take us between 3-5 working days to complete, however if your works require multiple processes, with masking stages between please make allowance for a 5-7 day turnaround.</p>
+    <p>• If you have any questions about your order, please contact us.</p>
+    <br>
+    <p>Thank you for your business.</p>
+    <br>
+    <p style="margin: 0; font-weight: bold; color: #1e40af;">Hard Anodising Surface Treatments Ltd</p>
+    <p style="margin: 5px 0;">Firs Industrial Estate, Rickets Close, Kidderminster DY11 7QN</p>
+    <p style="margin: 5px 0;">Tel: 01562 747100 | <a href="http://www.hard-anodising.co.uk" style="color: #2563eb; text-decoration: none;">www.hard-anodising.co.uk</a></p>
+  </div>
+</body>
+</html>

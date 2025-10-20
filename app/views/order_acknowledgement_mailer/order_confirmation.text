@@ -1,0 +1,43 @@
+HARD ANODISING SURFACE TREATMENTS LTD
+ORDER ACKNOWLEDGEMENT
+================================================================================
+
+Thank you for your order. Please find the details below.
+
+ORDER DETAILS
+--------------------------------------------------------------------------------
+Customer:         <%= @customer.name %>
+Order Number:     <%= @customer_order.number %>
+Order Date:       <%= @customer_order.date_received.strftime("%d %B %Y") %>
+<% if @customer_references.any? %>
+Your Reference:   <%= @customer_references.join(', ') %>
+<% end %>
+
+ORDER ITEMS
+--------------------------------------------------------------------------------
+<% @works_orders.each do |wo| %>
+Works Order:      WO<%= wo.number %>
+Part Number:      <%= wo.part_number %>-<%= wo.part_issue %>
+Description:      <%= wo.part_description %>
+Quantity:         <%= wo.quantity %>
+Price:            £<%= number_with_precision(wo.lot_price, precision: 2, delimiter: ',') %>
+
+<% end %>
+--------------------------------------------------------------------------------
+Total Quantity:   <%= @total_quantity %> items
+Total Value:      £<%= number_with_precision(@total_value, precision: 2, delimiter: ',') %>
+================================================================================
+
+IMPORTANT INFORMATION:
+• This is an automated acknowledgement of your order.
+• Orders usually take us between 3-5 working days to complete, however if your
+  works require multiple processes, with masking stages between please make
+  allowance for a 5-7 day turnaround.
+• If you have any questions about your order, please contact us.
+
+Thank you for your business.
+
+--------------------------------------------------------------------------------
+Hard Anodising Surface Treatments Ltd
+Firs Industrial Estate, Rickets Close, Kidderminster DY11 7QN
+Tel: 01562 747100 | www.hard-anodising.co.uk

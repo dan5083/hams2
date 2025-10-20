@@ -372,10 +372,24 @@ class WorksOrdersController < ApplicationController
   private
 
   def create_bulk
+    Rails.logger.info "🔧 BULK CREATE: Starting bulk works order creation"
+    Rails.logger.info "🔧 BULK CREATE: Received params: #{params.inspect}"
+
+    # Extract works_orders from the request
     works_orders_data = params[:works_orders]
+
+    unless works_orders_data.present?
+      render json: {
+        success: false,
+        error: "No works orders data provided"
+      }, status: :unprocessable_entity
+      return
+    end
+
     created_works_orders = []
     errors = []
 
+    # Wrap in a transaction so all-or-nothing
     ActiveRecord::Base.transaction do
       works_orders_data.each_with_index do |wo_data, index|
         # Convert to ActionController::Parameters for safety
@@ -421,8 +435,27 @@ class WorksOrdersController < ApplicationController
 
     # Check results and respond
     if errors.empty? && created_works_orders.any?
-      redirect_url = if created_works_orders.first.customer_order
-        customer_order_path(created_works_orders.first.customer_order)
+      # Send order acknowledgement email if customer has an email
+      customer_order = created_works_orders.first.customer_order
+
+      if customer_order && customer_order.customer.contact_email.present?
+        begin
+          OrderAcknowledgementMailer.order_confirmation(
+            customer_order,
+            created_works_orders
+          ).deliver_later
+
+          Rails.logger.info "📧 Order acknowledgement email queued for customer order #{customer_order.number}"
+        rescue => e
+          # Log error but don't fail the request - email is secondary to order creation
+          Rails.logger.error "❌ Failed to send order acknowledgement email: #{e.message}"
+        end
+      else
+        Rails.logger.warn "⚠️ No email address found for customer order #{customer_order&.number} - skipping acknowledgement"
+      end
+
+      redirect_url = if customer_order
+        customer_order_path(customer_order)
       else
         works_orders_path
       end
