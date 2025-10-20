@@ -543,7 +543,7 @@ function populateModalForm(wo) {
 }
 
 // Handle form submission
-document.addEventListener('DOMContentLoaded', function() {
+function initializeFormHandler() {
   const form = document.getElementById('worksOrderForm');
   if (form) {
     form.addEventListener('submit', function(e) {
@@ -581,7 +581,14 @@ document.addEventListener('DOMContentLoaded', function() {
       closeWorksOrderModal();
     });
   }
-});
+}
+
+// Initialize immediately if DOM is ready, otherwise wait for DOMContentLoaded
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeFormHandler);
+} else {
+  initializeFormHandler();
+}
 
 function collectModalFormData() {
   const partId = document.getElementById('modal_part_id').value;
