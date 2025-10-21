@@ -133,11 +133,6 @@ class User < ApplicationRecord
     end
   end
 
-  # Helper method to check if user prioritizes aerospace work
-  def aerospace_priority?
-    email_address.in?(['chris@hardanodisingstl.com', 'quality@hardanodisingstl.com'])
-  end
-
   private
 
   def set_defaults
@@ -180,11 +175,10 @@ class User < ApplicationRecord
     }
   end
 
-  # Chris Connon - Quality/NCRs (e-cards with aerospace priority)
+  # Chris Connon - Quality/NCRs (sees all e-cards)
   def chris_connon_filter
     {
-      aerospace_priority: true,
-      description: "Quality/NCRs - aerospace priority work"
+      description: "Quality/NCRs - sees all e-cards"
     }
   end
 
@@ -220,11 +214,10 @@ class User < ApplicationRecord
     }
   end
 
-  # Jim Ledger - Quality/NCRs (e-cards with aerospace priority)
+  # Jim Ledger - Quality/NCRs (sees all e-cards)
   def jim_ledger_filter
     {
-      aerospace_priority: true,
-      description: "Quality/NCRs - aerospace priority work"
+      description: "Quality/NCRs - sees all e-cards"
     }
   end
 

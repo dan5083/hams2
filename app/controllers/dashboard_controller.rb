@@ -164,11 +164,6 @@ class DashboardController < ApplicationController
     # Basic access only (maintenance) - no work orders
     return false if filter_criteria[:basic_access_only]
 
-    # Aerospace priority
-    if filter_criteria[:aerospace_priority] && part.aerospace_defense?
-      return true
-    end
-
     # VAT number filtering
     if filter_criteria[:vat_numbers].present?
       operation_vats = operations.flat_map(&:vat_numbers).uniq
