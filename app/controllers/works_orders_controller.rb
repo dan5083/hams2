@@ -371,7 +371,7 @@ class WorksOrdersController < ApplicationController
 
   private
 
-  def create_bulk
+ def create_bulk
     Rails.logger.info "🔧 BULK CREATE: Starting bulk works order creation"
     Rails.logger.info "🔧 BULK CREATE: Received params: #{params.inspect}"
 
@@ -435,8 +435,15 @@ class WorksOrdersController < ApplicationController
 
     # Check results and respond
     if errors.empty? && created_works_orders.any?
+      # ADD THESE DEBUG LINES HERE:
+      Rails.logger.info "🐛 DEBUG: About to check for email sending"
+      Rails.logger.info "🐛 DEBUG: created_works_orders.count = #{created_works_orders.count}"
+
       # Send order acknowledgement email if customer has an email
       customer_order = created_works_orders.first.customer_order
+
+      Rails.logger.info "🐛 DEBUG: customer_order = #{customer_order.inspect}"
+      Rails.logger.info "🐛 DEBUG: customer email = #{customer_order&.customer&.contact_email}"
 
       if customer_order && customer_order.customer.contact_email.present?
         begin
