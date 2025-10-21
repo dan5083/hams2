@@ -93,6 +93,8 @@ class WorksOrdersController < ApplicationController
   end
 
   def create
+      Rails.logger.info "🔍 DEBUG: request.format = #{request.format}, params[:works_orders].present? = #{params[:works_orders].present?}"
+
     # Check if this is a bulk creation request (JSON with works_orders array)
     if request.format.json? && params[:works_orders].present?
       create_bulk
