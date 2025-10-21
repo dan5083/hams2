@@ -1,3 +1,4 @@
+# app/models/xero_contact.rb
 class XeroContact < ApplicationRecord
   has_one :organization, dependent: :destroy
 
@@ -51,16 +52,57 @@ class XeroContact < ApplicationRecord
     )
   end
 
+  # FIXED: Xero uses PascalCase keys, not snake_case
   def primary_email
-    email || xero_data.dig('email_address')
+    email || xero_data&.dig("EmailAddress")  # Changed from 'email_address' to "EmailAddress"
   end
 
+  # FIXED: Extract phone from Xero's Phones array structure
   def primary_phone
-    phone || xero_data.dig('phones', 0, 'phone_number')
+    return phone if phone.present?
+
+    phones = xero_data&.dig("Phones")
+    return nil unless phones
+
+    # Get DEFAULT phone first, fallback to DDI or first available
+    default_phone = phones.find { |p| p["PhoneType"] == "DEFAULT" } ||
+                    phones.find { |p| p["PhoneType"] == "DDI" } ||
+                    phones.first
+
+    return nil unless default_phone && default_phone["PhoneNumber"].present?
+
+    area = default_phone["PhoneAreaCode"]
+    number = default_phone["PhoneNumber"]
+    [area, number].compact.join(" ")
   end
 
+  # FIXED: Extract address from Xero's Addresses array structure
   def primary_address
-    addresses&.first || xero_data.dig('addresses', 0)
+    return addresses if addresses.present?
+
+    xero_addresses = xero_data&.dig("Addresses")
+    return nil unless xero_addresses
+
+    # Prefer POBOX, then STREET
+    address = xero_addresses.find { |a| a["AddressType"] == "POBOX" } ||
+              xero_addresses.find { |a| a["AddressType"] == "STREET" }
+
+    return nil unless address
+
+    parts = []
+    parts << address["AddressLine1"] if address["AddressLine1"].present?
+    parts << address["AddressLine2"] if address["AddressLine2"].present?
+    parts << address["AddressLine3"] if address["AddressLine3"].present?
+    parts << address["AddressLine4"] if address["AddressLine4"].present?
+
+    # Add city, region, postal code
+    location_parts = []
+    location_parts << address["City"] if address["City"].present?
+    location_parts << address["Region"] if address["Region"].present?
+    location_parts << address["PostalCode"] if address["PostalCode"].present?
+    parts << location_parts.join(", ") if location_parts.any?
+
+    parts.join("\n")
   end
 
   def merged?
