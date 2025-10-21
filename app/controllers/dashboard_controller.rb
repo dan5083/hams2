@@ -121,8 +121,8 @@ class DashboardController < ApplicationController
     @ncrs_count = ExternalNcr.count
     @pending_ncrs = ExternalNcr.where(status: 'draft').count
     @aerospace_work_orders = WorksOrder.active.joins(:part)
-                                      .where("parts.customisation_data->>'operation_selection'->>'aerospace_defense' = 'true'")
-                                      .count
+                                  .where("parts.customisation_data->'operation_selection'->>'aerospace_defense' = 'true'")
+                                  .count
     @recent_quality_issues = ExternalNcr.where('created_at > ?', 7.days.ago).count
   end
 
