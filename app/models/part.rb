@@ -660,10 +660,18 @@ class Part < ApplicationRecord
     return false if file.blank?
 
     begin
+      # Determine the correct resource type based on file extension
+      filename = file.original_filename.to_s.downcase
+      resource_type = if filename.match?(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
+                        :image
+                      else
+                        :raw  # PDFs, documents, etc.
+                      end
+
       result = Cloudinary::Uploader.upload(
         file.tempfile,
         folder: "parts/files",
-        resource_type: :auto,
+        resource_type: resource_type,  # Changed from :auto to explicit type
         public_id: "#{customer.id}_#{part_number}_#{part_issue}_#{Time.current.to_i}"
       )
 
@@ -684,7 +692,14 @@ class Part < ApplicationRecord
     return false if index >= file_cloudinary_ids.length
 
     begin
-      Cloudinary::Uploader.destroy(file_cloudinary_ids[index])
+      # Determine resource type from filename
+      filename = file_filenames[index].to_s.downcase
+      resource_type = filename.match?(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i) ? 'image' : 'raw'
+
+      Cloudinary::Uploader.destroy(
+        file_cloudinary_ids[index],
+        resource_type: resource_type
+      )
 
       self.file_cloudinary_ids = file_cloudinary_ids.dup
       self.file_filenames = file_filenames.dup
@@ -705,16 +720,17 @@ class Part < ApplicationRecord
 
     public_id = file_cloudinary_ids[index]
     filename = file_filenames[index].to_s.downcase
-    original_filename = file_filenames[index]  # Keep original case
+    original_filename = file_filenames[index]
 
     # Determine resource type
-    if filename.match?(/\.(jpg|jpeg|png|gif|webp)$/i)
+    if filename.match?(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)
       Cloudinary::Utils.cloudinary_url(public_id, resource_type: 'image')
     else
       # Everything else as raw with specific attachment filename
       Cloudinary::Utils.cloudinary_url(public_id,
         resource_type: 'raw',
-        attachment: original_filename
+        attachment: original_filename,
+        flags: 'attachment'  # Force download instead of display in browser
       )
     end
   end
