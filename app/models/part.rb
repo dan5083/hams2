@@ -660,24 +660,32 @@ def upload_file(file)
   return false if file.blank?
 
   begin
-    # FIX: Use the original folder structure that worked
-    # Old working structure: parts/{customer-name}/{part-number}/
-    # Not: parts/files/
+    # Use customer/part folder structure (not generic /files/)
     customer_slug = customer.name.parameterize
     folder_path = "parts/#{customer_slug}/#{part_number}"
 
+    # Clean filename and keep extension
+    original_filename = file.original_filename
+    clean_filename = original_filename.gsub(/\s+/, '_')  # Replace spaces with underscores
+    basename = File.basename(clean_filename, '.*')  # Filename without extension
+    extension = File.extname(clean_filename)  # Extension with dot (e.g., '.pdf')
+
+    # Create public_id WITH extension (critical for Cloudinary to serve correctly)
+    timestamp = Time.current.strftime('%Y%m%d_%H%M%S')
+    public_id_with_extension = "#{basename}_#{timestamp}#{extension}"
+
     result = Cloudinary::Uploader.upload(
       file.tempfile,
-      folder: folder_path,  # CHANGED: Use customer/part structure
+      folder: folder_path,
       resource_type: :auto,
-      public_id: "#{file.original_filename.gsub(/\.[^.]+$/, '')}_#{Time.current.strftime('%Y%m%d_%H%M%S')}"  # CHANGED: Use filename-based ID
+      public_id: public_id_with_extension  # MUST include extension!
     )
 
     self.file_cloudinary_ids ||= []
     self.file_filenames ||= []
 
     self.file_cloudinary_ids << result['public_id']
-    self.file_filenames << file.original_filename
+    self.file_filenames << original_filename  # Store original for display
     save
   rescue => e
     errors.add(:base, "File upload failed: #{e.message}")
@@ -717,8 +725,7 @@ def file_download_url(index)
   if filename.match?(/\.(jpg|jpeg|png|gif|webp)$/i)
     Cloudinary::Utils.cloudinary_url(public_id, resource_type: 'image')
   else
-    # Everything else as raw with specific attachment filename
-    # This is correct - /raw/ in the URL is fine!
+    # For PDFs and other files - public_id already contains extension
     Cloudinary::Utils.cloudinary_url(public_id,
       resource_type: 'raw',
       attachment: original_filename
