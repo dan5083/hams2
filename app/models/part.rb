@@ -650,6 +650,7 @@ class Part < ApplicationRecord
     get_operations_with_auto_ops.any?
   end
 
+
   # Technical Drawing/photo Methods
   def has_files?
     file_cloudinary_ids.present? && file_cloudinary_ids.any?
@@ -714,6 +715,18 @@ class Part < ApplicationRecord
     end
 
     Cloudinary::Utils.cloudinary_url(public_id, resource_type: resource_type)
+  end
+
+  def files_with_urls
+    return [] unless has_files?
+
+    file_filenames.each_with_index.map do |filename, index|
+      {
+        index: index,
+        filename: filename,
+        download_url: file_download_url(index)
+      }
+    end
   end
 
   private
