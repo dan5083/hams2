@@ -656,11 +656,6 @@ class Part < ApplicationRecord
     drawing_cloudinary_public_id.present?
   end
 
-  def drawing_view_url
-    return nil unless has_drawing?
-    CloudinaryService.generate_view_url(drawing_cloudinary_public_id)
-  end
-
   def drawing_download_url
     return nil unless has_drawing?
     CloudinaryService.generate_download_url(drawing_cloudinary_public_id)
