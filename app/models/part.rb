@@ -651,85 +651,87 @@ class Part < ApplicationRecord
   end
 
 
-  # Technical Drawing/photo Methods
-  def has_files?
-    file_cloudinary_ids.present? && file_cloudinary_ids.any?
+ # Technical Drawing/photo Methods
+def has_files?
+  file_cloudinary_ids.present? && file_cloudinary_ids.any?
+end
+
+def upload_file(file)
+  return false if file.blank?
+
+  begin
+    result = Cloudinary::Uploader.upload(
+      file.tempfile,
+      folder: "parts/files",
+      resource_type: :auto,
+      public_id: "#{customer.id}_#{part_number}_#{part_issue}_#{Time.current.to_i}"
+    )
+
+    self.file_cloudinary_ids ||= []
+    self.file_filenames ||= []
+
+    self.file_cloudinary_ids << result['public_id']
+    self.file_filenames << file.original_filename
+    save
+  rescue => e
+    errors.add(:base, "File upload failed: #{e.message}")
+    false
   end
+end
 
-  def upload_file(file)
-    return false if file.blank?
+def delete_file(index)
+  return false unless has_files?
+  return false if index >= file_cloudinary_ids.length
 
-    begin
-      result = Cloudinary::Uploader.upload(
-        file.tempfile,
-        folder: "parts/files",
-        resource_type: :auto,
-        public_id: "#{customer.id}_#{part_number}_#{part_issue}_#{Time.current.to_i}"
-      )
+  begin
+    Cloudinary::Uploader.destroy(file_cloudinary_ids[index])
 
-      self.file_cloudinary_ids ||= []
-      self.file_filenames ||= []
+    self.file_cloudinary_ids = file_cloudinary_ids.dup
+    self.file_filenames = file_filenames.dup
 
-      self.file_cloudinary_ids << result['public_id']
-      self.file_filenames << file.original_filename
-      save
-    rescue => e
-      errors.add(:base, "File upload failed: #{e.message}")
-      false
-    end
+    file_cloudinary_ids.delete_at(index)
+    file_filenames.delete_at(index)
+
+    save
+  rescue => e
+    errors.add(:base, "File deletion failed: #{e.message}")
+    false
   end
+end
 
-  def delete_file(index)
-    return false unless has_files?
-    return false if index >= file_cloudinary_ids.length
+def file_download_url(index)
+  return nil unless has_files?
+  return nil if index >= file_cloudinary_ids.length
 
-    begin
-      Cloudinary::Uploader.destroy(file_cloudinary_ids[index])
+  public_id = file_cloudinary_ids[index]
+  filename = file_filenames[index].to_s.downcase
+  original_filename = file_filenames[index]  # Keep original case
 
-      self.file_cloudinary_ids = file_cloudinary_ids.dup
-      self.file_filenames = file_filenames.dup
-
-      file_cloudinary_ids.delete_at(index)
-      file_filenames.delete_at(index)
-
-      save
-    rescue => e
-      errors.add(:base, "File deletion failed: #{e.message}")
-      false
-    end
+  # Determine resource type
+  if filename.match?(/\.(jpg|jpeg|png|gif|webp)$/i)
+    Cloudinary::Utils.cloudinary_url(public_id, resource_type: 'image')
+  else
+    # FIXED: For PDFs and other files, don't specify resource_type: 'raw'
+    # Instead, use the default which works with resource_type: :auto from upload
+    Cloudinary::Utils.cloudinary_url(public_id,
+      flags: 'attachment',
+      attachment: original_filename
+    )
   end
+end
 
-  def file_download_url(index)
-    return nil unless has_files?
-    return nil if index >= file_cloudinary_ids.length
+def files_with_urls
+  return [] unless has_files?
 
-    public_id = file_cloudinary_ids[index]
-    filename = file_filenames[index].to_s.downcase
-    original_filename = file_filenames[index]  # Keep original case
-
-    # Determine resource type
-    if filename.match?(/\.(jpg|jpeg|png|gif|webp)$/i)
-      Cloudinary::Utils.cloudinary_url(public_id, resource_type: 'image')
-    else
-      # Everything else as raw with specific attachment filename
-      Cloudinary::Utils.cloudinary_url(public_id,
-        resource_type: 'raw',
-        attachment: original_filename
-      )
-    end
+  file_filenames.each_with_index.map do |filename, index|
+    {
+      index: index,
+      filename: filename,
+      download_url: file_download_url(index)
+    }
   end
+end
 
-  def files_with_urls
-    return [] unless has_files?
-
-    file_filenames.each_with_index.map do |filename, index|
-      {
-        index: index,
-        filename: filename,
-        download_url: file_download_url(index)
-      }
-    end
-  end
 
   private
 
