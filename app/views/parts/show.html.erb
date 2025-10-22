@@ -205,9 +205,11 @@
 
               <!-- Actions -->
               <div class="flex items-center space-x-2">
-                <%= link_to "Download", file[:download_url],
-                    target: "_blank",
-                    class: "inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" %>
+                <!-- Temporarily show the URL for debugging -->
+                <div class="text-xs break-all max-w-md">
+                  <p class="font-semibold">URL:</p>
+                  <p><%= file[:download_url] %></p>
+                </div>
 
                 <%= button_to "Delete", delete_file_part_path(@part, index: file[:index]),
                     method: :delete,
