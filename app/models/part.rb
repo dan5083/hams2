@@ -702,7 +702,7 @@ class Part < ApplicationRecord
     return nil unless has_files?
     return nil if index >= file_cloudinary_ids.length
 
-    Cloudinary::Utils.cloudinary_url(file_cloudinary_ids[index], flags: 'attachment')
+    Cloudinary::Utils.cloudinary_url(file_cloudinary_ids[index])
   end
 
   def files_with_urls
