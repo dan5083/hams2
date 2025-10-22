@@ -660,11 +660,17 @@ def upload_file(file)
   return false if file.blank?
 
   begin
+    # FIX: Use the original folder structure that worked
+    # Old working structure: parts/{customer-name}/{part-number}/
+    # Not: parts/files/
+    customer_slug = customer.name.parameterize
+    folder_path = "parts/#{customer_slug}/#{part_number}"
+
     result = Cloudinary::Uploader.upload(
       file.tempfile,
-      folder: "parts/files",
+      folder: folder_path,  # CHANGED: Use customer/part structure
       resource_type: :auto,
-      public_id: "#{customer.id}_#{part_number}_#{part_issue}_#{Time.current.to_i}"
+      public_id: "#{file.original_filename.gsub(/\.[^.]+$/, '')}_#{Time.current.strftime('%Y%m%d_%H%M%S')}"  # CHANGED: Use filename-based ID
     )
 
     self.file_cloudinary_ids ||= []
@@ -705,16 +711,16 @@ def file_download_url(index)
 
   public_id = file_cloudinary_ids[index]
   filename = file_filenames[index].to_s.downcase
-  original_filename = file_filenames[index]  # Keep original case
+  original_filename = file_filenames[index]
 
   # Determine resource type
   if filename.match?(/\.(jpg|jpeg|png|gif|webp)$/i)
     Cloudinary::Utils.cloudinary_url(public_id, resource_type: 'image')
   else
-    # FIXED: For PDFs and other files, don't specify resource_type: 'raw'
-    # Instead, use the default which works with resource_type: :auto from upload
+    # Everything else as raw with specific attachment filename
+    # This is correct - /raw/ in the URL is fine!
     Cloudinary::Utils.cloudinary_url(public_id,
-      flags: 'attachment',
+      resource_type: 'raw',
       attachment: original_filename
     )
   end
