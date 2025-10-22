@@ -702,19 +702,18 @@ class Part < ApplicationRecord
     return nil unless has_files?
     return nil if index >= file_cloudinary_ids.length
 
-    Cloudinary::Utils.cloudinary_url(file_cloudinary_ids[index])
-  end
+    public_id = file_cloudinary_ids[index]
 
-  def files_with_urls
-    return [] unless has_files?
-
-    file_filenames.each_with_index.map do |filename, index|
-      {
-        index: index,
-        filename: filename,
-        download_url: file_download_url(index)
-      }
+    # Determine resource type from the public ID or filename
+    # Images use 'image', everything else uses 'raw'
+    filename = file_filenames[index].to_s.downcase
+    resource_type = if filename.match?(/\.(jpg|jpeg|png|gif|webp)$/i)
+      'image'
+    else
+      'raw'
     end
+
+    Cloudinary::Utils.cloudinary_url(public_id, resource_type: resource_type)
   end
 
   private
