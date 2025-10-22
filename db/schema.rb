@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_10_10_135714) do
+ActiveRecord::Schema[8.0].define(version: 2025_10_22_115646) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -164,14 +164,14 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_10_135714) do
     t.uuid "replaces_id"
     t.text "specified_thicknesses"
     t.decimal "each_price", precision: 10, scale: 2
-    t.string "drawing_cloudinary_public_id"
-    t.string "drawing_filename"
+    t.string "file_cloudinary_ids", default: [], array: true
+    t.string "file_filenames", default: [], array: true
     t.index ["customer_id", "enabled"], name: "index_parts_on_customer_id_and_enabled"
     t.index ["customer_id", "part_number", "part_issue"], name: "index_parts_on_customer_and_part_number_and_issue", unique: true
     t.index ["customer_id"], name: "index_parts_on_customer_id"
     t.index ["customisation_data"], name: "index_parts_on_customisation_data", using: :gin
-    t.index ["drawing_cloudinary_public_id"], name: "index_parts_on_drawing_cloudinary_public_id"
     t.index ["enabled"], name: "index_parts_on_enabled"
+    t.index ["file_cloudinary_ids"], name: "index_parts_on_file_cloudinary_ids"
     t.index ["part_number"], name: "index_parts_on_part_number"
     t.index ["process_type"], name: "index_parts_on_process_type"
     t.index ["replaces_id"], name: "index_parts_on_replaces_id"

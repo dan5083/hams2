@@ -21,8 +21,8 @@ Rails.application.routes.draw do
       delete :delete_operation
       patch :update_locked_operation
       get :copy_operations
-      post :upload_drawing
-      delete :delete_drawing
+      post :upload_file
+      delete :delete_file
     end
     collection do
       get :search

@@ -7,7 +7,6 @@ class Part < ApplicationRecord
   has_many :replaced_by, class_name: 'Part', foreign_key: :replaces_id, dependent: :nullify
 
   validates :part_number, presence: true
-  validates :drawing_filename, length: { maximum: 255 }, allow_nil: true
   validates :part_issue, presence: true
   validates :each_price, numericality: { greater_than_or_equal_to: 0 }, allow_nil: true
   validates :part_number, uniqueness: {
@@ -651,58 +650,70 @@ class Part < ApplicationRecord
     get_operations_with_auto_ops.any?
   end
 
-  # Technical Drawing Methods
-  def has_drawing?
-    drawing_cloudinary_public_id.present?
+  # Technical Drawing/photo Methods
+  def has_files?
+    file_cloudinary_ids.present? && file_cloudinary_ids.any?
   end
 
-  def drawing_download_url
-    return nil unless has_drawing?
-    CloudinaryService.generate_download_url(drawing_cloudinary_public_id)
-  end
-
-  def upload_drawing(uploaded_file)
-    return false unless uploaded_file
+  def upload_file(file)
+    return false if file.blank?
 
     begin
-      delete_drawing if has_drawing?
-
-      result = CloudinaryService.upload_file(
-        uploaded_file,
-        "parts/#{customer.name.parameterize}/#{part_number}",
-        filename_prefix: 'drawing',
-        resource_type: 'auto'
+      result = Cloudinary::Uploader.upload(
+        file.tempfile,
+        folder: "parts/files",
+        resource_type: :auto,
+        public_id: "#{customer.id}_#{part_number}_#{part_issue}_#{Time.current.to_i}"
       )
 
-      update(
-        drawing_cloudinary_public_id: result[:public_id],
-        drawing_filename: result[:filename]
-      )
+      self.file_cloudinary_ids ||= []
+      self.file_filenames ||= []
 
-      true
-    rescue CloudinaryService::CloudinaryError => e
-      errors.add(:base, "Failed to upload drawing: #{e.message}")
+      self.file_cloudinary_ids << result['public_id']
+      self.file_filenames << file.original_filename
+      save
+    rescue => e
+      errors.add(:base, "File upload failed: #{e.message}")
       false
     end
   end
 
-  def delete_drawing
-    return false unless has_drawing?
+  def delete_file(index)
+    return false unless has_files?
+    return false if index >= file_cloudinary_ids.length
 
     begin
-      resource_type = drawing_cloudinary_public_id.match?(/\.(pdf|doc|docx)$/i) ? 'raw' : 'auto'
+      Cloudinary::Uploader.destroy(file_cloudinary_ids[index])
 
-      CloudinaryService.delete_file(drawing_cloudinary_public_id, resource_type: resource_type)
+      self.file_cloudinary_ids = file_cloudinary_ids.dup
+      self.file_filenames = file_filenames.dup
 
-      update(
-        drawing_cloudinary_public_id: nil,
-        drawing_filename: nil
-      )
+      file_cloudinary_ids.delete_at(index)
+      file_filenames.delete_at(index)
 
-      true
-    rescue CloudinaryService::CloudinaryError => e
-      errors.add(:base, "Failed to delete drawing: #{e.message}")
+      save
+    rescue => e
+      errors.add(:base, "File deletion failed: #{e.message}")
       false
+    end
+  end
+
+  def file_download_url(index)
+    return nil unless has_files?
+    return nil if index >= file_cloudinary_ids.length
+
+    Cloudinary::Utils.cloudinary_url(file_cloudinary_ids[index], flags: 'attachment')
+  end
+
+  def files_with_urls
+    return [] unless has_files?
+
+    file_filenames.each_with_index.map do |filename, index|
+      {
+        index: index,
+        filename: filename,
+        download_url: file_download_url(index)
+      }
     end
   end
 

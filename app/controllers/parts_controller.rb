@@ -1,7 +1,7 @@
 class PartsController < ApplicationController
  before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled, :toggle_aerospace_defense,
                                   :insert_operation, :reorder_operation, :delete_operation,
-                                  :update_locked_operation, :upload_drawing, :delete_drawing]
+                                  :update_locked_operation, :upload_file, :delete_file]
 
   def index
     @parts = Part.includes(:customer, :works_orders)
@@ -666,24 +666,24 @@ end
     end
   end
 
-    def upload_drawing
-    if params[:drawing].present?
-      if @part.upload_drawing(params[:drawing])
-        redirect_to @part, notice: 'Technical drawing uploaded successfully.'
+  def upload_file
+    if params[:file].present?
+      if @part.upload_file(params[:file])
+        redirect_to @part, notice: 'File uploaded successfully.'
       else
-        redirect_to @part, alert: "Failed to upload drawing: #{@part.errors.full_messages.join(', ')}"
+        redirect_to @part, alert: "Failed to upload: #{@part.errors.full_messages.join(', ')}"
       end
     else
-      redirect_to @part, alert: 'Please select a file to upload.'
+      redirect_to @part, alert: 'Please select a file.'
     end
   end
 
-  # Delete technical drawing
-  def delete_drawing
-    if @part.delete_drawing
-      redirect_to @part, notice: 'Technical drawing deleted successfully.'
+  def delete_file
+    index = params[:index].to_i
+    if @part.delete_file(index)
+      redirect_to @part, notice: 'File deleted successfully.'
     else
-      redirect_to @part, alert: "Failed to delete drawing: #{@part.errors.full_messages.join(', ')}"
+      redirect_to @part, alert: "Failed to delete: #{@part.errors.full_messages.join(', ')}"
     end
   end
 
