@@ -704,17 +704,23 @@ class Part < ApplicationRecord
     return nil if index >= file_cloudinary_ids.length
 
     public_id = file_cloudinary_ids[index]
-
-    # Determine resource type from the public ID or filename
-    # Images use 'image', everything else uses 'raw'
     filename = file_filenames[index].to_s.downcase
-    resource_type = if filename.match?(/\.(jpg|jpeg|png|gif|webp)$/i)
-      'image'
+
+    # Determine resource type and whether to force download
+    if filename.match?(/\.(jpg|jpeg|png|gif|webp)$/i)
+      resource_type = 'image'
+      options = { resource_type: resource_type }
+    elsif filename.match?(/\.(docx|doc|xlsx|xls)$/i)
+      # Office documents - force download
+      resource_type = 'raw'
+      options = { resource_type: resource_type, flags: 'attachment' }
     else
-      'raw'
+      # PDFs and other files - let browser decide
+      resource_type = 'raw'
+      options = { resource_type: resource_type }
     end
 
-    Cloudinary::Utils.cloudinary_url(public_id, resource_type: resource_type)
+    Cloudinary::Utils.cloudinary_url(public_id, options)
   end
 
   def files_with_urls
