@@ -652,96 +652,131 @@ class Part < ApplicationRecord
 
 
  # Technical Drawing/photo Methods
-def has_files?
-  file_cloudinary_ids.present? && file_cloudinary_ids.any?
+  def files
+  customisation_data&.dig("files") || []
 end
 
-def upload_file(file)
-  return false if file.blank?
+def has_files?
+  files.any?
+end
+
+def upload_file(uploaded_file)
+  return false unless uploaded_file.present?
 
   begin
-    # Use customer/part folder structure (not generic /files/)
+    # Create folder structure similar to NCRs
+    # Use customer slug and part number for organization
     customer_slug = customer.name.parameterize
-    folder_path = "parts/#{customer_slug}/#{part_number}"
+    part_slug = "#{part_number}-#{part_issue}".parameterize
 
-    # Clean filename and keep extension
-    original_filename = file.original_filename
-    clean_filename = original_filename.gsub(/\s+/, '_')  # Replace spaces with underscores
-    basename = File.basename(clean_filename, '.*')  # Filename without extension
-    extension = File.extname(clean_filename)  # Extension with dot (e.g., '.pdf')
+    folder_path = "parts/#{customer_slug}/#{part_slug}"
 
-    # Create public_id WITH extension (critical for Cloudinary to serve correctly)
+    # Generate filename prefix with timestamp
     timestamp = Time.current.strftime('%Y%m%d_%H%M%S')
-    public_id_with_extension = "#{basename}_#{timestamp}#{extension}"
+    filename_prefix = "#{part_number}_#{part_issue}_#{timestamp}".parameterize
 
-    result = Cloudinary::Uploader.upload(
-      file.tempfile,
-      folder: folder_path,
-      resource_type: :auto,
-      public_id: public_id_with_extension  # MUST include extension!
+    # Upload to Cloudinary using the same service as NCRs
+    upload_result = CloudinaryService.upload_file(
+      uploaded_file,
+      folder_path,
+      filename_prefix: filename_prefix
     )
 
-    self.file_cloudinary_ids ||= []
-    self.file_filenames ||= []
+    # Store metadata in JSONB (following NCR pattern)
+    file_metadata = {
+      "cloudinary_public_id" => upload_result[:public_id],
+      "cloudinary_url" => upload_result[:secure_url],
+      "original_filename" => upload_result[:filename],
+      "file_size_bytes" => upload_result[:size],
+      "content_type" => upload_result[:content_type],
+      "uploaded_at" => Time.current.iso8601
+    }
 
-    self.file_cloudinary_ids << result['public_id']
-    self.file_filenames << original_filename  # Store original for display
-    save
+    # Initialize files array if needed
+    self.customisation_data = customisation_data.dup || {}
+    self.customisation_data["files"] ||= []
+    self.customisation_data["files"] << file_metadata
+
+    save!
+
+    Rails.logger.info "Successfully uploaded file for Part #{display_name}: #{upload_result[:public_id]}"
+    true
+
+  rescue CloudinaryService::CloudinaryError => e
+    Rails.logger.error "Failed to upload file for Part #{display_name}: #{e.message}"
+    errors.add(:base, "File upload failed: #{e.message}")
+    false
   rescue => e
+    Rails.logger.error "Unexpected error uploading file for Part #{display_name}: #{e.message}"
     errors.add(:base, "File upload failed: #{e.message}")
     false
   end
 end
 
 def delete_file(index)
-  return false unless has_files?
-  return false if index >= file_cloudinary_ids.length
+  return false if index < 0 || index >= files.length
+
+  file_to_delete = files[index]
+  cloudinary_public_id = file_to_delete["cloudinary_public_id"]
 
   begin
-    Cloudinary::Uploader.destroy(file_cloudinary_ids[index])
-
-    self.file_cloudinary_ids = file_cloudinary_ids.dup
-    self.file_filenames = file_filenames.dup
-
-    file_cloudinary_ids.delete_at(index)
-    file_filenames.delete_at(index)
-
-    save
+    # Delete from Cloudinary first (following NCR pattern)
+    if cloudinary_public_id.present?
+      CloudinaryService.delete_file(cloudinary_public_id)
+      Rails.logger.info "Deleted Cloudinary file for Part #{display_name}: #{cloudinary_public_id}"
+    end
   rescue => e
-    errors.add(:base, "File deletion failed: #{e.message}")
-    false
+    Rails.logger.error "Failed to delete Cloudinary file: #{e.message}"
+    # Continue with metadata deletion even if Cloudinary deletion fails
   end
+
+  # Remove from files array
+  self.customisation_data = customisation_data.dup || {}
+  self.customisation_data["files"] ||= []
+  self.customisation_data["files"].delete_at(index)
+
+  save!
+  true
+rescue => e
+  Rails.logger.error "Failed to delete file for Part #{display_name}: #{e.message}"
+  errors.add(:base, "File deletion failed: #{e.message}")
+  false
 end
 
-def file_download_url(index)
-  return nil unless has_files?
-  return nil if index >= file_cloudinary_ids.length
+def file_display_name(index)
+  file = files[index]
+  return nil unless file
 
-  public_id = file_cloudinary_ids[index]
-  filename = file_filenames[index].to_s.downcase
-  original_filename = file_filenames[index]
+  file["original_filename"] || "File #{index + 1}"
+end
 
-  # Determine resource type
-  if filename.match?(/\.(jpg|jpeg|png|gif|webp)$/i)
-    Cloudinary::Utils.cloudinary_url(public_id, resource_type: 'image')
+def file_size_formatted(index)
+  file = files[index]
+  return nil unless file
+
+  bytes = file["file_size_bytes"].to_i
+  if bytes < 1024
+    "#{bytes} bytes"
+  elsif bytes < 1_048_576
+    "#{(bytes / 1024.0).round(1)} KB"
   else
-    # For PDFs and other files - public_id already contains extension
-    Cloudinary::Utils.cloudinary_url(public_id,
-      resource_type: 'raw',
-      attachment: original_filename
-    )
+    "#{(bytes / 1_048_576.0).round(1)} MB"
   end
 end
 
-def files_with_urls
-  return [] unless has_files?
+def generate_file_download_url(index)
+  file = files[index]
+  return nil unless file
 
-  file_filenames.each_with_index.map do |filename, index|
-    {
-      index: index,
-      filename: filename,
-      download_url: file_download_url(index)
-    }
+  cloudinary_public_id = file["cloudinary_public_id"]
+  return nil unless cloudinary_public_id.present?
+
+  begin
+    # Use the same method as NCRs to generate download URL
+    CloudinaryService.generate_download_url(cloudinary_public_id)
+  rescue => e
+    Rails.logger.error "Failed to generate download URL for Part #{display_name} file #{index}: #{e.message}"
+    nil
   end
 end
 

@@ -22,7 +22,8 @@ Rails.application.routes.draw do
       patch :update_locked_operation
       get :copy_operations
       post :upload_file
-      delete :delete_file
+      delete 'delete_file/:index', action: :delete_file, as: :delete_file
+      get 'download_file/:index', action: :download_file, as: :download_file
     end
     collection do
       get :search

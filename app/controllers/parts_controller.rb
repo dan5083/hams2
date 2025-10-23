@@ -1,7 +1,7 @@
 class PartsController < ApplicationController
  before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled, :toggle_aerospace_defense,
                                   :insert_operation, :reorder_operation, :delete_operation,
-                                  :update_locked_operation, :upload_file, :delete_file]
+                                  :update_locked_operation, :upload_file, :delete_file, :download_file]
 
   def index
     @parts = Part.includes(:customer, :works_orders)
@@ -666,6 +666,7 @@ end
     end
   end
 
+  # UPDATED upload_file method
   def upload_file
     if params[:file].present?
       if @part.upload_file(params[:file])
@@ -678,12 +679,42 @@ end
     end
   end
 
+  # UPDATED delete_file method
   def delete_file
     index = params[:index].to_i
     if @part.delete_file(index)
       redirect_to @part, notice: 'File deleted successfully.'
     else
       redirect_to @part, alert: "Failed to delete: #{@part.errors.full_messages.join(', ')}"
+    end
+  end
+
+  # NEW download_file method (following NCR pattern)
+  def download_file
+    index = params[:index].to_i
+
+    if index < 0 || index >= @part.files.length
+      redirect_to @part, alert: 'File not found.'
+      return
+    end
+
+    begin
+      Rails.logger.info "Starting download for Part #{@part.display_name} file #{index}"
+
+      # Generate a signed URL with attachment flag for download (same as NCR)
+      download_url = @part.generate_file_download_url(index)
+
+      if download_url
+        Rails.logger.info "Generated download URL, redirecting to Cloudinary"
+        redirect_to download_url, allow_other_host: true
+      else
+        Rails.logger.error "Failed to generate download URL"
+        redirect_to @part, alert: 'Unable to generate download link. Please try again.'
+      end
+
+    rescue => e
+      Rails.logger.error "Download error: #{e.class} - #{e.message}"
+      redirect_to @part, alert: "Download failed: #{e.message}"
     end
   end
 
