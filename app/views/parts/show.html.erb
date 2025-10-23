@@ -185,7 +185,7 @@
     <% if @part.has_files? %>
       <!-- Display existing files -->
       <div class="space-y-3 mb-4">
-        <% @part.files_with_urls.each do |file| %>
+        <% @part.files.each_with_index do |file, index| %>
           <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
             <div class="flex items-center justify-between">
               <div class="flex items-center space-x-3">
@@ -198,20 +198,24 @@
 
                 <!-- File info -->
                 <div>
-                  <p class="text-sm font-medium text-gray-900"><%= file[:filename] %></p>
-                  <p class="text-xs text-gray-500">File for <%= @part.part_number %></p>
+                  <p class="text-sm font-medium text-gray-900"><%= @part.file_display_name(index) %></p>
+                  <p class="text-xs text-gray-500">
+                    <%= @part.file_size_formatted(index) %>
+                    <% if file["uploaded_at"].present? %>
+                      • Uploaded <%= Time.parse(file["uploaded_at"]).strftime("%d/%m/%Y %H:%M") rescue "N/A" %>
+                    <% end %>
+                  </p>
                 </div>
               </div>
 
               <!-- Actions -->
               <div class="flex items-center space-x-2">
-                <%= link_to "Download", file[:download_url],
-                    target: "_blank",
+                <%= link_to "Download", download_file_part_path(@part, index: index),
                     class: "inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" %>
 
-                <%= button_to "Delete", delete_file_part_path(@part, index: file[:index]),
+                <%= button_to "Delete", delete_file_part_path(@part, index: index),
                     method: :delete,
-                    form: { data: { confirm: "Are you sure you want to delete #{file[:filename]}?" } },
+                    form: { data: { confirm: "Are you sure you want to delete #{@part.file_display_name(index)}?" } },
                     class: "inline-flex items-center px-3 py-2 border border-red-300 shadow-sm text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500" %>
               </div>
             </div>
