@@ -1,3 +1,4 @@
+# app/models/organization.rb
 class Organization < ApplicationRecord
   belongs_to :xero_contact, optional: true
 
@@ -117,6 +118,33 @@ class Organization < ApplicationRecord
   def contact_address
     # Keep this method for backward compatibility, but prefer pdf_address for PDFs
     xero_contact&.primary_address
+  end
+
+  # NEW: Get buyer emails for order acknowledgements
+  # Returns array of buyer emails from Xero contact persons with "Include in emails" enabled
+  # Falls back to primary contact email if no buyers configured
+  def buyer_emails
+    return [] unless xero_contact
+
+    emails = xero_contact.buyer_emails
+
+    # If no buyer emails configured, fall back to primary contact email
+    if emails.empty?
+      primary = contact_email
+      return primary.present? ? [primary] : []
+    end
+
+    emails
+  end
+
+  # Helper to get buyer contact details for display/debugging
+  def buyer_contacts
+    xero_contact&.buyer_contacts || []
+  end
+
+  # Check if this customer has buyers configured
+  def has_buyers?
+    xero_contact&.buyer_emails&.any? || false
   end
 
   def synced_with_xero?

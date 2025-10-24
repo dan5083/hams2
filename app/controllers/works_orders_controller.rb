@@ -373,7 +373,7 @@ class WorksOrdersController < ApplicationController
 
   private
 
- def create_bulk
+  def create_bulk
     Rails.logger.info "🔧 BULK CREATE: Starting bulk works order creation"
     Rails.logger.info "🔧 BULK CREATE: Received params: #{params.inspect}"
 
@@ -437,30 +437,30 @@ class WorksOrdersController < ApplicationController
 
     # Check results and respond
     if errors.empty? && created_works_orders.any?
-      # ADD THESE DEBUG LINES HERE:
-      Rails.logger.info "🐛 DEBUG: About to check for email sending"
-      Rails.logger.info "🐛 DEBUG: created_works_orders.count = #{created_works_orders.count}"
-
-      # Send order acknowledgement email if customer has an email
+      # Send order acknowledgement email to buyers
       customer_order = created_works_orders.first.customer_order
 
-      Rails.logger.info "🐛 DEBUG: customer_order = #{customer_order.inspect}"
-      Rails.logger.info "🐛 DEBUG: customer email = #{customer_order&.customer&.contact_email}"
+      Rails.logger.info "📧 Checking email configuration for customer order #{customer_order.number}"
 
-      if customer_order && customer_order.customer.contact_email.present?
+      if customer_order && customer_order.customer.buyer_emails.any?
         begin
+          buyer_list = customer_order.customer.buyer_emails.join(', ')
+
           OrderAcknowledgementMailer.order_confirmation(
             customer_order,
             created_works_orders
           ).deliver_later
 
           Rails.logger.info "📧 Order acknowledgement email queued for customer order #{customer_order.number}"
+          Rails.logger.info "📧 Recipients: #{buyer_list}"
         rescue => e
           # Log error but don't fail the request - email is secondary to order creation
           Rails.logger.error "❌ Failed to send order acknowledgement email: #{e.message}"
+          Rails.logger.error "❌ Backtrace: #{e.backtrace.first(3).join("\n")}"
         end
       else
-        Rails.logger.warn "⚠️ No email address found for customer order #{customer_order&.number} - skipping acknowledgement"
+        Rails.logger.warn "⚠️ No buyer email addresses configured for #{customer_order.customer.name} (Order #{customer_order.number})"
+        Rails.logger.warn "⚠️ Skipping order acknowledgement email - add buyers in Xero contact 'Additional people' with 'Include in emails' enabled"
       end
 
       redirect_url = if customer_order

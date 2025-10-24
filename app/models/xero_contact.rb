@@ -105,6 +105,34 @@ class XeroContact < ApplicationRecord
     parts.join("\n")
   end
 
+  # NEW: Extract contact persons from Xero data
+  def contact_persons
+    xero_data&.dig("ContactPersons") || []
+  end
+
+  # NEW: Get emails for buyers (contact persons with IncludeInEmails enabled)
+  def buyer_emails
+    contact_persons
+      .select { |person| person["IncludeInEmails"] == true }
+      .map { |person| person["EmailAddress"] }
+      .compact
+      .reject(&:blank?)
+      .uniq
+  end
+
+  # Helper to get all contact person details for display/debugging
+  def buyer_contacts
+    contact_persons
+      .select { |person| person["IncludeInEmails"] == true }
+      .map do |person|
+        {
+          name: [person["FirstName"], person["LastName"]].compact.join(" "),
+          email: person["EmailAddress"]
+        }
+      end
+      .select { |contact| contact[:email].present? }
+  end
+
   def merged?
     merged_to_contact_id.present?
   end

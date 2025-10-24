@@ -2,7 +2,7 @@
 class OrderAcknowledgementMailer < ApplicationMailer
   def order_confirmation(customer_order, works_orders)
     @customer_order = customer_order
-    @works_orders = works_orders  # Remove .includes() - these are already loaded objects
+    @works_orders = works_orders
     @customer = customer_order.customer
 
     # Calculate totals
@@ -12,8 +12,11 @@ class OrderAcknowledgementMailer < ApplicationMailer
     # Get unique customer references if any
     @customer_references = @works_orders.map(&:customer_reference).compact.uniq.reject(&:blank?)
 
+    # Get buyer emails (returns array, falls back to primary contact if no buyers)
+    recipient_emails = @customer.buyer_emails
+
     mail(
-      to: @customer.contact_email,
+      to: recipient_emails,
       subject: "Order Acknowledgement - #{@customer_order.number} - Hard Anodising Surface Treatments Ltd"
     )
   end
