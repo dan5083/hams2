@@ -20,8 +20,69 @@
     </div>
   </div>
 
-  <% if @customers.any? %>
-    <div class="bg-white shadow-md rounded-lg overflow-hidden">
+  <%# Search and Filter Form %>
+  <div class="bg-white shadow-md rounded-lg p-4 mb-6">
+    <%= form_with url: organizations_path, method: :get, class: "space-y-4" do |f| %>
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <%# Search %>
+        <div>
+          <%= f.label :search, "Search by Name", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.text_field :search,
+              value: params[:search],
+              placeholder: "Customer name...",
+              class: "w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" %>
+        </div>
+
+        <%# Type Filter %>
+        <div>
+          <%= f.label :type, "Type", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.select :type,
+              options_for_select([
+                ['All', ''],
+                ['Customers Only', 'customers'],
+                ['Suppliers Only', 'suppliers']
+              ], params[:type]),
+              {},
+              class: "w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" %>
+        </div>
+
+        <%# Status Filter %>
+        <div>
+          <%= f.label :status, "Status", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.select :status,
+              options_for_select([
+                ['Enabled', 'enabled'],
+                ['Disabled', 'disabled'],
+                ['All', '']
+              ], params[:status] || 'enabled'),
+              {},
+              class: "w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" %>
+        </div>
+
+        <%# Buyers Filter %>
+        <div>
+          <%= f.label :buyers, "Buyers", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.select :buyers,
+              options_for_select([
+                ['All', ''],
+                ['With Buyers', 'with_buyers'],
+                ['Without Buyers', 'without_buyers']
+              ], params[:buyers]),
+              {},
+              class: "w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" %>
+        </div>
+      </div>
+
+      <div class="flex gap-2">
+        <%= f.submit "Filter", class: "bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" %>
+        <%= link_to "Clear Filters", organizations_path, class: "bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded" %>
+      </div>
+    <% end %>
+  </div>
+
+  <%# Results %>
+  <% if @organizations.any? %>
+    <div class="bg-white shadow-md rounded-lg overflow-hidden mb-4">
       <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
           <tr>
@@ -37,7 +98,7 @@
           </tr>
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
-          <% @customers.each do |customer| %>
+          <% @organizations.each do |customer| %>
             <tr>
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="text-sm font-medium text-gray-900">
@@ -75,13 +136,15 @@
         </tbody>
       </table>
     </div>
+
+    <%# Pagination %>
+    <div class="flex justify-center">
+      <%= paginate @organizations %>
+    </div>
   <% else %>
     <div class="bg-white shadow-md rounded-lg p-8 text-center">
-      <p class="text-gray-500 mb-4">No customers found. Sync from Xero to import customers.</p>
-      <%= button_to 'Sync from Xero',
-          sync_from_xero_organizations_path,
-          method: :post,
-          class: "bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" %>
+      <p class="text-gray-500 mb-4">No organizations found matching your criteria.</p>
+      <%= link_to "Clear Filters", organizations_path, class: "text-blue-600 hover:text-blue-800 font-semibold" %>
     </div>
   <% end %>
 
