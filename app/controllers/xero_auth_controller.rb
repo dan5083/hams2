@@ -1,3 +1,4 @@
+# app/controllers/xero_auth_controller.rb
 class XeroAuthController < ApplicationController
   before_action :require_xero_access, except: [:authorize, :callback]
   allow_unauthenticated_access only: [:authorize, :callback]
@@ -126,12 +127,53 @@ class XeroAuthController < ApplicationController
 
   # Syncs all active contacts from Xero, regardless of customer/supplier status
   # This allows the app to manage customer/supplier flags independently of Xero transaction history
-    def sync_contacts_from_xero(token_set, tenant_id)
+  def sync_contacts_from_xero(token_set, tenant_id)
     begin
       Rails.logger.info "Fetching contacts from Xero..."
 
       contacts_data = fetch_contacts_from_xero(token_set, tenant_id)
       Rails.logger.info "Found #{contacts_data.length} total contacts"
+
+      # === DEBUG SECTION START - Check for ContactPersons data ===
+      Rails.logger.info "=== CHECKING FOR CONTACTPERSONS DATA ==="
+
+      # Check Aero Components
+      aero = contacts_data.find { |c| c['Name']&.include?('Aero Components') }
+      if aero
+        Rails.logger.info "🔍 Found Aero Components contact"
+        Rails.logger.info "🔍 ContactPersons present: #{aero.key?('ContactPersons')}"
+        Rails.logger.info "🔍 ContactPersons value: #{aero['ContactPersons'].inspect}"
+        Rails.logger.info "🔍 ContactPersons count: #{aero['ContactPersons']&.length || 0}"
+        if aero['ContactPersons']&.any?
+          aero['ContactPersons'].each_with_index do |person, i|
+            Rails.logger.info "🔍   Person #{i+1}: #{person['FirstName']} #{person['LastName']} - #{person['EmailAddress']} - IncludeInEmails: #{person['IncludeInEmails']}"
+          end
+        end
+      else
+        Rails.logger.info "⚠️ Aero Components not found in contacts"
+      end
+
+      # Check Driver Southall
+      driver = contacts_data.find { |c| c['Name']&.include?('Driver Southall') }
+      if driver
+        Rails.logger.info "🔍 Found Driver Southall contact"
+        Rails.logger.info "🔍 ContactPersons present: #{driver.key?('ContactPersons')}"
+        Rails.logger.info "🔍 ContactPersons value: #{driver['ContactPersons'].inspect}"
+        Rails.logger.info "🔍 ContactPersons count: #{driver['ContactPersons']&.length || 0}"
+        if driver['ContactPersons']&.any?
+          driver['ContactPersons'].each_with_index do |person, i|
+            Rails.logger.info "🔍   Person #{i+1}: #{person['FirstName']} #{person['LastName']} - #{person['EmailAddress']} - IncludeInEmails: #{person['IncludeInEmails']}"
+          end
+        end
+      else
+        Rails.logger.info "⚠️ Driver Southall not found in contacts"
+      end
+
+      # Show a sample of what keys exist on contacts
+      if contacts_data.any?
+        Rails.logger.info "🔍 Sample contact keys: #{contacts_data.first.keys.inspect}"
+      end
+      # === DEBUG SECTION END ===
 
       # Log summary of all contacts before processing
       customers = contacts_data.select { |c| c['IsCustomer'] == true }
@@ -219,7 +261,9 @@ class XeroAuthController < ApplicationController
     require 'uri'
     require 'json'
 
-    uri = URI("https://api.xero.com/api.xro/2.0/Contacts")
+    # Note: ContactPersons should be included by default in Xero API responses
+    # Adding includeArchived=false to filter out archived contacts
+    uri = URI("https://api.xero.com/api.xro/2.0/Contacts?includeArchived=false")
 
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl = true
