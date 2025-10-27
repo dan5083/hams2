@@ -239,4 +239,3 @@ class CustomerOrdersController < ApplicationController
     )
   end
 end
-end
