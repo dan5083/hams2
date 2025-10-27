@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_10_22_115646) do
+ActiveRecord::Schema[8.0].define(version: 2025_10_27_110839) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -177,16 +177,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_22_115646) do
     t.index ["replaces_id"], name: "index_parts_on_replaces_id"
   end
 
-  create_table "release_levels", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.string "name", null: false
-    t.text "statement", null: false
-    t.boolean "enabled", default: true, null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["enabled"], name: "index_release_levels_on_enabled"
-    t.index ["name"], name: "index_release_levels_on_name", unique: true
-  end
-
   create_table "release_notes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.integer "number", null: false
     t.uuid "works_order_id", null: false
@@ -266,7 +256,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_22_115646) do
     t.integer "number", null: false
     t.uuid "customer_order_id", null: false
     t.uuid "part_id", null: false
-    t.uuid "release_level_id", null: false
     t.uuid "transport_method_id", null: false
     t.string "customer_order_line"
     t.string "part_number", null: false
@@ -295,7 +284,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_22_115646) do
     t.index ["number"], name: "index_works_orders_on_number", unique: true
     t.index ["part_id"], name: "index_works_orders_on_part_id"
     t.index ["part_number", "part_issue"], name: "index_works_orders_on_part_number_and_part_issue"
-    t.index ["release_level_id"], name: "index_works_orders_on_release_level_id"
     t.index ["transport_method_id"], name: "index_works_orders_on_transport_method_id"
     t.index ["voided"], name: "index_works_orders_on_voided"
     t.check_constraint "lot_price >= 0::numeric AND (each_price IS NULL OR each_price >= 0::numeric)", name: "check_positive_prices"
@@ -334,6 +322,5 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_22_115646) do
   add_foreign_key "sessions", "users"
   add_foreign_key "works_orders", "customer_orders"
   add_foreign_key "works_orders", "parts"
-  add_foreign_key "works_orders", "release_levels"
   add_foreign_key "works_orders", "transport_methods"
 end

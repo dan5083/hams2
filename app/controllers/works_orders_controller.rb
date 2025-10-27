@@ -4,7 +4,7 @@ class WorksOrdersController < ApplicationController
   before_action :require_ecard_access, only: [:ecard, :sign_off_operation, :save_batches, :save_operation_input]
 
  def index
-    @works_orders = WorksOrder.includes(:customer_order, :part, :release_level, :transport_method, customer: [])
+    @works_orders = WorksOrder.includes(:customer_order, :part, :transport_method, customer: [])
 
     # Apply user-specific e-card filtering if user sees e-cards
     if Current.user.sees_ecards?
@@ -403,7 +403,6 @@ class WorksOrdersController < ApplicationController
       works_order.part_id = wo_params[:part_id]
       works_order.customer_reference = wo_params[:customer_reference]
       works_order.quantity = wo_params[:quantity]
-      works_order.release_level_id = wo_params[:release_level_id]
       works_order.transport_method_id = wo_params[:transport_method_id]
       works_order.price_type = wo_params[:price_type]
 
@@ -525,7 +524,7 @@ end
     # Always allow these core parameters
     permitted_params = [
       :customer_order_id, :part_id, :quantity, :price_type,
-      :release_level_id, :transport_method_id, :customer_reference
+      :transport_method_id, :customer_reference
     ]
 
     # Add additional charges parameters
@@ -552,7 +551,6 @@ end
   end
 
   def load_reference_data
-    @release_levels = ReleaseLevel.enabled.ordered
     @transport_methods = TransportMethod.enabled.ordered
     @additional_charge_presets = AdditionalChargePreset.enabled.ordered
 

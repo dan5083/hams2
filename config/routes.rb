@@ -147,12 +147,6 @@ Rails.application.routes.draw do
     end
   end
 
-  resources :release_levels, except: [:show] do
-    member do
-      patch :toggle_enabled
-    end
-  end
-
   resources :transport_methods, except: [:show] do
     member do
       patch :toggle_enabled

@@ -281,24 +281,18 @@
         <div class="sm:col-span-6">
           <%= form.label :remarks, "Statement", class: "block text-sm font-medium text-gray-700" %>
           <%
-            default_statement = ""
-            if @release_note.new_record? && @release_note.remarks.blank?
-              if @works_order.release_level&.statement
-                default_statement = @works_order.release_level.statement
-                if @works_order.specification.present?
-                  default_statement = default_statement.gsub('[SPECIFICATION]', @works_order.specification)
-                end
-              end
-            end
+            # Default statement for new release notes
+            default_statement = "Certificate of conformity - We certify that the above work has been processed and inspected according to the terms of your order."
 
+            # Use existing remarks if present, otherwise use default
             field_value = @release_note.remarks.present? ? @release_note.remarks : default_statement
           %>
           <%= form.text_area :remarks, rows: 4,
-                             value: field_value,
-                             class: "mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
-                             placeholder: "Enter the release statement for this release note..." %>
+                            value: field_value,
+                            class: "mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
+                            placeholder: "Enter the release statement for this release note..." %>
           <p class="mt-1 text-xs text-gray-500">
-            Customize the release statement for this specific release note. The default comes from the release level template.
+            Customize the release statement for this specific release note.
             <% if @release_note.invoiced? %>
               <span class="font-medium text-green-600">Changes will appear in updated PDFs.</span>
             <% end %>

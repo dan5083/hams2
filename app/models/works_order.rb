@@ -4,7 +4,6 @@ class WorksOrder < ApplicationRecord
 
   belongs_to :customer_order
   belongs_to :part
-  belongs_to :release_level
   belongs_to :transport_method
   belongs_to :issued_by, class_name: 'User', optional: true
 
