@@ -10,5 +10,9 @@ class ArtifactsController < ApplicationController
 
     @additional_charge_presets_count = AdditionalChargePreset.count
     @enabled_additional_charge_presets_count = AdditionalChargePreset.enabled.count
+
+    @total_buyers_count = Buyer.count
+    @enabled_buyers_count = Buyer.where(enabled: true).count
+    @customers_with_buyers_count = Organization.customers.joins(:buyers).distinct.count
   end
 end

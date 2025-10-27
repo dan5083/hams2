@@ -1,0 +1,13 @@
+<%# app/views/buyers/edit.html.erb %>
+<div class="container mx-auto px-4 py-6">
+  <div class="max-w-2xl mx-auto">
+    <div class="mb-6">
+      <h1 class="text-3xl font-bold text-gray-900">Edit Buyer</h1>
+      <p class="text-gray-600 mt-2">Update buyer email address for <%= @organization.name %></p>
+    </div>
+
+    <div class="bg-white shadow-md rounded-lg p-6">
+      <%= render 'form', buyer: @buyer %>
+    </div>
+  </div>
+</div>

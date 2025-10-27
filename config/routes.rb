@@ -145,6 +145,13 @@ Rails.application.routes.draw do
     collection do
       post :sync_from_xero
     end
+
+    # Nested buyers management
+    resources :buyers do
+      member do
+        patch :toggle_enabled
+      end
+    end
   end
 
   resources :transport_methods, except: [:show] do

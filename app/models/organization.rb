@@ -1,6 +1,7 @@
 # app/models/organization.rb
 class Organization < ApplicationRecord
   belongs_to :xero_contact, optional: true
+  has_many :buyers, dependent: :destroy
 
   # Future associations (we'll add these as we build the system)
   # has_many :parts, foreign_key: :customer_id
@@ -120,25 +121,21 @@ class Organization < ApplicationRecord
     xero_contact&.primary_address
   end
 
-  # Get primary contact email for order acknowledgements
-  # Returns array with primary contact email only
+  # Get buyer emails for order acknowledgements
+  # Returns array of enabled buyer email addresses
+  # Falls back to primary contact email if no buyers configured
   def buyer_emails
-    return [] unless xero_contact
+    enabled_buyer_emails = buyers.enabled.pluck(:email)
+    return enabled_buyer_emails if enabled_buyer_emails.any?
 
+    # Fallback to primary contact email from Xero
     primary = contact_email
     return primary.present? ? [primary] : []
   end
 
-  # Helper to get buyer contact details for display/debugging (deprecated)
-  def buyer_contacts
-    # This method is no longer used but kept for backward compatibility
-    []
-  end
-
-  # Check if this customer has buyers configured (deprecated)
+  # Check if this customer has buyers configured
   def has_buyers?
-    # Always returns false now that buyer_emails is discontinued
-    false
+    buyers.enabled.any?
   end
 
   def synced_with_xero?

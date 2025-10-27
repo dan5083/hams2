@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_10_27_110839) do
+ActiveRecord::Schema[8.0].define(version: 2025_10_27_122324) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -55,6 +55,17 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_27_110839) do
     t.index ["enabled"], name: "index_additional_charge_presets_on_enabled"
     t.index ["is_variable"], name: "index_additional_charge_presets_on_is_variable"
     t.index ["name"], name: "index_additional_charge_presets_on_name", unique: true
+  end
+
+  create_table "buyers", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "organization_id", null: false
+    t.string "email", null: false
+    t.boolean "enabled", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["enabled"], name: "index_buyers_on_enabled"
+    t.index ["organization_id", "email"], name: "index_buyers_on_organization_id_and_email", unique: true
+    t.index ["organization_id"], name: "index_buyers_on_organization_id"
   end
 
   create_table "customer_orders", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -307,6 +318,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_27_110839) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "buyers", "organizations"
   add_foreign_key "customer_orders", "organizations", column: "customer_id"
   add_foreign_key "external_ncrs", "release_notes"
   add_foreign_key "external_ncrs", "users", column: "assigned_to_id"
