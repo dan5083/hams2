@@ -60,10 +60,9 @@ def index
 end
 
   def show
-    @works_orders = @customer_order.works_orders
-                                   .includes(:part, :release_level, :transport_method)
-                                   .order(created_at: :desc)
-  end
+  @works_orders = @customer_order.works_orders
+                                .includes(:part, :transport_method)
+                                .order(created_at: :desc)
 
   def new
     @customer_order = CustomerOrder.new

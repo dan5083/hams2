@@ -2,9 +2,6 @@
 class ArtifactsController < ApplicationController
   def index
     # Load counts for all artifact types
-    @release_levels_count = ReleaseLevel.count
-    @enabled_release_levels_count = ReleaseLevel.enabled.count
-
     @transport_methods_count = TransportMethod.count
     @enabled_transport_methods_count = TransportMethod.enabled.count
 

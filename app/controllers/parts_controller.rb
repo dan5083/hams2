@@ -22,9 +22,9 @@ class PartsController < ApplicationController
 
   def show
     @works_orders = @part.works_orders
-                         .includes(:customer_order, :release_level, :transport_method)
-                         .order(created_at: :desc)
-                         .limit(10) # Show recent works orders
+                        .includes(:customer_order, :transport_method)
+                        .order(created_at: :desc)
+                        .limit(10)
   end
 
   def new

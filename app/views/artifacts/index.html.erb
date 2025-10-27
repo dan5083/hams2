@@ -4,31 +4,7 @@
     <h1 class="text-3xl font-bold text-gray-900">Artifacts Management</h1>
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-    <!-- Release Levels Card -->
-    <div class="bg-white rounded-lg shadow-md p-6">
-      <h2 class="text-xl font-semibold text-gray-800 mb-4">Release Levels</h2>
-      <p class="text-gray-600 mb-4">Manage release level types and statements.</p>
-
-      <div class="space-y-2 text-sm mb-4">
-        <div><strong>Total:</strong> <%= @release_levels_count %></div>
-        <div><strong>Enabled:</strong> <%= @enabled_release_levels_count %></div>
-        <div><strong>Disabled:</strong> <%= @release_levels_count - @enabled_release_levels_count %></div>
-      </div>
-
-      <div class="space-y-2">
-        <%= link_to release_levels_path,
-            class: "block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm text-center" do %>
-          📋 Manage Release Levels
-        <% end %>
-
-        <%= link_to new_release_level_path,
-            class: "block w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded text-sm text-center" do %>
-          ➕ Add New Release Level
-        <% end %>
-      </div>
-    </div>
-
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
     <!-- Transport Methods Card -->
     <div class="bg-white rounded-lg shadow-md p-6">
       <h2 class="text-xl font-semibold text-gray-800 mb-4">Transport Methods</h2>
@@ -109,7 +85,7 @@
         <h3 class="text-sm font-medium text-blue-800">About Artifacts Management</h3>
         <div class="mt-2 text-sm text-blue-700">
           <p>This page provides centralized access to manage all system reference data including
-          release levels, transport methods, specification presets, and additional charges.
+          transport methods, specification presets, and additional charges.
           Use these tools to maintain the reference data used throughout the application.</p>
         </div>
       </div>
