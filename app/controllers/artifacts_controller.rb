@@ -1,7 +1,5 @@
 # app/controllers/artifacts_controller.rb
 class ArtifactsController < ApplicationController
-  before_action :require_artifacts_access
-
   def index
     # Load counts for all artifact types
     @release_levels_count = ReleaseLevel.count

@@ -38,11 +38,9 @@
               class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(external_ncrs_path)}" %>
         <% end %>
 
-        <!-- Artifacts - Developer only -->
-        <% if Current.user&.email_address == 'daniel@hardanodisingstl.com' %>
-          <%= link_to "Artifacts", artifacts_path,
-              class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(artifacts_path)}" %>
-        <% end %>
+        <!-- Artifacts - Always visible -->
+        <%= link_to "Artifacts", artifacts_path,
+            class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(artifacts_path)}" %>
       </div>
 
       <!-- Mobile menu button -->
@@ -92,10 +90,8 @@
             class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(external_ncrs_path)}" %>
       <% end %>
 
-      <% if Current.user&.email_address == 'daniel@hardanodisingstl.com' %>
-        <%= link_to "Artifacts", artifacts_path,
-            class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(artifacts_path)}" %>
-      <% end %>
+      <%= link_to "Artifacts", artifacts_path,
+          class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(artifacts_path)}" %>
 
       <!-- User section in mobile -->
       <% if Current.user %>
