@@ -373,116 +373,108 @@ class WorksOrdersController < ApplicationController
 
   private
 
-  def create_bulk
-    Rails.logger.info "🔧 BULK CREATE: Starting bulk works order creation"
-    Rails.logger.info "🔧 BULK CREATE: Received params: #{params.inspect}"
+ def create_bulk
+  Rails.logger.info "Starting bulk works order creation"
 
-    # Extract works_orders from the request
-    works_orders_data = params[:works_orders]
+  # Extract works_orders from the request
+  works_orders_data = params[:works_orders]
 
-    unless works_orders_data.present?
-      render json: {
-        success: false,
-        error: "No works orders data provided"
-      }, status: :unprocessable_entity
-      return
-    end
+  unless works_orders_data.present?
+    render json: {
+      success: false,
+      error: "No works orders data provided"
+    }, status: :unprocessable_entity
+    return
+  end
 
-    created_works_orders = []
-    errors = []
+  created_works_orders = []
+  errors = []
 
-    # Wrap in a transaction so all-or-nothing
-    ActiveRecord::Base.transaction do
-      works_orders_data.each_with_index do |wo_data, index|
-        # Convert to ActionController::Parameters for safety
-        wo_params = ActionController::Parameters.new(wo_data.to_unsafe_h)
+  # Wrap in a transaction so all-or-nothing
+  ActiveRecord::Base.transaction do
+    works_orders_data.each_with_index do |wo_data, index|
+      # Convert to ActionController::Parameters for safety
+      wo_params = ActionController::Parameters.new(wo_data.to_unsafe_h)
 
-        works_order = WorksOrder.new
+      works_order = WorksOrder.new
 
-        # Manually assign attributes from params
-        works_order.customer_order_id = wo_params[:customer_order_id]
-        works_order.part_id = wo_params[:part_id]
-        works_order.customer_reference = wo_params[:customer_reference]
-        works_order.quantity = wo_params[:quantity]
-        works_order.release_level_id = wo_params[:release_level_id]
-        works_order.transport_method_id = wo_params[:transport_method_id]
-        works_order.price_type = wo_params[:price_type]
+      # Manually assign attributes from params
+      works_order.customer_order_id = wo_params[:customer_order_id]
+      works_order.part_id = wo_params[:part_id]
+      works_order.customer_reference = wo_params[:customer_reference]
+      works_order.quantity = wo_params[:quantity]
+      works_order.release_level_id = wo_params[:release_level_id]
+      works_order.transport_method_id = wo_params[:transport_method_id]
+      works_order.price_type = wo_params[:price_type]
 
-        # Set pricing based on type
-        if wo_params[:price_type] == 'each'
-          works_order.each_price = wo_params[:each_price]
-          # lot_price will be calculated by before_validation callback
-        else
-          works_order.lot_price = wo_params[:lot_price]
-        end
-
-        # Set additional charges (stored in jsonb)
-        works_order.selected_charge_ids = wo_params[:selected_charge_ids] || []
-        works_order.custom_amounts = wo_params[:custom_amounts] || {}
-
-        # Validate part configuration
-        unless validate_part_configuration(works_order)
-          errors << { line: index + 1, errors: works_order.errors.full_messages }
-          raise ActiveRecord::Rollback
-        end
-
-        unless works_order.save
-          errors << { line: index + 1, errors: works_order.errors.full_messages }
-          raise ActiveRecord::Rollback
-        end
-
-        created_works_orders << works_order
-      end
-    end
-
-    # Check results and respond
-    if errors.empty? && created_works_orders.any?
-      # Send order acknowledgement email to buyers
-      customer_order = created_works_orders.first.customer_order
-
-      Rails.logger.info "📧 Checking email configuration for customer order #{customer_order.number}"
-
-      if customer_order && customer_order.customer.buyer_emails.any?
-        begin
-          buyer_list = customer_order.customer.buyer_emails.join(', ')
-
-          OrderAcknowledgementMailer.order_confirmation(
-            customer_order,
-            created_works_orders
-          ).deliver_later
-
-          Rails.logger.info "📧 Order acknowledgement email queued for customer order #{customer_order.number}"
-          Rails.logger.info "📧 Recipients: #{buyer_list}"
-        rescue => e
-          # Log error but don't fail the request - email is secondary to order creation
-          Rails.logger.error "❌ Failed to send order acknowledgement email: #{e.message}"
-          Rails.logger.error "❌ Backtrace: #{e.backtrace.first(3).join("\n")}"
-        end
+      # Set pricing based on type
+      if wo_params[:price_type] == 'each'
+        works_order.each_price = wo_params[:each_price]
+        # lot_price will be calculated by before_validation callback
       else
-        Rails.logger.warn "⚠️ No buyer email addresses configured for #{customer_order.customer.name} (Order #{customer_order.number})"
-        Rails.logger.warn "⚠️ Skipping order acknowledgement email - add buyers in Xero contact 'Additional people' with 'Include in emails' enabled"
+        works_order.lot_price = wo_params[:lot_price]
       end
 
-      redirect_url = if customer_order
-        customer_order_path(customer_order)
-      else
-        works_orders_path
+      # Set additional charges (stored in jsonb)
+      works_order.selected_charge_ids = wo_params[:selected_charge_ids] || []
+      works_order.custom_amounts = wo_params[:custom_amounts] || {}
+
+      # Validate part configuration
+      unless validate_part_configuration(works_order)
+        errors << { line: index + 1, errors: works_order.errors.full_messages }
+        raise ActiveRecord::Rollback
       end
 
-      render json: {
-        success: true,
-        message: "#{created_works_orders.count} works order(s) created successfully",
-        works_order_ids: created_works_orders.map(&:id),
-        redirect_url: redirect_url
-      }
-    else
-      render json: {
-        success: false,
-        error: "Failed to create works orders",
-        errors: errors
-      }, status: :unprocessable_entity
+      unless works_order.save
+        errors << { line: index + 1, errors: works_order.errors.full_messages }
+        raise ActiveRecord::Rollback
+      end
+
+      created_works_orders << works_order
     end
   end
+
+  # Check results and respond
+  if errors.empty? && created_works_orders.any?
+    # Send order acknowledgement email to buyers
+    customer_order = created_works_orders.first.customer_order
+
+    if customer_order && customer_order.customer.buyer_emails.any?
+      begin
+        OrderAcknowledgementMailer.order_confirmation(
+          customer_order,
+          created_works_orders
+        ).deliver_later
+
+        Rails.logger.info "Order acknowledgement email queued for #{customer_order.customer.name}"
+      rescue => e
+        # Log error but don't fail the request - email is secondary to order creation
+        Rails.logger.error "Failed to send order acknowledgement email: #{e.message}"
+      end
+    else
+      Rails.logger.info "No buyer emails configured for #{customer_order.customer.name} - skipping order acknowledgement"
+    end
+
+    redirect_url = if customer_order
+      customer_order_path(customer_order)
+    else
+      works_orders_path
+    end
+
+    render json: {
+      success: true,
+      message: "#{created_works_orders.count} works order(s) created successfully",
+      works_order_ids: created_works_orders.map(&:id),
+      redirect_url: redirect_url
+    }
+  else
+    render json: {
+      success: false,
+      error: "Failed to create works orders",
+      errors: errors
+    }, status: :unprocessable_entity
+  end
+end
 
   def create_single
     @works_order = WorksOrder.new(works_order_params)

@@ -4,8 +4,6 @@ class XeroAuthController < ApplicationController
   allow_unauthenticated_access only: [:authorize, :callback]
 
   def authorize
-    Rails.logger.info "=== XERO AUTH: Inside authorize method ==="
-    Rails.logger.info "=== XERO AUTH: Current.session = #{Current.session.inspect} ==="
     Rails.logger.info "=== STARTING XERO AUTH ==="
 
     creds = {
@@ -65,12 +63,6 @@ class XeroAuthController < ApplicationController
 
         Rails.logger.info "Processing organization: #{tenant_name}"
 
-        # # Skip Demo Company - we only want real business contacts
-        # if tenant_name.downcase.include?('demo company')
-        #   Rails.logger.info "Skipping Demo Company: #{tenant_name}"
-        #   next
-        # end
-
         # Store the main organization (prioritize Hard Anodising)
         if tenant_name.downcase.include?('hard anodising') || session[:xero_tenant_id].nil?
           session[:xero_tenant_id] = tenant_id
@@ -102,7 +94,6 @@ class XeroAuthController < ApplicationController
   def test_api
     Rails.logger.info "=== MANUAL API TEST ==="
 
-    # Try session storage (cache is unreliable on Heroku)
     token_set = session[:xero_token_set]
     tenant_id = session[:xero_tenant_id]
 
@@ -125,8 +116,6 @@ class XeroAuthController < ApplicationController
 
   private
 
-  # Syncs all active contacts from Xero, regardless of customer/supplier status
-  # This allows the app to manage customer/supplier flags independently of Xero transaction history
   def sync_contacts_from_xero(token_set, tenant_id)
     begin
       Rails.logger.info "Fetching contacts from Xero..."
@@ -134,67 +123,15 @@ class XeroAuthController < ApplicationController
       contacts_data = fetch_contacts_from_xero(token_set, tenant_id)
       Rails.logger.info "Found #{contacts_data.length} total contacts"
 
-      # === DEBUG SECTION START - Check for ContactPersons data ===
-      Rails.logger.info "=== CHECKING FOR CONTACTPERSONS DATA ==="
-
-      # Check Aero Components
-      aero = contacts_data.find { |c| c['Name']&.include?('Aero Components') }
-      if aero
-        Rails.logger.info "🔍 Found Aero Components contact"
-        Rails.logger.info "🔍 ContactPersons present: #{aero.key?('ContactPersons')}"
-        Rails.logger.info "🔍 ContactPersons value: #{aero['ContactPersons'].inspect}"
-        Rails.logger.info "🔍 ContactPersons count: #{aero['ContactPersons']&.length || 0}"
-        if aero['ContactPersons']&.any?
-          aero['ContactPersons'].each_with_index do |person, i|
-            Rails.logger.info "🔍   Person #{i+1}: #{person['FirstName']} #{person['LastName']} - #{person['EmailAddress']} - IncludeInEmails: #{person['IncludeInEmails']}"
-          end
-        end
-      else
-        Rails.logger.info "⚠️ Aero Components not found in contacts"
-      end
-
-      # Check Driver Southall
-      driver = contacts_data.find { |c| c['Name']&.include?('Driver Southall') }
-      if driver
-        Rails.logger.info "🔍 Found Driver Southall contact"
-        Rails.logger.info "🔍 ContactPersons present: #{driver.key?('ContactPersons')}"
-        Rails.logger.info "🔍 ContactPersons value: #{driver['ContactPersons'].inspect}"
-        Rails.logger.info "🔍 ContactPersons count: #{driver['ContactPersons']&.length || 0}"
-        if driver['ContactPersons']&.any?
-          driver['ContactPersons'].each_with_index do |person, i|
-            Rails.logger.info "🔍   Person #{i+1}: #{person['FirstName']} #{person['LastName']} - #{person['EmailAddress']} - IncludeInEmails: #{person['IncludeInEmails']}"
-          end
-        end
-      else
-        Rails.logger.info "⚠️ Driver Southall not found in contacts"
-      end
-
-      # Show a sample of what keys exist on contacts
-      if contacts_data.any?
-        Rails.logger.info "🔍 Sample contact keys: #{contacts_data.first.keys.inspect}"
-      end
-      # === DEBUG SECTION END ===
-
-      # Log summary of all contacts before processing
       customers = contacts_data.select { |c| c['IsCustomer'] == true }
       suppliers = contacts_data.select { |c| c['IsSupplier'] == true }
-      unassigned = contacts_data.select { |c| !c['IsCustomer'] && !c['IsSupplier'] }
 
-      Rails.logger.info "=== CONTACT SUMMARY ==="
-      Rails.logger.info "Total: #{contacts_data.length}, Customers: #{customers.length}, Suppliers: #{suppliers.length}, Unassigned: #{unassigned.length}"
-
-      # Log all contact names for debugging
-      Rails.logger.info "=== ALL CONTACT NAMES ==="
-      contacts_data.each { |c| Rails.logger.info "- #{c['Name']} (Customer: #{c['IsCustomer']}, Supplier: #{c['IsSupplier']}, Status: #{c['ContactStatus']})" }
+      Rails.logger.info "Customers: #{customers.length}, Suppliers: #{suppliers.length}"
 
       contact_count = 0
       contacts_data.each do |contact|
-        Rails.logger.info "Contact: #{contact['Name']} - Status: #{contact['ContactStatus']} - IsCustomer: #{contact['IsCustomer']} - IsSupplier: #{contact['IsSupplier']}"
-
-        # Skip archived contacts but include all others
+        # Skip archived contacts
         next if contact['ContactStatus'] == 'ARCHIVED'
-
-        Rails.logger.info "Processing contact: #{contact['Name']}"
 
         # Find or create XeroContact record
         xero_contact = XeroContact.find_or_initialize_by(xero_id: contact['ContactID'])
@@ -214,7 +151,6 @@ class XeroAuthController < ApplicationController
         organization = Organization.find_or_initialize_by(xero_contact: xero_contact)
 
         if organization.new_record?
-          Rails.logger.info "Creating new organization: #{contact['Name']}"
           organization.assign_attributes(
             name: contact['Name'] || 'Unknown',
             enabled: true,
@@ -222,7 +158,6 @@ class XeroAuthController < ApplicationController
             is_supplier: contact['IsSupplier'] || false
           )
         else
-          Rails.logger.info "Updating existing organization: #{organization.name}"
           # Update organization details from fresh Xero data
           organization.assign_attributes(
             name: contact['Name'] || organization.name,
@@ -235,10 +170,8 @@ class XeroAuthController < ApplicationController
 
         # Sync address for customer organizations
         if organization.is_customer
-          Rails.logger.info "Syncing address for customer: #{organization.name}"
           begin
             organization.sync_address_from_xero!
-            Rails.logger.info "Address synced for #{organization.name}"
           rescue => e
             Rails.logger.error "Failed to sync address for #{organization.name}: #{e.message}"
           end
@@ -247,7 +180,7 @@ class XeroAuthController < ApplicationController
         contact_count += 1
       end
 
-      Rails.logger.info "✅ Successfully synced #{contact_count} contacts with addresses"
+      Rails.logger.info "✅ Successfully synced #{contact_count} contacts"
       contact_count
 
     rescue => e
@@ -261,8 +194,6 @@ class XeroAuthController < ApplicationController
     require 'uri'
     require 'json'
 
-    # Note: ContactPersons should be included by default in Xero API responses
-    # Adding includeArchived=false to filter out archived contacts
     uri = URI("https://api.xero.com/api.xro/2.0/Contacts?includeArchived=false")
 
     http = Net::HTTP.new(uri.host, uri.port)
