@@ -120,31 +120,25 @@ class Organization < ApplicationRecord
     xero_contact&.primary_address
   end
 
-  # NEW: Get buyer emails for order acknowledgements
-  # Returns array of buyer emails from Xero contact persons with "Include in emails" enabled
-  # Falls back to primary contact email if no buyers configured
+  # Get primary contact email for order acknowledgements
+  # Returns array with primary contact email only
   def buyer_emails
     return [] unless xero_contact
 
-    emails = xero_contact.buyer_emails
-
-    # If no buyer emails configured, fall back to primary contact email
-    if emails.empty?
-      primary = contact_email
-      return primary.present? ? [primary] : []
-    end
-
-    emails
+    primary = contact_email
+    return primary.present? ? [primary] : []
   end
 
-  # Helper to get buyer contact details for display/debugging
+  # Helper to get buyer contact details for display/debugging (deprecated)
   def buyer_contacts
-    xero_contact&.buyer_contacts || []
+    # This method is no longer used but kept for backward compatibility
+    []
   end
 
-  # Check if this customer has buyers configured
+  # Check if this customer has buyers configured (deprecated)
   def has_buyers?
-    xero_contact&.buyer_emails&.any? || false
+    # Always returns false now that buyer_emails is discontinued
+    false
   end
 
   def synced_with_xero?
