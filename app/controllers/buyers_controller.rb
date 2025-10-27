@@ -9,6 +9,7 @@ class BuyersController < ApplicationController
 
   def new
     @buyer = @organization.buyers.new
+    @organizations = Organization.none  # Add this line to prevent nil error
   end
 
   def create
@@ -18,11 +19,13 @@ class BuyersController < ApplicationController
       redirect_to organization_buyers_path(@organization),
                   notice: 'Buyer was successfully added.'
     else
+      @organizations = Organization.none  # Add this line for error rendering
       render :new, status: :unprocessable_entity
     end
   end
 
   def edit
+    @organizations = Organization.none  # Add this line for consistency
   end
 
   def update
@@ -30,6 +33,7 @@ class BuyersController < ApplicationController
       redirect_to organization_buyers_path(@organization),
                   notice: 'Buyer was successfully updated.'
     else
+      @organizations = Organization.none  # Add this line for error rendering
       render :edit, status: :unprocessable_entity
     end
   end
