@@ -126,6 +126,70 @@
       </dl>
     </div>
 
+    <!-- Additional Charges -->
+    <% if @works_order.selected_charge_ids.present? && @works_order.selected_charge_ids.any? %>
+      <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">Additional Charges</h2>
+
+        <dl class="space-y-3">
+          <%
+            selected_charges = @works_order.get_selected_additional_charges
+            total_additional_charges = 0.0
+          %>
+
+          <% selected_charges.each do |charge| %>
+            <div class="flex justify-between items-start">
+              <dt class="text-sm font-medium text-gray-500">
+                <%= charge.name %>
+                <% if charge.is_variable? %>
+                  <% custom_amount = @works_order.get_custom_amount(charge.id)&.to_f %>
+                  <% if custom_amount.present? && custom_amount > 0 %>
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 ml-1">
+                      Custom
+                    </span>
+                  <% else %>
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800 ml-1">
+                      Variable (Default)
+                    </span>
+                  <% end %>
+                <% end %>
+              </dt>
+              <dd class="text-sm text-gray-900 font-medium">
+                <%
+                  if charge.is_variable?
+                    custom_amount = @works_order.get_custom_amount(charge.id)&.to_f
+                    display_amount = custom_amount.present? && custom_amount > 0 ? custom_amount : charge.amount
+                    total_additional_charges += display_amount
+                %>
+                  £<%= sprintf("%.2f", display_amount) %>
+                <% else
+                    total_additional_charges += charge.amount
+                %>
+                  £<%= sprintf("%.2f", charge.amount) %>
+                <% end %>
+              </dd>
+            </div>
+          <% end %>
+
+          <!-- Total Additional Charges -->
+          <div class="flex justify-between items-start pt-3 border-t border-gray-200">
+            <dt class="text-sm font-semibold text-gray-700">Total Additional Charges</dt>
+            <dd class="text-sm font-bold text-gray-900">
+              £<%= sprintf("%.2f", total_additional_charges) %>
+            </dd>
+          </div>
+
+          <!-- Grand Total -->
+          <div class="flex justify-between items-start pt-2 border-t-2 border-gray-300">
+            <dt class="text-base font-bold text-gray-900">Grand Total (Lot + Charges)</dt>
+            <dd class="text-base font-bold text-blue-600">
+              £<%= sprintf("%.2f", @works_order.lot_price + total_additional_charges) %>
+            </dd>
+          </div>
+        </dl>
+      </div>
+    <% end %>
+
     <!-- Status & Dates -->
     <div class="bg-white shadow rounded-lg p-6">
       <h2 class="text-xl font-semibold text-gray-900 mb-4">Status & Dates</h2>
