@@ -189,6 +189,94 @@
           background-image: url('<%= asset_path("aerospace-defence-certification.png") %>');
         }
       }
+
+      /* Contract Review Checklist Styling */
+      .contract-review-checklist {
+        page-break-before: always;
+        margin-top: 1cm;
+      }
+
+      .checklist-header {
+        text-align: center;
+        margin-bottom: 1rem;
+      }
+
+      .checklist-header h1 {
+        font-size: 14pt;
+        font-weight: bold;
+        margin: 0 0 0.3rem 0;
+      }
+
+      .checklist-header h2 {
+        font-size: 13pt;
+        font-weight: bold;
+        margin: 0 0 0.3rem 0;
+      }
+
+      .checklist-header h3 {
+        font-size: 11pt;
+        font-weight: normal;
+        margin: 0;
+      }
+
+      .checklist-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 1rem;
+        font-size: 9pt;
+      }
+
+      .checklist-table th,
+      .checklist-table td {
+        border: 1px solid #000;
+        padding: 0.15cm;
+        vertical-align: top;
+      }
+
+      .checklist-table th {
+        background-color: #e0e0e0;
+        font-weight: bold;
+        text-align: center;
+      }
+
+      .checklist-item-col {
+        width: 60%;
+        text-align: left !important;
+      }
+
+      .checklist-yes-col,
+      .checklist-no-col {
+        width: 8%;
+        text-align: center;
+      }
+
+      .checklist-action-col {
+        width: 24%;
+      }
+
+      .checklist-table tbody td {
+        min-height: 0.8cm;
+      }
+
+      .checklist-footer {
+        margin-top: 0.5cm;
+        font-size: 9pt;
+      }
+
+      .footer-action-section {
+        border: 1px solid #000;
+        padding: 0.3cm;
+      }
+
+      .footer-action-section strong {
+        display: block;
+        margin-bottom: 0.2cm;
+      }
+
+      .footer-action-section p {
+        margin: 0.1cm 0;
+        line-height: 1.3;
+      }
     </style>
   </head>
   <body>
@@ -208,5 +296,161 @@
     <div class="page-identification">
       WO<%= @works_order.number %> - Generated <%= Time.current.strftime("%d/%m/%Y %H:%M") %>
     </div>
+
+    <!-- Aerospace/Defence Contract Review Checklist -->
+    <% if @works_order&.aerospace_defense? %>
+      <%
+        # For Lufthansa Technik, only show checklist on first works order in customer order
+        # For all other customers, show on every aerospace works order
+        show_checklist = true
+        customer_name = @works_order.customer&.name
+
+        if customer_name == "Lufthansa Technik Landing Gear Services UK"
+          # Get all active works orders in this customer order, sorted by number (ascending)
+          all_wos_in_order = @works_order.customer_order.works_orders.active.order(:number)
+          first_wo = all_wos_in_order.first
+
+          # Only show checklist if this is the first (lowest numbered) works order
+          show_checklist = (@works_order.id == first_wo&.id)
+        end
+      %>
+
+      <% if show_checklist %>
+      <div class="contract-review-checklist">
+        <header class="checklist-header">
+          <h1>HARD ANODISING SURFACE TREATMENTS LTD</h1>
+          <h2>CONTRACT REVIEW CHECKLIST</h2>
+          <h3>AEROSPACE/DEFENCE CONTRACT REVIEW CHECKLIST - WORKS ORDER NO: <%= @works_order.number %></h3>
+        </header>
+
+        <table class="checklist-table">
+          <thead>
+            <tr>
+              <th class="checklist-item-col">ITEM</th>
+              <th class="checklist-yes-col">YES</th>
+              <th class="checklist-no-col">NO</th>
+              <th class="checklist-action-col">ACTION TAKEN SIGN AND DATE</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1. Receipt of Order - (check all details are clear and unambiguous)</td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>2. Order agrees with quotation?</td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>3. Ensure drawings and relevant specifications have been reviewed and are at the correct issue - check - Review Log. Ensure the Contract Review Result Sheet is available for relevent specifications so hey can be used to facilitate the contract review.</td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>4. Have key characteristics been identified on the drawing or as part of this review? (if yes Phil to determine if control plan required). Refer IP 2007 (page 7) to determine the relevant OCV data to be recorded.</td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>5. Jigging Review? when viewing drawing, carry out a jigging review to ensure work holding, special threads, and component orientation suitable to minimise air locks is taken into account</td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>6. Do Customer Quality Stipulations require frozen planning/quality plan?</td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>7. Are identified exceptional risks (metal/alloy etc)</td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>8. Are delivery timescales achievable?</td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>9. Are inspection requirements identified and inspection/test equipment available and within calibration</td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>10. Release certification determined</td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>11. Is coating thickness verification possible?</td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>12. Test pieces required</td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>13. Tooling and production equipment capable and available</td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>14. Processing materials or required specifications available to meet delivery programme</td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>15. Is a production Permit required?</td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>16. Does HASTL have the appropriate approval to process the order?</td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>17. For timed processes, ensure works order refers to use of calibrated timers</td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="checklist-footer">
+          <div class="footer-action-section">
+            <strong>ACTION</strong>
+            <p>If the correct specification issues are not available but work on hold and contact the customer. (Recall sheet is available from the web site no contract review)</p>
+            <p>Customer Own In House (delete as applicable)</p>
+          </div>
+        </div>
+
+        <div class="page-identification">
+          Form 2002/1 Iss 1.0
+        </div>
+      </div>
+      <% end %>
+    <% end %>
   </body>
 </html>
