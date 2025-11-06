@@ -90,24 +90,39 @@ for f in app/views/works_orders/*.html.erb; do echo "=== $f ==="; cat "$f"; echo
 for f in app/views/xero_auth/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
 
 
-<!-- HOW TO SEQUENCE FROM 1 -->
+<!-- HOW TO GET CHRIS"S ORDER COMPLETION REPORT -->
 
-# Step 1: Start the console
-heroku console
+heroku run rails runner "$(cat <<'EOF'
+require 'csv'
 
-# Step 2: Clear the data (in the console) Clear dependent records first, then independent ones
-InvoiceItem.delete_all
-Invoice.delete_all
-ReleaseNote.delete_all
-WorksOrder.delete_all
-CustomerOrder.delete_all
-Part.delete_all
-Sequence.delete_all
-
-puts "All records cleared"
-
-# Step 3: Create sequences (still in console) Create the required sequences
-['works_order_number', 'release_note_number', 'invoice_number', 'customer_order_number'].each do |key|
-  seq = Sequence.create!(key: key, value: 1)
-  puts "Created sequence: #{key} = #{seq.value}"
+def working_days_between(start_date, end_date)
+  return 0 if end_date.nil? || start_date.nil?
+  return 0 if end_date < start_date
+  days = 0
+  current_date = start_date
+  while current_date <= end_date
+    days += 1 if current_date.wday.between?(1, 5)
+    current_date += 1
+  end
+  days
 end
+
+october_start = Date.new(2025, 10, 1) <!-- edit -->
+october_end = Date.new(2025, 10, 31) <!-- edit -->
+
+customer_orders = CustomerOrder.includes(:customer, works_orders: :release_notes)
+                                .where(voided: false)
+                                .where(date_received: october_start..october_end)
+                                .order(Arel.sql('CASE WHEN EXISTS (SELECT 1 FROM works_orders wo JOIN release_notes rn ON rn.works_order_id = wo.id WHERE wo.customer_order_id = customer_orders.id AND rn.voided = false) THEN 0 ELSE 1 END, date_received'))
+
+CSV.generate do |csv|
+  csv << ['Customer Name', 'Order Number', 'Date Created', 'Date Released', 'Duration (Working Days)']
+  customer_orders.each do |order|
+    release_notes = ReleaseNote.active.where(works_order_id: order.works_orders.pluck(:id)).order(:date)
+    last_release_date = release_notes.maximum(:date)
+    duration = last_release_date ? working_days_between(order.date_received, last_release_date) : nil
+    csv << [order.customer.name, order.number, order.date_received.strftime('%d/%m/%Y'), last_release_date ? last_release_date.strftime('%d/%m/%Y') : '', duration || '']
+  end
+end
+EOF
+)" > october_orders.csv
