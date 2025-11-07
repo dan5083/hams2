@@ -1139,7 +1139,8 @@ export default class extends Controller {
             <option value="aerospace_minimal" ${treatment.selected_material_type === 'aerospace_minimal' ? 'selected' : ''}>Aerospace (Minimal Pretreatment)</option>
             <option value="castings_plate" ${treatment.selected_material_type === 'castings_plate' ? 'selected' : ''}>Castings/Plate</option>
             <option value="machined_wrought" ${treatment.selected_material_type === 'machined_wrought' ? 'selected' : ''}>Machined/Wrought</option>
-          </select>
+            <option value="magnesium" ${treatment.selected_material_type === 'magnesium' ? 'selected' : ''}>Magnesium</option>
+            </select>
           <p class="mt-1 text-xs text-gray-500">Material type determines required pretreatment sequence</p>
         </div>
       </div>

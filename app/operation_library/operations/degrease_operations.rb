@@ -28,16 +28,26 @@ module OperationLibrary
         return aluminium_based_alloy?(selected_alloy)
       end
 
+      # Chemical conversion: skip degrease for magnesium (rinse only)
+      if operation.process_type == 'chemical_conversion'
+        return !magnesium_material?(selected_alloy)
+      end
+
       # All other surface treatments require degrease
       surface_treatment_processes = %w[
         standard_anodising
         hard_anodising
         chromic_anodising
-        chemical_conversion
         stripping_only
       ]
 
       surface_treatment_processes.include?(operation.process_type)
+    end
+
+    # Check if material is magnesium (skip degrease for chemical conversion)
+    def self.magnesium_material?(material)
+      return false if material.blank?
+      material.upcase == 'MAGNESIUM'
     end
 
     # Check if alloy is aluminium-based (requires degrease for ENP)

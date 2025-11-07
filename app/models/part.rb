@@ -1148,8 +1148,13 @@ end
       return OperationLibrary::DegreaseOperations.aluminium_based_alloy?(selected_alloy)
     end
 
+    # Chemical conversion has conditional degrease based on material
+    if op.process_type == 'chemical_conversion'
+      return !OperationLibrary::DegreaseOperations.magnesium_material?(selected_alloy)
+    end
+
     # All other processes require degrease
-    ['standard_anodising', 'hard_anodising', 'chromic_anodising', 'chemical_conversion', 'stripping_only'].include?(op.process_type)
+    ['standard_anodising', 'hard_anodising', 'chromic_anodising', 'stripping_only'].include?(op.process_type)
   end
 
   def needs_pretreatment?(op)
@@ -1222,7 +1227,8 @@ end
     mapping = {
       'aerospace_minimal' => 'AEROSPACE_MINIMAL',
       'castings_plate' => 'CASTINGS_PLATE',
-      'machined_wrought' => 'MACHINED_WROUGHT'
+      'machined_wrought' => 'MACHINED_WROUGHT',
+      'magnesium' => 'MAGNESIUM'
     }
 
     mapping[form_material_type]
