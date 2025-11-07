@@ -930,9 +930,14 @@ end
     # Get jig type for this specific treatment
     treatment_jig_type = treatment_data["selected_jig_type"]
 
-    # Get alloy for ENP treatments to determine degrease requirement
-    selected_alloy = op.process_type == 'electroless_nickel_plating' ?
-                    get_selected_enp_alloy_for_treatment_data(treatment_data) : nil
+    # Get alloy/material for treatments to determine degrease requirement
+    selected_alloy = if op.process_type == 'electroless_nickel_plating'
+                      get_selected_enp_alloy_for_treatment_data(treatment_data)
+                    elsif op.process_type == 'chemical_conversion'
+                      get_selected_material_for_pretreatment(op, treatment_data)
+                    else
+                      nil
+                    end
 
     # Handle strip-only treatments
     if op.process_type == 'stripping_only'
