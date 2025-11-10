@@ -269,6 +269,12 @@
       <%= render 'route_card_header', works_order: @works_order %>
     <% end %>
 
+    <% if @works_order&.aerospace_defense? %>
+      <div style="margin: 0.5rem 0; padding: 0.25rem 0.5rem; background-color: #fff3cd; border: 1px solid #856404; font-weight: bold; text-align: center;">
+        When OCV monitoring use calibrated timers ONLY
+      </div>
+    <% end %>
+
     <section class="operations">
       <%= render 'route_card_ops', operations: @operations %>
     </section>

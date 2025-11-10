@@ -107,22 +107,106 @@ def working_days_between(start_date, end_date)
   days
 end
 
-october_start = Date.new(2025, 10, 1) <!-- edit -->
-october_end = Date.new(2025, 10, 31) <!-- edit -->
+october_start = Date.new(2025, 10, 1)
+october_end = Date.new(2025, 10, 31)
 
-customer_orders = CustomerOrder.includes(:customer, works_orders: :release_notes)
+customer_orders = CustomerOrder.includes(:customer, works_orders: [:part, :release_notes])
                                 .where(voided: false)
                                 .where(date_received: october_start..october_end)
                                 .order(Arel.sql('CASE WHEN EXISTS (SELECT 1 FROM works_orders wo JOIN release_notes rn ON rn.works_order_id = wo.id WHERE wo.customer_order_id = customer_orders.id AND rn.voided = false) THEN 0 ELSE 1 END, date_received'))
 
-CSV.generate do |csv|
-  csv << ['Customer Name', 'Order Number', 'Date Created', 'Date Released', 'Duration (Working Days)']
+csv_data = CSV.generate do |csv|
+  csv << ['Customer Name', 'Order Number', 'Date Created', 'Date Released', 'Duration (Working Days)', 'Is Aerospace?']
   customer_orders.each do |order|
     release_notes = ReleaseNote.active.where(works_order_id: order.works_orders.pluck(:id)).order(:date)
     last_release_date = release_notes.maximum(:date)
     duration = last_release_date ? working_days_between(order.date_received, last_release_date) : nil
-    csv << [order.customer.name, order.number, order.date_received.strftime('%d/%m/%Y'), last_release_date ? last_release_date.strftime('%d/%m/%Y') : '', duration || '']
+    is_aerospace = order.works_orders.any? { |wo| wo.part&.aerospace_defense? }
+    csv << [order.customer.name, order.number, order.date_received.strftime('%d/%m/%Y'), last_release_date ? last_release_date.strftime('%d/%m/%Y') : '', duration || '', is_aerospace]
   end
 end
+
+puts csv_data
+
+# Now generate the summary statistics
+puts "\n"
+puts "=" * 60
+puts "PERFORMANCE ANALYSIS"
+puts "=" * 60
+
+# Parse the CSV data we just generated
+rows = CSV.parse(csv_data, headers: true)
+completed = rows.select { |r| r['Date Released'].present? && r['Duration (Working Days)'].present? }
+
+aerospace_orders = completed.select { |r| r['Is Aerospace?'] == 'true' }
+non_aerospace_orders = completed.select { |r| r['Is Aerospace?'] == 'false' }
+
+aerospace_success = aerospace_orders.select { |r| r['Duration (Working Days)'].to_i <= 15 }
+aerospace_failure = aerospace_orders.select { |r| r['Duration (Working Days)'].to_i > 15 }
+
+non_aerospace_success = non_aerospace_orders.select { |r| r['Duration (Working Days)'].to_i <= 10 }
+non_aerospace_failure = non_aerospace_orders.select { |r| r['Duration (Working Days)'].to_i > 10 }
+
+total_success = aerospace_success.size + non_aerospace_success.size
+total_failure = aerospace_failure.size + non_aerospace_failure.size
+
+puts "\nDEADLINES:"
+puts "  Non-Aerospace: 10 working days"
+puts "  Aerospace:     15 working days"
+puts "\n" + "=" * 60
+puts "OVERALL RESULTS"
+puts "=" * 60
+puts "Total completed orders: #{completed.size}"
+puts "Orders not yet released: #{rows.size - completed.size}"
+puts ""
+puts "Met deadline:    #{total_success} (#{'%.1f' % (total_success.to_f / completed.size * 100)}%)"
+puts "Missed deadline: #{total_failure} (#{'%.1f' % (total_failure.to_f / completed.size * 100)}%)"
+
+puts "\n" + "=" * 60
+puts "NON-AEROSPACE ORDERS (<=10 days target)"
+puts "=" * 60
+puts "Total: #{non_aerospace_orders.size}"
+puts "Met deadline:    #{non_aerospace_success.size} (#{'%.1f' % (non_aerospace_success.size.to_f / non_aerospace_orders.size * 100)}%)"
+puts "Missed deadline: #{non_aerospace_failure.size} (#{'%.1f' % (non_aerospace_failure.size.to_f / non_aerospace_orders.size * 100)}%)"
+if non_aerospace_orders.any?
+  durations = non_aerospace_orders.map { |r| r['Duration (Working Days)'].to_i }
+  puts "Average duration:   #{'%.1f' % (durations.sum.to_f / durations.size)} days"
+  puts "Median duration:    #{durations.sort[durations.size / 2]} days"
+  puts "Range:              #{durations.min}-#{durations.max} days"
+end
+
+puts "\n" + "=" * 60
+puts "AEROSPACE ORDERS (<=15 days target)"
+puts "=" * 60
+puts "Total: #{aerospace_orders.size}"
+puts "Met deadline:    #{aerospace_success.size} (#{'%.1f' % (aerospace_success.size.to_f / aerospace_orders.size * 100)}%)"
+puts "Missed deadline: #{aerospace_failure.size} (#{'%.1f' % (aerospace_failure.size.to_f / aerospace_orders.size * 100)}%)"
+if aerospace_orders.any?
+  durations = aerospace_orders.map { |r| r['Duration (Working Days)'].to_i }
+  puts "Average duration:   #{'%.1f' % (durations.sum.to_f / durations.size)} days"
+  puts "Median duration:    #{durations.sort[durations.size / 2]} days"
+  puts "Range:              #{durations.min}-#{durations.max} days"
+end
+
+# Show failures
+all_failures = (aerospace_failure + non_aerospace_failure).sort_by { |r| -r['Duration (Working Days)'].to_i }
+if all_failures.any?
+  puts "\n" + "=" * 60
+  puts "ORDERS THAT MISSED DEADLINE"
+  puts "=" * 60
+  all_failures.each do |row|
+    deadline = row['Is Aerospace?'] == 'true' ? 15 : 10
+    overage = row['Duration (Working Days)'].to_i - deadline
+    aero_flag = row['Is Aerospace?'] == 'true' ? '[AERO]' : ''
+    puts "%-40s %8s  %2d days (over by %d) %s" % [
+      row['Customer Name'][0..39],
+      row['Order Number'],
+      row['Duration (Working Days)'].to_i,
+      overage,
+      aero_flag
+    ]
+  end
+end
+
 EOF
 )" > october_orders.csv
