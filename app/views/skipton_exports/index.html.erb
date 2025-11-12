@@ -39,7 +39,7 @@
       </div>
     <% end %>
 
-    <%= form_with url: skipton_exports_path, method: :post, multipart: true, class: "space-y-4" do |f| %>
+    <%= form_with url: skipton_exports_path, method: :post, multipart: true, data: { turbo: false }, class: "space-y-4" do |f| %>
       <div>
         <label class="block text-sm font-medium mb-2">
           Select Xero Invoice Export (CSV)
