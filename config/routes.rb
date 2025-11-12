@@ -3,6 +3,7 @@ Rails.application.routes.draw do
   resource :session
   resources :passwords, param: :token
   resources :registrations, only: [:new, :create]
+  resources :skipton_exports, only: [:index, :create]
 
   # Xero OAuth routes - MOVED BEFORE magic_link route
   get '/auth/xero', to: 'xero_auth#authorize'

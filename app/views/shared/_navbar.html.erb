@@ -41,6 +41,10 @@
         <!-- Artifacts - Always visible -->
         <%= link_to "Artifacts", artifacts_path,
             class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(artifacts_path)}" %>
+
+        <!-- Skipton Export - Always visible -->
+        <%= link_to "Skipton Export", skipton_exports_path,
+            class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(skipton_exports_path)}" %>
       </div>
 
       <!-- Mobile menu button -->
@@ -92,6 +96,10 @@
 
       <%= link_to "Artifacts", artifacts_path,
           class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(artifacts_path)}" %>
+
+      <!-- Skipton Export - Always visible -->
+      <%= link_to "Skipton Export", skipton_exports_path,
+          class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(skipton_exports_path)}" %>
 
       <!-- User section in mobile -->
       <% if Current.user %>
