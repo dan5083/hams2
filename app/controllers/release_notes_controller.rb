@@ -249,3 +249,115 @@ def process_thickness_measurements
   end
 end
 end
+
+# =============================================================================
+# CHEAT SHEET: Adding Thickness Measurement Requirements to Parts
+# =============================================================================
+#
+# PROBLEM: When copying parts, locked_operations contain anodising processes
+# but customisation_data["operation_selection"]["treatments"] is empty.
+# This causes release notes to NOT require thickness measurements even though
+# the part is aerospace/defense and has anodising.
+#
+# SOLUTION: Manually add the treatment to the treatments field using Heroku console.
+#
+# -----------------------------------------------------------------------------
+# 1. FIND PROBLEMATIC PARTS FOR A CUSTOMER
+# -----------------------------------------------------------------------------
+#
+# customer = Organization.find_by("name ILIKE ?", "%CUSTOMER_NAME%")
+# parts = Part.where(customer: customer, enabled: true)
+#
+# parts.each do |part|
+#   treatments = part.get_treatments
+#   if part.aerospace_defense? && treatments.empty? && part.locked_for_editing?
+#     # Check if they have anodising in locked operations
+#     has_anodising = part.locked_operations.any? do |op|
+#       op_text = op["operation_text"]&.downcase || ""
+#       op_name = op["display_name"]&.downcase || ""
+#       op_text.include?("anodis") || op_name.include?("anodis")
+#     end
+#     puts "❌ #{part.display_name} - needs fixing" if has_anodising
+#   end
+# end
+#
+# -----------------------------------------------------------------------------
+# 2. FIX A PART - Add Thickness Measurement Requirement
+# -----------------------------------------------------------------------------
+#
+# CHROMIC ANODISING:
+# ------------------
+# part = Part.find_by(part_number: 'PART-NUMBER-HERE')
+# part.customisation_data["operation_selection"]["treatments"] = [
+#   {
+#     "type" => "chromic_anodising",
+#     "operation_id" => "CHROMIC_22V",
+#     "selected_jig_type" => "titanium_wire",
+#     "target_thickness" => 5
+#   }
+# ].to_json
+# part.save!
+#
+# HARD ANODISING:
+# ---------------
+# part = Part.find_by(part_number: 'PART-NUMBER-HERE')
+# part.customisation_data["operation_selection"]["treatments"] = [
+#   {
+#     "type" => "hard_anodising",
+#     "operation_id" => "HARD_ANODISING",
+#     "selected_jig_type" => "titanium_wire",
+#     "target_thickness" => 25
+#   }
+# ].to_json
+# part.save!
+#
+# STANDARD ANODISING:
+# -------------------
+# part = Part.find_by(part_number: 'PART-NUMBER-HERE')
+# part.customisation_data["operation_selection"]["treatments"] = [
+#   {
+#     "type" => "standard_anodising",
+#     "operation_id" => "STANDARD_ANODISING",
+#     "selected_jig_type" => "titanium_wire",
+#     "target_thickness" => 15
+#   }
+# ].to_json
+# part.save!
+#
+# MULTIPLE TREATMENTS (e.g., Chromic + Hard):
+# --------------------------------------------
+# part = Part.find_by(part_number: 'PART-NUMBER-HERE')
+# part.customisation_data["operation_selection"]["treatments"] = [
+#   {
+#     "type" => "chromic_anodising",
+#     "operation_id" => "CHROMIC_22V",
+#     "selected_jig_type" => "titanium_wire",
+#     "target_thickness" => 5
+#   },
+#   {
+#     "type" => "hard_anodising",
+#     "operation_id" => "HARD_ANODISING",
+#     "selected_jig_type" => "titanium_wire",
+#     "target_thickness" => 25
+#   }
+# ].to_json
+# part.save!
+#
+# -----------------------------------------------------------------------------
+# 3. VERIFY THE FIX
+# -----------------------------------------------------------------------------
+#
+# wo = part.works_orders.last
+# if wo
+#   rn = wo.release_notes.build
+#   puts "✅ Requires thickness: #{rn.requires_thickness_measurements?}"
+#   puts "Required treatments: #{rn.get_required_treatments.inspect}"
+# end
+#
+# -----------------------------------------------------------------------------
+# NOTES:
+# - Adjust target_thickness to match your specification
+# - Common jig types: "titanium_wire", "titanium_bar", "aluminium_bar"
+# - Valid types: "chromic_anodising", "hard_anodising", "standard_anodising"
+# - For multiple treatments, just add more hashes to the array
+# =============================================================================
