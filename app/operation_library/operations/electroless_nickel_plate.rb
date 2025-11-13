@@ -34,9 +34,9 @@ module OperationLibrary
           process_type: 'electroless_nickel_plating',
           enp_type: 'low_phosphorous',
           target_thickness: nil,
-          deposition_rate_range: [6.8, 18.2],
+          deposition_rate_range: [6.8, 12.2],
           vat_numbers: [7, 8],
-          operation_text: "Electroless nickel plate in Nicklad ELV 824 (Low Phos) at 82-91°C. Deposition rate: 6.8-18.2 μm/hour. Time for {THICKNESS}μm: {TIME_RANGE}"
+          operation_text: "Electroless nickel plate in Nicklad ELV 824 (Low Phos) at 82-91°C. Deposition rate: 6.8-12.2 μm/hour. Time for {THICKNESS}μm: {TIME_RANGE}"
         },
 
         # PTFE Composite - Nicklad Ice
