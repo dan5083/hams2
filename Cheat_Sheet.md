@@ -1,93 +1,102 @@
 # FYI to see decluttered tree use:
 tree -I "node_modules|.git|.DS_Store|*.log|coverage|build|dist|tmp"
-# Show all models with filenames as headers:
-for file in app/models/[a-e]*.rb; do echo "=== $file ==="; cat "$file"; echo; done
-for file in app/models/[f-j]*.rb; do echo "=== $file ==="; cat "$file"; echo; done
-for file in app/models/[k-p]*.rb; do echo "=== $file ==="; cat "$file"; echo; done
-for file in app/models/[q-z]*.rb; do echo "=== $file ==="; cat "$file"; echo; done
 
-# Show controllers.rb files starting with a-i
-for file in app/controllers/[a-e]*.rb; do
-  echo "=== $file ==="
-  cat "$file"
-  echo
-done
+<!-- HOW TO GET UNINVOICED RELEASE LIST -->
 
-# Show controllers.rb files starting with j-z
-for file in app/controllers/[f-j]*.rb; do
-  echo "=== $file ==="
-  cat "$file"
-  echo
-done
+require 'csv'
 
-# Show controllers.rb files starting with j-z
-for file in app/controllers/[k-p]*.rb; do
-  echo "=== $file ==="
-  cat "$file"
-  echo
-done
+# Find all release notes with accepted quantity that haven't been invoiced
+uninvoiced = ReleaseNote.where(voided: false, no_invoice: false)
+  .where('quantity_accepted > 0')
+  .where.not(id: InvoiceItem.select(:release_note_id).where.not(release_note_id: nil))
+  .includes(works_order: [:part, customer_order: :customer])
+  .order(:number)
 
-# Show controllers.rb files starting with j-z
-for file in app/controllers/[q-z]*.rb; do
-  echo "=== $file ==="
-  cat "$file"
-  echo
-done
+# Generate CSV
+csv_output = CSV.generate do |csv|
+  # Header row
+  csv << ['RN Number', 'RN Date', 'WO Number', 'Customer Order', 'Customer', 'Part Number', 'Part Issue', 'Description', 'Qty Accepted', 'Qty Rejected', 'Each Price', 'Line Total', 'Partial Release']
 
-# Remember config/initializers/operation_library.rb
+  # Data rows
+  uninvoiced.each do |rn|
+    wo = rn.works_order
+    co = wo.customer_order
+    customer = co.customer
 
-# Routes & Schema
-echo "=== db/schema.rb ==="; cat db/schema.rb; echo; echo "=== config/routes.rb ==="; cat config/routes.rb; echo
+    line_total = (wo.price_per_unit * rn.quantity_accepted).round(2)
+    partial_release = wo.quantity_released < wo.quantity
 
-# Show operation library base file
-echo "=== app/operation_library/operation.rb ==="
-cat "app/operation_library/operation.rb"
-echo
+    csv << [
+      rn.number,
+      rn.date,
+      wo.number,
+      co.number,
+      customer.name,
+      wo.part_number,
+      wo.part_issue,
+      wo.part_description,
+      rn.quantity_accepted,
+      rn.quantity_rejected,
+      wo.price_per_unit.round(2),
+      line_total,
+      partial_release
+    ]
+  end
+end
 
-# Op files a-g
-for file in app/operation_library/operations/[a-g]*.rb; do
-  echo "=== $file ==="
-  cat "$file"
-  echo
-done
+puts csv_output
+puts "\n=== SUMMARY ==="
+puts "Total uninvoiced release notes: #{uninvoiced.count}"
+puts "Total uninvoiced quantity: #{uninvoiced.sum(:quantity_accepted)}"
+puts "Total value: £#{uninvoiced.sum { |rn| rn.works_order.price_per_unit * rn.quantity_accepted }.round(2)}"
 
-# Show hard_anodising specifically
-echo "=== app/operation_library/operations/hard_anodising.rb ==="
-cat "app/operation_library/operations/hard_anodising.rb"
-echo
 
-# Show operations i-p
-for file in app/operation_library/operations/[i-p]*.rb; do
-  echo "=== $file ==="
-  cat "$file"
-  echo
-done
+<!-- HOW TO CHANGE LUFTHANSA MISSING MFT TO CHROMIC  -->
 
-# Show operations q-z
-for file in app/operation_library/operations/[q-z]*.rb; do
-  echo "=== $file ==="
-  cat "$file"
-  echo
-done
+customer = Organization.find_by("name ILIKE ?", "%Lufthansa Technik%")
+raise "Customer not found" unless customer
 
-# Views
-for f in app/views/artifacts/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/customer_orders/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/dashboard/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/layouts/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
+fixed = 0
 
-for f in app/views/parts/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
+Part.where(customer: customer, enabled: true).find_each do |part|
+  next unless part.aerospace_defense?
+  next unless part.locked_for_editing?
 
-for f in app/views/passwords/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/passwords_mailer/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/registrations/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/release_levels/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/release_notes/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/sessions/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/shared/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/transport_methods/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/works_orders/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/xero_auth/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
+  treatments_json = part.customisation_data.dig("operation_selection", "treatments")
+  treatments = if treatments_json.is_a?(String)
+    JSON.parse(treatments_json) rescue []
+  else
+    treatments_json || []
+  end
+
+  next if treatments.any?
+
+  has_chromic = part.locked_operations.any? do |op|
+    text = "#{op['operation_text']} #{op['display_name']}".downcase
+    text.include?("chromic") && text.include?("anodis")
+  end
+
+  next unless has_chromic
+
+  part.customisation_data['operation_selection']['treatments'] = [
+    {
+      'type' => 'chromic_anodising',
+      'operation_id' => 'CHROMIC_22V',
+      'selected_jig_type' => 'titanium_wire',
+      'target_thickness' => 5
+    }
+  ].to_json
+
+  if part.save
+    puts "✅ #{part.part_number}"
+    fixed += 1
+  else
+    puts "❌ #{part.part_number}"
+  end
+end
+
+puts ""
+puts "Fixed #{fixed} parts"
 
 
 <!-- HOW TO GET CHRIS"S ORDER COMPLETION REPORT -->
