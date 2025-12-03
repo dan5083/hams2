@@ -1,93 +1,5 @@
 # FYI to see decluttered tree use:
 tree -I "node_modules|.git|.DS_Store|*.log|coverage|build|dist|tmp"
-# Show all models with filenames as headers:
-for file in app/models/[a-e]*.rb; do echo "=== $file ==="; cat "$file"; echo; done
-for file in app/models/[f-j]*.rb; do echo "=== $file ==="; cat "$file"; echo; done
-for file in app/models/[k-p]*.rb; do echo "=== $file ==="; cat "$file"; echo; done
-for file in app/models/[q-z]*.rb; do echo "=== $file ==="; cat "$file"; echo; done
-
-# Show controllers.rb files starting with a-i
-for file in app/controllers/[a-e]*.rb; do
-  echo "=== $file ==="
-  cat "$file"
-  echo
-done
-
-# Show controllers.rb files starting with j-z
-for file in app/controllers/[f-j]*.rb; do
-  echo "=== $file ==="
-  cat "$file"
-  echo
-done
-
-# Show controllers.rb files starting with j-z
-for file in app/controllers/[k-p]*.rb; do
-  echo "=== $file ==="
-  cat "$file"
-  echo
-done
-
-# Show controllers.rb files starting with j-z
-for file in app/controllers/[q-z]*.rb; do
-  echo "=== $file ==="
-  cat "$file"
-  echo
-done
-
-# Remember config/initializers/operation_library.rb
-
-# Routes & Schema
-echo "=== db/schema.rb ==="; cat db/schema.rb; echo; echo "=== config/routes.rb ==="; cat config/routes.rb; echo
-
-# Show operation library base file
-echo "=== app/operation_library/operation.rb ==="
-cat "app/operation_library/operation.rb"
-echo
-
-# Op files a-g
-for file in app/operation_library/operations/[a-g]*.rb; do
-  echo "=== $file ==="
-  cat "$file"
-  echo
-done
-
-# Show hard_anodising specifically
-echo "=== app/operation_library/operations/hard_anodising.rb ==="
-cat "app/operation_library/operations/hard_anodising.rb"
-echo
-
-# Show operations i-p
-for file in app/operation_library/operations/[i-p]*.rb; do
-  echo "=== $file ==="
-  cat "$file"
-  echo
-done
-
-# Show operations q-z
-for file in app/operation_library/operations/[q-z]*.rb; do
-  echo "=== $file ==="
-  cat "$file"
-  echo
-done
-
-# Views
-for f in app/views/artifacts/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/customer_orders/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/dashboard/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/layouts/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-
-for f in app/views/parts/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-
-for f in app/views/passwords/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/passwords_mailer/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/registrations/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/release_levels/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/release_notes/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/sessions/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/shared/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/transport_methods/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/works_orders/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
-for f in app/views/xero_auth/*.html.erb; do echo "=== $f ==="; cat "$f"; echo; done
 
 
 <!-- HOW TO GET CHRIS"S ORDER COMPLETION REPORT -->
@@ -210,3 +122,80 @@ end
 
 EOF
 )" > october_orders.csv
+
+<!-- HOW Find and Fix Lufthansa parts that don't require thickness measurements -->
+
+customer = Organization.find_by("name ILIKE ?", "%lufthansa%")
+puts "Customer: #{customer.name}"
+puts "=" * 80
+
+parts = Part.where(customer: customer, enabled: true)
+
+actually_broken = []
+
+parts.each do |part|
+  next unless part.aerospace_defense?
+
+  has_anodising = part.locked_operations.any? do |op|
+    op_text = op["operation_text"]&.downcase || ""
+    op_name = op["display_name"]&.downcase || ""
+    op_text.include?("anodis") || op_name.include?("anodis")
+  end
+
+  next unless has_anodising
+
+  wo = part.works_orders.last
+  next unless wo
+
+  rn = wo.release_notes.build
+  unless rn.requires_thickness_measurements?
+    actually_broken << part
+  end
+end
+
+puts "Found #{actually_broken.count} parts that need fixing:\n"
+actually_broken.each do |part|
+  puts "  - #{part.display_name} (#{part.part_number})"
+end
+
+if actually_broken.empty?
+  puts "✅ Nothing to fix!"
+  exit
+end
+
+puts "\n" + "=" * 80
+puts "Ready to fix these parts with chromic anodising treatment?"
+puts "Type 'yes' to proceed:"
+confirmation = gets.chomp
+
+exit unless confirmation.downcase == 'yes'
+
+puts "\nFixing parts..."
+puts "=" * 80
+
+actually_broken.each do |part|
+  begin
+    part.customisation_data["operation_selection"]["treatments"] = [
+      {
+        "type" => "chromic_anodising",
+        "operation_id" => "CHROMIC_22V",
+        "selected_jig_type" => "titanium_wire",
+        "target_thickness" => 5
+      }
+    ].to_json
+
+    part.save!
+
+    # Verify the fix
+    wo = part.works_orders.last
+    rn = wo.release_notes.build
+    requires = rn.requires_thickness_measurements?
+
+    puts "✅ #{part.display_name} - Fixed! (requires_thickness: #{requires})"
+  rescue => e
+    puts "❌ #{part.display_name} - Failed: #{e.message}"
+  end
+end
+
+puts "\n" + "=" * 80
+puts "Done!"
