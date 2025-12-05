@@ -6,6 +6,41 @@
   bottom_style = has_variables ? 'border-top-style: dashed;' : ''
   rowspan = has_variables ? 2 : 1
   is_op_1 = op[:number] == 1
+
+  # Parse operation content to extract OCV batches
+  main_content = []
+  ocv_batches = []
+  in_ocv_section = false
+
+  if op[:content]
+    op[:content].each do |item|
+      if item[:type] == "paragraph"
+        text = item[:as_html] || ""
+
+        # Split by newlines to process line by line
+        lines = text.split(/\n/)
+
+        lines.each do |line|
+          # Check if this line contains OCV monitoring header
+          if line.match(/\*\*OCV Monitoring:\*\*/)
+            in_ocv_section = true
+            next # Skip the header line itself
+          end
+
+          # Check if this line is a batch line
+          if line.strip.match(/^Batch\s+___:/)
+            ocv_batches << line.strip
+          else
+            # Regular content line
+            main_content << line unless line.strip.empty? && in_ocv_section
+          end
+        end
+      end
+    end
+  end
+
+  # Reconstruct main content HTML
+  main_html = main_content.join("\n")
 %>
 
 <tr class="op op-<%= op[:number] %>">
@@ -13,12 +48,17 @@
     <%= op[:number] %>
   </td>
   <td style="<%= top_style %>">
-    <% if op[:content] %>
-      <% op[:content].each do |item| %>
-        <% if item[:type] == "paragraph" %>
-          <%= item[:as_html]&.html_safe %>
+    <%= main_html.html_safe %>
+
+    <% if ocv_batches.any? %>
+      <div class="ocv-section">
+        <div class="ocv-header">OCV Monitoring:</div>
+        <% ocv_batches.each do |batch| %>
+          <div class="ocv-batch-card">
+            <%= batch.html_safe %>
+          </div>
         <% end %>
-      <% end %>
+      </div>
     <% end %>
   </td>
 
