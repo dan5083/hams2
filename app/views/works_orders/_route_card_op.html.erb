@@ -7,9 +7,10 @@
   rowspan = has_variables ? 2 : 1
   is_op_1 = op[:number] == 1
 
-  # Parse operation content to extract OCV batches
+  # Parse operation content to extract OCV batches and test result lines
   main_content = []
   ocv_batches = []
+  test_results = []
   in_ocv_section = false
 
   if op[:content]
@@ -30,6 +31,9 @@
           # Check if this line is a batch line
           if line.strip.match(/^Batch\s+___:/)
             ocv_batches << line.strip
+          # Check if this line is a test result line (A), B), C), etc.)
+          elsif line.strip.match(/^[A-F]\)/)
+            test_results << line.strip
           else
             # Regular content line
             main_content << line unless line.strip.empty? && in_ocv_section
@@ -49,6 +53,17 @@
   </td>
   <td style="<%= top_style %>">
     <%= main_html.html_safe %>
+
+    <% if test_results.any? %>
+      <div class="ocv-section">
+        <div class="ocv-header">Test Results:</div>
+        <% test_results.each do |result| %>
+          <div class="ocv-batch-card">
+            <%= result.html_safe %>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
 
     <% if ocv_batches.any? %>
       <div class="ocv-section">
