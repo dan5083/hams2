@@ -30,21 +30,45 @@
 
           # Check for inline OCV monitoring format: *OCV monitoring; Batch ...*
           if line.match(/\*OCV monitoring;.*Batch.*\*/i)
-            # Extract the batch info from within the asterisks
             batch_match = line.match(/\*OCV monitoring;\s*(Batch.*?)\*/)
             if batch_match
               ocv_batches << batch_match[1].strip
-              # Remove the OCV monitoring portion from the line
               line = line.gsub(/\*OCV monitoring;.*?\*/, '').strip
-              # Only add to main content if there's text remaining
               main_content << line unless line.empty?
               next
             end
           end
 
-          # Check if this line is a batch line (multi-line format)
-          if line.strip.match(/^Batch\s+___:/)
-            ocv_batches << line.strip
+          # Check if line contains any "Batch X:" pattern
+          if line.match(/Batch\s+(?:___|[0-9]+):/)
+            # Check if it starts with Batch (separate line format)
+            if line.strip.match(/^Batch\s+(?:___|[0-9]+):/)
+              ocv_batches << line.strip
+            else
+              # Embedded batch format
+              # Extract text before any batch
+              before_match = line.match(/^(.*?)Batch\s+(?:___|[0-9]+):/)
+              if before_match
+                pre_batch_text = before_match[1].strip
+                main_content << pre_batch_text unless pre_batch_text.empty?
+              end
+
+              # Extract all batches using scan with negative lookahead
+              # Pattern captures: "Batch X: [anything that's not the start of another Batch or **CapitalLetter]"
+              batch_matches = line.scan(/(Batch\s+(?:___|[0-9]+):\s*(?:(?!Batch\s+(?:___|[0-9]+):|\*\*[A-Z]).)*?)(?=Batch\s+(?:___|[0-9]+):|\*\*[A-Z]|$)/m)
+
+              batch_matches.each do |match|
+                batch_text = match[0].strip
+                ocv_batches << batch_text unless batch_text.empty?
+              end
+
+              # Extract content after all batches (like **Measured Film Thickness**)
+              after_batches_match = line.match(/Batch\s+(?:___|[0-9]+):[^*]*?(\*\*[A-Z].*$)/)
+              if after_batches_match
+                post_batch_text = after_batches_match[1].strip
+                main_content << post_batch_text unless post_batch_text.empty?
+              end
+            end
           # Check if this line is a test result line (A), B), C), etc.)
           elsif line.strip.match(/^[A-F]\)/)
             test_results << line.strip
