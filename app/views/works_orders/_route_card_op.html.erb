@@ -22,13 +22,27 @@
         lines = text.split(/\n/)
 
         lines.each do |line|
-          # Check if this line contains OCV monitoring header
-          if line.match(/\*\*OCV Monitoring:\*\*/)
+          # Check if this line contains OCV monitoring header (with or without bold)
+          if line.match(/\*{0,2}OCV Monitoring:\*{0,2}/i)
             in_ocv_section = true
             next # Skip the header line itself
           end
 
-          # Check if this line is a batch line
+          # Check for inline OCV monitoring format: *OCV monitoring; Batch ...*
+          if line.match(/\*OCV monitoring;.*Batch.*\*/i)
+            # Extract the batch info from within the asterisks
+            batch_match = line.match(/\*OCV monitoring;\s*(Batch.*?)\*/)
+            if batch_match
+              ocv_batches << batch_match[1].strip
+              # Remove the OCV monitoring portion from the line
+              line = line.gsub(/\*OCV monitoring;.*?\*/, '').strip
+              # Only add to main content if there's text remaining
+              main_content << line unless line.empty?
+              next
+            end
+          end
+
+          # Check if this line is a batch line (multi-line format)
           if line.strip.match(/^Batch\s+___:/)
             ocv_batches << line.strip
           # Check if this line is a test result line (A), B), C), etc.)
