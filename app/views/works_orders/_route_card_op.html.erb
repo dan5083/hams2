@@ -23,9 +23,16 @@
 
         lines.each do |line|
           # Check if this line contains OCV monitoring header (with or without bold)
+          # BUT only if it's on its own line (not inline with operation text)
+          # We consider it "on its own" if there's very little content before it
           if line.match(/\*{0,2}OCV Monitoring:\*{0,2}/i)
-            in_ocv_section = true
-            next # Skip the header line itself
+            # Check if there's substantial operation text before the OCV header
+            before_ocv = line.sub(/\*{0,2}OCV Monitoring:.*$/i, '').strip
+            if before_ocv.length < 10  # Less than 10 chars = it's a standalone header
+              in_ocv_section = true
+              next # Skip the header line itself
+            end
+            # Otherwise, this is inline format - let it fall through to be handled below
           end
 
           # Check for inline OCV monitoring format: *OCV monitoring; Batch ...*
