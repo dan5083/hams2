@@ -39,6 +39,27 @@
             end
           end
 
+          # Check for inline OCV monitoring with colon: **OCV Monitoring:** Batch (no semicolon, no wrapping asterisks)
+          if line.match(/\*\*OCV Monitoring:\*\*\s+Batch/i)
+            # Extract content before OCV monitoring
+            before_match = line.match(/^(.*?)\s*\*\*OCV Monitoring:\*\*/i)
+            if before_match
+              pre_ocv_text = before_match[1].strip
+              main_content << pre_ocv_text unless pre_ocv_text.empty?
+            end
+
+            # Extract all batches from the rest of the line
+            ocv_part = line.sub(/^.*?\*\*OCV Monitoring:\*\*/i, '').strip
+            # Split by "Batch" and reconstruct each batch line
+            batch_segments = ocv_part.split(/(?=Batch\s+___:)/)
+            batch_segments.each do |segment|
+              segment = segment.strip
+              next if segment.empty?
+              ocv_batches << segment if segment.start_with?('Batch')
+            end
+            next
+          end
+
           # Check if line contains any "Batch X:" pattern
           if line.match(/Batch\s+(?:___|[0-9]+):/)
             # Check if it starts with Batch (separate line format)
