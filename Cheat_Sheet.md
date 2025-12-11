@@ -199,3 +199,8 @@ end
 
 puts "\n" + "=" * 80
 puts "Done!"
+
+<!-- # RELEASED BUT UNINVOICED REPORT # ONE-LINER - Copy and paste into Heroku console:-->
+
+
+require 'csv'; wos = WorksOrder.where('quantity_released > 0').where(voided: false).includes(:customer_order, :customer, :part, release_notes: :invoice_item).order('works_orders.number DESC'); csv = CSV.generate { |c| c << ['Customer Order', 'Works Order', 'Customer', 'Part', 'Released Uninvoiced', 'Remaining to Release', 'Uninvoiced Value £']; wos.each { |wo| uninvoiced_rns = wo.release_notes.active.select { |rn| rn.ready_for_invoice? }; next if uninvoiced_rns.empty?; qty_uninvoiced = uninvoiced_rns.sum(&:quantity_accepted); value_uninvoiced = uninvoiced_rns.sum(&:invoice_value); c << [wo.customer_order.number, wo.number, wo.customer_name, "#{wo.part_number}-#{wo.part_issue}", qty_uninvoiced, wo.unreleased_quantity, value_uninvoiced.round(2)] } }; puts csv; wos_with_uninvoiced = wos.select { |wo| wo.release_notes.active.any? { |rn| rn.ready_for_invoice? } }; total_value = wos_with_uninvoiced.sum { |wo| wo.release_notes.active.select { |rn| rn.ready_for_invoice? }.sum(&:invoice_value) }; puts "\nTotal: #{wos_with_uninvoiced.count} works orders, £#{total_value.round(2)} uninvoiced"; nil
