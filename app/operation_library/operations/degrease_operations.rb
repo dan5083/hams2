@@ -2,7 +2,7 @@
 module OperationLibrary
   class DegreaseOperations
     def self.operations(aerospace_defense: false)
-      operation_text = 'Clean in Oxidite C-8 at 65-70°C for 5-10 mins'
+      operation_text = 'Clean in Oxidite C-8 at 45-70°C for 5-10 mins'
 
       # Append OCV monitoring for aerospace/defense
       if aerospace_defense
