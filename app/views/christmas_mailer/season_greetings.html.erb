@@ -3,6 +3,11 @@
 <head>
   <meta content='text/html; charset=UTF-8' http-equiv='Content-Type' />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@400;700&display=swap');
+  </style>
 </head>
 <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f4f4f4;">
@@ -37,25 +42,26 @@
                     <td style="padding: 160px 0 0 0;">
                       <!-- Greeting with festive styling -->
                       <h1 style="color: #ffffff;
-                                 font-size: 44px;
-                                 font-weight: bold;
+                                 font-size: 48px;
+                                 font-weight: 700;
                                  margin: 0 0 20px 0;
                                  text-shadow: 0 0 20px rgba(255, 215, 0, 0.8),
                                              2px 2px 4px rgba(0,0,0,0.5);
                                  line-height: 1.2;
-                                 font-family: Georgia, 'Times New Roman', serif;">
+                                 font-family: 'Mountains of Christmas', Georgia, cursive;">
                         ✨ Season's Greetings ✨
                       </h1>
 
                       <!-- Personalized or Company Message -->
                       <% if @first_name.present? %>
                         <!-- Personal greeting -->
-                        <p style="color: #FFD700;
-                                 font-size: 22px;
+                        <p style="color: #ffffff;
+                                 font-size: 24px;
                                  margin: 0 0 15px 0;
                                  text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
                                  line-height: 1.4;
-                                 font-weight: bold;">
+                                 font-weight: bold;
+                                 font-family: 'Mountains of Christmas', Georgia, cursive;">
                           Dear <%= @first_name %>,
                         </p>
 
@@ -67,7 +73,7 @@
                                  max-width: 480px;
                                  margin-left: auto;
                                  margin-right: auto;">
-                          Thank you for your business in 2024. We wish you and everyone at <%= @organization.name %> a wonderful Christmas and a prosperous New Year.
+                          Thank you for your business in 2025. We wish you and everyone at <%= @organization.name %> a wonderful Christmas and a prosperous New Year.
                         </p>
                       <% else %>
                         <!-- Company-only greeting (no personal name) -->
@@ -90,7 +96,7 @@
                                  max-width: 480px;
                                  margin-left: auto;
                                  margin-right: auto;">
-                          Thank you for your business in 2024.
+                          Thank you for your business in 2025.
                         </p>
                       <% end %>
 
@@ -104,10 +110,11 @@
                                   box-shadow: 0 6px 12px rgba(0,0,0,0.4),
                                              0 0 30px rgba(255, 215, 0, 0.3);">
                         <p style="color: #FFD700;
-                                 font-size: 16px;
-                                 margin: 0 0 10px 0;
+                                 font-size: 18px;
+                                 margin: 0 0 15px 0;
                                  line-height: 1.5;
-                                 font-weight: bold;">
+                                 font-weight: bold;
+                                 font-family: 'Mountains of Christmas', Georgia, cursive;">
                           🎄 Holiday Closure Notice 🎄
                         </p>
                         <p style="color: #ffffff;
@@ -140,14 +147,14 @@
                         </p>
                       </div>
 
-                      <p style="color: #FFD700;
-                               font-size: 18px;
+                      <p style="color: #ffffff;
+                               font-size: 20px;
                                margin: 25px 0 0 0;
-                               text-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
+                               text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
                                line-height: 1.6;
-                               font-weight: bold;">
+                               font-family: 'Mountains of Christmas', Georgia, cursive;">
                         🎅 Best wishes, 🎅<br>
-                        <span style="color: #ffffff;">The Hard Anodising Team</span>
+                        <span style="font-size: 18px;">The Hard Anodising Team</span>
                       </p>
                     </td>
                   </tr>
@@ -169,10 +176,11 @@
                        text-align: center;
                        border-top: 2px solid #FFD700;">
               <p style="color: #FFD700;
-                       font-size: 14px;
+                       font-size: 16px;
                        margin: 0 0 10px 0;
                        line-height: 1.5;
-                       font-weight: bold;">
+                       font-weight: bold;
+                       font-family: 'Mountains of Christmas', Georgia, cursive;">
                 Hard Anodising Surface Treatments Limited
               </p>
               <p style="color: #b8d4c8;
@@ -182,10 +190,11 @@
                 Firs Industrial Estate, Rickets Close, Kidderminster, DY11 7QN
               </p>
               <p style="color: #8fb9a8;
-                       font-size: 12px;
+                       font-size: 13px;
                        margin: 0;
                        line-height: 1.5;
-                       font-style: italic;">
+                       font-style: italic;
+                       font-family: 'Mountains of Christmas', Georgia, cursive;">
                 🎄 Wishing you a joyful festive season 🎄
               </p>
             </td>
