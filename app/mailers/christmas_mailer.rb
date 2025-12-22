@@ -1,5 +1,5 @@
 class ChristmasMailer < ApplicationMailer
-  default from: 'noreply@hardanodising.co.uk'
+  # Uses default from: "noreply@hams-2.co.uk" from ApplicationMailer
 
   def season_greetings(buyer, first_name = nil)
     @buyer = buyer
