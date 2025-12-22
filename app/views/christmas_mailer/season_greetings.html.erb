@@ -14,8 +14,8 @@
 
           <!-- Background Image Section with Text Overlay -->
           <tr>
-            <td background="https://www.hardanodising.co.uk/assets/christmas-email-bg-b954ef24.png"
-                style="background-image: url('https://www.hardanodising.co.uk/assets/christmas-email-bg-b954ef24.png');
+            <td background="https://www.hardanodising.co.uk/christmas-email-bg.png"
+                style="background-image: url('https://www.hardanodising.co.uk/christmas-email-bg.png');
                        background-size: cover;
                        background-position: center;
                        background-repeat: no-repeat;
@@ -25,7 +25,7 @@
                        padding: 60px 40px;">
 
               <!--[if gte mso 9]>
-              <v:image xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="border: 0; display: inline-block; width: 600px; height: 600px;" src="https://www.hardanodising.co.uk/assets/christmas-email-bg-b954ef24.png" />
+              <v:image xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="border: 0; display: inline-block; width: 600px; height: 600px;" src="https://www.hardanodising.co.uk/christmas-email-bg.png" />
               <v:rect xmlns:v="urn:schemas-microsoft-com:vml" fill="true" stroke="false" style="border: 0; display: inline-block; position: absolute; width: 600px; height: 600px;">
               <v:fill opacity="0%" color="#ffffff" />
               <v:textbox inset="0,0,0,0">
@@ -50,29 +50,29 @@
                         <!-- Personal greeting -->
                         <p style="color: #ffffff;
                                  font-size: 22px;
-                                 margin: 0 0 20px 0;
+                                 margin: 0 0 15px 0;
                                  text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
                                  line-height: 1.4;">
                           Dear <%= @first_name %>,
                         </p>
 
                         <p style="color: #ffffff;
-                                 font-size: 18px;
-                                 margin: 0 0 20px 0;
+                                 font-size: 17px;
+                                 margin: 0 0 25px 0;
                                  text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
-                                 line-height: 1.6;
+                                 line-height: 1.5;
                                  max-width: 480px;
                                  margin-left: auto;
                                  margin-right: auto;">
-                          Thank you for your continued support throughout 2024. We wish you and everyone at <%= @organization.name %> a wonderful Christmas and a prosperous New Year.
+                          Thank you for your business in 2024. We wish you and everyone at <%= @organization.name %> a wonderful Christmas and a prosperous New Year.
                         </p>
                       <% else %>
                         <!-- Company-only greeting (no personal name) -->
                         <p style="color: #ffffff;
-                                 font-size: 20px;
-                                 margin: 0 0 20px 0;
+                                 font-size: 18px;
+                                 margin: 0 0 15px 0;
                                  text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
-                                 line-height: 1.6;
+                                 line-height: 1.5;
                                  max-width: 500px;
                                  margin-left: auto;
                                  margin-right: auto;">
@@ -80,16 +80,51 @@
                         </p>
 
                         <p style="color: #ffffff;
-                                 font-size: 18px;
-                                 margin: 0 0 20px 0;
+                                 font-size: 17px;
+                                 margin: 0 0 25px 0;
                                  text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
-                                 line-height: 1.6;
+                                 line-height: 1.5;
                                  max-width: 480px;
                                  margin-left: auto;
                                  margin-right: auto;">
-                          Thank you for your continued support throughout 2024.
+                          Thank you for your business in 2024.
                         </p>
                       <% end %>
+
+                      <!-- Closing Dates Notice Box -->
+                      <div style="background-color: rgba(44, 62, 80, 0.9);
+                                  border-radius: 8px;
+                                  padding: 20px 30px;
+                                  margin: 0 auto;
+                                  max-width: 440px;
+                                  box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                        <p style="color: #ffffff;
+                                 font-size: 15px;
+                                 margin: 0 0 10px 0;
+                                 line-height: 1.5;">
+                          The office and factory will close on
+                        </p>
+                        <p style="color: #ffffff;
+                                 font-size: 18px;
+                                 font-weight: bold;
+                                 margin: 0 0 15px 0;
+                                 line-height: 1.3;">
+                          Tuesday 23rd December at 12:30 pm
+                        </p>
+                        <p style="color: #ffffff;
+                                 font-size: 15px;
+                                 margin: 0 0 10px 0;
+                                 line-height: 1.5;">
+                          and re-open on
+                        </p>
+                        <p style="color: #ffffff;
+                                 font-size: 18px;
+                                 font-weight: bold;
+                                 margin: 0;
+                                 line-height: 1.3;">
+                          Monday 5th January 2026
+                        </p>
+                      </div>
 
                       <p style="color: #ffffff;
                                font-size: 18px;
@@ -126,7 +161,6 @@
                        font-size: 12px;
                        margin: 10px 0 0 0;
                        line-height: 1.5;">
-                This is an automated message. Please do not reply to this email.
               </p>
             </td>
           </tr>
