@@ -9,7 +9,6 @@ export default class extends Controller {
     "statistics",
     "manualInput",
     "manualReadingInput",
-    "bulkInput",
     "readingsData"
   ]
 
@@ -117,68 +116,50 @@ export default class extends Controller {
   }
 
   // Handle Enter key in manual reading input
-  handleKeypress(event) {
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      this.addManualReading()
-    }
-  }
-
-  // Add a single manual reading
-  addManualReading() {
+  // Add readings from the 8 manual input fields
+  addManualReadings() {
     if (!this.hasManualReadingInputTarget) return
 
-    const input = this.manualReadingInputTarget
-    const value = parseFloat(input.value)
+    const inputs = this.manualReadingInputTargets
+    const values = []
+    const errors = []
 
-    if (isNaN(value) || value <= 0) {
-      this.showError('Please enter a valid positive number')
-      return
-    }
+    inputs.forEach((input, index) => {
+      const valueStr = input.value.trim()
 
-    // Add the reading
-    this.addReading(value)
-
-    // Clear the input and focus
-    input.value = ''
-    input.focus()
-  }
-
-  // Handle bulk paste from textarea
-  addBulkReadings(event) {
-    if (!this.hasBulkInputTarget) return
-
-    const input = this.bulkInputTarget
-    const text = input.value.trim()
-
-    if (!text) return
-
-    // Split by comma, newline, tab, or space (handles paste from spreadsheet)
-    const values = text.split(/[\n,\t\s]+/).map(v => v.trim()).filter(v => v)
-
-    let addedCount = 0
-    let errors = []
-
-    values.forEach(valueStr => {
-      const value = parseFloat(valueStr)
-      if (!isNaN(value) && value > 0) {
-        this.addReading(value)
-        addedCount++
-      } else if (valueStr) {
-        errors.push(valueStr)
+      if (valueStr) {
+        const value = parseFloat(valueStr)
+        if (!isNaN(value) && value > 0) {
+          values.push(value)
+        } else {
+          errors.push(`Field ${index + 1}`)
+        }
       }
     })
 
-    // Clear the input
-    input.value = ''
+    if (values.length === 0 && errors.length === 0) {
+      this.showWarning('Please enter at least one reading')
+      return
+    }
+
+    // Add all valid readings
+    values.forEach(value => this.addReading(value))
+
+    // Clear all inputs
+    inputs.forEach(input => input.value = '')
 
     // Show feedback
-    if (addedCount > 0) {
-      this.showSuccess(`Added ${addedCount} reading(s)`)
+    if (values.length > 0) {
+      this.showSuccess(`Added ${values.length} reading(s)`)
     }
 
     if (errors.length > 0) {
-      this.showError(`Could not parse: ${errors.join(', ')}`)
+      this.showError(`Invalid values in: ${errors.join(', ')}`)
+    }
+
+    // Focus first input
+    if (inputs.length > 0) {
+      inputs[0].focus()
     }
   }
 
@@ -230,11 +211,6 @@ export default class extends Controller {
       `
     } else {
       this.statisticsTarget.innerHTML = ''
-    }
-
-    // Hide manual input when we have Elcometer readings
-    if (this.hasManualInputTarget) {
-      this.manualInputTarget.classList.toggle("hidden", this.readings.length > 0)
     }
   }
 
