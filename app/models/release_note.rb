@@ -46,6 +46,9 @@ class ReleaseNote < ApplicationRecord
     chromic_anodising
     hard_anodising
     standard_anodising
+    electroless_nickel_plating
+    enp_high_phosphorous
+    enp_medium_phosphorous
   ].freeze
 
   def display_name
@@ -272,7 +275,13 @@ class ReleaseNote < ApplicationRecord
   def has_thickness_measurements?
     return false unless measured_thicknesses.is_a?(Hash)
     measurements = measured_thicknesses['measurements']
-    measurements.present? && measurements.any? { |m| m['readings'].present? && m['readings'].any? }
+    return false unless measurements.present?
+
+    # Check for either anodic readings OR ENP measurements
+    measurements.any? do |m|
+      (m['readings'].present? && m['readings'].any?) ||
+      (m['enp_measurements'].present? && m['enp_measurements'].any?)
+    end
   end
 
   def thickness_measurements_summary
@@ -280,17 +289,30 @@ class ReleaseNote < ApplicationRecord
 
     measurements = measured_thicknesses['measurements'] || []
     summary_parts = measurements.filter_map do |measurement|
-      readings = measurement['readings']
-      next unless readings.present? && readings.any?
-
       display_name = measurement['display_name'] || measurement['process_type'].humanize.titleize
-      mean = calculate_mean(readings)
-      count = readings.count
 
-      if count == 1
-        "#{display_name}: #{readings.first} µm"
-      else
-        "#{display_name}: #{mean} µm (#{count} readings)"
+      # Check if this is ENP or anodic
+      if measurement['enp_measurements'].present? && measurement['enp_measurements'].any?
+        # ENP measurement
+        enp_data = measurement['enp_measurements']
+        valid_growths = enp_data.map { |m| m['growth_um'] }.compact.select { |g| g >= 0 }
+        next if valid_growths.empty?
+
+        mean = calculate_mean(valid_growths)
+        count = valid_growths.count
+        "#{display_name}: #{mean} µm growth (#{count}/6 points)"
+
+      elsif measurement['readings'].present? && measurement['readings'].any?
+        # Anodic measurement
+        readings = measurement['readings']
+        mean = calculate_mean(readings)
+        count = readings.count
+
+        if count == 1
+          "#{display_name}: #{readings.first} µm"
+        else
+          "#{display_name}: #{mean} µm (#{count} readings)"
+        end
       end
     end
 
@@ -327,6 +349,81 @@ class ReleaseNote < ApplicationRecord
         treatment
       end
     end
+  end
+
+  # ENP MEASUREMENT METHODS
+
+  def treatment_is_enp?(process_type)
+    process_type.to_s.start_with?('enp_') || process_type == 'electroless_nickel_plating'
+  end
+
+  def treatment_is_anodic?(process_type)
+    %w[chromic_anodising hard_anodising standard_anodising].include?(process_type.to_s)
+  end
+
+  # Get ENP measurements for a treatment (returns array of 6 points)
+  def get_enp_measurements(treatment_id)
+    return [] unless measured_thicknesses.is_a?(Hash)
+    measurement = measured_thicknesses['measurements']&.find { |m| m['treatment_id'] == treatment_id }
+    return [] unless measurement
+
+    measurement['enp_measurements'] || []
+  end
+
+  # Set ENP measurements for a treatment
+  def set_enp_measurements(treatment_id, enp_data, treatment_info = {})
+    # Initialize the structure if needed
+    self.measured_thicknesses = { 'measurements' => [] } unless measured_thicknesses.is_a?(Hash)
+    self.measured_thicknesses['measurements'] ||= []
+
+    # Find existing measurement or create new one
+    measurement = self.measured_thicknesses['measurements'].find { |m| m['treatment_id'] == treatment_id }
+
+    if measurement
+      # Update existing measurement
+      if enp_data.blank? || (enp_data.is_a?(Array) && enp_data.empty?)
+        # Remove measurement if data is blank
+        self.measured_thicknesses['measurements'].reject! { |m| m['treatment_id'] == treatment_id }
+      else
+        measurement['enp_measurements'] = enp_data
+      end
+    elsif enp_data.present?
+      # Add new measurement
+      new_measurement = {
+        'treatment_id' => treatment_id,
+        'process_type' => treatment_info[:process_type],
+        'enp_type' => treatment_info[:enp_type],
+        'display_name' => treatment_info[:display_name],
+        'enp_measurements' => enp_data
+      }
+      self.measured_thicknesses['measurements'] << new_measurement
+    end
+
+    true
+  rescue => e
+    Rails.logger.error "Error setting ENP measurements: #{e.message}"
+    false
+  end
+
+  # Check if a treatment has ENP measurements
+  def has_enp_measurements?(treatment_id)
+    measurements = get_enp_measurements(treatment_id)
+    measurements.present? && measurements.any? { |m| m['growth_um'].present? }
+  end
+
+  # Get ENP statistics for a treatment
+  def get_enp_statistics(treatment_id)
+    measurements = get_enp_measurements(treatment_id)
+    valid_growths = measurements.map { |m| m['growth_um'] }.compact.select { |g| g >= 0 }
+
+    return nil if valid_growths.empty?
+
+    {
+      count: valid_growths.count,
+      mean: calculate_mean(valid_growths),
+      min: valid_growths.min,
+      max: valid_growths.max
+    }
   end
 
   def self.next_number
@@ -392,20 +489,49 @@ class ReleaseNote < ApplicationRecord
     required_treatments = get_required_treatments
 
     required_treatments.each do |treatment|
-      readings = get_thickness_readings(treatment[:treatment_id])
+      display_name = treatment[:display_name] || treatment[:process_type].humanize.titleize
 
-      if readings.blank? || readings.empty?
-        display_name = treatment[:display_name] || treatment[:process_type].humanize.titleize
-        errors.add(:measured_thicknesses, "#{display_name} thickness measurement is required for aerospace/defense parts")
+      # Check if this is an ENP or anodic treatment
+      if treatment_is_enp?(treatment[:process_type])
+        # Validate ENP measurements
+        enp_measurements = get_enp_measurements(treatment[:treatment_id])
+
+        if enp_measurements.blank? || enp_measurements.empty?
+          errors.add(:measured_thicknesses, "#{display_name} ENP measurements are required for aerospace/defense parts")
+        else
+          # Validate that all 6 points have valid measurements
+          enp_measurements.each do |measurement|
+            point = measurement['point']
+            growth = measurement['growth_um']
+
+            if growth.nil?
+              errors.add(:measured_thicknesses, "#{display_name} point #{point} is incomplete")
+            elsif growth < 0
+              errors.add(:measured_thicknesses, "#{display_name} point #{point} has negative growth (#{growth}µm)")
+            elsif growth > 1000
+              errors.add(:measured_thicknesses, "#{display_name} point #{point} seems unrealistically high (#{growth}µm)")
+            end
+          end
+
+          # Ensure we have all 6 points
+          if enp_measurements.count < 6
+            errors.add(:measured_thicknesses, "#{display_name} requires all 6 measurement points (A-F)")
+          end
+        end
       else
-        # Validate each reading
-        readings.each_with_index do |reading, index|
-          if reading <= 0
-            display_name = treatment[:display_name] || treatment[:process_type].humanize.titleize
-            errors.add(:measured_thicknesses, "#{display_name} reading #{index + 1} must be greater than 0")
-          elsif reading > 1000
-            display_name = treatment[:display_name] || treatment[:process_type].humanize.titleize
-            errors.add(:measured_thicknesses, "#{display_name} reading #{index + 1} seems unrealistically high (>1000µm)")
+        # Validate anodic thickness readings
+        readings = get_thickness_readings(treatment[:treatment_id])
+
+        if readings.blank? || readings.empty?
+          errors.add(:measured_thicknesses, "#{display_name} thickness measurement is required for aerospace/defense parts")
+        else
+          # Validate each reading
+          readings.each_with_index do |reading, index|
+            if reading <= 0
+              errors.add(:measured_thicknesses, "#{display_name} reading #{index + 1} must be greater than 0")
+            elsif reading > 1000
+              errors.add(:measured_thicknesses, "#{display_name} reading #{index + 1} seems unrealistically high (>1000µm)")
+            end
           end
         end
       end

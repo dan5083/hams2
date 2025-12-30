@@ -224,6 +224,48 @@
         border-radius: 2pt;
       }
 
+      /* ENP measurements table styling */
+      .enp-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 0.5rem;
+        margin-bottom: 0.75rem;
+        font-size: 8.5pt;
+      }
+
+      .enp-table thead th {
+        background-color: #e9ecef;
+        font-weight: bold;
+        text-align: center;
+        padding: 0.3rem;
+        border: 1pt solid #adb5bd;
+      }
+
+      .enp-table tbody td {
+        text-align: center;
+        padding: 0.3rem;
+        border: 1pt solid #dee2e6;
+      }
+
+      .enp-table tbody tr:nth-child(even) {
+        background-color: #f8f9fa;
+      }
+
+      .enp-point {
+        font-weight: bold;
+        background-color: #e9ecef;
+      }
+
+      .enp-growth-positive {
+        color: #16a34a;
+        font-weight: bold;
+      }
+
+      .enp-growth-negative {
+        color: #dc2626;
+        font-weight: bold;
+      }
+
       p {
         margin: 0.4rem 0;
         line-height: 1.3;
@@ -515,11 +557,11 @@
           </tbody>
         </table>
 
-        <!-- Calibrated Thickness Measurements - WITH GAUGE INFO FOR SPECIAL CUSTOMERS -->
+        <!-- Calibrated Thickness Measurements - UPDATED FOR ENP -->
         <% if @release_note.has_thickness_measurements? %>
           <h2>Calibrated Thickness Measurements</h2>
 
-          <!-- Elcometer Gauge Information for Special Customers -->
+          <!-- Elcometer Gauge Information for Special Customers (anodic only) -->
           <% if is_special_customer %>
             <div class="gauge-info">
               <strong>Gauge Type:</strong> Elcometer 456/4, Serial # BD10146<br/>
@@ -536,13 +578,10 @@
               <% measurements.each do |measurement| %>
                 <%
                   display_name = measurement['display_name'] || measurement['process_type'].humanize.titleize
-                  readings = measurement['readings'] || []
-                  next if readings.empty?
+                  treatment_id = measurement['treatment_id']
 
-                  mean = (readings.sum / readings.count.to_f).round(1)
-                  min_val = readings.min
-                  max_val = readings.max
-                  count = readings.count
+                  # Check if this is ENP or anodic
+                  is_enp = @release_note.treatment_is_enp?(measurement['process_type'])
 
                   # Only show display name if it differs from the group header
                   group_header_text = process_type.humanize.gsub('_', ' ').titleize
@@ -556,20 +595,83 @@
                     </div>
                   <% end %>
 
-                  <!-- Statistics -->
-                  <div class="thickness-stats">
-                    <strong>Mean: <%= mean %> µm</strong> |
-                    Min: <%= min_val %> µm |
-                    Max: <%= max_val %> µm |
-                    Count: <%= count %> readings
-                  </div>
+                  <% if is_enp %>
+                    <!-- ENP Measurements Table -->
+                    <%
+                      enp_measurements = measurement['enp_measurements'] || []
+                      next if enp_measurements.empty?
 
-                  <!-- All Individual Readings -->
-                  <div class="readings-grid">
-                    <% readings.each do |reading| %>
-                      <div class="reading-value"><%= reading %> µm</div>
+                      # Calculate statistics
+                      valid_growths = enp_measurements.map { |m| m['growth_um'] }.compact.select { |g| g >= 0 }
+                      if valid_growths.any?
+                        mean = (valid_growths.sum / valid_growths.count.to_f).round(1)
+                        min_val = valid_growths.min
+                        max_val = valid_growths.max
+                        count = valid_growths.count
+                      end
+                    %>
+
+                    <!-- Statistics -->
+                    <% if valid_growths.any? %>
+                      <div class="thickness-stats">
+                        <strong>Mean Growth: <%= mean %> µm</strong> |
+                        Min: <%= min_val %> µm |
+                        Max: <%= max_val %> µm |
+                        Points: <%= count %>/6
+                      </div>
                     <% end %>
-                  </div>
+
+                    <!-- ENP Measurements Table -->
+                    <table class="thickness-table" style="margin-top: 0.5rem;">
+                      <thead>
+                        <tr>
+                          <th style="width: 12%; text-align: center;">Point</th>
+                          <th style="width: 29%; text-align: center;">Before (mm)</th>
+                          <th style="width: 29%; text-align: center;">After (mm)</th>
+                          <th style="width: 30%; text-align: center;">Growth (µm)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <% enp_measurements.each do |measurement| %>
+                          <tr>
+                            <td style="text-align: center; font-weight: bold;"><%= measurement['point'] %></td>
+                            <td style="text-align: center;"><%= measurement['start_mm'] ? sprintf('%.3f', measurement['start_mm']) : '—' %></td>
+                            <td style="text-align: center;"><%= measurement['finish_mm'] ? sprintf('%.3f', measurement['finish_mm']) : '—' %></td>
+                            <td style="text-align: center; <%= measurement['growth_um'] && measurement['growth_um'] < 0 ? 'color: #dc2626; font-weight: bold;' : 'color: #16a34a; font-weight: bold;' %>">
+                              <%= measurement['growth_um'] ? sprintf('%.1f', measurement['growth_um']) : '—' %>
+                            </td>
+                          </tr>
+                        <% end %>
+                      </tbody>
+                    </table>
+
+                  <% else %>
+                    <!-- Anodic Measurements (existing format) -->
+                    <%
+                      readings = measurement['readings'] || []
+                      next if readings.empty?
+
+                      mean = (readings.sum / readings.count.to_f).round(1)
+                      min_val = readings.min
+                      max_val = readings.max
+                      count = readings.count
+                    %>
+
+                    <!-- Statistics -->
+                    <div class="thickness-stats">
+                      <strong>Mean: <%= mean %> µm</strong> |
+                      Min: <%= min_val %> µm |
+                      Max: <%= max_val %> µm |
+                      Count: <%= count %> readings
+                    </div>
+
+                    <!-- All Individual Readings -->
+                    <div class="readings-grid">
+                      <% readings.each do |reading| %>
+                        <div class="reading-value"><%= reading %> µm</div>
+                      <% end %>
+                    </div>
+                  <% end %>
                 </div>
               <% end %>
             </div>

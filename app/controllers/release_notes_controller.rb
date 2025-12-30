@@ -182,8 +182,10 @@ class ReleaseNotesController < ApplicationController
   def thickness_measurements_provided?
     # Check if measurements were provided via JSON (from Elcometer or form submission)
     params[:release_note][:measured_thicknesses].present? ||
-    # Check if individual thickness readings fields were provided
+    # Check if individual thickness readings fields were provided (anodic)
     params.keys.any? { |key| key.to_s.start_with?('thickness_readings_') } ||
+    # Check if ENP measurement fields were provided
+    params.keys.any? { |key| key.to_s.start_with?('enp_measurements_') } ||
     # Check if legacy individual thickness fields were provided (backward compatibility)
     params.keys.any? { |key| key.to_s.start_with?('thickness_measurement_') }
   end
@@ -205,46 +207,83 @@ def process_thickness_measurements
     end
   end
 
-  # Process individual thickness readings fields (both Elcometer and manual entry)
+  # Process individual measurement fields
+  required_treatments = @release_note.get_required_treatments
+  @release_note.measured_thicknesses = { 'measurements' => [] }
+
+  # Process anodic thickness readings fields (Elcometer and manual entry)
   readings_fields = params.select { |key, _|
     key.to_s.start_with?('thickness_readings_') || key.to_s.start_with?('thickness_measurement_')
   }
 
-  if readings_fields.present?
-    required_treatments = @release_note.get_required_treatments
-    @release_note.measured_thicknesses = { 'measurements' => [] }
+  readings_fields.each do |field_name, field_value|
+    # Extract treatment_id (works for both field name formats)
+    treatment_id = field_name.to_s.sub(/^thickness_(readings|measurement)_/, '')
 
-    readings_fields.each do |field_name, field_value|
-      # Extract treatment_id (works for both field name formats)
-      treatment_id = field_name.to_s.sub(/^thickness_(readings|measurement)_/, '')
+    treatment_info = required_treatments.find { |t| t[:treatment_id] == treatment_id }
+    next unless treatment_info
 
-      treatment_info = required_treatments.find { |t| t[:treatment_id] == treatment_id }
-      next unless treatment_info
-
-      begin
-        # Parse readings - handle both JSON arrays and single values
-        readings = if field_value.is_a?(String) && field_value.strip.start_with?('[')
-          JSON.parse(field_value) # Elcometer: "[70.5, 70.7, 69.9]"
-        elsif field_value.present?
-          [field_value] # Manual entry: "25.4" -> [25.4]
-        else
-          []
-        end
-
-        if readings.any?
-          Rails.logger.info "Processing #{readings.count} reading(s) for treatment #{treatment_id}"
-          success = @release_note.set_thickness_measurement(treatment_id, readings, treatment_info)
-
-          unless success
-            @release_note.errors.add(:measured_thicknesses,
-              "Invalid readings for #{treatment_info[:display_name]}")
-          end
-        end
-      rescue JSON::ParserError => e
-        Rails.logger.error "Failed to parse readings for #{treatment_id}: #{e.message}"
-        @release_note.errors.add(:measured_thicknesses,
-          "Invalid data format for #{treatment_info[:display_name]}")
+    begin
+      # Parse readings - handle both JSON arrays and single values
+      readings = if field_value.is_a?(String) && field_value.strip.start_with?('[')
+        JSON.parse(field_value) # Elcometer: "[70.5, 70.7, 69.9]"
+      elsif field_value.present?
+        [field_value] # Manual entry: "25.4" -> [25.4]
+      else
+        []
       end
+
+      if readings.any?
+        Rails.logger.info "Processing #{readings.count} anodic reading(s) for treatment #{treatment_id}"
+        success = @release_note.set_thickness_measurement(treatment_id, readings, treatment_info)
+
+        unless success
+          @release_note.errors.add(:measured_thicknesses,
+            "Invalid readings for #{treatment_info[:display_name]}")
+        end
+      end
+    rescue JSON::ParserError => e
+      Rails.logger.error "Failed to parse readings for #{treatment_id}: #{e.message}"
+      @release_note.errors.add(:measured_thicknesses,
+        "Invalid data format for #{treatment_info[:display_name]}")
+    end
+  end
+
+  # Process ENP measurement fields
+  enp_fields = params.select { |key, _| key.to_s.start_with?('enp_measurements_') }
+
+  enp_fields.each do |field_name, field_value|
+    # Extract treatment_id: enp_measurements_abc123
+    treatment_id = field_name.to_s.sub(/^enp_measurements_/, '')
+
+    treatment_info = required_treatments.find { |t| t[:treatment_id] == treatment_id }
+    next unless treatment_info
+
+    begin
+      # Parse ENP measurements JSON
+      enp_data = if field_value.is_a?(String) && field_value.strip.present?
+        JSON.parse(field_value)
+      else
+        []
+      end
+
+      if enp_data.any?
+        Rails.logger.info "Processing #{enp_data.count} ENP measurement(s) for treatment #{treatment_id}"
+
+        # Add enp_type to treatment_info if available
+        treatment_info[:enp_type] = treatment_info[:process_type]
+
+        success = @release_note.set_enp_measurements(treatment_id, enp_data, treatment_info)
+
+        unless success
+          @release_note.errors.add(:measured_thicknesses,
+            "Invalid ENP measurements for #{treatment_info[:display_name]}")
+        end
+      end
+    rescue JSON::ParserError => e
+      Rails.logger.error "Failed to parse ENP measurements for #{treatment_id}: #{e.message}"
+      @release_note.errors.add(:measured_thicknesses,
+        "Invalid ENP data format for #{treatment_info[:display_name]}")
     end
   end
 end

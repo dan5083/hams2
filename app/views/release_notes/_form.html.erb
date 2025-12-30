@@ -122,110 +122,222 @@
                   <%
                     treatment_id = treatment[:treatment_id]
                     display_name = treatment[:display_name]
-                    target_thickness = treatment[:target_thickness]
-                    existing_readings = @release_note.get_thickness_readings(treatment_id)
-                    field_name = "thickness_measurement_#{treatment_id}"
+                    process_type = treatment[:process_type]
+                    is_enp = @release_note.treatment_is_enp?(process_type)
                   %>
 
-                  <!-- Elcometer Controller Wrapper -->
-                  <div data-controller="elcometer"
-                       data-elcometer-treatment-id-value="<%= treatment_id %>"
-                       data-elcometer-process-type-value="<%= treatment[:process_type] %>"
-                       data-elcometer-target-thickness-value="<%= target_thickness %>"
-                       data-elcometer-display-name-value="<%= display_name %>"
-                       class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                  <% if is_enp %>
+                    <!-- ENP Measurement UI -->
+                    <%
+                      existing_enp_measurements = @release_note.get_enp_measurements(treatment_id)
+                    %>
 
-                    <!-- Treatment Header -->
-                    <div class="flex items-center justify-between mb-4">
-                      <div>
-                        <label class="block text-sm font-medium text-gray-700">
-                          <%= display_name %>
-                          <span class="text-red-500">*</span>
-                        </label>
+                    <div data-controller="enp"
+                         data-enp-treatment-id-value="<%= treatment_id %>"
+                         data-enp-process-type-value="<%= process_type %>"
+                         data-enp-enp-type-value="<%= process_type %>"
+                         data-enp-display-name-value="<%= display_name %>"
+                         class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+
+                      <!-- ENP Header -->
+                      <div class="flex items-center justify-between mb-4">
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700">
+                            <%= display_name %>
+                            <span class="text-red-500">*</span>
+                          </label>
+                          <p class="mt-1 text-xs text-gray-500">6 measurement points (A-F)</p>
+                        </div>
+                        <div class="flex gap-2">
+                          <!-- Progress Counter -->
+                          <span data-enp-target="progressCounter" class="text-sm text-gray-500">0/6 complete</span>
+
+                          <!-- Clear Button -->
+                          <button type="button"
+                                  data-action="click->enp#clearAllMeasurements"
+                                  class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                            Clear
+                          </button>
+                        </div>
                       </div>
-                      <div class="flex gap-2">
-                        <!-- Connect Button -->
-                        <button type="button"
-                                data-elcometer-target="connectButton"
-                                data-action="click->elcometer#connectElcometer"
-                                class="inline-flex items-center px-3 py-2 border border-blue-600 rounded-md shadow-sm text-sm font-medium text-blue-600 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                          <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                          </svg>
-                          Connect Elcometer
-                        </button>
 
-                        <!-- Stop Button (hidden initially) -->
-                        <button type="button"
-                                data-elcometer-target="stopButton"
-                                data-action="click->elcometer#stopReading"
-                                class="hidden inline-flex items-center px-3 py-2 border border-red-600 rounded-md shadow-sm text-sm font-medium text-red-600 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
-                          <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                          </svg>
-                          Stop
-                        </button>
+                      <!-- Statistics Display -->
+                      <div data-enp-target="statistics" class="mb-4"></div>
 
-                        <!-- Clear Button -->
-                        <button type="button"
-                                data-action="click->elcometer#clearReadings"
-                                class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                          <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                          </svg>
-                          Clear
-                        </button>
-                      </div>
-                    </div>
-
-                    <!-- Statistics Display -->
-                    <div data-elcometer-target="statistics" class="mb-4"></div>
-
-                    <!-- Readings Display -->
-                    <div class="mb-4">
-                      <label class="block text-xs font-medium text-gray-500 mb-2">Readings:</label>
-                      <div data-elcometer-target="readingsList" class="min-h-[3rem] p-3 bg-white border border-gray-200 rounded-md">
-                        <% if existing_readings.any? %>
-                          <% existing_readings.each do |reading| %>
-                            <span class="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm mr-2 mb-2">
-                              <%= reading %> µm
-                            </span>
-                          <% end %>
-                        <% else %>
-                          <span class="text-gray-400 text-sm">No readings yet...</span>
-                        <% end %>
-                      </div>
-                    </div>
-
-                    <!-- Manual Entry - 8 Individual Fields -->
-                    <div class="space-y-3">
-                      <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-2">
-                          Manual Entry (µm):
-                        </label>
-                        <div class="grid grid-cols-4 gap-2">
-                          <% 8.times do |i| %>
-                            <input type="number"
-                                   data-elcometer-target="manualReadingInput"
-                                   data-action="blur->elcometer#addManualReading"
-                                   data-index="<%= i %>"
-                                   step="0.1"
-                                   min="0"
-                                   class="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                                   placeholder="<%= i + 1 %>" />
-                          <% end %>
+                      <!-- ENP Measurement Table -->
+                      <div class="mb-4">
+                        <div class="overflow-hidden border border-gray-200 rounded-md">
+                          <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-100">
+                              <tr>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase">Point</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase">Before (mm)</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase">After (mm)</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase">Growth (µm)</th>
+                              </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                              <% ['A', 'B', 'C', 'D', 'E', 'F'].each_with_index do |point, index| %>
+                                <%
+                                  existing_point = existing_enp_measurements.find { |m| m['point'] == point }
+                                  start_value = existing_point ? existing_point['start_mm'] : nil
+                                  finish_value = existing_point ? existing_point['finish_mm'] : nil
+                                %>
+                                <tr>
+                                  <td class="px-3 py-2 text-sm font-medium text-gray-900"><%= point %></td>
+                                  <td class="px-3 py-2">
+                                    <input type="number"
+                                           data-enp-target="startInput"
+                                           data-action="blur->enp#updateMeasurement"
+                                           data-index="<%= index %>"
+                                           data-field="start"
+                                           step="0.001"
+                                           min="0"
+                                           value="<%= start_value %>"
+                                           class="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                           placeholder="10.500" />
+                                  </td>
+                                  <td class="px-3 py-2">
+                                    <input type="number"
+                                           data-enp-target="finishInput"
+                                           data-action="blur->enp#updateMeasurement"
+                                           data-index="<%= index %>"
+                                           data-field="finish"
+                                           step="0.001"
+                                           min="0"
+                                           value="<%= finish_value %>"
+                                           class="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                           placeholder="10.525" />
+                                  </td>
+                                  <td class="px-3 py-2">
+                                    <span data-enp-target="growthDisplay" class="text-sm text-gray-500">—</span>
+                                  </td>
+                                </tr>
+                              <% end %>
+                            </tbody>
+                          </table>
                         </div>
                         <p class="mt-2 text-xs text-gray-500">
-                          Enter readings and press TAB. Values are added automatically.
+                          Enter before/after dimensions and press TAB. Growth calculates automatically (µm = (after - before) × 1000).
                         </p>
                       </div>
+
+                      <!-- Hidden field to store ENP measurements for form submission -->
+                      <%= hidden_field_tag "enp_measurements_#{treatment_id}",
+                                          existing_enp_measurements.to_json,
+                                          data: { enp_target: "measurementsData" } %>
                     </div>
 
-                    <!-- Hidden field to store readings array for form submission -->
-                    <%= hidden_field_tag "thickness_readings_#{treatment_id}",
-                                        existing_readings.to_json,
-                                        data: { elcometer_target: "readingsData" } %>
-                  </div>
+                  <% else %>
+                    <!-- Anodic Treatment - Elcometer Controller Wrapper -->
+                    <%
+                      target_thickness = treatment[:target_thickness]
+                      existing_readings = @release_note.get_thickness_readings(treatment_id)
+                      field_name = "thickness_measurement_#{treatment_id}"
+                    %>
+
+                    <div data-controller="elcometer"
+                         data-elcometer-treatment-id-value="<%= treatment_id %>"
+                         data-elcometer-process-type-value="<%= process_type %>"
+                         data-elcometer-target-thickness-value="<%= target_thickness %>"
+                         data-elcometer-display-name-value="<%= display_name %>"
+                         class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+
+                      <!-- Treatment Header -->
+                      <div class="flex items-center justify-between mb-4">
+                        <div>
+                          <label class="block text-sm font-medium text-gray-700">
+                            <%= display_name %>
+                            <span class="text-red-500">*</span>
+                          </label>
+                        </div>
+                        <div class="flex gap-2">
+                          <!-- Connect Button -->
+                          <button type="button"
+                                  data-elcometer-target="connectButton"
+                                  data-action="click->elcometer#connectElcometer"
+                                  class="inline-flex items-center px-3 py-2 border border-blue-600 rounded-md shadow-sm text-sm font-medium text-blue-600 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                            Connect Elcometer
+                          </button>
+
+                          <!-- Stop Button (hidden initially) -->
+                          <button type="button"
+                                  data-elcometer-target="stopButton"
+                                  data-action="click->elcometer#stopReading"
+                                  class="hidden inline-flex items-center px-3 py-2 border border-red-600 rounded-md shadow-sm text-sm font-medium text-red-600 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                            Stop
+                          </button>
+
+                          <!-- Clear Button -->
+                          <button type="button"
+                                  data-action="click->elcometer#clearReadings"
+                                  class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+
+                      <!-- Statistics Display -->
+                      <div data-elcometer-target="statistics" class="mb-4"></div>
+
+                      <!-- Readings Display -->
+                      <div class="mb-4">
+                        <label class="block text-xs font-medium text-gray-500 mb-2">Readings:</label>
+                        <div data-elcometer-target="readingsList" class="min-h-[3rem] p-3 bg-white border border-gray-200 rounded-md">
+                          <% if existing_readings.any? %>
+                            <% existing_readings.each do |reading| %>
+                              <span class="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm mr-2 mb-2">
+                                <%= reading %> µm
+                              </span>
+                            <% end %>
+                          <% else %>
+                            <span class="text-gray-400 text-sm">No readings yet...</span>
+                          <% end %>
+                        </div>
+                      </div>
+
+                      <!-- Manual Entry - 8 Individual Fields -->
+                      <div class="space-y-3">
+                        <div>
+                          <label class="block text-xs font-medium text-gray-500 mb-2">
+                            Manual Entry (µm):
+                          </label>
+                          <div class="grid grid-cols-4 gap-2">
+                            <% 8.times do |i| %>
+                              <input type="number"
+                                     data-elcometer-target="manualReadingInput"
+                                     data-action="blur->elcometer#addManualReading"
+                                     data-index="<%= i %>"
+                                     step="0.1"
+                                     min="0"
+                                     class="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                     placeholder="<%= i + 1 %>" />
+                            <% end %>
+                          </div>
+                          <p class="mt-2 text-xs text-gray-500">
+                            Enter readings and press TAB. Values are added automatically.
+                          </p>
+                        </div>
+                      </div>
+
+                      <!-- Hidden field to store readings array for form submission -->
+                      <%= hidden_field_tag "thickness_readings_#{treatment_id}",
+                                          existing_readings.to_json,
+                                          data: { elcometer_target: "readingsData" } %>
+                    </div>
+                  <% end %>
                 <% end %>
               </div>
             </div>
