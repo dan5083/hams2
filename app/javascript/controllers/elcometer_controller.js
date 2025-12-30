@@ -136,9 +136,6 @@ export default class extends Controller {
 
     // Clear the field
     input.value = ''
-
-    // Update quantity accepted
-    this.updateQuantityAccepted()
   }
 
   addReading(value) {
@@ -151,9 +148,6 @@ export default class extends Controller {
 
     // Visual feedback - flash the new reading
     this.flashNewReading()
-
-    // Update quantity accepted
-    this.updateQuantityAccepted()
   }
 
   updateDisplay() {
@@ -240,7 +234,6 @@ export default class extends Controller {
       this.readings = []
       this.updateDisplay()
       this.updateHiddenField()
-      this.updateQuantityAccepted()
       this.showSuccess("Readings cleared")
     }
   }
@@ -318,38 +311,5 @@ export default class extends Controller {
     setTimeout(() => {
       notification.remove()
     }, 5000)
-  }
-
-  updateQuantityAccepted() {
-    // Find the quantity_accepted field
-    const quantityField = document.getElementById('release_note_quantity_accepted')
-
-    if (!quantityField) return
-
-    const currentValue = parseInt(quantityField.value) || 0
-    const readingCount = this.readings.length
-
-    // Only update if the field is empty or if the count changed significantly
-    if (currentValue === 0 || Math.abs(currentValue - readingCount) > 0) {
-      // Store the old value for the notification
-      const oldValue = currentValue
-
-      // Update the field
-      quantityField.value = readingCount
-
-      // Flash the field to draw attention
-      quantityField.classList.add('ring-2', 'ring-amber-400', 'bg-amber-50')
-      setTimeout(() => {
-        quantityField.classList.remove('ring-2', 'ring-amber-400', 'bg-amber-50')
-      }, 1500)
-
-      // Show notification pointing to the field
-      if (readingCount > 0) {
-        this.showWarning(
-          `Quantity Accepted updated to ${readingCount} based on readings. ` +
-          `Please verify this matches your actual accepted quantity.`
-        )
-      }
-    }
   }
 }
