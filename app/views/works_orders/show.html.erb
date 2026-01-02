@@ -70,7 +70,10 @@
 
         <div>
           <dt class="text-sm font-medium text-gray-500">Part Number</dt>
-          <dd class="text-sm text-gray-900"><%= @works_order.part_number %>-<%= @works_order.part_issue %></dd>
+          <dd class="text-sm text-gray-900">
+            <%= link_to "#{@works_order.part_number}-#{@works_order.part_issue}", @works_order.part,
+                class: "text-blue-600 hover:text-blue-900" %>
+          </dd>
         </div>
 
         <div>
