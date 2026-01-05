@@ -349,7 +349,7 @@
           <%= form.label :remarks, "Statement", class: "block text-sm font-medium text-gray-700" %>
           <%
             # Default statement for new release notes
-            default_statement = "Certificate of conformity - We certify that the above work has been processed and inspected according to the terms of your order."
+            default_statement = "Certificate of conformity - We certify that the above work has been processed and inspected in accordance with AS9100D & BS EN ISO 9001:2015 standards and the terms of your order."
 
             # Use existing remarks if present, otherwise use default
             field_value = @release_note.remarks.present? ? @release_note.remarks : default_statement
