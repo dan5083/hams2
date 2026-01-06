@@ -1,0 +1,149 @@
+<!-- app/views/specifications/index.html.erb -->
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="sm:flex sm:items-center sm:justify-between mb-6">
+    <div>
+      <h1 class="text-3xl font-bold text-gray-900">Specifications</h1>
+      <p class="mt-2 text-sm text-gray-700">
+        <%= @specifications.total_count %> specification<%= @specifications.total_count == 1 ? '' : 's' %> found
+      </p>
+    </div>
+    <div class="mt-4 sm:mt-0">
+      <%= link_to new_specification_path, class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
+        <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+        </svg>
+        New Specification
+      <% end %>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="bg-white shadow rounded-lg p-4 mb-6">
+    <%= form_with url: specifications_path, method: :get, class: "space-y-4" do |f| %>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Search -->
+        <div>
+          <%= f.label :search, "Search", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.text_field :search, value: params[:search], placeholder: "Title, spec number, description...", class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md" %>
+        </div>
+
+        <!-- Type Filter -->
+        <div>
+          <%= f.label :type, "Type", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.select :type,
+              options_for_select([['All Types', ''], ['QS Specs', 'qs'], ['Non-QS Specs', 'non_qs']], params[:type]),
+              {},
+              class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md" %>
+        </div>
+
+        <!-- Archive Filter -->
+        <div>
+          <%= f.label :show_archived, "Status", class: "block text-sm font-medium text-gray-700 mb-1" %>
+          <%= f.select :show_archived,
+              options_for_select([['Active', 'false'], ['Archived', 'true']], params[:show_archived]),
+              {},
+              class: "shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md" %>
+        </div>
+      </div>
+
+      <div class="flex space-x-3">
+        <%= f.submit "Apply Filters", class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+        <%= link_to "Clear", specifications_path, class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+      </div>
+    <% end %>
+  </div>
+
+  <!-- Specifications List -->
+  <div class="bg-white shadow overflow-hidden sm:rounded-md">
+    <% if @specifications.any? %>
+      <ul class="divide-y divide-gray-200">
+        <% @specifications.each do |spec| %>
+          <li>
+            <%= link_to specification_path(spec), class: "block hover:bg-gray-50" do %>
+              <div class="px-4 py-4 sm:px-6">
+                <div class="flex items-center justify-between">
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center space-x-3">
+                      <p class="text-lg font-medium text-indigo-600 truncate">
+                        <%= spec.display_name %>
+                      </p>
+                      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium <%= spec.spec_type_badge_class %>">
+                        <%= spec.spec_type %>
+                      </span>
+                      <% if spec.archived? %>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                          Archived
+                        </span>
+                      <% end %>
+                    </div>
+                    <% if spec.description.present? %>
+                      <p class="mt-2 text-sm text-gray-600 line-clamp-2">
+                        <%= spec.description %>
+                      </p>
+                    <% end %>
+                    <div class="mt-2 flex items-center text-sm text-gray-500 space-x-4">
+                      <span class="flex items-center">
+                        <svg class="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        <%= spec.created_by.full_name %>
+                      </span>
+                      <span class="flex items-center">
+                        <svg class="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <%= spec.created_at.strftime("%d %b %Y") %>
+                      </span>
+                      <% if spec.version.present? %>
+                        <span class="flex items-center">
+                          <svg class="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                          </svg>
+                          v<%= spec.version %>
+                        </span>
+                      <% end %>
+                      <% if spec.has_document? %>
+                        <span class="flex items-center">
+                          <svg class="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <%= spec.document_size_formatted %>
+                        </span>
+                      <% end %>
+                    </div>
+                  </div>
+                  <div class="ml-5 flex-shrink-0">
+                    <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+
+      <!-- Pagination -->
+      <div class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
+        <%= paginate @specifications, theme: 'tailwind' %>
+      </div>
+    <% else %>
+      <div class="text-center py-12">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">No specifications found</h3>
+        <p class="mt-1 text-sm text-gray-500">Get started by creating a new specification.</p>
+        <div class="mt-6">
+          <%= link_to new_specification_path, class: "inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
+            <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
+            </svg>
+            New Specification
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>

@@ -1,0 +1,163 @@
+<!-- app/views/specifications/_form.html.erb -->
+<%= form_with(model: specification, class: "space-y-6") do |f| %>
+  <% if specification.errors.any? %>
+    <div class="rounded-md bg-red-50 p-4">
+      <div class="flex">
+        <div class="flex-shrink-0">
+          <svg class="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+          </svg>
+        </div>
+        <div class="ml-3">
+          <h3 class="text-sm font-medium text-red-800">
+            <%= pluralize(specification.errors.count, "error") %> prohibited this specification from being saved:
+          </h3>
+          <div class="mt-2 text-sm text-red-700">
+            <ul class="list-disc pl-5 space-y-1">
+              <% specification.errors.full_messages.each do |message| %>
+                <li><%= message %></li>
+              <% end %>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="bg-white shadow sm:rounded-lg">
+    <div class="px-4 py-5 sm:p-6">
+      <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+        Specification Details
+      </h3>
+
+      <div class="space-y-6">
+        <!-- Title -->
+        <div>
+          <%= f.label :title, class: "block text-sm font-medium text-gray-700" do %>
+            Title <span class="text-red-500">*</span>
+          <% end %>
+          <%= f.text_field :title, class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md", required: true %>
+        </div>
+
+        <!-- Spec Number and Version -->
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <div>
+            <%= f.label :spec_number, "Spec Number", class: "block text-sm font-medium text-gray-700" %>
+            <%= f.text_field :spec_number, placeholder: "e.g., HAL-001", class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
+            <p class="mt-1 text-xs text-gray-500">Optional unique identifier</p>
+          </div>
+
+          <div>
+            <%= f.label :version, class: "block text-sm font-medium text-gray-700" %>
+            <%= f.text_field :version, placeholder: "e.g., 1.0", class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
+            <p class="mt-1 text-xs text-gray-500">Optional version number</p>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div>
+          <%= f.label :description, class: "block text-sm font-medium text-gray-700" %>
+          <%= f.text_area :description, rows: 4, class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md", placeholder: "Describe this specification..." %>
+        </div>
+
+        <!-- Specification Type (QS / Non-QS) -->
+        <div>
+          <%= f.label :is_qs, "Specification Type", class: "block text-sm font-medium text-gray-700 mb-2" %>
+          <div class="space-y-3">
+            <div class="flex items-start">
+              <div class="flex items-center h-5">
+                <%= f.radio_button :is_qs, false, class: "focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300", id: "is_qs_non_qs" %>
+              </div>
+              <div class="ml-3 text-sm">
+                <%= f.label :is_qs, "Non-QS Specification", value: false, class: "font-medium text-gray-700", for: "is_qs_non_qs" %>
+                <p class="text-gray-500">Can be added by any team member</p>
+              </div>
+            </div>
+            <div class="flex items-start">
+              <div class="flex items-center h-5">
+                <%= f.radio_button :is_qs, true, class: "focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300", id: "is_qs_qs" %>
+              </div>
+              <div class="ml-3 text-sm">
+                <%= f.label :is_qs, "QS Specification", value: true, class: "font-medium text-gray-700", for: "is_qs_qs" %>
+                <p class="text-gray-500">Only Quality System admins can add these (appearance only - no authentication enforced)</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Document Upload -->
+  <div class="bg-white shadow sm:rounded-lg">
+    <div class="px-4 py-5 sm:p-6">
+      <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+        Document
+      </h3>
+
+      <% if specification.persisted? && specification.has_document? %>
+        <!-- Existing Document Info -->
+        <div class="rounded-md bg-blue-50 p-4 mb-4">
+          <div class="flex">
+            <div class="flex-shrink-0">
+              <svg class="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+              </svg>
+            </div>
+            <div class="ml-3 flex-1">
+              <h3 class="text-sm font-medium text-blue-800">Current Document</h3>
+              <div class="mt-2 text-sm text-blue-700">
+                <p><strong>Filename:</strong> <%= specification.document_filename %></p>
+                <p><strong>Size:</strong> <%= specification.document_size_formatted %></p>
+                <% if specification.document_uploaded_date %>
+                  <p><strong>Uploaded:</strong> <%= specification.document_uploaded_date.strftime("%d %b %Y at %H:%M") %></p>
+                <% end %>
+              </div>
+              <div class="mt-3">
+                <%= link_to download_document_specification_path(specification), class: "inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-500" do %>
+                  <svg class="mr-1.5 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download Current Document
+                <% end %>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Replace Document Section -->
+        <div>
+          <%= f.label :temp_document, "Replace Document", class: "block text-sm font-medium text-gray-700" %>
+          <%= f.file_field :temp_document,
+              accept: ".pdf,.doc,.docx,.xls,.xlsx",
+              class: "mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" %>
+          <p class="mt-1 text-xs text-gray-500">
+            Leave empty to keep current document. Upload a new file to replace it.
+          </p>
+        </div>
+      <% else %>
+        <!-- New Document Upload -->
+        <div>
+          <%= f.label :temp_document, "Upload Document", class: "block text-sm font-medium text-gray-700" do %>
+            Document <span class="text-red-500">*</span>
+          <% end %>
+          <%= f.file_field :temp_document,
+              accept: ".pdf,.doc,.docx,.xls,.xlsx",
+              class: "mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100",
+              required: specification.new_record? %>
+          <p class="mt-1 text-xs text-gray-500">
+            Accepted formats: PDF, DOC, DOCX, XLS, XLSX
+          </p>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="flex justify-end space-x-3">
+    <%= link_to "Cancel", specification.persisted? ? specification : specifications_path,
+        class: "inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+    <%= f.submit specification.new_record? ? "Create Specification" : "Update Specification",
+        class: "inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
+  </div>
+<% end %>

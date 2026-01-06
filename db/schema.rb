@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_10_27_122324) do
+ActiveRecord::Schema[8.0].define(version: 2026_01_06_143555) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -238,6 +238,27 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_27_122324) do
     t.index ["name"], name: "index_specification_presets_on_name", unique: true
   end
 
+  create_table "specifications", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "title", null: false
+    t.text "description"
+    t.string "spec_number"
+    t.string "version"
+    t.boolean "is_qs", default: false, null: false
+    t.boolean "archived", default: false, null: false
+    t.jsonb "document_data", default: {}, null: false
+    t.uuid "created_by_id", null: false
+    t.uuid "updated_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["archived"], name: "index_specifications_on_archived"
+    t.index ["created_by_id"], name: "index_specifications_on_created_by_id"
+    t.index ["document_data"], name: "index_specifications_on_document_data", using: :gin
+    t.index ["is_qs"], name: "index_specifications_on_is_qs"
+    t.index ["spec_number"], name: "index_specifications_on_spec_number", unique: true, where: "(spec_number IS NOT NULL)"
+    t.index ["title"], name: "index_specifications_on_title"
+    t.index ["updated_by_id"], name: "index_specifications_on_updated_by_id"
+  end
+
   create_table "transport_methods", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "name", null: false
     t.boolean "enabled", default: true, null: false
@@ -332,6 +353,8 @@ ActiveRecord::Schema[8.0].define(version: 2025_10_27_122324) do
   add_foreign_key "release_notes", "users", column: "issued_by_id"
   add_foreign_key "release_notes", "works_orders"
   add_foreign_key "sessions", "users"
+  add_foreign_key "specifications", "users", column: "created_by_id"
+  add_foreign_key "specifications", "users", column: "updated_by_id"
   add_foreign_key "works_orders", "customer_orders"
   add_foreign_key "works_orders", "parts"
   add_foreign_key "works_orders", "transport_methods"

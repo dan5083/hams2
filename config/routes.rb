@@ -169,6 +169,15 @@ Rails.application.routes.draw do
     get :customer_summary
   end
 
+  # Specifications routes
+  resources :specifications do
+    member do
+      get :download_document
+      patch :archive
+      patch :unarchive
+    end
+  end
+
   # API routes for AJAX functionality - Updated to use parts
   namespace :api do
     namespace :v1 do

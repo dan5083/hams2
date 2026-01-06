@@ -38,6 +38,10 @@
               class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(external_ncrs_path)}" %>
         <% end %>
 
+        <!-- Specifications - Always visible -->
+        <%= link_to "Specs", specifications_path,
+            class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(specifications_path)}" %>
+
         <!-- Artifacts - Always visible -->
         <%= link_to "Artifacts", artifacts_path,
             class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(artifacts_path)}" %>
@@ -93,6 +97,10 @@
         <%= link_to "NCRs", external_ncrs_path,
             class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(external_ncrs_path)}" %>
       <% end %>
+
+      <!-- Specifications - Always visible -->
+      <%= link_to "Specs", specifications_path,
+          class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(specifications_path)}" %>
 
       <%= link_to "Artifacts", artifacts_path,
           class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(artifacts_path)}" %>
