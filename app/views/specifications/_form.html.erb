@@ -39,19 +39,11 @@
           <%= f.text_field :title, class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md", required: true %>
         </div>
 
-        <!-- Spec Number and Version -->
-        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <div>
-            <%= f.label :spec_number, "Spec Number", class: "block text-sm font-medium text-gray-700" %>
-            <%= f.text_field :spec_number, placeholder: "e.g., HAL-001", class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
-            <p class="mt-1 text-xs text-gray-500">Optional unique identifier</p>
-          </div>
-
-          <div>
-            <%= f.label :version, class: "block text-sm font-medium text-gray-700" %>
-            <%= f.text_field :version, placeholder: "e.g., 1.0", class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
-            <p class="mt-1 text-xs text-gray-500">Optional version number</p>
-          </div>
+        <!-- Version -->
+        <div>
+          <%= f.label :version, class: "block text-sm font-medium text-gray-700" %>
+          <%= f.text_field :version, placeholder: "e.g., 1.0", class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
+          <p class="mt-1 text-xs text-gray-500">Optional version number</p>
         </div>
 
         <!-- Description -->

@@ -55,11 +55,7 @@ class SpecificationsController < ApplicationController
         year = Date.current.year
         folder_path = "Specs/#{spec_type}/#{year}"
 
-        filename_prefix = if @specification.spec_number.present?
-          "SPEC#{@specification.spec_number}"
-        else
-          @specification.title.parameterize[0..50] # Limit length
-        end
+        filename_prefix = @specification.title.parameterize[0..50] # Limit length
 
         upload_result = CloudinaryService.upload_file(
           uploaded_file,
@@ -128,11 +124,7 @@ class SpecificationsController < ApplicationController
         year = Date.current.year
         folder_path = "Specs/#{spec_type}/#{year}"
 
-        filename_prefix = if @specification.spec_number.present?
-          "SPEC#{@specification.spec_number}"
-        else
-          @specification.title.parameterize[0..50]
-        end
+        filename_prefix = @specification.title.parameterize[0..50]
 
         upload_result = CloudinaryService.upload_file(
           uploaded_file,
@@ -231,7 +223,7 @@ class SpecificationsController < ApplicationController
 
   def specification_params
     params.require(:specification).permit(
-      :title, :description, :spec_number, :version, :is_qs
+      :title, :description, :version, :is_qs
       # Note: temp_document is handled separately
     )
   end

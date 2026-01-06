@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_01_06_143555) do
+ActiveRecord::Schema[8.0].define(version: 2026_01_06_155522) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -241,7 +241,6 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_06_143555) do
   create_table "specifications", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "title", null: false
     t.text "description"
-    t.string "spec_number"
     t.string "version"
     t.boolean "is_qs", default: false, null: false
     t.boolean "archived", default: false, null: false
@@ -254,7 +253,6 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_06_143555) do
     t.index ["created_by_id"], name: "index_specifications_on_created_by_id"
     t.index ["document_data"], name: "index_specifications_on_document_data", using: :gin
     t.index ["is_qs"], name: "index_specifications_on_is_qs"
-    t.index ["spec_number"], name: "index_specifications_on_spec_number", unique: true, where: "(spec_number IS NOT NULL)"
     t.index ["title"], name: "index_specifications_on_title"
     t.index ["updated_by_id"], name: "index_specifications_on_updated_by_id"
   end

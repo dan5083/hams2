@@ -14,7 +14,6 @@ class Specification < ApplicationRecord
 
   # Validations
   validates :title, presence: true, length: { maximum: 255 }
-  validates :spec_number, uniqueness: { allow_blank: true }
   validates :is_qs, inclusion: { in: [true, false] }
   validates :version, length: { maximum: 50 }, allow_blank: true
   validates :created_by_id, presence: true
@@ -25,17 +24,13 @@ class Specification < ApplicationRecord
   scope :active, -> { where(archived: false) }
   scope :archived, -> { where(archived: true) }
   scope :recent, -> { order(created_at: :desc) }
-  scope :by_spec_number, -> { order(Arel.sql("CASE WHEN spec_number IS NULL THEN 1 ELSE 0 END, spec_number")) }
 
   # Callbacks
   before_validation :set_defaults, if: :new_record?
   after_create :log_creation
 
   def display_name
-    parts = []
-    parts << spec_number if spec_number.present?
-    parts << title
-    parts.join(" - ")
+    title
   end
 
   def spec_type
@@ -136,10 +131,9 @@ class Specification < ApplicationRecord
 
     where(
       "title ILIKE ? OR " \
-      "spec_number ILIKE ? OR " \
       "description ILIKE ? OR " \
       "(document_data->>'original_filename') ILIKE ?",
-      "%#{term}%", "%#{term}%", "%#{term}%", "%#{term}%"
+      "%#{term}%", "%#{term}%", "%#{term}%"
     )
   end
 
