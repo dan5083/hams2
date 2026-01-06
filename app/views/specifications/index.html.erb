@@ -125,9 +125,30 @@
       </ul>
 
       <!-- Pagination -->
-      <div class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
-        <%= paginate @specifications, theme: 'tailwind' %>
-      </div>
+      <% if @specifications.respond_to?(:current_page) %>
+        <div class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
+          <div class="flex justify-between items-center">
+            <div class="text-sm text-gray-700">
+              Showing <%= @specifications.offset_value + 1 %> to <%= [@specifications.offset_value + @specifications.limit_value, @specifications.total_count].min %> of <%= @specifications.total_count %> specifications
+            </div>
+            <div class="flex items-center space-x-2">
+              <% if @specifications.prev_page %>
+                <%= link_to "← Previous", specifications_path(page: @specifications.prev_page, search: params[:search], type: params[:type], show_archived: params[:show_archived]),
+                    class: "px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50" %>
+              <% end %>
+
+              <span class="px-3 py-2 text-sm font-medium text-gray-700 bg-blue-50 border border-blue-300 rounded-md">
+                Page <%= @specifications.current_page %> of <%= @specifications.total_pages %>
+              </span>
+
+              <% if @specifications.next_page %>
+                <%= link_to "Next →", specifications_path(page: @specifications.next_page, search: params[:search], type: params[:type], show_archived: params[:show_archived]),
+                    class: "px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50" %>
+              <% end %>
+            </div>
+          </div>
+        </div>
+      <% end %>
     <% else %>
       <div class="text-center py-12">
         <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
