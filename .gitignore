@@ -3,3 +3,5 @@
 ngrok-v3-stable-linux-amd64.tgz
 tmp/
 log/*.log
+
+/config/master.key
