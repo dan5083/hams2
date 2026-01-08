@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_01_06_155522) do
+ActiveRecord::Schema[8.0].define(version: 2026_01_08_141725) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -257,16 +257,6 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_06_155522) do
     t.index ["updated_by_id"], name: "index_specifications_on_updated_by_id"
   end
 
-  create_table "transport_methods", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.string "name", null: false
-    t.boolean "enabled", default: true, null: false
-    t.text "description"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["enabled"], name: "index_transport_methods_on_enabled"
-    t.index ["name"], name: "index_transport_methods_on_name", unique: true
-  end
-
   create_table "users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "email_address", null: false
     t.string "password_digest"
@@ -286,7 +276,6 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_06_155522) do
     t.integer "number", null: false
     t.uuid "customer_order_id", null: false
     t.uuid "part_id", null: false
-    t.uuid "transport_method_id", null: false
     t.string "customer_order_line"
     t.string "part_number", null: false
     t.string "part_issue", null: false
@@ -314,7 +303,6 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_06_155522) do
     t.index ["number"], name: "index_works_orders_on_number", unique: true
     t.index ["part_id"], name: "index_works_orders_on_part_id"
     t.index ["part_number", "part_issue"], name: "index_works_orders_on_part_number_and_part_issue"
-    t.index ["transport_method_id"], name: "index_works_orders_on_transport_method_id"
     t.index ["voided"], name: "index_works_orders_on_voided"
     t.check_constraint "lot_price >= 0::numeric AND (each_price IS NULL OR each_price >= 0::numeric)", name: "check_positive_prices"
     t.check_constraint "quantity > 0 AND quantity_released >= 0 AND quantity_released <= quantity", name: "check_positive_quantities"
@@ -355,5 +343,4 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_06_155522) do
   add_foreign_key "specifications", "users", column: "updated_by_id"
   add_foreign_key "works_orders", "customer_orders"
   add_foreign_key "works_orders", "parts"
-  add_foreign_key "works_orders", "transport_methods"
 end

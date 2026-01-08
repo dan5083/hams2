@@ -61,7 +61,7 @@ class CustomerOrdersController < ApplicationController
 
   def show
     @works_orders = @customer_order.works_orders
-                                  .includes(:part, :transport_method)
+                                  .includes(:part)
                                   .order(created_at: :desc)
   end
 

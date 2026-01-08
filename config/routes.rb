@@ -155,12 +155,6 @@ Rails.application.routes.draw do
     end
   end
 
-  resources :transport_methods, except: [:show] do
-    member do
-      patch :toggle_enabled
-    end
-  end
-
   # Reporting and dashboard routes
   namespace :reports do
     get :works_orders

@@ -5,30 +5,6 @@
   </div>
 
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-    <!-- Transport Methods Card -->
-    <div class="bg-white rounded-lg shadow-md p-6">
-      <h2 class="text-xl font-semibold text-gray-800 mb-4">Transport Methods</h2>
-      <p class="text-gray-600 mb-4">Manage delivery and transport options.</p>
-
-      <div class="space-y-2 text-sm mb-4">
-        <div><strong>Total:</strong> <%= @transport_methods_count %></div>
-        <div><strong>Enabled:</strong> <%= @enabled_transport_methods_count %></div>
-        <div><strong>Disabled:</strong> <%= @transport_methods_count - @enabled_transport_methods_count %></div>
-      </div>
-
-      <div class="space-y-2">
-        <%= link_to transport_methods_path,
-            class: "block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm text-center" do %>
-          🚚 Manage Transport Methods
-        <% end %>
-
-        <%= link_to new_transport_method_path,
-            class: "block w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded text-sm text-center" do %>
-          ➕ Add New Transport Method
-        <% end %>
-      </div>
-    </div>
-
     <!-- Specification Presets Card -->
     <div class="bg-white rounded-lg shadow-md p-6">
       <h2 class="text-xl font-semibold text-gray-800 mb-4">Specification Presets</h2>
@@ -104,7 +80,7 @@
         <h3 class="text-sm font-medium text-blue-800">About Artifacts Management</h3>
         <div class="mt-2 text-sm text-blue-700">
           <p>This page provides centralized access to manage all system reference data including
-          transport methods, specification presets, additional charges, and customer buyer contacts.
+          specification presets, additional charges, and customer buyer contacts.
           Use these tools to maintain the reference data used throughout the application.</p>
         </div>
       </div>

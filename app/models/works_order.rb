@@ -4,7 +4,6 @@ class WorksOrder < ApplicationRecord
 
   belongs_to :customer_order
   belongs_to :part
-  belongs_to :transport_method
   belongs_to :issued_by, class_name: 'User', optional: true
 
   has_many :release_notes, dependent: :restrict_with_error
@@ -352,11 +351,6 @@ class WorksOrder < ApplicationRecord
   # Get available additional charges for this works order
   def available_additional_charges
     AdditionalChargePreset.enabled.ordered
-  end
-
-  # Helper method to determine if this works order requires shipping
-  def requires_shipping?
-    !transport_method.name.downcase.include?('collect')
   end
 
   # Calculate total additional charges amount for a given set of charge IDs
