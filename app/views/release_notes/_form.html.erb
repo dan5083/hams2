@@ -52,10 +52,10 @@
     </div>
   <% end %>
 
-  <!-- Shipping Charges Warning for Courier Deliveries (excluding Lufthansa) -->
+  <!-- Shipping Charges Warning for All Deliveries (excluding Lufthansa) -->
   <%
     is_lufthansa = @works_order&.customer&.name&.downcase&.include?('lufthansa')
-    show_shipping_warning = @works_order&.requires_shipping? && !@release_note.persisted? && !is_lufthansa
+    show_shipping_warning = !@release_note.persisted? && !is_lufthansa
   %>
   <% if show_shipping_warning %>
     <% selected_charges = @works_order.get_selected_additional_charges %>
@@ -76,11 +76,11 @@
         </div>
         <div class="ml-3">
           <h3 class="text-sm font-medium <%= has_charges ? 'text-blue-800' : 'text-amber-800' %>">
-            <%= has_charges ? 'Courier Delivery - Charges Configured' : 'Courier Delivery - No Charges Set' %>
+            <%= has_charges ? 'Shipping Charges Configured' : 'Shipping Charges - Check Required' %>
           </h3>
           <div class="mt-2 text-sm <%= has_charges ? 'text-blue-700' : 'text-amber-700' %>">
             <% if has_charges %>
-              <p class="mb-2">This order will be sent by courier. The following charges are configured:</p>
+              <p class="mb-2">The following shipping charges are configured for this order:</p>
               <ul class="list-disc list-inside mb-2">
                 <% selected_charges.each do |charge| %>
                   <%
@@ -101,14 +101,15 @@
                 (opens in new tab - won't lose your measurements)
               </p>
             <% else %>
-              <p class="mb-2"><strong>Important:</strong> This order requires courier delivery but no shipping charges are configured.</p>
+              <p class="mb-2"><strong>Check shipping charges:</strong> No shipping charges are currently configured for this works order.</p>
               <p class="mb-2">
-                <%= link_to "Add shipping charges to this works order →", edit_works_order_path(@works_order),
+                If this order needs shipping charges (DPD, courier, special handling, etc.):
+                <%= link_to "Add charges to the works order →", edit_works_order_path(@works_order),
                     target: "_blank",
                     class: "font-medium underline hover:no-underline inline-flex items-center" %>
                 <span class="ml-1 text-xs">(opens in new tab - won't lose your measurements)</span>
               </p>
-              <p class="text-xs">After adding charges, return to this tab and submit the release note.</p>
+              <p class="text-xs">If the customer is collecting or no charges apply, just tick the confirmation box below.</p>
             <% end %>
 
             <!-- Required Acknowledgement Checkbox -->
@@ -120,9 +121,9 @@
                        class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-offset-0 focus:ring-blue-200 focus:ring-opacity-50 mt-0.5 flex-shrink-0">
                 <span class="ml-2 text-sm <%= has_charges ? 'text-blue-800' : 'text-amber-800' %>">
                   <% if has_charges %>
-                    <strong>I confirm</strong> the shipping charges shown above are correct for this courier delivery.
+                    <strong>I confirm</strong> the shipping charges shown above are correct for this delivery.
                   <% else %>
-                    <strong>I acknowledge</strong> no shipping charges are configured. I will add them to the works order before creating the invoice.
+                    <strong>I confirm</strong> I have checked whether shipping charges are needed, and either added them or confirmed none apply (customer collecting, etc.).
                   <% end %>
                 </span>
               </label>
