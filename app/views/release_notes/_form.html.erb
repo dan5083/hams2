@@ -52,6 +52,70 @@
     </div>
   <% end %>
 
+  <!-- Shipping Charges Warning for Courier Deliveries (excluding Lufthansa) -->
+  <%
+    is_lufthansa = @works_order&.customer&.name&.downcase&.include?('lufthansa')
+    show_shipping_warning = @works_order&.requires_shipping? && !@release_note.persisted? && !is_lufthansa
+  %>
+  <% if show_shipping_warning %>
+    <% selected_charges = @works_order.get_selected_additional_charges %>
+    <% has_charges = selected_charges.any? %>
+
+    <div class="<%= has_charges ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200' %> border rounded-md p-4 mb-6">
+      <div class="flex">
+        <div class="flex-shrink-0">
+          <% if has_charges %>
+            <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+            </svg>
+          <% else %>
+            <svg class="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+            </svg>
+          <% end %>
+        </div>
+        <div class="ml-3">
+          <h3 class="text-sm font-medium <%= has_charges ? 'text-blue-800' : 'text-amber-800' %>">
+            <%= has_charges ? 'Courier Delivery - Charges Configured' : 'Courier Delivery - No Charges Set' %>
+          </h3>
+          <div class="mt-2 text-sm <%= has_charges ? 'text-blue-700' : 'text-amber-700' %>">
+            <% if has_charges %>
+              <p class="mb-2">This order will be sent by courier. The following charges are configured:</p>
+              <ul class="list-disc list-inside mb-2">
+                <% selected_charges.each do |charge| %>
+                  <%
+                    custom_amount = @works_order.get_custom_amount(charge.id)
+                    amount = charge.is_variable? && custom_amount.present? ? custom_amount.to_f : charge.amount
+                  %>
+                  <li><strong><%= charge.name %></strong>: £<%= sprintf("%.2f", amount) %></li>
+                <% end %>
+              </ul>
+              <p class="text-xs">
+                Total additional charges: <strong>£<%= sprintf("%.2f", @works_order.calculate_additional_charges_total(@works_order.selected_charge_ids, @works_order.custom_amounts || {})) %></strong>
+              </p>
+              <p class="mt-2 text-xs">
+                Need to modify charges?
+                <%= link_to "Edit works order charges", edit_works_order_path(@works_order),
+                    target: "_blank",
+                    class: "font-medium underline hover:no-underline" %>
+                (opens in new tab - won't lose your measurements)
+              </p>
+            <% else %>
+              <p class="mb-2"><strong>Important:</strong> This order requires courier delivery but no shipping charges are configured.</p>
+              <p class="mb-2">
+                <%= link_to "Add shipping charges to this works order →", edit_works_order_path(@works_order),
+                    target: "_blank",
+                    class: "font-medium underline hover:no-underline inline-flex items-center" %>
+                <span class="ml-1 text-xs">(opens in new tab - won't lose your measurements)</span>
+              </p>
+              <p class="text-xs">After adding charges, return to this tab and submit the release note.</p>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
   <div class="bg-white shadow-sm rounded-lg">
     <div class="px-4 py-5 sm:p-6">
       <div class="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
@@ -155,88 +219,71 @@
                           <!-- Clear Button -->
                           <button type="button"
                                   data-action="click->enp#clearAllMeasurements"
-                                  class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                            </svg>
-                            Clear
+                                  class="text-sm text-red-600 hover:text-red-800 underline">
+                            Clear All
                           </button>
                         </div>
                       </div>
 
-                      <!-- Statistics Display -->
-                      <div data-enp-target="statistics" class="mb-4"></div>
+                      <!-- ENP Measurement Grid -->
+                      <div class="grid grid-cols-2 gap-4">
+                        <% ['A', 'B', 'C', 'D', 'E', 'F'].each do |point| %>
+                          <%
+                            existing_measurement = existing_enp_measurements.find { |m| m[:point] == point }
+                            existing_thickness = existing_measurement&.dig(:thickness)
+                            existing_phos = existing_measurement&.dig(:phosphorus_pct)
+                          %>
+                          <div class="border border-gray-200 rounded p-3 bg-white">
+                            <label class="block text-xs font-medium text-gray-700 mb-2">
+                              Point <%= point %>
+                            </label>
 
-                      <!-- ENP Measurement Table -->
-                      <div class="mb-4">
-                        <div class="overflow-hidden border border-gray-200 rounded-md">
-                          <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-100">
-                              <tr>
-                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase">Point</th>
-                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase">Before (mm)</th>
-                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase">After (mm)</th>
-                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase">Growth (µm)</th>
-                              </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                              <% ['A', 'B', 'C', 'D', 'E', 'F'].each_with_index do |point, index| %>
-                                <%
-                                  existing_point = existing_enp_measurements.find { |m| m['point'] == point }
-                                  start_value = existing_point ? existing_point['start_mm'] : nil
-                                  finish_value = existing_point ? existing_point['finish_mm'] : nil
-                                %>
-                                <tr>
-                                  <td class="px-3 py-2 text-sm font-medium text-gray-900"><%= point %></td>
-                                  <td class="px-3 py-2">
-                                    <input type="number"
-                                           data-enp-target="startInput"
-                                           data-action="blur->enp#updateMeasurement"
-                                           data-index="<%= index %>"
-                                           data-field="start"
-                                           step="0.001"
-                                           min="0"
-                                           value="<%= start_value %>"
-                                           class="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                                           placeholder="10.500" />
-                                  </td>
-                                  <td class="px-3 py-2">
-                                    <input type="number"
-                                           data-enp-target="finishInput"
-                                           data-action="blur->enp#updateMeasurement"
-                                           data-index="<%= index %>"
-                                           data-field="finish"
-                                           step="0.001"
-                                           min="0"
-                                           value="<%= finish_value %>"
-                                           class="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                                           placeholder="10.525" />
-                                  </td>
-                                  <td class="px-3 py-2">
-                                    <span data-enp-target="growthDisplay" class="text-sm text-gray-500">—</span>
-                                  </td>
-                                </tr>
-                              <% end %>
-                            </tbody>
-                          </table>
-                        </div>
-                        <p class="mt-2 text-xs text-gray-500">
-                          Enter before/after dimensions and press TAB. Growth calculates automatically (µm = (after - before) × 1000).
-                        </p>
+                            <!-- Thickness Input -->
+                            <input type="number"
+                                   step="0.1"
+                                   min="0"
+                                   placeholder="Thickness (µm)"
+                                   value="<%= existing_thickness %>"
+                                   data-enp-target="thicknessInput"
+                                   data-point="<%= point %>"
+                                   data-action="input->enp#updateMeasurement"
+                                   class="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 mb-2">
+
+                            <!-- Phosphorus % Input -->
+                            <input type="number"
+                                   step="0.1"
+                                   min="0"
+                                   max="100"
+                                   placeholder="P% (optional)"
+                                   value="<%= existing_phos %>"
+                                   data-enp-target="phosphorusInput"
+                                   data-point="<%= point %>"
+                                   data-action="input->enp#updateMeasurement"
+                                   class="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                          </div>
+                        <% end %>
                       </div>
 
-                      <!-- Hidden field to store ENP measurements for form submission -->
-                      <%= hidden_field_tag "enp_measurements_#{treatment_id}",
-                                          existing_enp_measurements.to_json,
-                                          data: { enp_target: "measurementsData" } %>
+                      <!-- Hidden field for form submission -->
+                      <input type="hidden"
+                             name="enp_measurements_<%= treatment_id %>"
+                             data-enp-target="hiddenField"
+                             value="<%= existing_enp_measurements.to_json %>">
+
+                      <!-- Statistics Display -->
+                      <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded" data-enp-target="stats">
+                        <div class="text-xs text-blue-800">
+                          <strong>Statistics:</strong>
+                          <span data-enp-target="statsContent">No measurements yet</span>
+                        </div>
+                      </div>
                     </div>
 
                   <% else %>
-                    <!-- Anodic Treatment - Elcometer Controller Wrapper -->
+                    <!-- Anodic Thickness Measurement UI -->
                     <%
                       target_thickness = treatment[:target_thickness]
                       existing_readings = @release_note.get_thickness_readings(treatment_id)
-                      field_name = "thickness_measurement_#{treatment_id}"
                     %>
 
                     <div data-controller="elcometer"
@@ -246,96 +293,97 @@
                          data-elcometer-display-name-value="<%= display_name %>"
                          class="border border-gray-200 rounded-lg p-4 bg-gray-50">
 
-                      <!-- Treatment Header -->
+                      <!-- Elcometer Header -->
                       <div class="flex items-center justify-between mb-4">
                         <div>
                           <label class="block text-sm font-medium text-gray-700">
                             <%= display_name %>
                             <span class="text-red-500">*</span>
                           </label>
+                          <p class="mt-1 text-xs text-gray-500">
+                            Target: <%= target_thickness %>µm | Use Elcometer or enter manually
+                          </p>
                         </div>
                         <div class="flex gap-2">
-                          <!-- Connect Button -->
-                          <button type="button"
-                                  data-elcometer-target="connectButton"
-                                  data-action="click->elcometer#connectElcometer"
-                                  class="inline-flex items-center px-3 py-2 border border-blue-600 rounded-md shadow-sm text-sm font-medium text-blue-600 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                            </svg>
-                            Connect Elcometer
-                          </button>
-
-                          <!-- Stop Button (hidden initially) -->
-                          <button type="button"
-                                  data-elcometer-target="stopButton"
-                                  data-action="click->elcometer#stopReading"
-                                  class="hidden inline-flex items-center px-3 py-2 border border-red-600 rounded-md shadow-sm text-sm font-medium text-red-600 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
-                            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                            </svg>
-                            Stop
-                          </button>
+                          <!-- Reading Counter -->
+                          <span data-elcometer-target="counter" class="text-sm text-gray-500">0 readings</span>
 
                           <!-- Clear Button -->
                           <button type="button"
                                   data-action="click->elcometer#clearReadings"
-                                  class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                            </svg>
+                                  class="text-sm text-red-600 hover:text-red-800 underline">
                             Clear
                           </button>
                         </div>
                       </div>
 
-                      <!-- Statistics Display -->
-                      <div data-elcometer-target="statistics" class="mb-4"></div>
+                      <!-- Elcometer Input Area -->
+                      <div class="mb-4">
+                        <input type="text"
+                               placeholder="Click here, then scan with Elcometer"
+                               data-elcometer-target="input"
+                               data-action="keypress->elcometer#handleInput blur->elcometer#handleBlur"
+                               class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm font-mono">
+                        <p class="mt-1 text-xs text-gray-500">
+                          Elcometer sends readings as: "70.5µm␍" - they'll be captured automatically
+                        </p>
+                      </div>
+
+                      <!-- Manual Entry -->
+                      <div class="mb-4">
+                        <label class="block text-xs font-medium text-gray-700 mb-1">
+                          Or enter manually:
+                        </label>
+                        <div class="flex gap-2">
+                          <input type="number"
+                                 step="0.1"
+                                 min="0"
+                                 placeholder="e.g., 25.4"
+                                 data-elcometer-target="manualInput"
+                                 data-action="keypress->elcometer#handleManualKeypress"
+                                 class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                          <button type="button"
+                                  data-action="click->elcometer#addManualReading"
+                                  class="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700">
+                            Add
+                          </button>
+                        </div>
+                      </div>
 
                       <!-- Readings Display -->
                       <div class="mb-4">
-                        <label class="block text-xs font-medium text-gray-500 mb-2">Readings:</label>
-                        <div data-elcometer-target="readingsList" class="min-h-[3rem] p-3 bg-white border border-gray-200 rounded-md">
+                        <label class="block text-xs font-medium text-gray-700 mb-2">Readings:</label>
+                        <div data-elcometer-target="readingsList"
+                             class="bg-white border border-gray-200 rounded-md p-3 min-h-[60px] max-h-[200px] overflow-y-auto">
                           <% if existing_readings.any? %>
-                            <% existing_readings.each do |reading| %>
-                              <span class="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm mr-2 mb-2">
-                                <%= reading %> µm
+                            <% existing_readings.each_with_index do |reading, index| %>
+                              <span class="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded mr-2 mb-2">
+                                <%= sprintf("%.1f", reading) %>µm
+                                <button type="button"
+                                        data-action="click->elcometer#removeReading"
+                                        data-index="<%= index %>"
+                                        class="text-blue-600 hover:text-blue-900">×</button>
                               </span>
                             <% end %>
                           <% else %>
-                            <span class="text-gray-400 text-sm">No readings yet...</span>
+                            <p class="text-xs text-gray-400">No readings yet</p>
                           <% end %>
                         </div>
                       </div>
 
-                      <!-- Manual Entry - 8 Individual Fields -->
-                      <div class="space-y-3">
-                        <div>
-                          <label class="block text-xs font-medium text-gray-500 mb-2">
-                            Manual Entry (µm):
-                          </label>
-                          <div class="grid grid-cols-4 gap-2">
-                            <% 8.times do |i| %>
-                              <input type="number"
-                                     data-elcometer-target="manualReadingInput"
-                                     data-action="blur->elcometer#addManualReading"
-                                     data-index="<%= i %>"
-                                     step="0.1"
-                                     min="0"
-                                     class="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                                     placeholder="<%= i + 1 %>" />
-                            <% end %>
-                          </div>
-                          <p class="mt-2 text-xs text-gray-500">
-                            Enter readings and press TAB. Values are added automatically.
-                          </p>
+                      <!-- Hidden field for form submission (JSON array of readings) -->
+                      <input type="hidden"
+                             name="thickness_readings_<%= treatment_id %>"
+                             data-elcometer-target="hiddenField"
+                             value="<%= existing_readings.to_json %>">
+
+                      <!-- Statistics Display -->
+                      <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded" data-elcometer-target="stats">
+                        <div class="text-xs text-blue-800">
+                          <strong>Statistics:</strong>
+                          <span data-elcometer-target="statsContent">No readings yet</span>
                         </div>
                       </div>
-
-                      <!-- Hidden field to store readings array for form submission -->
-                      <%= hidden_field_tag "thickness_readings_#{treatment_id}",
-                                          existing_readings.to_json,
-                                          data: { elcometer_target: "readingsData" } %>
                     </div>
                   <% end %>
                 <% end %>
@@ -344,26 +392,13 @@
           </div>
         <% end %>
 
-        <!-- Statement (using remarks field) -->
+        <!-- Remarks Field -->
         <div class="sm:col-span-6">
-          <%= form.label :remarks, "Statement", class: "block text-sm font-medium text-gray-700" %>
-          <%
-            # Default statement for new release notes
-            default_statement = "Certificate of conformity - We certify that the above work has been processed and inspected in accordance with AS9100D & BS EN ISO 9001:2015 standards and the terms of your order."
-
-            # Use existing remarks if present, otherwise use default
-            field_value = @release_note.remarks.present? ? @release_note.remarks : default_statement
-          %>
-          <%= form.text_area :remarks, rows: 4,
-                            value: field_value,
-                            class: "mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
-                            placeholder: "Enter the release statement for this release note..." %>
-          <p class="mt-1 text-xs text-gray-500">
-            Customize the release statement for this specific release note.
-            <% if @release_note.invoiced? %>
-              <span class="font-medium text-green-600">Changes will appear in updated PDFs.</span>
-            <% end %>
-          </p>
+          <%= form.label :remarks, class: "block text-sm font-medium text-gray-700" %>
+          <%= form.text_area :remarks,
+                            rows: 4,
+                            placeholder: "Optional notes about this release...",
+                            class: "mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm" %>
         </div>
 
         <!-- No Invoice Checkbox - Disabled if already invoiced -->
