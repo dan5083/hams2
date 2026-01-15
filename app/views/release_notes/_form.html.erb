@@ -214,11 +214,7 @@
                       existing_enp_measurements = @release_note.get_enp_measurements(treatment_id)
                     %>
 
-                    <div data-controller="enp"
-                         data-enp-treatment-id-value="<%= treatment_id %>"
-                         data-enp-process-type-value="<%= process_type %>"
-                         data-enp-enp-type-value="<%= process_type %>"
-                         data-enp-display-name-value="<%= display_name %>"
+                    <div data-enp-section="<%= treatment_id %>"
                          class="border border-gray-200 rounded-lg p-4 bg-gray-50">
 
                       <!-- ENP Header -->
@@ -232,11 +228,11 @@
                         </div>
                         <div class="flex gap-2">
                           <!-- Progress Counter -->
-                          <span data-enp-target="progressCounter" class="text-sm text-gray-500">0/6 complete</span>
+                          <span class="enp-progress text-sm text-gray-500">0/6 complete</span>
 
                           <!-- Clear Button -->
                           <button type="button"
-                                  data-action="click->enp#clearAllMeasurements"
+                                  onclick="clearENPMeasurements('<%= treatment_id %>')"
                                   class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                             <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
@@ -247,7 +243,7 @@
                       </div>
 
                       <!-- Statistics Display -->
-                      <div data-enp-target="statistics" class="mb-4"></div>
+                      <div class="enp-statistics mb-4"></div>
 
                       <!-- ENP Measurement Table -->
                       <div class="mb-4">
@@ -258,7 +254,7 @@
                                 <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase">Point</th>
                                 <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase">Before (mm)</th>
                                 <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase">After (mm)</th>
-                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase">Growth (µm)</th>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase">Film Thickness (µm)</th>
                               </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
@@ -272,30 +268,28 @@
                                   <td class="px-3 py-2 text-sm font-medium text-gray-900"><%= point %></td>
                                   <td class="px-3 py-2">
                                     <input type="number"
-                                           data-enp-target="startInput"
-                                           data-action="blur->enp#updateMeasurement"
+                                           class="enp-start block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                           data-treatment="<%= treatment_id %>"
                                            data-index="<%= index %>"
-                                           data-field="start"
                                            step="0.001"
                                            min="0"
                                            value="<%= start_value %>"
-                                           class="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                           onblur="updateENPMeasurement(this)"
                                            placeholder="10.500" />
                                   </td>
                                   <td class="px-3 py-2">
                                     <input type="number"
-                                           data-enp-target="finishInput"
-                                           data-action="blur->enp#updateMeasurement"
+                                           class="enp-finish block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                           data-treatment="<%= treatment_id %>"
                                            data-index="<%= index %>"
-                                           data-field="finish"
                                            step="0.001"
                                            min="0"
                                            value="<%= finish_value %>"
-                                           class="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                           onblur="updateENPMeasurement(this)"
                                            placeholder="10.525" />
                                   </td>
                                   <td class="px-3 py-2">
-                                    <span data-enp-target="growthDisplay" class="text-sm text-gray-500">—</span>
+                                    <span class="enp-growth text-sm text-gray-500" data-index="<%= index %>">—</span>
                                   </td>
                                 </tr>
                               <% end %>
@@ -303,14 +297,15 @@
                           </table>
                         </div>
                         <p class="mt-2 text-xs text-gray-500">
-                          Enter before/after dimensions and press TAB. Growth calculates automatically (µm = (after - before) × 1000).
+                          <strong>Auto-fill:</strong> Enter "Before" value for point A and press TAB - all other points will be filled automatically.<br>
+                          <strong>Calculation:</strong> Film thickness (µm) = (After - Before) × 1000 ÷ 2 (plated on both sides).
                         </p>
                       </div>
 
                       <!-- Hidden field to store ENP measurements for form submission -->
                       <%= hidden_field_tag "enp_measurements_#{treatment_id}",
                                           existing_enp_measurements.to_json,
-                                          data: { enp_target: "measurementsData" } %>
+                                          class: "enp-data" %>
                     </div>
 
                   <% else %>
@@ -597,6 +592,255 @@
           hiddenField.name = 'release_note[measured_thicknesses]';
           hiddenField.value = JSON.stringify({ measurements: measurements });
           form.appendChild(hiddenField);
+        });
+      });
+    </script>
+
+    <!-- JavaScript for ENP measurements -->
+    <script>
+      // Store ENP measurements for each treatment
+      const enpData = {};
+
+      function updateENPMeasurement(input) {
+        const treatmentId = input.dataset.treatment;
+        const index = parseInt(input.dataset.index);
+        const isStart = input.classList.contains('enp-start');
+
+        // Initialize data structure if needed
+        if (!enpData[treatmentId]) {
+          enpData[treatmentId] = [{}, {}, {}, {}, {}, {}];
+        }
+
+        const value = parseFloat(input.value);
+
+        if (isStart) {
+          // Update start value
+          if (!isNaN(value) && value > 0) {
+            enpData[treatmentId][index].start_mm = value;
+            enpData[treatmentId][index].point = String.fromCharCode(65 + index); // A-F
+
+            // AUTO-COMPLETE: If this is point A, copy to all other points
+            if (index === 0) {
+              for (let i = 1; i < 6; i++) {
+                enpData[treatmentId][i].start_mm = value;
+                enpData[treatmentId][i].point = String.fromCharCode(65 + i);
+
+                // Update the input field
+                const section = document.querySelector(`[data-enp-section="${treatmentId}"]`);
+                const startInputs = section.querySelectorAll('.enp-start');
+                startInputs[i].value = value;
+
+                // Flash the field
+                startInputs[i].classList.add('ring-2', 'ring-blue-400', 'bg-blue-50');
+                setTimeout(() => {
+                  startInputs[i].classList.remove('ring-2', 'ring-blue-400', 'bg-blue-50');
+                }, 800);
+
+                // Recalculate growth if finish exists
+                if (enpData[treatmentId][i].finish_mm) {
+                  const diff = enpData[treatmentId][i].finish_mm - value;
+                  enpData[treatmentId][i].growth_um = Math.round((diff * 1000 / 2) * 10) / 10;
+                }
+              }
+
+              // Show notification
+              showENPNotification('Initial size copied to all measurement points', 'success');
+            }
+          } else if (input.value === '') {
+            delete enpData[treatmentId][index].start_mm;
+          }
+        } else {
+          // Update finish value
+          if (!isNaN(value) && value > 0) {
+            enpData[treatmentId][index].finish_mm = value;
+            enpData[treatmentId][index].point = String.fromCharCode(65 + index);
+          } else if (input.value === '') {
+            delete enpData[treatmentId][index].finish_mm;
+          }
+        }
+
+        // Calculate growth - DIVIDE BY 2 for dual-sided plating
+        const measurement = enpData[treatmentId][index];
+        if (measurement.start_mm && measurement.finish_mm) {
+          const diff = measurement.finish_mm - measurement.start_mm;
+          measurement.growth_um = Math.round((diff * 1000 / 2) * 10) / 10;
+        } else {
+          measurement.growth_um = null;
+        }
+
+        updateENPDisplay(treatmentId);
+        saveENPToHiddenField(treatmentId);
+      }
+
+      function updateENPDisplay(treatmentId) {
+        const section = document.querySelector(`[data-enp-section="${treatmentId}"]`);
+        if (!section) return;
+
+        // Update growth displays
+        const growthDisplays = section.querySelectorAll('.enp-growth');
+        growthDisplays.forEach((display, index) => {
+          const measurement = enpData[treatmentId][index];
+          if (measurement && measurement.growth_um !== null && measurement.growth_um !== undefined) {
+            display.textContent = `${measurement.growth_um} µm`;
+            display.classList.remove('text-gray-500');
+            display.classList.add('text-gray-900', 'font-medium');
+          } else {
+            display.textContent = '—';
+            display.classList.remove('text-gray-900', 'font-medium');
+            display.classList.add('text-gray-500');
+          }
+        });
+
+        // Update statistics
+        const validMeasurements = enpData[treatmentId].filter(m =>
+          m && m.growth_um !== null && m.growth_um !== undefined && m.growth_um >= 0
+        );
+
+        const statsDiv = section.querySelector('.enp-statistics');
+        if (validMeasurements.length > 0) {
+          const growths = validMeasurements.map(m => m.growth_um);
+          const count = growths.length;
+          const sum = growths.reduce((a, b) => a + b, 0);
+          const mean = Math.round((sum / count) * 10) / 10;
+          const min = Math.min(...growths);
+          const max = Math.max(...growths);
+
+          statsDiv.innerHTML = `
+            <div class="grid grid-cols-4 gap-4 p-3 bg-gray-50 rounded-md">
+              <div>
+                <div class="text-xs text-gray-500">Count</div>
+                <div class="text-lg font-semibold text-gray-900">${count}</div>
+              </div>
+              <div>
+                <div class="text-xs text-gray-500">Mean Film Thickness</div>
+                <div class="text-lg font-semibold text-blue-600">${mean} µm</div>
+              </div>
+              <div>
+                <div class="text-xs text-gray-500">Min</div>
+                <div class="text-lg font-semibold text-gray-900">${min} µm</div>
+              </div>
+              <div>
+                <div class="text-xs text-gray-500">Max</div>
+                <div class="text-lg font-semibold text-gray-900">${max} µm</div>
+              </div>
+            </div>
+          `;
+        } else {
+          statsDiv.innerHTML = '';
+        }
+
+        // Update progress counter
+        const progressSpan = section.querySelector('.enp-progress');
+        if (progressSpan) {
+          const completedCount = enpData[treatmentId].filter(m =>
+            m && m.growth_um !== null && m.growth_um !== undefined
+          ).length;
+          progressSpan.textContent = `${completedCount}/6 complete`;
+        }
+      }
+
+      function saveENPToHiddenField(treatmentId) {
+        const hiddenField = document.querySelector(`[name="enp_measurements_${treatmentId}"]`);
+        if (!hiddenField) return;
+
+        const validMeasurements = enpData[treatmentId]
+          .map((m, index) => {
+            if (!m || (!m.start_mm && !m.finish_mm)) return null;
+            return {
+              point: String.fromCharCode(65 + index),
+              start_mm: m.start_mm || null,
+              finish_mm: m.finish_mm || null,
+              growth_um: m.growth_um || null
+            };
+          })
+          .filter(m => m !== null);
+
+        hiddenField.value = JSON.stringify(validMeasurements);
+      }
+
+      function clearENPMeasurements(treatmentId) {
+        if (!confirm('Clear all ENP measurements for this treatment?')) return;
+
+        enpData[treatmentId] = [{}, {}, {}, {}, {}, {}];
+
+        const section = document.querySelector(`[data-enp-section="${treatmentId}"]`);
+        const startInputs = section.querySelectorAll('.enp-start');
+        const finishInputs = section.querySelectorAll('.enp-finish');
+
+        startInputs.forEach(input => input.value = '');
+        finishInputs.forEach(input => input.value = '');
+
+        updateENPDisplay(treatmentId);
+        saveENPToHiddenField(treatmentId);
+        showENPNotification('ENP measurements cleared', 'success');
+      }
+
+      function showENPNotification(message, type) {
+        let container = document.getElementById('enp-notifications');
+        if (!container) {
+          container = document.createElement('div');
+          container.id = 'enp-notifications';
+          container.className = 'fixed top-4 right-4 z-50 space-y-2';
+          document.body.appendChild(container);
+        }
+
+        const colors = {
+          success: 'bg-green-50 border-green-200 text-green-800',
+          error: 'bg-red-50 border-red-200 text-red-800'
+        };
+
+        const notification = document.createElement('div');
+        notification.className = `${colors[type]} border rounded-md p-3 shadow-lg max-w-sm animate-fade-in`;
+        notification.innerHTML = `
+          <div class="flex items-start">
+            <div class="flex-1 text-sm">${message}</div>
+            <button class="ml-3 text-gray-400 hover:text-gray-600" onclick="this.parentElement.parentElement.remove()">
+              <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+              </svg>
+            </button>
+          </div>
+        `;
+
+        container.appendChild(notification);
+
+        setTimeout(() => {
+          notification.remove();
+        }, 4000);
+      }
+
+      // Initialize ENP data from existing values on page load
+      document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('[data-enp-section]').forEach(section => {
+          const treatmentId = section.getAttribute('data-enp-section');
+          const hiddenField = section.querySelector('.enp-data');
+
+          if (hiddenField && hiddenField.value) {
+            try {
+              const data = JSON.parse(hiddenField.value);
+              enpData[treatmentId] = [{}, {}, {}, {}, {}, {}];
+
+              if (Array.isArray(data)) {
+                data.forEach(m => {
+                  const index = m.point.charCodeAt(0) - 65;
+                  if (index >= 0 && index < 6) {
+                    enpData[treatmentId][index] = {
+                      point: m.point,
+                      start_mm: m.start_mm,
+                      finish_mm: m.finish_mm,
+                      growth_um: m.growth_um
+                    };
+                  }
+                });
+              }
+
+              updateENPDisplay(treatmentId);
+            } catch (err) {
+              console.error('Error loading ENP measurements:', err);
+            }
+          } else {
+            enpData[treatmentId] = [{}, {}, {}, {}, {}, {}];
+          }
         });
       });
     </script>
