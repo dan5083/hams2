@@ -1,15 +1,13 @@
 require 'csv'
 
 class SkiptonExportService
-  MAPPING_FILE = Rails.root.join('config', 'skipton_customer_mappings.csv')
-
   def initialize(xero_file)
     @xero_file = xero_file
   end
 
   def transform
-    # Load customer mapping from repo
-    customer_map = load_customer_map
+    # Load customer mapping from database
+    customer_map = SkiptonCustomerMapping.mapping_hash
 
     output_rows = []
     missing_customers = []
@@ -25,7 +23,7 @@ class SkiptonExportService
       next if processed_invoices.include?(invoice_number)
       processed_invoices.add(invoice_number)
 
-      # Look up Skipton ID
+      # Look up Skipton ID from database
       skipton_id = customer_map[contact_name]
 
       if skipton_id.present?
@@ -54,24 +52,5 @@ class SkiptonExportService
       invoices_count: output_rows.size,
       missing_customers: missing_customers
     }
-  end
-
-  private
-
-  def load_customer_map
-    map = {}
-
-    unless File.exist?(MAPPING_FILE)
-      Rails.logger.warn "Skipton mapping file not found: #{MAPPING_FILE}"
-      return map
-    end
-
-    CSV.foreach(MAPPING_FILE, headers: true) do |row|
-      customer_name = row['Xero Name']&.strip
-      skipton_id = row['Skipton ID']&.strip
-      map[customer_name] = skipton_id if customer_name && skipton_id
-    end
-
-    map
   end
 end

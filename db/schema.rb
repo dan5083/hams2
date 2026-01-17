@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_01_08_141725) do
+ActiveRecord::Schema[8.0].define(version: 2026_01_17_111418) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -226,6 +226,15 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_08_141725) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["user_id"], name: "index_sessions_on_user_id"
+  end
+
+  create_table "skipton_customer_mappings", force: :cascade do |t|
+    t.string "xero_name", null: false
+    t.string "skipton_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["skipton_id"], name: "index_skipton_customer_mappings_on_skipton_id"
+    t.index ["xero_name"], name: "index_skipton_customer_mappings_on_xero_name", unique: true
   end
 
   create_table "specification_presets", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|

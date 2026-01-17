@@ -3,7 +3,6 @@ Rails.application.routes.draw do
   resource :session
   resources :passwords, param: :token
   resources :registrations, only: [:new, :create]
-  resources :skipton_exports, only: [:index, :create]
 
   # Xero OAuth routes - MOVED BEFORE magic_link route
   get '/auth/xero', to: 'xero_auth#authorize'
@@ -162,6 +161,19 @@ Rails.application.routes.draw do
     get :invoicing
     get :customer_summary
   end
+
+  # Skipton Export Tool
+  resources :skipton_exports, only: [:index, :create]
+
+  # Skipton Customer Mappings (Admin)
+  resources :skipton_mappings,
+            only: [:index, :create, :edit, :update, :destroy],
+            path: 'skipton/mappings'
+
+  # Batch create mappings (from inline form on export page)
+  post 'skipton/mappings/batch',
+       to: 'skipton_mappings#batch_create',
+       as: :batch_create_skipton_mappings
 
   # Specifications routes
   resources :specifications do
