@@ -4,6 +4,21 @@ class SkiptonExportsController < ApplicationController
   def index
     # Show any missing customers from previous attempt (stored in session)
     @missing_customers = session.delete(:missing_customers) || []
+
+    # Load all mappings for display
+    @all_mappings = SkiptonCustomerMapping.order(:xero_name)
+
+    # Filter for search if provided
+    if params[:search].present?
+      search_term = "%#{params[:search]}%"
+      @displayed_mappings = @all_mappings.where(
+        "xero_name ILIKE ? OR skipton_id ILIKE ?",
+        search_term,
+        search_term
+      )
+    else
+      @displayed_mappings = @all_mappings
+    end
   end
 
   # POST /skipton_exports

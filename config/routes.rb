@@ -162,12 +162,12 @@ Rails.application.routes.draw do
     get :customer_summary
   end
 
-  # Skipton Export Tool
+# Skipton Export Tool
   resources :skipton_exports, only: [:index, :create]
 
-  # Skipton Customer Mappings (Admin)
+  # Skipton Customer Mappings (single-page admin)
   resources :skipton_mappings,
-            only: [:index, :create, :edit, :update, :destroy],
+            only: [:create, :destroy],
             path: 'skipton/mappings'
 
   # Batch create mappings (from inline form on export page)

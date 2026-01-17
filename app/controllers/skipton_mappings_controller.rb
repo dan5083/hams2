@@ -28,9 +28,9 @@ class SkiptonMappingsController < ApplicationController
     @mapping = SkiptonCustomerMapping.new(mapping_params)
 
     if @mapping.save
-      redirect_to skipton_mappings_path, notice: "Mapping added successfully for '#{@mapping.xero_name}'"
+      redirect_to skipton_exports_path, notice: "✅ Mapping added for '#{@mapping.xero_name}'"
     else
-      redirect_to skipton_mappings_path, alert: "Failed to add mapping: #{@mapping.errors.full_messages.join(', ')}"
+      redirect_to skipton_exports_path, alert: "Failed to add mapping: #{@mapping.errors.full_messages.join(', ')}"
     end
   end
 
@@ -84,7 +84,7 @@ class SkiptonMappingsController < ApplicationController
   def destroy
     customer_name = @mapping.xero_name
     @mapping.destroy
-    redirect_to skipton_mappings_path, notice: "Deleted mapping for '#{customer_name}'"
+    redirect_to skipton_exports_path, notice: "Deleted mapping for '#{customer_name}'"
   end
 
   private
