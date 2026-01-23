@@ -386,8 +386,7 @@
   <body>
     <%
       # Determine if we need compressed mode (ENP or Aerospace)
-      is_special_customer = @release_note.works_order.customer_order.customer.name.include?('Safran') ||
-                           @release_note.works_order.customer_order.customer.name.include?('Meggitt')
+      is_special_customer = @release_note.works_order.customer_order.customer.name.include?('Lufthansa')
 
       # Check if any measurements are ENP type
       has_enp = false
