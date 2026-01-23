@@ -38,6 +38,89 @@
         overflow: visible;
       }
 
+      /* Compressed mode for ENP/Aerospace jobs */
+      .certificate-page.compressed .logo-header {
+        margin-bottom: 0.5rem;
+      }
+
+      .certificate-page.compressed h1 {
+        margin: 0.4rem 0;
+        font-size: 1.2em;
+      }
+
+      .certificate-page.compressed h2 {
+        font-size: 0.9em;
+        margin: 0.5rem 0 0.3rem 0;
+      }
+
+      .certificate-page.compressed table {
+        margin-bottom: 0.5rem;
+      }
+
+      .certificate-page.compressed .header-table {
+        margin-bottom: 0.5rem;
+      }
+
+      .certificate-page.compressed .addresses {
+        margin-bottom: 0.5rem;
+      }
+
+      .certificate-page.compressed .detail-table {
+        margin-top: 0.5rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .certificate-page.compressed th,
+      .certificate-page.compressed td {
+        padding: 0.25rem;
+      }
+
+      .certificate-page.compressed .thickness-group {
+        margin-bottom: 0.4rem;
+      }
+
+      .certificate-page.compressed .thickness-stats {
+        padding: 0.2rem 0.3rem;
+        margin-bottom: 0.2rem;
+        font-size: 8pt;
+      }
+
+      .certificate-page.compressed .thickness-table {
+        margin-top: 0.3rem;
+        margin-bottom: 0.4rem;
+      }
+
+      .certificate-page.compressed .thickness-table th,
+      .certificate-page.compressed .thickness-table td {
+        padding: 0.2rem;
+        font-size: 8pt;
+      }
+
+      .certificate-page.compressed .statement {
+        margin: 0.5rem 0;
+        padding: 0.4rem;
+      }
+
+      .certificate-page.compressed .signature-block {
+        margin-top: 0.75rem;
+      }
+
+      .certificate-page.compressed .company-footer {
+        margin-top: 0.5rem;
+        font-size: 8pt;
+        line-height: 1.3;
+      }
+
+      .certificate-page.compressed .readings-grid {
+        gap: 0.15rem;
+        padding: 0.2rem;
+        font-size: 7.5pt;
+      }
+
+      .certificate-page.compressed .reading-value {
+        padding: 0.15rem;
+      }
+
       .logo-header {
         text-align: left;
         margin-bottom: 1rem;
@@ -266,29 +349,23 @@
         font-weight: bold;
       }
 
-      p {
-        margin: 0.4rem 0;
-        line-height: 1.3;
-      }
-
-      /* Compact spacing */
       .compact {
-        margin-bottom: 0.5rem;
+        /* Can be applied to any table to reduce spacing */
       }
 
       /* Company footer styling */
       .company-footer {
-        margin-top: 2rem;
-        padding-top: 1rem;
-        border-top: 1pt solid #ccc;
+        margin-top: 1rem;
         text-align: center;
-        font-size: 8pt;
-        color: #666;
-        line-height: 1.3;
+        font-size: 8.5pt;
+        color: #555;
+        line-height: 1.4;
+        border-top: 1pt solid #ddd;
+        padding-top: 0.5rem;
       }
 
       .company-footer a {
-        color: #666;
+        color: #555;
         text-decoration: none;
       }
 
@@ -297,53 +374,50 @@
       }
 
       .customer-reference-row {
-        margin-bottom: 1rem;
-        padding: 0.4rem;
-        font-weight: normal;
+        padding: 0.5rem;
+        background-color: #f0f9ff;
+        border: 1pt solid #bae6fd;
+        margin-bottom: 0.75rem;
+        font-weight: bold;
+        text-align: center;
       }
     </style>
   </head>
   <body>
     <%
-      # Determine if customer requires special handling (Lufthansa and 24 Locks demo)
-      customer_name = @release_note.works_order.customer_order.customer.name
-      is_special_customer = ['Lufthansa Technik Landing Gear Services UK', '24 Locks'].include?(customer_name)
+      # Determine if we need compressed mode (ENP or Aerospace)
+      is_special_customer = @release_note.works_order.customer_order.customer.name.include?('Safran') ||
+                           @release_note.works_order.customer_order.customer.name.include?('Meggitt')
 
-      # Parse customer reference for special customers (CS-Order and SerialNo)
+      has_enp = @release_note.has_enp_measurements?
+
+      # Aerospace is typically indicated by specification or customer type
+      is_aerospace = @release_note.specification.to_s.match?(/AMS|BAC|DTD|DEF STAN|AEROSPACE/i) ||
+                     @release_note.works_order.customer_order.customer.name.match?(/AEROSPACE|AIRCRAFT|AVIATION/i)
+
+      use_compressed_mode = has_enp || is_aerospace
+
+      # Extract CS-Order and Serial Number if present in customer reference
       cs_order = nil
       serial_no = nil
-
-      if is_special_customer && @release_note.works_order.customer_reference.present?
+      if @release_note.works_order.customer_reference.present?
         ref = @release_note.works_order.customer_reference
-
-        # Extract CS-Order number (format: "CS-Order: 52186350")
-        if match = ref.match(/CS-Order:\s*(\S+)/)
-          cs_order = match[1]
-        end
-
-        # Extract SerialNo if present (format: "SerialNo.: MK2501" or "SerialNo: MK2501")
-        if match = ref.match(/SerialNo\.?:\s*(.+)/)
-          serial_no = match[1].strip
-        end
+        cs_order = ref.match(/CS-?Order[:\s]+([^\s\/]+)/i)&.captures&.first
+        serial_no = ref.match(/S\/N[:\s]+([^\s\/]+)/i)&.captures&.first
       end
     %>
 
-    <!-- Page 1: Advice Note (Single sided) -->
+    <!-- Page 1: Advice Note (Always right side/odd page, single sided) -->
     <div class="advice-note">
       <!-- Logo Header -->
       <div class="logo-header">
-        <%= image_tag(asset_path("logo-with-company-name.png"), alt: "Hard Anodising Surface Treatments Ltd") %>
-        <!-- Company contact info in header -->
-        <div class="company-contact">
-          Firs Industrial Estate, Rickets Close, Kidderminster DY11 7QN<br/>
-          Tel: 01562 747100 | <a href="https://www.hard-anodising.co.uk/">www.hard-anodising.co.uk</a>
-        </div>
+        <%= image_tag("logo-with-company-name.png", alt: "Hard Anodising Surface Treatments Ltd") %>
       </div>
 
       <h1>Advice Note</h1>
 
       <!-- Header Information -->
-      <table class="header-table compact">
+      <table class="header-table">
         <tbody>
           <tr>
             <th>Release Note Number</th>
@@ -356,8 +430,8 @@
         </tbody>
       </table>
 
-      <!-- Invoice Address Only (removed deliver to) -->
-      <table class="addresses compact">
+      <!-- Customer Details -->
+      <table class="addresses">
         <tbody>
           <tr>
             <td class="address">
@@ -368,21 +442,18 @@
               </p>
             </td>
             <td class="address">
-              <!-- Empty space for balance -->
+              <h2>Deliver To</h2>
+              <p>
+                <%= @release_note.works_order.customer_order.customer.display_name %><br/>
+                <%= simple_format(@release_note.works_order.customer_order.customer.pdf_address) %>
+              </p>
             </td>
           </tr>
         </tbody>
       </table>
 
-      <!-- Customer Reference (if present AND not special customer) - Full width row, no label -->
-      <% if @release_note.works_order.customer_reference.present? && !is_special_customer %>
-        <div class="customer-reference-row">
-          <%= @release_note.works_order.customer_reference %>
-        </div>
-      <% end %>
-
       <!-- Release Note Details -->
-      <table class="detail-table compact">
+      <table class="detail-table">
         <tbody>
           <tr>
             <th>Customer Order</th>
@@ -391,29 +462,29 @@
               <% if @release_note.works_order.respond_to?(:customer_order_line) && @release_note.works_order.customer_order_line.present? %>
                 (line <%= @release_note.works_order.customer_order_line %>)
               <% end %>
-              <% if cs_order.present? %>
-                / CS-Order: <%= cs_order %>
-              <% end %>
             </td>
           </tr>
-          <tr>
-            <th>Part Number</th>
-            <td>
-              <%= @release_note.works_order.part_number %>
-              <% if serial_no.present? %>
-                / S/N: <%= serial_no %>
-              <% end %>
-            </td>
-          </tr>
-          <% unless is_special_customer %>
+          <% if @release_note.works_order.customer_reference.present? %>
             <tr>
-              <th>Issue</th>
-              <td><%= @release_note.works_order.part_issue %></td>
+              <th>Customer Reference</th>
+              <td><%= @release_note.works_order.customer_reference %></td>
             </tr>
           <% end %>
           <tr>
+            <th>Part Number</th>
+            <td><%= @release_note.works_order.part_number %></td>
+          </tr>
+          <tr>
+            <th>Issue</th>
+            <td><%= @release_note.works_order.part_issue %></td>
+          </tr>
+          <tr>
             <th>Description</th>
             <td><%= @release_note.works_order.part_description %></td>
+          </tr>
+          <tr>
+            <th>Specification</th>
+            <td><%= @release_note.specification %></td>
           </tr>
           <tr>
             <th>Quantity Accepted</th>
@@ -430,19 +501,18 @@
         </tbody>
       </table>
 
-      <!-- Proof of Collection/Delivery -->
-      <h2>Proof of Collection/Delivery</h2>
+      <!-- Signature Table -->
       <table class="signature-table">
         <tbody>
           <tr>
-            <th>Signature</th>
+            <th>Checked By</th>
+            <td></td>
+            <th>Received By</th>
             <td></td>
           </tr>
           <tr>
-            <th>Name</th>
+            <th>Date/Time</th>
             <td></td>
-          </tr>
-          <tr>
             <th>Date/Time</th>
             <td></td>
           </tr>
@@ -451,7 +521,7 @@
     </div>
 
     <!-- Page 2+: Certificate of Conformity (Can use multiple sides) -->
-    <div class="certificate-page">
+    <div class="certificate-page <%= 'compressed' if use_compressed_mode %>">
       <div class="certificate-content">
         <!-- Logo Header -->
         <div class="logo-header">
