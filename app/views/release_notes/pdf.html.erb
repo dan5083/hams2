@@ -389,7 +389,20 @@
       is_special_customer = @release_note.works_order.customer_order.customer.name.include?('Safran') ||
                            @release_note.works_order.customer_order.customer.name.include?('Meggitt')
 
-      has_enp = @release_note.has_enp_measurements?
+      # Check if any measurements are ENP type
+      has_enp = false
+      if @release_note.has_thickness_measurements?
+        measurements_by_type = @release_note.thickness_measurements_by_type
+        measurements_by_type.each do |process_type, measurements|
+          measurements.each do |measurement|
+            if @release_note.treatment_is_enp?(measurement['process_type'])
+              has_enp = true
+              break
+            end
+          end
+          break if has_enp
+        end
+      end
 
       # Aerospace is typically indicated by specification or customer type
       is_aerospace = @release_note.specification.to_s.match?(/AMS|BAC|DTD|DEF STAN|AEROSPACE/i) ||
