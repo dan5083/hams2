@@ -107,7 +107,8 @@ Rails.application.routes.draw do
       get :response_pdf
     end
     collection do
-      get :release_note_details  # AJAX endpoint for dynamic form updates
+      get :search_release_notes  # NEW - for autocomplete search
+      get :release_note_details  # Already existed
     end
   end
 

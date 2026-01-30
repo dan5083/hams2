@@ -26,10 +26,7 @@ class ExternalNcrsController < ApplicationController
       @external_ncr = @release_note.external_ncrs.build
     else
       @external_ncr = ExternalNcr.new
-      @release_notes = ReleaseNote.includes(works_order: [:customer_order, :part])
-                                  .where(voided: false)
-                                  .order(number: :desc)
-                                  .limit(100)
+      # Don't preload release notes - we'll use search instead
     end
   end
 
@@ -175,6 +172,48 @@ class ExternalNcrsController < ApplicationController
     end
   end
 
+  # AJAX endpoint for release note search
+  def search_release_notes
+    search_term = params[:q].to_s.strip
+
+    if search_term.blank?
+      # Return recent release notes if no search term
+      release_notes = ReleaseNote.includes(works_order: [:customer_order, :part])
+                                 .where(voided: false)
+                                 .order(number: :desc)
+                                 .limit(20)
+    else
+      # Search by release note number, works order number, customer name, or part number
+      release_notes = ReleaseNote.includes(works_order: [:customer_order, :part])
+                                 .joins(works_order: :customer_order)
+                                 .joins('LEFT JOIN organizations ON customer_orders.customer_id = organizations.id')
+                                 .where(voided: false)
+                                 .where(
+                                   "CAST(release_notes.number AS TEXT) ILIKE ? OR " \
+                                   "CAST(works_orders.number AS TEXT) ILIKE ? OR " \
+                                   "organizations.name ILIKE ? OR " \
+                                   "works_orders.part_number ILIKE ?",
+                                   "%#{search_term}%", "%#{search_term}%", "%#{search_term}%", "%#{search_term}%"
+                                 )
+                                 .order(number: :desc)
+                                 .limit(50)
+    end
+
+    results = release_notes.map do |rn|
+      {
+        id: rn.id,
+        number: rn.number,
+        display_text: "RN#{rn.number} - #{rn.works_order.customer_name} - #{rn.works_order.part_number}-#{rn.works_order.part_issue}",
+        customer_name: rn.works_order.customer_name,
+        part_number: rn.works_order.part_number,
+        part_issue: rn.works_order.part_issue,
+        works_order_number: rn.works_order.display_name
+      }
+    end
+
+    render json: results
+  end
+
   # AJAX endpoint for release note details
   def release_note_details
     release_note = ReleaseNote.find(params[:release_note_id])
@@ -265,11 +304,7 @@ end
       # Release note is already set from nested route
     elsif @external_ncr.release_note.present?
       @release_note = @external_ncr.release_note
-    else
-      @release_notes = ReleaseNote.includes(works_order: [:customer_order, :part])
-                                  .where(voided: false)
-                                  .order(number: :desc)
-                                  .limit(100)
     end
+    # Don't preload release notes - we'll use search instead
   end
 end
