@@ -353,27 +353,27 @@
       </div>
     <% end %>
 
-    <!-- Investigation/Root Cause Analysis -->
-    <% if @external_ncr.investigation_root_cause_analysis.present? %>
+    <!-- Containment (if required) -->
+    <% if @external_ncr.containment_action.present? %>
       <div class="response-section">
-        <h3>Investigation/Root Cause Analysis</h3>
-        <p><%= @external_ncr.investigation_root_cause_analysis %></p>
+        <h3>Containment (if required)</h3>
+        <p><%= @external_ncr.containment_action %></p>
       </div>
     <% end %>
 
-    <!-- Root Cause Identified -->
-    <% if @external_ncr.root_cause_identified.present? %>
+    <!-- Root Cause Analysis -->
+    <% if @external_ncr.root_cause_analysis.present? %>
       <div class="response-section">
-        <h3>Root Cause Identified</h3>
-        <p><%= @external_ncr.root_cause_identified %></p>
+        <h3>Root Cause Analysis</h3>
+        <p><%= @external_ncr.root_cause_analysis %></p>
       </div>
     <% end %>
 
-    <!-- Containment/Corrective Action -->
-    <% if @external_ncr.containment_corrective_action.present? %>
+    <!-- Corrective Actions -->
+    <% if @external_ncr.corrective_action.present? %>
       <div class="response-section">
-        <h3>Containment/Corrective Action</h3>
-        <p><%= @external_ncr.containment_corrective_action %></p>
+        <h3>Corrective Actions</h3>
+        <p><%= @external_ncr.corrective_action %></p>
       </div>
     <% end %>
 

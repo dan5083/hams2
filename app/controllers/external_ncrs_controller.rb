@@ -166,7 +166,7 @@ class ExternalNcrsController < ApplicationController
           'Cannot advance NCR status. Please complete required fields.'
         end
       when 'in_progress'
-        'Please complete containment/corrective action and preventive action fields.'
+        'Please complete corrective action and preventive action fields.'
       else
         'Cannot advance NCR status.'
       end
@@ -254,8 +254,8 @@ end
       :release_note_id, :date,
       :concession_number, :customer_ncr_number, :estimated_cost,
       :reject_quantity,
-      :description_of_non_conformance, :investigation_root_cause_analysis,
-      :root_cause_identified, :containment_corrective_action, :preventive_action
+      :description_of_non_conformance, :containment_action,
+      :root_cause_analysis, :corrective_action, :preventive_action
       # Note: temp_document is handled separately
     )
   end

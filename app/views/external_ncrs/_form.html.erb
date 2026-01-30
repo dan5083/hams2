@@ -248,6 +248,7 @@
         <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">NCR Content</h3>
 
         <div class="space-y-6">
+          <!-- 1. Description of Non-Conformance -->
           <div>
             <%= f.label :description_of_non_conformance, "Description of Non-Conformance",
                 class: "block text-sm font-medium text-gray-700" %>
@@ -259,33 +260,43 @@
                 class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
           </div>
 
+          <!-- 2. Containment (if required) -->
           <div>
-            <%= f.label :investigation_root_cause_analysis, "Investigation/Root Cause Analysis",
-                class: "block text-sm font-medium text-gray-700" %>
-            <%= f.text_area :investigation_root_cause_analysis,
-                rows: 4,
-                class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
-          </div>
-
-          <div>
-            <%= f.label :root_cause_identified, "Root Cause Identified",
-                class: "block text-sm font-medium text-gray-700" %>
-            <%= f.text_area :root_cause_identified,
-                rows: 3,
-                class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
-          </div>
-
-          <div>
-            <%= f.label :containment_corrective_action, "Containment/Corrective Action",
+            <%= f.label :containment_action, "Containment (if required)",
                 class: "block text-sm font-medium text-gray-700" %>
             <p class="mt-1 text-xs text-gray-500 mb-2">
-              Required to advance from in-progress to completed status
+              Has customer requested containment? Y/N. Check WIP for similar parts for customer
             </p>
-            <%= f.text_area :containment_corrective_action,
+            <%= f.text_area :containment_action,
                 rows: 4,
                 class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
           </div>
 
+          <!-- 3. Root Cause Analysis -->
+          <div>
+            <%= f.label :root_cause_analysis, "Root Cause Analysis",
+                class: "block text-sm font-medium text-gray-700" %>
+            <p class="mt-1 text-xs text-gray-500 mb-2">
+              Review the reasons for non-conformity
+            </p>
+            <%= f.text_area :root_cause_analysis,
+                rows: 4,
+                class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
+          </div>
+
+          <!-- 4. Corrective Actions -->
+          <div>
+            <%= f.label :corrective_action, "Corrective Actions",
+                class: "block text-sm font-medium text-gray-700" %>
+            <p class="mt-1 text-xs text-gray-500 mb-2">
+              Actions to correct part [rework] if applicable. Required to advance from in-progress to completed status
+            </p>
+            <%= f.text_area :corrective_action,
+                rows: 4,
+                class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
+          </div>
+
+          <!-- 5. Preventive Action -->
           <div>
             <%= f.label :preventive_action, "Preventive Action",
                 class: "block text-sm font-medium text-gray-700" %>

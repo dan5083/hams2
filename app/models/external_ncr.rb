@@ -20,11 +20,11 @@ class ExternalNcr < ApplicationRecord
     # Quantities
     :reject_quantity,
 
-    # NCR Content
+    # NCR Content (in workflow order)
     :description_of_non_conformance,
-    :investigation_root_cause_analysis,
-    :root_cause_identified,
-    :containment_corrective_action,
+    :containment_action,
+    :root_cause_analysis,
+    :corrective_action,
     :preventive_action,
     :completed_by_user_id,
 
@@ -175,7 +175,7 @@ class ExternalNcr < ApplicationRecord
     when 'draft'
       description_of_non_conformance.present? && has_document?
     when 'in_progress'
-      containment_corrective_action.present? && preventive_action.present?
+      corrective_action.present? && preventive_action.present?
     else
       false
     end

@@ -237,6 +237,7 @@
         </div>
         <div class="px-4 py-5 sm:p-6">
           <dl class="space-y-6">
+            <!-- 1. Description of Non-Conformance -->
             <div>
               <dt class="text-sm font-medium text-gray-500 mb-2">Description of Non-Conformance</dt>
               <dd class="text-sm text-gray-900">
@@ -255,12 +256,13 @@
               </dd>
             </div>
 
+            <!-- 2. Containment (if required) -->
             <div>
-              <dt class="text-sm font-medium text-gray-500 mb-2">Investigation/Root Cause Analysis</dt>
+              <dt class="text-sm font-medium text-gray-500 mb-2">Containment (if required)</dt>
               <dd class="text-sm text-gray-900">
-                <% if @external_ncr.investigation_root_cause_analysis.present? %>
+                <% if @external_ncr.containment_action.present? %>
                   <div class="whitespace-pre-wrap bg-gray-50 p-3 rounded border">
-                    <%= @external_ncr.investigation_root_cause_analysis %>
+                    <%= @external_ncr.containment_action %>
                   </div>
                 <% else %>
                   <span class="text-gray-400 italic">Not provided</span>
@@ -268,12 +270,13 @@
               </dd>
             </div>
 
+            <!-- 3. Root Cause Analysis -->
             <div>
-              <dt class="text-sm font-medium text-gray-500 mb-2">Root Cause Identified</dt>
+              <dt class="text-sm font-medium text-gray-500 mb-2">Root Cause Analysis</dt>
               <dd class="text-sm text-gray-900">
-                <% if @external_ncr.root_cause_identified.present? %>
+                <% if @external_ncr.root_cause_analysis.present? %>
                   <div class="whitespace-pre-wrap bg-gray-50 p-3 rounded border">
-                    <%= @external_ncr.root_cause_identified %>
+                    <%= @external_ncr.root_cause_analysis %>
                   </div>
                 <% else %>
                   <span class="text-gray-400 italic">Not provided</span>
@@ -281,12 +284,13 @@
               </dd>
             </div>
 
+            <!-- 4. Corrective Actions -->
             <div>
-              <dt class="text-sm font-medium text-gray-500 mb-2">Containment/Corrective Action</dt>
+              <dt class="text-sm font-medium text-gray-500 mb-2">Corrective Actions</dt>
               <dd class="text-sm text-gray-900">
-                <% if @external_ncr.containment_corrective_action.present? %>
+                <% if @external_ncr.corrective_action.present? %>
                   <div class="whitespace-pre-wrap bg-gray-50 p-3 rounded border">
-                    <%= @external_ncr.containment_corrective_action %>
+                    <%= @external_ncr.corrective_action %>
                   </div>
                 <% else %>
                   <span class="text-gray-400 italic">Not provided</span>
@@ -299,6 +303,7 @@
               </dd>
             </div>
 
+            <!-- 5. Preventive Action -->
             <div>
               <dt class="text-sm font-medium text-gray-500 mb-2">Preventive Action</dt>
               <dd class="text-sm text-gray-900">
@@ -349,8 +354,8 @@
                 <% when 'in_progress' %>
                   <p>To advance to <strong>Completed</strong>:</p>
                   <ul class="list-disc list-inside mt-1">
-                    <% unless @external_ncr.containment_corrective_action.present? %>
-                      <li>Add containment/corrective action</li>
+                    <% unless @external_ncr.corrective_action.present? %>
+                      <li>Add corrective action</li>
                     <% end %>
                     <% unless @external_ncr.preventive_action.present? %>
                       <li>Add preventive action</li>
