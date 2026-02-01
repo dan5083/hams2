@@ -158,7 +158,7 @@
             <div>
               <dt class="text-sm font-medium text-gray-500">Part</dt>
               <dd class="mt-1 text-sm text-gray-900">
-                <%= @external_ncr.part_number %>-<%= @external_ncr.part_issue %>
+                <%= @external_ncr.part_number || 'N/A' %>-<%= @external_ncr.part_issue || 'N/A' %>
                 <% if @external_ncr.part_description.present? %>
                   <div class="text-xs text-gray-500 mt-1">
                     <%= @external_ncr.part_description %>

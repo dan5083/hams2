@@ -117,7 +117,7 @@
                 <p class="text-sm text-gray-900">
                   <%= link_to @external_ncr.release_note_number, @external_ncr.release_note, class: "text-indigo-600 hover:text-indigo-900 font-medium" %>
                   - <%= @external_ncr.customer_name %> -
-                  <%= @external_ncr.part_number %>-<%= @external_ncr.part_issue %>
+                  <%= @external_ncr.part_number || 'N/A' %>-<%= @external_ncr.part_issue || 'N/A' %>
                 </p>
               </div>
             <% elsif @release_note %>
@@ -127,7 +127,7 @@
                 <p class="text-sm text-gray-900">
                   <%= link_to "RN#{@release_note.number}", @release_note, class: "text-indigo-600 hover:text-indigo-900 font-medium" %>
                   - <%= @release_note.works_order.customer_name %> -
-                  <%= @release_note.works_order.part_number %>-<%= @release_note.works_order.part_issue %>
+                  <%= @release_note.works_order.part_number || 'N/A' %>-<%= @release_note.works_order.part_issue || 'N/A' %>
                 </p>
               </div>
             <% else %>
