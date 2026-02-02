@@ -3,8 +3,23 @@ class QualityDocumentsController < ApplicationController
   before_action :set_document, only: [:show, :edit, :update, :destroy, :show_pdf]
 
   def index
-    @documents = QualityDocument.order(:document_type, :code)
-    @documents_by_type = @documents.group_by(&:document_type)
+    @documents = QualityDocument.all
+
+    # Filter by document type if provided
+    if params[:document_type].present?
+      @documents = @documents.where(document_type: params[:document_type])
+    end
+
+    # Search by code, title, or approved_by if provided
+    if params[:search].present?
+      search_term = "%#{params[:search]}%"
+      @documents = @documents.where(
+        "code ILIKE ? OR title ILIKE ? OR approved_by ILIKE ?",
+        search_term, search_term, search_term
+      )
+    end
+
+    @documents = @documents.order(:document_type, :code)
   end
 
   def show
@@ -13,10 +28,14 @@ class QualityDocumentsController < ApplicationController
 
   def new
     @document = QualityDocument.new
+    @document.content = { 'sections' => [], 'references' => [] }
   end
 
   def create
     @document = QualityDocument.new(document_params)
+
+    # Handle sections and references from form
+    @document.content = build_content_from_params
 
     if @document.save
       redirect_to @document, notice: 'Quality document was successfully created.'
@@ -29,7 +48,10 @@ class QualityDocumentsController < ApplicationController
   end
 
   def update
-    if @document.update(document_params)
+    # Handle sections and references from form
+    updated_content = build_content_from_params
+
+    if @document.update(document_params.except(:content).merge(content: updated_content))
       redirect_to @document, notice: 'Quality document was successfully updated.'
     else
       render :edit, status: :unprocessable_entity
@@ -57,8 +79,31 @@ class QualityDocumentsController < ApplicationController
       :code,
       :title,
       :current_issue_number,
-      :approved_by,
-      :content
+      :approved_by
     )
+  end
+
+  def build_content_from_params
+    content = {
+      'sections' => [],
+      'references' => []
+    }
+
+    # Build sections from form params
+    if params[:sections].present?
+      params[:sections].each do |index, section_data|
+        content['sections'] << {
+          'heading' => section_data[:heading],
+          'content' => section_data[:content]
+        }
+      end
+    end
+
+    # Build references from form params
+    if params[:document].present? && params[:document][:references].present?
+      content['references'] = params[:document][:references].reject(&:blank?)
+    end
+
+    content
   end
 end

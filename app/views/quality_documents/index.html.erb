@@ -1,46 +1,143 @@
-<!-- app/views/quality_documents/index.html.erb -->
-<div class="quality-documents-index">
-  <h1>Quality Documents</h1>
+<%# app/views/quality_documents/index.html.erb %>
+<div class="container mx-auto px-4 py-6">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold text-gray-900">Quality Documents</h1>
+    <%= link_to "New Quality Document", new_quality_document_path,
+        class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" %>
+  </div>
 
-  <div class="toolbar">
-    <%= link_to 'New Quality Document', new_quality_document_path, class: 'btn btn-primary' %>
+  <!-- Filter -->
+  <div class="bg-white p-4 rounded-lg shadow mb-6">
+    <%= form_with url: quality_documents_path, method: :get, local: true, class: "flex items-end gap-4" do |form| %>
+      <div class="flex-1">
+        <%= form.label :document_type, "Filter by Type", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.select :document_type,
+            options_for_select([['All Types', '']] + QualityDocument::DOCUMENT_TYPES.map { |k, v| [v, k] }, params[:document_type]),
+            {},
+            { class: "border border-gray-300 rounded-md px-3 py-2 w-full" } %>
+      </div>
 
-    <%= form_with url: quality_documents_path, method: :get, local: true do |f| %>
-      <%= f.select :document_type,
-          options_for_select([['All Types', '']] + QualityDocument::DOCUMENT_TYPES.map { |k, v| [v, k] }, params[:document_type]),
-          {},
-          { onchange: 'this.form.requestSubmit()', class: 'form-control' } %>
+      <div class="flex-1">
+        <%= form.label :search, "Search Documents", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= form.text_field :search,
+            value: params[:search],
+            placeholder: "Search by code, title, or approved by...",
+            class: "border border-gray-300 rounded-md px-3 py-2 w-full" %>
+      </div>
+
+      <div>
+        <%= form.submit "Filter", class: "bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" %>
+        <%= link_to "Clear", quality_documents_path, class: "bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded ml-2" %>
+      </div>
     <% end %>
   </div>
 
-  <table class="table">
-    <thead>
-      <tr>
-        <th>Code</th>
-        <th>Type</th>
-        <th>Title</th>
-        <th>Issue</th>
-        <th>Approved By</th>
-        <th>Last Updated</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% @documents.each do |doc| %>
+  <!-- Documents Table -->
+  <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
         <tr>
-          <td><%= doc.full_code %></td>
-          <td><%= doc.type_description %></td>
-          <td><%= link_to doc.title, quality_document_path(doc) %></td>
-          <td><%= doc.current_issue_number %></td>
-          <td><%= doc.approved_by %></td>
-          <td><%= doc.updated_at.strftime('%d/%m/%Y') %></td>
-          <td>
-            <%= link_to 'View', quality_document_path(doc), class: 'btn btn-sm btn-info' %>
-            <%= link_to 'Edit', edit_quality_document_path(doc), class: 'btn btn-sm btn-warning' %>
-            <%= link_to 'PDF', show_pdf_quality_document_path(doc), class: 'btn btn-sm btn-secondary', target: '_blank' %>
-          </td>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Code
+          </th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Type
+          </th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Title
+          </th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Issue
+          </th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Approved By
+          </th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Last Updated
+          </th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Actions
+          </th>
         </tr>
-      <% end %>
-    </tbody>
-  </table>
+      </thead>
+      <tbody class="bg-white divide-y divide-gray-200">
+        <% @documents.each do |doc| %>
+          <tr class="hover:bg-gray-50">
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+              <%= link_to doc.full_code, quality_document_path(doc), class: "text-blue-600 hover:text-blue-900" %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              <%
+                badge_color = case doc.document_type
+                when 'IP'
+                  'bg-purple-100 text-purple-800'
+                when 'WI'
+                  'bg-blue-100 text-blue-800'
+                when 'PCD'
+                  'bg-green-100 text-green-800'
+                when 'F'
+                  'bg-orange-100 text-orange-800'
+                when 'PM'
+                  'bg-indigo-100 text-indigo-800'
+                else
+                  'bg-gray-100 text-gray-800'
+                end
+              %>
+              <span class="inline-flex px-2 py-1 text-xs font-semibold rounded <%= badge_color %>">
+                <%= doc.type_description %>
+              </span>
+            </td>
+            <td class="px-6 py-4 text-sm text-gray-900">
+              <%= doc.title %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              <span class="inline-flex px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-800">
+                Issue <%= doc.current_issue_number %>
+              </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              <%= doc.approved_by || 'N/A' %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              <%= doc.updated_at.strftime('%d/%m/%Y') %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+              <div class="flex space-x-2">
+                <%= link_to "View", quality_document_path(doc), class: "text-blue-600 hover:text-blue-900" %>
+                <%= link_to "Edit", edit_quality_document_path(doc), class: "text-yellow-600 hover:text-yellow-900" %>
+                <%= link_to "PDF", show_pdf_quality_document_path(doc), class: "text-green-600 hover:text-green-900", target: "_blank" %>
+                <%= button_to "Delete", quality_document_path(doc),
+                    method: :delete,
+                    form: {
+                      class: "inline",
+                      data: { confirm: "Are you sure you want to delete this document? This cannot be undone." }
+                    },
+                    class: "text-red-600 hover:text-red-900" %>
+              </div>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+
+    <% if @documents.empty? %>
+      <div class="text-center py-8">
+        <p class="text-gray-500">No quality documents found.</p>
+        <%= link_to "Create your first quality document", new_quality_document_path,
+            class: "text-blue-600 hover:text-blue-900 font-medium" %>
+      </div>
+    <% end %>
+  </div>
+
+  <!-- Info Box -->
+  <div class="mt-6 bg-blue-50 border border-blue-200 rounded-md p-4">
+    <div class="flex">
+      <div class="ml-3">
+        <h3 class="text-sm font-medium text-blue-800">Quality Management System</h3>
+        <div class="mt-2 text-sm text-blue-700">
+          <p>Manage your quality documentation including Integrated Procedures (IP), Works Instructions (WI), Process Control Documents (PCD), Forms (F), and Process Mapping Processes (PM). All documents maintain full revision history and can be exported as PDFs for audits and compliance.</p>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
