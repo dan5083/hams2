@@ -32,15 +32,52 @@
         <%= link_to "Parts", parts_path,
             class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(parts_path)}" %>
 
-        <!-- NCRs - Quality staff and management -->
-        <% if Current.user&.email_address&.in?(['chris@hardanodisingstl.com', 'quality@hardanodisingstl.com', 'phil@hardanodisingstl.com', 'tariq@hardanodisingstl.com', 'daniel@hardanodisingstl.com']) %>
-          <%= link_to "NCRs", external_ncrs_path,
-              class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(external_ncrs_path)}" %>
-        <% end %>
+        <!-- Quality Dropdown -->
+        <div class="relative">
+          <button type="button"
+                  id="quality-dropdown-button"
+                  class="text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium flex items-center">
+            Quality
+            <svg class="ml-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
 
-        <!-- Specifications - Always visible -->
-        <%= link_to "Specs", specifications_path,
-            class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(specifications_path)}" %>
+          <div id="quality-dropdown-menu"
+               class="hidden absolute left-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50">
+            <div class="py-1" role="menu">
+              <% if Current.user&.email_address&.in?(['chris@hardanodisingstl.com', 'quality@hardanodisingstl.com', 'phil@hardanodisingstl.com', 'tariq@hardanodisingstl.com', 'daniel@hardanodisingstl.com']) %>
+                <%= link_to "NCRs", external_ncrs_path,
+                    class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100",
+                    role: "menuitem" %>
+              <% end %>
+              <%= link_to "Specs", specifications_path,
+                  class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100",
+                  role: "menuitem" %>
+              <%= link_to "Manual", quality_documents_path,
+                  class: "block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100",
+                  role: "menuitem" %>
+            </div>
+          </div>
+        </div>
+
+        <script>
+          document.addEventListener('DOMContentLoaded', function() {
+            const button = document.getElementById('quality-dropdown-button');
+            const menu = document.getElementById('quality-dropdown-menu');
+
+            button.addEventListener('click', function(e) {
+              e.stopPropagation();
+              menu.classList.toggle('hidden');
+            });
+
+            document.addEventListener('click', function(e) {
+              if (!menu.classList.contains('hidden') && !menu.contains(e.target) && e.target !== button) {
+                menu.classList.add('hidden');
+              }
+            });
+          });
+        </script>
 
         <!-- Artifacts - Always visible -->
         <%= link_to "Artifacts", artifacts_path,
@@ -92,15 +129,18 @@
       <%= link_to "Parts", parts_path,
           class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(parts_path)}" %>
 
-      <!-- Role-based mobile links -->
-      <% if Current.user&.email_address&.in?(['chris@hardanodisingstl.com', 'quality@hardanodisingstl.com', 'phil@hardanodisingstl.com', 'tariq@hardanodisingstl.com', 'daniel@hardanodisingstl.com']) %>
-        <%= link_to "NCRs", external_ncrs_path,
-            class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(external_ncrs_path)}" %>
-      <% end %>
-
-      <!-- Specifications - Always visible -->
-      <%= link_to "Specs", specifications_path,
-          class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(specifications_path)}" %>
+      <!-- Quality submenu (mobile) -->
+      <div class="border-t border-blue-600 mt-2 pt-2">
+        <div class="text-white text-xs font-semibold px-3 py-1">QUALITY</div>
+        <% if Current.user&.email_address&.in?(['chris@hardanodisingstl.com', 'quality@hardanodisingstl.com', 'phil@hardanodisingstl.com', 'tariq@hardanodisingstl.com', 'daniel@hardanodisingstl.com']) %>
+          <%= link_to "NCRs", external_ncrs_path,
+              class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(external_ncrs_path)}" %>
+        <% end %>
+        <%= link_to "Specs", specifications_path,
+            class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(specifications_path)}" %>
+        <%= link_to "Manual", quality_documents_path,
+            class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(quality_documents_path)}" %>
+      </div>
 
       <%= link_to "Artifacts", artifacts_path,
           class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(artifacts_path)}" %>
