@@ -11,6 +11,7 @@ class Part < ApplicationRecord
   validates :each_price, numericality: { greater_than_or_equal_to: 0 }, allow_nil: true
   validates :part_number, uniqueness: {
     scope: [:customer_id, :part_issue],
+    case_sensitive: false,  # Case-insensitive uniqueness check
     message: "and issue must be unique per customer"
   }
   validate :validate_treatments
@@ -29,7 +30,7 @@ class Part < ApplicationRecord
     find_or_create_by(
       customer_id: customer_id,
       part_number: part_number.upcase.strip,
-      part_issue: part_issue.upcase.strip
+      part_issue: part_issue.strip  # Preserve case
     )
   end
 
@@ -37,7 +38,7 @@ class Part < ApplicationRecord
     scope = all
     scope = scope.where(customer_id: customer_id) if customer_id
     scope = scope.where("UPPER(part_number) = ?", part_number.upcase.strip) if part_number
-    scope = scope.where("UPPER(part_issue) = ?", part_issue.upcase.strip) if part_issue
+    scope = scope.where("UPPER(part_issue) = ?", part_issue.upcase.strip) if part_issue  # Case-insensitive search
     scope
   end
 
@@ -1271,7 +1272,7 @@ end
 
   def normalize_part_details
     self.part_number = part_number&.upcase&.strip
-    self.part_issue = part_issue&.upcase&.strip
+    self.part_issue = part_issue&.strip  # Preserve customer's preferred case
   end
 
   def set_defaults
