@@ -21,13 +21,17 @@
     }
 
     .metadata {
-      display: flex;
-      gap: 30px;
       font-size: 12px;
     }
 
     .metadata p {
       margin: 5px 0;
+    }
+
+    .metadata .issue-history {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #ccc;
     }
 
     .section {
@@ -94,6 +98,15 @@
       <p><strong>Issue:</strong> <%= @document.current_issue_number %></p>
       <p><strong>Approved by:</strong> <%= @document.approved_by %></p>
       <p><strong>Date:</strong> <%= @document.updated_at.strftime('%d/%m/%Y') %></p>
+
+      <% if @document.content['issue_history'].present? %>
+        <div class="issue-history">
+          <strong>Issue History:</strong><br>
+          <% @document.content['issue_history'].each do |history| %>
+            Issue <%= history['issue'] %>: <%= Date.parse(history['date']).strftime('%d/%m/%Y') rescue history['date'] %><br>
+          <% end %>
+        </div>
+      <% end %>
     </div>
   </div>
 

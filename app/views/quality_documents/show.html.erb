@@ -34,6 +34,16 @@
         <th>Last Updated:</th>
         <td><%= @document.updated_at.strftime('%d/%m/%Y %H:%M') %></td>
       </tr>
+      <% if @document.content['issue_history'].present? %>
+        <tr>
+          <th>Issue History:</th>
+          <td>
+            <% @document.content['issue_history'].each do |history| %>
+              <div>Issue <%= history['issue'] %>: <%= Date.parse(history['date']).strftime('%d/%m/%Y') rescue history['date'] %></div>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
       <tr>
         <th>References:</th>
         <td>
