@@ -211,6 +211,12 @@ Rails.application.routes.draw do
     end
   end
 
+  resources :quality_documents do
+    member do
+      get :show_pdf
+    end
+  end
+
   # Health check route
   get "up" => "rails/health#show", as: :rails_health_check
 

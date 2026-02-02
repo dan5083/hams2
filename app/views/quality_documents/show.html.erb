@@ -1,0 +1,78 @@
+<!-- app/views/quality_documents/show.html.erb -->
+<div class="quality-document-show">
+  <div class="document-header">
+    <h1><%= @document.full_code %> - <%= @document.title %></h1>
+
+    <div class="actions">
+      <%= link_to 'Edit', edit_quality_document_path(@document), class: 'btn btn-warning' %>
+      <%= link_to 'View PDF', show_pdf_quality_document_path(@document), class: 'btn btn-secondary', target: '_blank' %>
+      <%= link_to 'Back to List', quality_documents_path, class: 'btn btn-light' %>
+      <%= link_to 'Delete', quality_document_path(@document), method: :delete,
+          data: { confirm: 'Are you sure?' }, class: 'btn btn-danger' %>
+    </div>
+  </div>
+
+  <div class="document-metadata">
+    <table class="table">
+      <tr>
+        <th>Document Type:</th>
+        <td><%= @document.type_description %></td>
+      </tr>
+      <tr>
+        <th>Code:</th>
+        <td><%= @document.full_code %></td>
+      </tr>
+      <tr>
+        <th>Current Issue:</th>
+        <td><%= @document.current_issue_number %></td>
+      </tr>
+      <tr>
+        <th>Approved By:</th>
+        <td><%= @document.approved_by %></td>
+      </tr>
+      <tr>
+        <th>Last Updated:</th>
+        <td><%= @document.updated_at.strftime('%d/%m/%Y %H:%M') %></td>
+      </tr>
+      <tr>
+        <th>References:</th>
+        <td>
+          <% if @document.content['references'].present? %>
+            <%= @document.content['references'].join(', ') %>
+          <% else %>
+            None
+          <% end %>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="revision-history">
+    <h2>Revision History</h2>
+
+    <% if @revisions.any? %>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Issue</th>
+            <th>Changed By</th>
+            <th>Date</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @revisions.each do |revision| %>
+            <tr>
+              <td><%= revision.issue_number %></td>
+              <td><%= revision.changed_by %></td>
+              <td><%= revision.changed_at.strftime('%d/%m/%Y %H:%M') %></td>
+              <td><%= revision.change_description %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <p>No revisions yet.</p>
+    <% end %>
+  </div>
+</div>

@@ -1,0 +1,124 @@
+<!-- app/views/quality_documents/_form.html.erb -->
+<%= form_with model: @document, local: true do |f| %>
+  <% if @document.errors.any? %>
+    <div class="alert alert-danger">
+      <h4><%= pluralize(@document.errors.count, "error") %> prohibited this document from being saved:</h4>
+      <ul>
+        <% @document.errors.full_messages.each do |message| %>
+          <li><%= message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div class="form-group">
+    <%= f.label :document_type %>
+    <%= f.select :document_type,
+        options_for_select(QualityDocument::DOCUMENT_TYPES.map { |k, v| [v, k] }, @document.document_type),
+        { prompt: 'Select document type' },
+        { class: 'form-control', required: true } %>
+  </div>
+
+  <div class="form-group">
+    <%= f.label :code %>
+    <%= f.text_field :code, class: 'form-control', required: true,
+        placeholder: 'e.g., 2000, 3102, 1' %>
+  </div>
+
+  <div class="form-group">
+    <%= f.label :title %>
+    <%= f.text_field :title, class: 'form-control', required: true %>
+  </div>
+
+  <div class="form-group">
+    <%= f.label :current_issue_number %>
+    <%= f.number_field :current_issue_number, class: 'form-control', required: true, min: 1 %>
+  </div>
+
+  <div class="form-group">
+    <%= f.label :approved_by %>
+    <%= f.text_field :approved_by, class: 'form-control' %>
+  </div>
+
+  <div class="form-group">
+    <%= f.label :references, 'Referenced Documents' %>
+    <%= select_tag 'document[references][]',
+        options_from_collection_for_select(
+          QualityDocument.where.not(id: @document.id).order(:document_type, :code),
+          :full_code,
+          :full_code,
+          @document.content['references'] || []
+        ),
+        { multiple: true, class: 'form-control', size: 5 } %>
+    <small class="form-text text-muted">Hold Ctrl/Cmd to select multiple documents</small>
+  </div>
+
+  <div id="sections-container">
+    <h3>Document Sections</h3>
+    <div id="sections">
+      <% (@document.content['sections'] || []).each_with_index do |section, index| %>
+        <div class="section-editor" data-index="<%= index %>">
+          <div class="form-group">
+            <%= label_tag "sections[#{index}][heading]", "Section Heading" %>
+            <%= text_field_tag "sections[#{index}][heading]", section['heading'],
+                class: 'form-control', required: true %>
+          </div>
+
+          <div class="form-group">
+            <%= label_tag "section_#{index}_content", "Section Content" %>
+            <%= hidden_field_tag "sections[#{index}][content]", section['content'],
+                id: "section_#{index}_content_input" %>
+            <trix-editor input="section_#{index}_content_input"></trix-editor>
+          </div>
+
+          <button type="button" class="btn btn-danger btn-sm remove-section">Remove Section</button>
+          <hr>
+        </div>
+      <% end %>
+    </div>
+
+    <button type="button" id="add-section" class="btn btn-success">Add Section</button>
+  </div>
+
+  <div class="form-actions">
+    <%= f.submit class: 'btn btn-primary' %>
+    <%= link_to 'Cancel', @document.persisted? ? quality_document_path(@document) : quality_documents_path,
+        class: 'btn btn-secondary' %>
+  </div>
+<% end %>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  let sectionIndex = <%= (@document.content['sections'] || []).length %>;
+
+  document.getElementById('add-section').addEventListener('click', function() {
+    const sectionsDiv = document.getElementById('sections');
+    const newSection = document.createElement('div');
+    newSection.className = 'section-editor';
+    newSection.dataset.index = sectionIndex;
+    newSection.innerHTML = `
+      <div class="form-group">
+        <label for="sections[${sectionIndex}][heading]">Section Heading</label>
+        <input type="text" name="sections[${sectionIndex}][heading]" class="form-control" required>
+      </div>
+
+      <div class="form-group">
+        <label for="section_${sectionIndex}_content">Section Content</label>
+        <input type="hidden" name="sections[${sectionIndex}][content]" id="section_${sectionIndex}_content_input">
+        <trix-editor input="section_${sectionIndex}_content_input"></trix-editor>
+      </div>
+
+      <button type="button" class="btn btn-danger btn-sm remove-section">Remove Section</button>
+      <hr>
+    `;
+    sectionsDiv.appendChild(newSection);
+    sectionIndex++;
+  });
+
+  document.getElementById('sections').addEventListener('click', function(e) {
+    if (e.target.classList.contains('remove-section')) {
+      e.target.closest('.section-editor').remove();
+    }
+  });
+});
+</script>

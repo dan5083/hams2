@@ -1,0 +1,46 @@
+<!-- app/views/quality_documents/index.html.erb -->
+<div class="quality-documents-index">
+  <h1>Quality Documents</h1>
+
+  <div class="toolbar">
+    <%= link_to 'New Quality Document', new_quality_document_path, class: 'btn btn-primary' %>
+
+    <%= form_with url: quality_documents_path, method: :get, local: true do |f| %>
+      <%= f.select :document_type,
+          options_for_select([['All Types', '']] + QualityDocument::DOCUMENT_TYPES.map { |k, v| [v, k] }, params[:document_type]),
+          {},
+          { onchange: 'this.form.requestSubmit()', class: 'form-control' } %>
+    <% end %>
+  </div>
+
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Code</th>
+        <th>Type</th>
+        <th>Title</th>
+        <th>Issue</th>
+        <th>Approved By</th>
+        <th>Last Updated</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @documents.each do |doc| %>
+        <tr>
+          <td><%= doc.full_code %></td>
+          <td><%= doc.type_description %></td>
+          <td><%= link_to doc.title, quality_document_path(doc) %></td>
+          <td><%= doc.current_issue_number %></td>
+          <td><%= doc.approved_by %></td>
+          <td><%= doc.updated_at.strftime('%d/%m/%Y') %></td>
+          <td>
+            <%= link_to 'View', quality_document_path(doc), class: 'btn btn-sm btn-info' %>
+            <%= link_to 'Edit', edit_quality_document_path(doc), class: 'btn btn-sm btn-warning' %>
+            <%= link_to 'PDF', show_pdf_quality_document_path(doc), class: 'btn btn-sm btn-secondary', target: '_blank' %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>

@@ -1,0 +1,93 @@
+<!-- app/views/quality_documents/show_pdf.html.erb -->
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+  }
+  .document-header {
+    border-bottom: 2px solid #000;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+  }
+  .document-header h1 {
+    margin: 0 0 10px 0;
+    font-size: 24px;
+  }
+  .metadata {
+    display: flex;
+    gap: 30px;
+    font-size: 12px;
+  }
+  .metadata p {
+    margin: 5px 0;
+  }
+  .section {
+    margin-bottom: 30px;
+  }
+  .section h2 {
+    font-size: 18px;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 5px;
+    margin-bottom: 10px;
+  }
+  .content {
+    line-height: 1.6;
+  }
+  .content ul, .content ol {
+    margin-left: 20px;
+    margin-bottom: 10px;
+  }
+  .content table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 10px 0;
+  }
+  .content table td, .content table th {
+    border: 1px solid #000;
+    padding: 5px;
+  }
+  .content strong {
+    font-weight: bold;
+  }
+  .references {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #ccc;
+  }
+  .references h2 {
+    font-size: 16px;
+    margin-bottom: 10px;
+  }
+  .references ul {
+    margin-left: 20px;
+  }
+</style>
+
+<div class="document-header">
+  <h1><%= @document.full_code %> - <%= @document.title %></h1>
+  <div class="metadata">
+    <p><strong>Issue:</strong> <%= @document.current_issue_number %></p>
+    <p><strong>Approved by:</strong> <%= @document.approved_by %></p>
+    <p><strong>Date:</strong> <%= @document.updated_at.strftime('%d/%m/%Y') %></p>
+  </div>
+</div>
+
+<% (@document.content['sections'] || []).each do |section| %>
+  <div class="section">
+    <h2><%= section['heading'] %></h2>
+    <div class="content">
+      <%= sanitize(section['content']) %>
+    </div>
+  </div>
+<% end %>
+
+<% if @document.content['references'].present? %>
+  <div class="references">
+    <h2>References</h2>
+    <ul>
+      <% @document.content['references'].each do |ref| %>
+        <li><%= ref %></li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>

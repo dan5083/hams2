@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_01_17_111418) do
+ActiveRecord::Schema[8.0].define(version: 2026_02_02_124520) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -188,6 +188,30 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_17_111418) do
     t.index ["replaces_id"], name: "index_parts_on_replaces_id"
   end
 
+  create_table "quality_document_revisions", force: :cascade do |t|
+    t.bigint "quality_document_id", null: false
+    t.integer "issue_number", null: false
+    t.string "changed_by", null: false
+    t.text "change_description"
+    t.jsonb "previous_content"
+    t.datetime "changed_at", precision: nil, null: false
+    t.index ["quality_document_id", "issue_number"], name: "idx_on_quality_document_id_issue_number_08772926ba"
+    t.index ["quality_document_id"], name: "index_quality_document_revisions_on_quality_document_id"
+  end
+
+  create_table "quality_documents", force: :cascade do |t|
+    t.string "document_type", null: false
+    t.string "code", null: false
+    t.string "title", null: false
+    t.integer "current_issue_number", default: 1, null: false
+    t.string "approved_by"
+    t.jsonb "content", default: {}
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["content"], name: "index_quality_documents_on_content", using: :gin
+    t.index ["document_type", "code"], name: "index_quality_documents_on_document_type_and_code", unique: true
+  end
+
   create_table "release_notes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.integer "number", null: false
     t.uuid "works_order_id", null: false
@@ -345,6 +369,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_01_17_111418) do
   add_foreign_key "organizations", "xero_contacts"
   add_foreign_key "parts", "organizations", column: "customer_id"
   add_foreign_key "parts", "parts", column: "replaces_id"
+  add_foreign_key "quality_document_revisions", "quality_documents"
   add_foreign_key "release_notes", "users", column: "issued_by_id"
   add_foreign_key "release_notes", "works_orders"
   add_foreign_key "sessions", "users"
