@@ -64,7 +64,7 @@ class QualityDocumentsController < ApplicationController
   end
 
   def show_pdf
-    render layout: 'pdf'
+    render layout: false
   end
 
   private
