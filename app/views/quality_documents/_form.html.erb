@@ -1,124 +1,345 @@
 <!-- app/views/quality_documents/_form.html.erb -->
-<%= form_with model: @document, local: true do |f| %>
+<%= form_with model: @document, local: true, class: "space-y-6" do |f| %>
   <% if @document.errors.any? %>
-    <div class="alert alert-danger">
-      <h4><%= pluralize(@document.errors.count, "error") %> prohibited this document from being saved:</h4>
-      <ul>
-        <% @document.errors.full_messages.each do |message| %>
-          <li><%= message %></li>
-        <% end %>
-      </ul>
+    <div class="bg-red-50 border border-red-200 rounded-md p-4">
+      <div class="flex">
+        <div class="ml-3">
+          <h3 class="text-sm font-medium text-red-800">
+            <%= pluralize(@document.errors.count, "error") %> prohibited this document from being saved:
+          </h3>
+          <div class="mt-2 text-sm text-red-700">
+            <ul class="list-disc list-inside space-y-1">
+              <% @document.errors.full_messages.each do |message| %>
+                <li><%= message %></li>
+              <% end %>
+            </ul>
+          </div>
+        </div>
+      </div>
     </div>
   <% end %>
 
-  <div class="form-group">
-    <%= f.label :document_type %>
-    <%= f.select :document_type,
-        options_for_select(QualityDocument::DOCUMENT_TYPES.map { |k, v| [v, k] }, @document.document_type),
-        { prompt: 'Select document type' },
-        { class: 'form-control', required: true } %>
+  <!-- Basic Information Section -->
+  <div class="bg-white shadow rounded-lg p-6">
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Basic Information</h3>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div>
+        <%= f.label :document_type, class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.select :document_type,
+            options_for_select(QualityDocument::DOCUMENT_TYPES.map { |k, v| [v, k] }, @document.document_type),
+            { prompt: 'Select document type' },
+            { class: 'mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm', required: true } %>
+      </div>
+
+      <div>
+        <%= f.label :code, class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.text_field :code,
+            class: 'mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm font-mono',
+            required: true,
+            placeholder: 'e.g., 001, 002, 003' %>
+      </div>
+
+      <div class="md:col-span-2">
+        <%= f.label :title, class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.text_field :title,
+            class: 'mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm',
+            required: true %>
+      </div>
+
+      <div>
+        <%= f.label :current_issue_number, class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.number_field :current_issue_number,
+            class: 'mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm',
+            required: true, min: 1 %>
+      </div>
+
+      <div>
+        <%= f.label :approved_by, class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.text_field :approved_by,
+            class: 'mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm' %>
+      </div>
+    </div>
   </div>
 
-  <div class="form-group">
-    <%= f.label :code %>
-    <%= f.text_field :code, class: 'form-control', required: true,
-        placeholder: 'e.g., 2000, 3102, 1' %>
+  <!-- Referenced Documents Section -->
+  <div class="bg-white shadow rounded-lg p-6">
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Referenced Documents</h3>
+
+    <div class="relative">
+      <div class="relative">
+        <input type="text"
+               id="reference-search"
+               class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 pr-10 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+               placeholder="Search for documents to reference..."
+               autocomplete="off">
+        <button type="button" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xl hidden" id="clear-search">&times;</button>
+      </div>
+
+      <div id="reference-dropdown" class="absolute z-50 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto hidden"></div>
+
+      <div class="mt-3 flex flex-wrap gap-2 min-h-[2rem]" id="selected-references">
+        <% if @document.content && @document.content['references'].present? %>
+          <% @document.content['references'].each do |ref| %>
+            <span class="inline-flex items-center gap-2 bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium" data-code="<%= ref %>">
+              <%= ref %>
+              <button type="button" onclick="removeReference(this)" class="hover:text-purple-900 text-lg leading-none">&times;</button>
+              <input type="hidden" name="document[references][]" value="<%= ref %>">
+            </span>
+          <% end %>
+        <% end %>
+      </div>
+
+      <p class="mt-2 text-xs text-gray-500">Search and click to add document references</p>
+    </div>
   </div>
 
-  <div class="form-group">
-    <%= f.label :title %>
-    <%= f.text_field :title, class: 'form-control', required: true %>
-  </div>
+  <!-- Document Sections -->
+  <div class="bg-white shadow rounded-lg p-6">
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Document Sections</h3>
 
-  <div class="form-group">
-    <%= f.label :current_issue_number %>
-    <%= f.number_field :current_issue_number, class: 'form-control', required: true, min: 1 %>
-  </div>
-
-  <div class="form-group">
-    <%= f.label :approved_by %>
-    <%= f.text_field :approved_by, class: 'form-control' %>
-  </div>
-
-  <div class="form-group">
-    <%= f.label :references, 'Referenced Documents' %>
-    <%= select_tag 'document[references][]',
-        options_from_collection_for_select(
-          QualityDocument.where.not(id: @document.id).order(:document_type, :code),
-          :full_code,
-          :full_code,
-          @document.content['references'] || []
-        ),
-        { multiple: true, class: 'form-control', size: 5 } %>
-    <small class="form-text text-muted">Hold Ctrl/Cmd to select multiple documents</small>
-  </div>
-
-  <div id="sections-container">
-    <h3>Document Sections</h3>
-    <div id="sections">
-      <% (@document.content['sections'] || []).each_with_index do |section, index| %>
-        <div class="section-editor" data-index="<%= index %>">
-          <div class="form-group">
-            <%= label_tag "sections[#{index}][heading]", "Section Heading" %>
-            <%= text_field_tag "sections[#{index}][heading]", section['heading'],
-                class: 'form-control', required: true %>
+    <div id="sections" class="space-y-4">
+      <% sections = @document.content && @document.content['sections'] ? @document.content['sections'] : [] %>
+      <% sections.each_with_index do |section, index| %>
+        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4" data-index="<%= index %>">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-3">
+              <span class="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 text-white text-sm font-semibold">
+                <%= index + 1 %>
+              </span>
+              <span class="text-sm font-medium text-gray-700">Section <%= index + 1 %></span>
+            </div>
+            <button type="button" class="remove-section bg-red-500 hover:bg-red-700 text-white text-sm font-bold py-1 px-3 rounded">
+              Remove
+            </button>
           </div>
 
-          <div class="form-group">
-            <%= label_tag "section_#{index}_content", "Section Content" %>
-            <%= hidden_field_tag "sections[#{index}][content]", section['content'],
-                id: "section_#{index}_content_input" %>
-            <trix-editor input="section_#{index}_content_input"></trix-editor>
-          </div>
+          <div class="space-y-3">
+            <div>
+              <%= label_tag "sections[#{index}][heading]", "Section Heading", class: "block text-sm font-medium text-gray-700 mb-1" %>
+              <%= text_field_tag "sections[#{index}][heading]", section['heading'],
+                  class: 'mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm',
+                  required: true,
+                  placeholder: 'e.g., Purpose, Scope, Procedure' %>
+            </div>
 
-          <button type="button" class="btn btn-danger btn-sm remove-section">Remove Section</button>
-          <hr>
+            <div>
+              <%= label_tag "section_#{index}_content", "Section Content", class: "block text-sm font-medium text-gray-700 mb-1" %>
+              <%= text_area_tag "sections[#{index}][content]", section['content'],
+                  class: 'mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm',
+                  rows: 6,
+                  placeholder: 'Enter section content...' %>
+            </div>
+          </div>
         </div>
       <% end %>
     </div>
 
-    <button type="button" id="add-section" class="btn btn-success">Add Section</button>
+    <button type="button" id="add-section" class="mt-4 bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+      + Add Section
+    </button>
   </div>
 
-  <div class="form-actions">
-    <%= f.submit class: 'btn btn-primary' %>
+  <!-- Form Actions -->
+  <div class="flex items-center justify-between pt-6 border-t-2 border-gray-200">
+    <div>
+      <div class="flex gap-2">
+        <%= f.submit 'Update', name: 'commit', value: 'Update',
+            class: 'bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded' %>
+        <%= f.submit 'Update & Reissue', name: 'commit', value: 'Update & Reissue',
+            class: 'bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-6 rounded' %>
+      </div>
+      <p class="mt-2 text-xs text-gray-500">Update saves changes. Update & Reissue increments the issue number.</p>
+    </div>
     <%= link_to 'Cancel', @document.persisted? ? quality_document_path(@document) : quality_documents_path,
-        class: 'btn btn-secondary' %>
+        class: 'bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded' %>
   </div>
 <% end %>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-  let sectionIndex = <%= (@document.content['sections'] || []).length %>;
+// Available documents for reference
+const availableDocuments = <%= raw QualityDocument.where.not(id: @document.id).order(:document_type, :code).map { |d| { code: d.full_code, title: d.title } }.to_json %>;
 
-  document.getElementById('add-section').addEventListener('click', function() {
-    const sectionsDiv = document.getElementById('sections');
-    const newSection = document.createElement('div');
-    newSection.className = 'section-editor';
-    newSection.dataset.index = sectionIndex;
-    newSection.innerHTML = `
-      <div class="form-group">
-        <label for="sections[${sectionIndex}][heading]">Section Heading</label>
-        <input type="text" name="sections[${sectionIndex}][heading]" class="form-control" required>
+// Reference selection functionality
+const searchInput = document.getElementById('reference-search');
+const clearSearchBtn = document.getElementById('clear-search');
+const dropdown = document.getElementById('reference-dropdown');
+const selectedContainer = document.getElementById('selected-references');
+
+let selectedReferences = new Set();
+
+// Initialize with existing references
+document.querySelectorAll('#selected-references [data-code]').forEach(tag => {
+  selectedReferences.add(tag.dataset.code);
+});
+
+function filterDocuments(searchTerm) {
+  if (!searchTerm) return availableDocuments;
+
+  const term = searchTerm.toLowerCase();
+  return availableDocuments.filter(doc =>
+    doc.code.toLowerCase().includes(term) ||
+    doc.title.toLowerCase().includes(term)
+  );
+}
+
+function renderDropdown(documents) {
+  if (documents.length === 0) {
+    dropdown.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500 text-center italic">No documents found</div>';
+  } else {
+    dropdown.innerHTML = documents.map(doc => `
+      <div class="px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm border-b border-gray-100 last:border-0 ${selectedReferences.has(doc.code) ? 'bg-purple-50 text-purple-800' : ''}"
+           data-code="${doc.code}"
+           data-title="${doc.title}">
+        <strong>${doc.code}</strong> - ${doc.title}
+      </div>
+    `).join('');
+  }
+}
+
+searchInput.addEventListener('input', function() {
+  const searchTerm = this.value.trim();
+
+  if (searchTerm) {
+    clearSearchBtn.classList.remove('hidden');
+    const filtered = filterDocuments(searchTerm);
+    renderDropdown(filtered);
+    dropdown.classList.remove('hidden');
+  } else {
+    clearSearchBtn.classList.add('hidden');
+    dropdown.classList.add('hidden');
+  }
+});
+
+searchInput.addEventListener('focus', function() {
+  if (this.value.trim()) {
+    dropdown.classList.remove('hidden');
+  }
+});
+
+clearSearchBtn.addEventListener('click', function() {
+  searchInput.value = '';
+  this.classList.add('hidden');
+  dropdown.classList.add('hidden');
+  searchInput.focus();
+});
+
+dropdown.addEventListener('click', function(e) {
+  const option = e.target.closest('[data-code]');
+  if (!option) return;
+
+  const code = option.dataset.code;
+
+  if (selectedReferences.has(code)) {
+    removeReferenceByCode(code);
+  } else {
+    addReference(code);
+  }
+
+  option.classList.toggle('bg-purple-50');
+  option.classList.toggle('text-purple-800');
+});
+
+function addReference(code) {
+  if (selectedReferences.has(code)) return;
+
+  selectedReferences.add(code);
+
+  const tag = document.createElement('span');
+  tag.className = 'inline-flex items-center gap-2 bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium';
+  tag.dataset.code = code;
+  tag.innerHTML = `
+    ${code}
+    <button type="button" onclick="removeReference(this)" class="hover:text-purple-900 text-lg leading-none">&times;</button>
+    <input type="hidden" name="document[references][]" value="${code}">
+  `;
+
+  selectedContainer.appendChild(tag);
+}
+
+window.removeReference = function(button) {
+  const tag = button.closest('[data-code]');
+  const code = tag.dataset.code;
+  selectedReferences.delete(code);
+  tag.remove();
+
+  const option = dropdown.querySelector(`[data-code="${code}"]`);
+  if (option) {
+    option.classList.remove('bg-purple-50', 'text-purple-800');
+  }
+}
+
+function removeReferenceByCode(code) {
+  selectedReferences.delete(code);
+  const tag = selectedContainer.querySelector(`[data-code="${code}"]`);
+  if (tag) tag.remove();
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('#reference-search') && !e.target.closest('#reference-dropdown')) {
+    dropdown.classList.add('hidden');
+  }
+});
+
+// Section management
+let sectionIndex = <%= (@document.content && @document.content['sections'] ? @document.content['sections'].length : 0) %>;
+
+document.getElementById('add-section').addEventListener('click', function() {
+  const sectionsDiv = document.getElementById('sections');
+  const newSection = document.createElement('div');
+  newSection.className = 'bg-gray-50 border border-gray-200 rounded-lg p-4';
+  newSection.dataset.index = sectionIndex;
+
+  const sectionNumber = document.querySelectorAll('#sections > div').length + 1;
+
+  newSection.innerHTML = `
+    <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center gap-3">
+        <span class="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 text-white text-sm font-semibold">
+          ${sectionNumber}
+        </span>
+        <span class="text-sm font-medium text-gray-700">Section ${sectionNumber}</span>
+      </div>
+      <button type="button" class="remove-section bg-red-500 hover:bg-red-700 text-white text-sm font-bold py-1 px-3 rounded">
+        Remove
+      </button>
+    </div>
+
+    <div class="space-y-3">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Section Heading</label>
+        <input type="text" name="sections[${sectionIndex}][heading]"
+               class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+               required placeholder="e.g., Purpose, Scope, Procedure">
       </div>
 
-      <div class="form-group">
-        <label for="section_${sectionIndex}_content">Section Content</label>
-        <input type="hidden" name="sections[${sectionIndex}][content]" id="section_${sectionIndex}_content_input">
-        <trix-editor input="section_${sectionIndex}_content_input"></trix-editor>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Section Content</label>
+        <textarea name="sections[${sectionIndex}][content]"
+                  class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                  rows="6"
+                  placeholder="Enter section content..."></textarea>
       </div>
+    </div>
+  `;
+  sectionsDiv.appendChild(newSection);
+  sectionIndex++;
 
-      <button type="button" class="btn btn-danger btn-sm remove-section">Remove Section</button>
-      <hr>
-    `;
-    sectionsDiv.appendChild(newSection);
-    sectionIndex++;
-  });
+  newSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
 
-  document.getElementById('sections').addEventListener('click', function(e) {
-    if (e.target.classList.contains('remove-section')) {
-      e.target.closest('.section-editor').remove();
-    }
-  });
+document.getElementById('sections').addEventListener('click', function(e) {
+  if (e.target.classList.contains('remove-section') || e.target.closest('.remove-section')) {
+    const section = e.target.closest('[data-index]');
+    section.remove();
+
+    // Renumber remaining sections
+    document.querySelectorAll('#sections > div').forEach((section, index) => {
+      const numberBadge = section.querySelector('.rounded-full');
+      const label = section.querySelector('.text-sm.font-medium');
+      if (numberBadge) numberBadge.textContent = index + 1;
+      if (label) label.textContent = `Section ${index + 1}`;
+    });
+  }
 });
 </script>
