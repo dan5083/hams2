@@ -12,11 +12,17 @@ class SessionsController < ApplicationController
       user = User.find_by(email_address: email)
 
       if user&.active?
-        # Generate magic link and send email
-        token = user.generate_magic_link_token
+        # Generate magic link and send email - wrapped in transaction to ensure DB commit
+        token = nil
+        User.transaction do
+          token = user.generate_magic_link_token
+          # Force reload to ensure the token is persisted before sending email
+          user.reload
+        end
+
         PasswordsMailer.magic_link(user, token).deliver_now
 
-        Rails.logger.info "Magic link sent to #{email}"
+        Rails.logger.info "Magic link sent to #{email} - token: #{token[0..10]}..."
       end
     end
 
@@ -26,6 +32,9 @@ class SessionsController < ApplicationController
 
   def magic_link
     token = params[:token]
+
+    Rails.logger.info "Magic link attempt with token: #{token[0..10]}... at #{Time.current}"
+
     user = User.find_by_magic_link(token)
 
     if user
