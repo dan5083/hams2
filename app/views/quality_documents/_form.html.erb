@@ -101,10 +101,10 @@
     <div id="sections" class="space-y-4">
       <% sections = @document.content && @document.content['sections'] ? @document.content['sections'] : [] %>
       <% sections.each_with_index do |section, index| %>
-        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4" data-index="<%= index %>">
+        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 section-item" data-index="<%= index %>">
           <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-3">
-              <span class="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 text-white text-sm font-semibold">
+              <span class="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 text-white text-sm font-semibold section-number">
                 <%= index + 1 %>
               </span>
               <span class="text-sm font-medium text-gray-700">Section <%= index + 1 %></span>
@@ -125,10 +125,45 @@
 
             <div>
               <%= label_tag "section_#{index}_content", "Section Content", class: "block text-sm font-medium text-gray-700 mb-1" %>
+
+              <!-- Formatting Toolbar -->
+              <div class="flex flex-wrap gap-1 mb-2 p-2 bg-gray-100 rounded-t-md border border-gray-300 border-b-0">
+                <button type="button" onclick="addParagraph(<%= index %>)" class="px-3 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50" title="Add Paragraph">
+                  ¶ Paragraph
+                </button>
+                <button type="button" onclick="startList(<%= index %>)" class="px-3 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50" title="Start Numbered List">
+                  1. List
+                </button>
+                <button type="button" onclick="addListItem(<%= index %>)" class="px-3 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50" title="Add List Item">
+                  + Item
+                </button>
+                <button type="button" onclick="endList(<%= index %>)" class="px-3 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50" title="End List">
+                  End List
+                </button>
+                <button type="button" onclick="makeBold(<%= index %>)" class="px-3 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50 font-bold" title="Make Bold">
+                  B
+                </button>
+                <button type="button" onclick="makeItalic(<%= index %>)" class="px-3 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50 italic" title="Make Italic">
+                  I
+                </button>
+                <button type="button" onclick="cleanHTML(<%= index %>)" class="px-3 py-1 text-xs bg-purple-100 border border-purple-300 rounded hover:bg-purple-200 text-purple-800" title="Clean HTML">
+                  🧹 Clean
+                </button>
+              </div>
+
               <%= text_area_tag "sections[#{index}][content]", section['content'],
-                  class: 'mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm',
-                  rows: 6,
+                  class: 'block w-full border border-gray-300 border-t-0 rounded-b-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm font-mono',
+                  rows: 8,
+                  id: "section_#{index}_textarea",
                   placeholder: 'Enter section content...' %>
+
+              <!-- Preview -->
+              <div class="mt-2">
+                <button type="button" onclick="togglePreview(<%= index %>)" class="text-xs text-purple-600 hover:text-purple-800">
+                  👁️ Toggle Preview
+                </button>
+                <div id="preview_<%= index %>" class="hidden mt-2 p-3 bg-white border border-gray-200 rounded prose prose-sm max-w-none"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -156,7 +191,134 @@
   </div>
 <% end %>
 
+<style>
+/* Prose styling for preview */
+.prose p {
+  margin: 0.5rem 0;
+}
+
+.prose ul, .prose ol {
+  margin: 0.75rem 0;
+  padding-left: 1.5rem;
+}
+
+.prose ul {
+  list-style-type: disc;
+}
+
+.prose ol {
+  list-style-type: decimal;
+}
+
+.prose li {
+  margin: 0.25rem 0;
+}
+
+.prose strong {
+  font-weight: 600;
+}
+
+.prose em {
+  font-style: italic;
+}
+</style>
+
 <script>
+// HTML Helper Functions
+function addParagraph(index) {
+  const textarea = document.getElementById(`section_${index}_textarea`);
+  const cursorPos = textarea.selectionStart;
+  const textBefore = textarea.value.substring(0, cursorPos);
+  const textAfter = textarea.value.substring(cursorPos);
+
+  const newText = '<p></p>';
+  textarea.value = textBefore + newText + textAfter;
+  textarea.selectionStart = textarea.selectionEnd = cursorPos + 3; // Position cursor inside <p>
+  textarea.focus();
+}
+
+function startList(index) {
+  const textarea = document.getElementById(`section_${index}_textarea`);
+  const cursorPos = textarea.selectionStart;
+  const textBefore = textarea.value.substring(0, cursorPos);
+  const textAfter = textarea.value.substring(cursorPos);
+
+  const newText = '<ol>\n<li></li>\n</ol>';
+  textarea.value = textBefore + newText + textAfter;
+  textarea.selectionStart = textarea.selectionEnd = cursorPos + 8; // Position cursor inside <li>
+  textarea.focus();
+}
+
+function addListItem(index) {
+  const textarea = document.getElementById(`section_${index}_textarea`);
+  const cursorPos = textarea.selectionStart;
+  const textBefore = textarea.value.substring(0, cursorPos);
+  const textAfter = textarea.value.substring(cursorPos);
+
+  const newText = '<li></li>';
+  textarea.value = textBefore + newText + textAfter;
+  textarea.selectionStart = textarea.selectionEnd = cursorPos + 4; // Position cursor inside <li>
+  textarea.focus();
+}
+
+function endList(index) {
+  const textarea = document.getElementById(`section_${index}_textarea`);
+  const cursorPos = textarea.selectionStart;
+  const textBefore = textarea.value.substring(0, cursorPos);
+  const textAfter = textarea.value.substring(cursorPos);
+
+  textarea.value = textBefore + '</ol>\n' + textAfter;
+  textarea.selectionStart = textarea.selectionEnd = cursorPos + 6;
+  textarea.focus();
+}
+
+function makeBold(index) {
+  wrapSelection(index, '<strong>', '</strong>');
+}
+
+function makeItalic(index) {
+  wrapSelection(index, '<em>', '</em>');
+}
+
+function wrapSelection(index, openTag, closeTag) {
+  const textarea = document.getElementById(`section_${index}_textarea`);
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const selectedText = textarea.value.substring(start, end);
+  const textBefore = textarea.value.substring(0, start);
+  const textAfter = textarea.value.substring(end);
+
+  textarea.value = textBefore + openTag + selectedText + closeTag + textAfter;
+  textarea.selectionStart = start + openTag.length;
+  textarea.selectionEnd = end + openTag.length;
+  textarea.focus();
+}
+
+function cleanHTML(index) {
+  const textarea = document.getElementById(`section_${index}_textarea`);
+  let html = textarea.value;
+
+  // Add line breaks for readability
+  html = html.replace(/<\/li>/g, '</li>\n');
+  html = html.replace(/<\/p>/g, '</p>\n');
+  html = html.replace(/<ol>/g, '<ol>\n');
+  html = html.replace(/<\/ol>/g, '\n</ol>\n');
+
+  textarea.value = html;
+}
+
+function togglePreview(index) {
+  const preview = document.getElementById(`preview_${index}`);
+  const textarea = document.getElementById(`section_${index}_textarea`);
+
+  if (preview.classList.contains('hidden')) {
+    preview.innerHTML = textarea.value;
+    preview.classList.remove('hidden');
+  } else {
+    preview.classList.add('hidden');
+  }
+}
+
 // Available documents for reference
 const availableDocuments = <%= raw QualityDocument.where.not(id: @document.id).order(:document_type, :code).map { |d| { code: d.full_code, title: d.title } }.to_json %>;
 
@@ -287,15 +449,15 @@ let sectionIndex = <%= (@document.content && @document.content['sections'] ? @do
 document.getElementById('add-section').addEventListener('click', function() {
   const sectionsDiv = document.getElementById('sections');
   const newSection = document.createElement('div');
-  newSection.className = 'bg-gray-50 border border-gray-200 rounded-lg p-4';
+  newSection.className = 'bg-gray-50 border border-gray-200 rounded-lg p-4 section-item';
   newSection.dataset.index = sectionIndex;
 
-  const sectionNumber = document.querySelectorAll('#sections > div').length + 1;
+  const sectionNumber = document.querySelectorAll('#sections .section-item').length + 1;
 
   newSection.innerHTML = `
     <div class="flex items-center justify-between mb-3">
       <div class="flex items-center gap-3">
-        <span class="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 text-white text-sm font-semibold">
+        <span class="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 text-white text-sm font-semibold section-number">
           ${sectionNumber}
         </span>
         <span class="text-sm font-medium text-gray-700">Section ${sectionNumber}</span>
@@ -315,10 +477,27 @@ document.getElementById('add-section').addEventListener('click', function() {
 
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Section Content</label>
+
+        <div class="flex flex-wrap gap-1 mb-2 p-2 bg-gray-100 rounded-t-md border border-gray-300 border-b-0">
+          <button type="button" onclick="addParagraph(${sectionIndex})" class="px-3 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50">¶ Paragraph</button>
+          <button type="button" onclick="startList(${sectionIndex})" class="px-3 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50">1. List</button>
+          <button type="button" onclick="addListItem(${sectionIndex})" class="px-3 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50">+ Item</button>
+          <button type="button" onclick="endList(${sectionIndex})" class="px-3 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50">End List</button>
+          <button type="button" onclick="makeBold(${sectionIndex})" class="px-3 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50 font-bold">B</button>
+          <button type="button" onclick="makeItalic(${sectionIndex})" class="px-3 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50 italic">I</button>
+          <button type="button" onclick="cleanHTML(${sectionIndex})" class="px-3 py-1 text-xs bg-purple-100 border border-purple-300 rounded hover:bg-purple-200 text-purple-800">🧹 Clean</button>
+        </div>
+
         <textarea name="sections[${sectionIndex}][content]"
-                  class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                  rows="6"
+                  class="block w-full border border-gray-300 border-t-0 rounded-b-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm font-mono"
+                  rows="8"
+                  id="section_${sectionIndex}_textarea"
                   placeholder="Enter section content..."></textarea>
+
+        <div class="mt-2">
+          <button type="button" onclick="togglePreview(${sectionIndex})" class="text-xs text-purple-600 hover:text-purple-800">👁️ Toggle Preview</button>
+          <div id="preview_${sectionIndex}" class="hidden mt-2 p-3 bg-white border border-gray-200 rounded prose prose-sm max-w-none"></div>
+        </div>
       </div>
     </div>
   `;
@@ -330,12 +509,12 @@ document.getElementById('add-section').addEventListener('click', function() {
 
 document.getElementById('sections').addEventListener('click', function(e) {
   if (e.target.classList.contains('remove-section') || e.target.closest('.remove-section')) {
-    const section = e.target.closest('[data-index]');
+    const section = e.target.closest('.section-item');
     section.remove();
 
     // Renumber remaining sections
-    document.querySelectorAll('#sections > div').forEach((section, index) => {
-      const numberBadge = section.querySelector('.rounded-full');
+    document.querySelectorAll('#sections .section-item').forEach((section, index) => {
+      const numberBadge = section.querySelector('.section-number');
       const label = section.querySelector('.text-sm.font-medium');
       if (numberBadge) numberBadge.textContent = index + 1;
       if (label) label.textContent = `Section ${index + 1}`;
