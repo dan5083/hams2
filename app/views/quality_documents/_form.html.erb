@@ -101,10 +101,10 @@
     <div id="sections" class="space-y-4">
       <% sections = @document.content && @document.content['sections'] ? @document.content['sections'] : [] %>
       <% sections.each_with_index do |section, index| %>
-        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4" data-index="<%= index %>">
+        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 section-item" data-index="<%= index %>">
           <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-3">
-              <span class="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 text-white text-sm font-semibold">
+              <span class="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 text-white text-sm font-semibold section-number">
                 <%= index + 1 %>
               </span>
               <span class="text-sm font-medium text-gray-700">Section <%= index + 1 %></span>
@@ -125,10 +125,8 @@
 
             <div>
               <%= label_tag "section_#{index}_content", "Section Content", class: "block text-sm font-medium text-gray-700 mb-1" %>
-              <%= text_area_tag "sections[#{index}][content]", section['content'],
-                  class: 'mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm',
-                  rows: 6,
-                  placeholder: 'Enter section content...' %>
+              <%= hidden_field_tag "sections[#{index}][content]", section['content'], id: "section_#{index}_content_input" %>
+              <trix-editor input="section_#{index}_content_input" class="trix-content"></trix-editor>
             </div>
           </div>
         </div>
@@ -155,6 +153,109 @@
         class: 'bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded' %>
   </div>
 <% end %>
+
+<style>
+/* Trix Editor Styling */
+trix-toolbar {
+  background: #f9fafb;
+  border: 1px solid #d1d5db;
+  border-radius: 6px 6px 0 0;
+  padding: 0.5rem;
+}
+
+trix-toolbar .trix-button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+trix-toolbar .trix-button-group {
+  display: flex;
+  gap: 0.25rem;
+  margin-right: 0.75rem;
+  border-right: 1px solid #d1d5db;
+  padding-right: 0.75rem;
+}
+
+trix-toolbar .trix-button-group:last-child {
+  border-right: none;
+  margin-right: 0;
+  padding-right: 0;
+}
+
+trix-toolbar .trix-button {
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 0.375rem 0.5rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+trix-toolbar .trix-button:hover {
+  background: #f3f4f6;
+}
+
+trix-toolbar .trix-button.trix-active {
+  background: #7c3aed;
+  color: white;
+  border-color: #7c3aed;
+}
+
+trix-toolbar .trix-button--icon {
+  width: 2rem;
+  height: 2rem;
+}
+
+trix-editor {
+  border: 1px solid #d1d5db;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  padding: 0.75rem;
+  min-height: 200px;
+  background: white;
+  outline: none;
+}
+
+trix-editor:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 1px #7c3aed;
+}
+
+trix-editor.trix-content {
+  line-height: 1.6;
+}
+
+/* Style the content inside Trix */
+trix-editor h1 {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin: 1rem 0 0.5rem 0;
+}
+
+trix-editor ul, trix-editor ol {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+trix-editor li {
+  margin: 0.25rem 0;
+}
+
+trix-editor strong {
+  font-weight: 600;
+}
+
+trix-editor em {
+  font-style: italic;
+}
+
+trix-editor a {
+  color: #7c3aed;
+  text-decoration: underline;
+}
+</style>
 
 <script>
 // Available documents for reference
@@ -287,15 +388,15 @@ let sectionIndex = <%= (@document.content && @document.content['sections'] ? @do
 document.getElementById('add-section').addEventListener('click', function() {
   const sectionsDiv = document.getElementById('sections');
   const newSection = document.createElement('div');
-  newSection.className = 'bg-gray-50 border border-gray-200 rounded-lg p-4';
+  newSection.className = 'bg-gray-50 border border-gray-200 rounded-lg p-4 section-item';
   newSection.dataset.index = sectionIndex;
 
-  const sectionNumber = document.querySelectorAll('#sections > div').length + 1;
+  const sectionNumber = document.querySelectorAll('#sections .section-item').length + 1;
 
   newSection.innerHTML = `
     <div class="flex items-center justify-between mb-3">
       <div class="flex items-center gap-3">
-        <span class="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 text-white text-sm font-semibold">
+        <span class="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 text-white text-sm font-semibold section-number">
           ${sectionNumber}
         </span>
         <span class="text-sm font-medium text-gray-700">Section ${sectionNumber}</span>
@@ -315,10 +416,8 @@ document.getElementById('add-section').addEventListener('click', function() {
 
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Section Content</label>
-        <textarea name="sections[${sectionIndex}][content]"
-                  class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                  rows="6"
-                  placeholder="Enter section content..."></textarea>
+        <input type="hidden" name="sections[${sectionIndex}][content]" id="section_${sectionIndex}_content_input">
+        <trix-editor input="section_${sectionIndex}_content_input" class="trix-content"></trix-editor>
       </div>
     </div>
   `;
@@ -330,12 +429,12 @@ document.getElementById('add-section').addEventListener('click', function() {
 
 document.getElementById('sections').addEventListener('click', function(e) {
   if (e.target.classList.contains('remove-section') || e.target.closest('.remove-section')) {
-    const section = e.target.closest('[data-index]');
+    const section = e.target.closest('.section-item');
     section.remove();
 
     // Renumber remaining sections
-    document.querySelectorAll('#sections > div').forEach((section, index) => {
-      const numberBadge = section.querySelector('.rounded-full');
+    document.querySelectorAll('#sections .section-item').forEach((section, index) => {
+      const numberBadge = section.querySelector('.section-number');
       const label = section.querySelector('.text-sm.font-medium');
       if (numberBadge) numberBadge.textContent = index + 1;
       if (label) label.textContent = `Section ${index + 1}`;

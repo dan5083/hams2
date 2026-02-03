@@ -1,4 +1,98 @@
 <!-- app/views/quality_documents/show.html.erb -->
+<style>
+  /* Style for rendered HTML content */
+  .prose {
+    line-height: 1.6;
+  }
+
+  .prose p {
+    margin: 0.5rem 0;
+  }
+
+  .prose ul, .prose ol {
+    margin: 0.75rem 0;
+    padding-left: 1.5rem;
+  }
+
+  .prose ul {
+    list-style-type: disc;
+  }
+
+  .prose ol {
+    list-style-type: decimal;
+  }
+
+  .prose li {
+    margin: 0.25rem 0;
+  }
+
+  .prose strong {
+    font-weight: 600;
+    color: #1f2937;
+  }
+
+  .prose em {
+    font-style: italic;
+  }
+
+  .prose a {
+    color: #7c3aed;
+    text-decoration: underline;
+  }
+
+  .prose a:hover {
+    color: #6d28d9;
+  }
+
+  .prose h1, .prose h2, .prose h3 {
+    font-weight: 600;
+    margin: 1rem 0 0.5rem 0;
+    color: #1f2937;
+  }
+
+  .prose h1 {
+    font-size: 1.25rem;
+  }
+
+  .prose h2 {
+    font-size: 1.125rem;
+  }
+
+  .prose h3 {
+    font-size: 1rem;
+  }
+
+  .prose blockquote {
+    border-left: 4px solid #e5e7eb;
+    padding-left: 1rem;
+    margin: 1rem 0;
+    color: #6b7280;
+    font-style: italic;
+  }
+
+  .prose code {
+    background-color: #f3f4f6;
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+    font-size: 0.875em;
+    font-family: monospace;
+  }
+
+  .prose pre {
+    background-color: #1f2937;
+    color: #f3f4f6;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+    margin: 1rem 0;
+  }
+
+  .prose pre code {
+    background: none;
+    padding: 0;
+  }
+</style>
+
 <div class="container mx-auto px-4 py-6">
   <!-- Header Section -->
   <div class="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg shadow-lg p-6 mb-6">
@@ -10,7 +104,7 @@
       <%= link_to 'View PDF', show_pdf_quality_document_path(@document),
           class: "bg-gray-600 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded", target: '_blank' %>
       <%= link_to 'Back to List', quality_documents_path,
-          class: "bg-white bg-opacity-20 hover:bg-opacity-30 text-white font-bold py-2 px-4 rounded border border-white border-opacity-30" %>
+          class: "bg-white hover:bg-gray-100 text-purple-600 font-bold py-2 px-4 rounded border border-white" %>
       <%= link_to 'Delete', quality_document_path(@document), method: :delete,
           data: { confirm: 'Are you sure?' },
           class: "bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded" %>
@@ -88,7 +182,9 @@
         <% @document.content['sections'].each do |section| %>
           <div class="border-l-4 border-purple-500 pl-4">
             <h3 class="text-lg font-semibold text-gray-900 mb-2"><%= section['heading'] %></h3>
-            <div class="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed"><%= section['content'] %></div>
+            <div class="text-sm text-gray-700 leading-relaxed prose prose-sm max-w-none">
+              <%= raw section['content'] %>
+            </div>
           </div>
         <% end %>
       </div>
