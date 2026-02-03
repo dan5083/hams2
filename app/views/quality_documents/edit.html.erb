@@ -1,5 +1,9 @@
 <!-- app/views/quality_documents/edit.html.erb -->
-<div class="quality-document-edit">
-  <h1>Edit <%= @document.full_code %></h1>
+<div class="container mx-auto px-4 py-6">
+  <div class="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg shadow-lg p-6 mb-6">
+    <h1 class="text-3xl font-bold text-white">Edit Quality Document</h1>
+    <p class="text-white text-opacity-90 mt-2"><%= @document.full_code %> - <%= @document.title %></p>
+  </div>
+
   <%= render 'form' %>
 </div>

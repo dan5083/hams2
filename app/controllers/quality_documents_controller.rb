@@ -51,8 +51,22 @@ class QualityDocumentsController < ApplicationController
     # Handle sections and references from form
     updated_content = build_content_from_params
 
-    if @document.update(document_params.except(:content).merge(content: updated_content))
-      redirect_to @document, notice: 'Quality document was successfully updated.'
+    # Check if this is a reissue (increment issue number)
+    should_reissue = params[:commit] == 'Update & Reissue'
+
+    # Prepare update parameters
+    update_params = document_params.except(:content).merge(content: updated_content)
+
+    if should_reissue
+      # Increment the issue number
+      update_params[:current_issue_number] = @document.current_issue_number + 1
+    end
+
+    if @document.update(update_params)
+      message = should_reissue ?
+        "Quality document was successfully updated and reissued as Issue #{@document.current_issue_number}." :
+        'Quality document was successfully updated.'
+      redirect_to @document, notice: message
     else
       render :edit, status: :unprocessable_entity
     end

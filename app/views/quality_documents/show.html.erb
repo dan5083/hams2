@@ -1,88 +1,147 @@
 <!-- app/views/quality_documents/show.html.erb -->
-<div class="quality-document-show">
-  <div class="document-header">
-    <h1><%= @document.full_code %> - <%= @document.title %></h1>
+<div class="container mx-auto px-4 py-6">
+  <!-- Header Section -->
+  <div class="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg shadow-lg p-6 mb-6">
+    <h1 class="text-3xl font-bold text-white mb-4"><%= @document.full_code %> - <%= @document.title %></h1>
 
-    <div class="actions">
-      <%= link_to 'Edit', edit_quality_document_path(@document), class: 'btn btn-warning' %>
-      <%= link_to 'View PDF', show_pdf_quality_document_path(@document), class: 'btn btn-secondary', target: '_blank' %>
-      <%= link_to 'Back to List', quality_documents_path, class: 'btn btn-light' %>
+    <div class="flex flex-wrap gap-2">
+      <%= link_to 'Edit', edit_quality_document_path(@document),
+          class: "bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded" %>
+      <%= link_to 'View PDF', show_pdf_quality_document_path(@document),
+          class: "bg-gray-600 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded", target: '_blank' %>
+      <%= link_to 'Back to List', quality_documents_path,
+          class: "bg-white bg-opacity-20 hover:bg-opacity-30 text-white font-bold py-2 px-4 rounded border border-white border-opacity-30" %>
       <%= link_to 'Delete', quality_document_path(@document), method: :delete,
-          data: { confirm: 'Are you sure?' }, class: 'btn btn-danger' %>
+          data: { confirm: 'Are you sure?' },
+          class: "bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded" %>
     </div>
   </div>
 
-  <div class="document-metadata">
-    <table class="table">
-      <tr>
-        <th>Document Type:</th>
-        <td><%= @document.type_description %></td>
-      </tr>
-      <tr>
-        <th>Code:</th>
-        <td><%= @document.full_code %></td>
-      </tr>
-      <tr>
-        <th>Current Issue:</th>
-        <td><%= @document.current_issue_number %></td>
-      </tr>
-      <tr>
-        <th>Approved By:</th>
-        <td><%= @document.approved_by %></td>
-      </tr>
-      <tr>
-        <th>Last Updated:</th>
-        <td><%= @document.updated_at.strftime('%d/%m/%Y %H:%M') %></td>
-      </tr>
+  <!-- Document Information Card -->
+  <div class="bg-white shadow rounded-lg p-6 mb-6">
+    <h2 class="text-xl font-semibold text-gray-900 mb-4 pb-2 border-b-2 border-gray-200">Document Information</h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div>
+        <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Document Type</dt>
+        <dd class="text-sm text-gray-900 font-medium"><%= @document.type_description %></dd>
+      </div>
+
+      <div>
+        <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Code</dt>
+        <dd class="text-sm text-gray-900 font-medium font-mono"><%= @document.full_code %></dd>
+      </div>
+
+      <div>
+        <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Current Issue</dt>
+        <dd class="text-sm text-gray-900 font-medium">Issue <%= @document.current_issue_number %></dd>
+      </div>
+
+      <div>
+        <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Approved By</dt>
+        <dd class="text-sm text-gray-900 font-medium"><%= @document.approved_by %></dd>
+      </div>
+
+      <div>
+        <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Last Updated</dt>
+        <dd class="text-sm text-gray-900 font-medium"><%= @document.updated_at.strftime('%d/%m/%Y %H:%M') %></dd>
+      </div>
+
       <% if @document.content['issue_history'].present? %>
-        <tr>
-          <th>Issue History:</th>
-          <td>
+        <div class="col-span-full">
+          <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Issue History</dt>
+          <dd class="space-y-1">
             <% @document.content['issue_history'].each do |history| %>
-              <div>Issue <%= history['issue'] %>: <%= Date.parse(history['date']).strftime('%d/%m/%Y') rescue history['date'] %></div>
+              <div class="text-sm bg-gray-50 border-l-4 border-purple-500 py-2 px-3 rounded">
+                Issue <%= history['issue'] %>: <%= Date.parse(history['date']).strftime('%d/%m/%Y') rescue history['date'] %>
+              </div>
             <% end %>
-          </td>
-        </tr>
+          </dd>
+        </div>
       <% end %>
-      <tr>
-        <th>References:</th>
-        <td>
-          <% if @document.content['references'].present? %>
-            <%= @document.content['references'].join(', ') %>
+
+      <div class="col-span-full">
+        <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">References</dt>
+        <dd>
+          <% if @document.content['references'].present? && @document.content['references'].any? %>
+            <div class="flex flex-wrap gap-2">
+              <% @document.content['references'].each do |reference| %>
+                <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                  <%= reference %>
+                </span>
+              <% end %>
+            </div>
           <% else %>
-            None
+            <span class="text-sm text-gray-500 italic">None</span>
           <% end %>
-        </td>
-      </tr>
-    </table>
+        </dd>
+      </div>
+    </div>
   </div>
 
-  <div class="revision-history">
-    <h2>Revision History</h2>
+  <!-- Document Content Section -->
+  <% if @document.content['sections'].present? && @document.content['sections'].any? %>
+    <div class="bg-white shadow rounded-lg p-6 mb-6">
+      <h2 class="text-xl font-semibold text-gray-900 mb-4 pb-2 border-b-2 border-gray-200">Document Content</h2>
+
+      <div class="space-y-6">
+        <% @document.content['sections'].each do |section| %>
+          <div class="border-l-4 border-purple-500 pl-4">
+            <h3 class="text-lg font-semibold text-gray-900 mb-2"><%= section['heading'] %></h3>
+            <div class="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed"><%= section['content'] %></div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <!-- Revision History Section -->
+  <div class="bg-white shadow rounded-lg p-6">
+    <h2 class="text-xl font-semibold text-gray-900 mb-4 pb-2 border-b-2 border-gray-200">Revision History</h2>
 
     <% if @revisions.any? %>
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Issue</th>
-            <th>Changed By</th>
-            <th>Date</th>
-            <th>Description</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% @revisions.each do |revision| %>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
             <tr>
-              <td><%= revision.issue_number %></td>
-              <td><%= revision.changed_by %></td>
-              <td><%= revision.changed_at.strftime('%d/%m/%Y %H:%M') %></td>
-              <td><%= revision.change_description %></td>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Issue
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Changed By
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Date
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Description
+              </th>
             </tr>
-          <% end %>
-        </tbody>
-      </table>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            <% @revisions.each do |revision| %>
+              <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
+                  Issue <%= revision.issue_number %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <%= revision.changed_by %>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <%= revision.changed_at.strftime('%d/%m/%Y %H:%M') %>
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-900">
+                  <%= revision.change_description %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
     <% else %>
-      <p>No revisions yet.</p>
+      <div class="text-center py-8">
+        <p class="text-gray-500 italic">No revisions yet.</p>
+      </div>
     <% end %>
   </div>
 </div>
