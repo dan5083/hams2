@@ -31,6 +31,12 @@ class SessionsController < ApplicationController
   end
 
   def magic_link
+    # Ignore HEAD requests from email scanners
+    if request.head?
+      head :ok
+      return
+    end
+
     token = params[:token]
 
     Rails.logger.info "Magic link attempt with token: #{token[0..10]}... at #{Time.current}"
