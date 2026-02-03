@@ -634,6 +634,13 @@
               <th>Specification</th>
               <td><%= @release_note.specification %></td>
             </tr>
+            <% if @release_note.works_order.part.aerospace_defense? %>
+            <tr>
+              <td colspan="2" style="background-color: #f0f8ff; text-align: center; font-weight: bold; padding: 0.5rem;">
+                NADCAP ACCREDITED - Chemical Processing Certificate Number 7426237911
+              </td>
+            </tr>
+            <% end %>
             <tr>
               <th>Quantity Accepted</th>
               <td><%= @release_note.quantity_accepted %></td>
