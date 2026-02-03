@@ -125,7 +125,7 @@
 
             <div>
               <%= label_tag "section_#{index}_content", "Section Content", class: "block text-sm font-medium text-gray-700 mb-1" %>
-              <%= hidden_field_tag "sections[#{index}][content]", section['content'], id: "section_#{index}_content_input" %>
+              <%= hidden_field_tag "sections[#{index}][content]", section['content'], id: "section_#{index}_content_input", value: section['content'] %>
               <trix-editor input="section_#{index}_content_input" class="trix-content"></trix-editor>
             </div>
           </div>
@@ -458,5 +458,25 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
   }, 100);
+});
+
+// Also try on trix-initialize event
+document.addEventListener('trix-initialize', function(event) {
+  const editor = event.target;
+  const inputId = editor.getAttribute('input');
+  const hiddenInput = document.getElementById(inputId);
+
+  console.log('Trix editor initialized:', inputId);
+  console.log('Hidden input found:', hiddenInput);
+  console.log('Hidden input value:', hiddenInput ? hiddenInput.value : 'NO VALUE');
+  console.log('Hidden input value length:', hiddenInput && hiddenInput.value ? hiddenInput.value.length : 0);
+
+  if (hiddenInput && hiddenInput.value) {
+    console.log('Loading HTML into editor...');
+    editor.editor.loadHTML(hiddenInput.value);
+    console.log('HTML loaded');
+  } else {
+    console.log('No content to load');
+  }
 });
 </script>
