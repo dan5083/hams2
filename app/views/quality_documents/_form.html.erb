@@ -125,8 +125,8 @@
 
             <div>
               <%= label_tag "section_#{index}_content", "Section Content", class: "block text-sm font-medium text-gray-700 mb-1" %>
-              <%= hidden_field_tag "sections[#{index}][content]", section['content'], id: "section_#{index}_content_input", value: section['content'] %>
-              <trix-editor input="section_#{index}_content_input" class="trix-content"></trix-editor>
+              <input type="hidden" name="sections[<%= index %>][content]" id="section_<%= index %>_content" value="<%= h(section['content']) %>">
+              <trix-editor input="section_<%= index %>_content" class="trix-content" data-section-index="<%= index %>"></trix-editor>
             </div>
           </div>
         </div>
@@ -258,6 +258,30 @@ trix-editor a {
 </style>
 
 <script>
+console.log('Form script loading...');
+
+// Load content into Trix editors when they initialize
+document.addEventListener('trix-initialize', function(event) {
+  const editor = event.target;
+  const inputId = editor.getAttribute('input');
+  const hiddenInput = document.getElementById(inputId);
+
+  console.log('Trix initialized for:', inputId);
+  console.log('Hidden input:', hiddenInput);
+  console.log('Hidden input value:', hiddenInput ? hiddenInput.value : 'NOT FOUND');
+
+  if (hiddenInput && hiddenInput.value) {
+    console.log('Setting Trix content...');
+    // Trix should automatically load from the input, but force it just in case
+    setTimeout(() => {
+      if (editor.editor && !editor.editor.getDocument().toString().trim()) {
+        editor.editor.loadHTML(hiddenInput.value);
+        console.log('Content loaded into Trix');
+      }
+    }, 50);
+  }
+});
+
 // Available documents for reference
 const availableDocuments = <%= raw QualityDocument.where.not(id: @document.id).order(:document_type, :code).map { |d| { code: d.full_code, title: d.title } }.to_json %>;
 
@@ -416,8 +440,8 @@ document.getElementById('add-section').addEventListener('click', function() {
 
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Section Content</label>
-        <input type="hidden" name="sections[${sectionIndex}][content]" id="section_${sectionIndex}_content_input">
-        <trix-editor input="section_${sectionIndex}_content_input" class="trix-content"></trix-editor>
+        <input type="hidden" name="sections[${sectionIndex}][content]" id="section_${sectionIndex}_content">
+        <trix-editor input="section_${sectionIndex}_content" class="trix-content"></trix-editor>
       </div>
     </div>
   `;
@@ -441,42 +465,6 @@ document.getElementById('sections').addEventListener('click', function(e) {
     });
   }
 });
-</script>
 
-<script>
-// Initialize Trix editors with existing content after page load
-document.addEventListener('DOMContentLoaded', function() {
-  // Wait a brief moment for Trix to fully initialize
-  setTimeout(function() {
-    document.querySelectorAll('trix-editor').forEach(function(editor) {
-      const inputId = editor.getAttribute('input');
-      const hiddenInput = document.getElementById(inputId);
-
-      if (hiddenInput && hiddenInput.value) {
-        // Set the editor content
-        editor.editor.loadHTML(hiddenInput.value);
-      }
-    });
-  }, 100);
-});
-
-// Also try on trix-initialize event
-document.addEventListener('trix-initialize', function(event) {
-  const editor = event.target;
-  const inputId = editor.getAttribute('input');
-  const hiddenInput = document.getElementById(inputId);
-
-  console.log('Trix editor initialized:', inputId);
-  console.log('Hidden input found:', hiddenInput);
-  console.log('Hidden input value:', hiddenInput ? hiddenInput.value : 'NO VALUE');
-  console.log('Hidden input value length:', hiddenInput && hiddenInput.value ? hiddenInput.value.length : 0);
-
-  if (hiddenInput && hiddenInput.value) {
-    console.log('Loading HTML into editor...');
-    editor.editor.loadHTML(hiddenInput.value);
-    console.log('HTML loaded');
-  } else {
-    console.log('No content to load');
-  }
-});
+console.log('Form script loaded successfully');
 </script>
