@@ -442,3 +442,21 @@ document.getElementById('sections').addEventListener('click', function(e) {
   }
 });
 </script>
+
+<script>
+// Initialize Trix editors with existing content after page load
+document.addEventListener('DOMContentLoaded', function() {
+  // Wait a brief moment for Trix to fully initialize
+  setTimeout(function() {
+    document.querySelectorAll('trix-editor').forEach(function(editor) {
+      const inputId = editor.getAttribute('input');
+      const hiddenInput = document.getElementById(inputId);
+
+      if (hiddenInput && hiddenInput.value) {
+        // Set the editor content
+        editor.editor.loadHTML(hiddenInput.value);
+      }
+    });
+  }, 100);
+});
+</script>
