@@ -125,8 +125,8 @@
 
             <div>
               <%= label_tag "section_#{index}_content", "Section Content", class: "block text-sm font-medium text-gray-700 mb-1" %>
-              <input type="hidden" name="sections[<%= index %>][content]" id="section_<%= index %>_content" value="<%= h(section['content']) %>">
-              <trix-editor input="section_<%= index %>_content" class="trix-content" data-section-index="<%= index %>"></trix-editor>
+              <input type="hidden" name="sections[<%= index %>][content]" id="section_<%= index %>_content_input" value="<%= h(section['content']) %>">
+              <div id="section_<%= index %>_editor" class="quill-editor"></div>
             </div>
           </div>
         </div>
@@ -154,132 +154,47 @@
   </div>
 <% end %>
 
-<style>
-/* Trix Editor Styling */
-trix-toolbar {
-  background: #f9fafb;
-  border: 1px solid #d1d5db;
-  border-radius: 6px 6px 0 0;
-  padding: 0.5rem;
-}
-
-trix-toolbar .trix-button-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-}
-
-trix-toolbar .trix-button-group {
-  display: flex;
-  gap: 0.25rem;
-  margin-right: 0.75rem;
-  border-right: 1px solid #d1d5db;
-  padding-right: 0.75rem;
-}
-
-trix-toolbar .trix-button-group:last-child {
-  border-right: none;
-  margin-right: 0;
-  padding-right: 0;
-}
-
-trix-toolbar .trix-button {
-  background: white;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  padding: 0.375rem 0.5rem;
-  font-size: 0.875rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-trix-toolbar .trix-button:hover {
-  background: #f3f4f6;
-}
-
-trix-toolbar .trix-button.trix-active {
-  background: #7c3aed;
-  color: white;
-  border-color: #7c3aed;
-}
-
-trix-toolbar .trix-button--icon {
-  width: 2rem;
-  height: 2rem;
-}
-
-trix-editor {
-  border: 1px solid #d1d5db;
-  border-top: none;
-  border-radius: 0 0 6px 6px;
-  padding: 0.75rem;
-  min-height: 200px;
-  background: white;
-  outline: none;
-}
-
-trix-editor:focus {
-  border-color: #7c3aed;
-  box-shadow: 0 0 0 1px #7c3aed;
-}
-
-trix-editor.trix-content {
-  line-height: 1.6;
-}
-
-/* Style the content inside Trix */
-trix-editor h1 {
-  font-size: 1.5rem;
-  font-weight: bold;
-  margin: 1rem 0 0.5rem 0;
-}
-
-trix-editor ul, trix-editor ol {
-  margin: 0.5rem 0;
-  padding-left: 1.5rem;
-}
-
-trix-editor li {
-  margin: 0.25rem 0;
-}
-
-trix-editor strong {
-  font-weight: 600;
-}
-
-trix-editor em {
-  font-style: italic;
-}
-
-trix-editor a {
-  color: #7c3aed;
-  text-decoration: underline;
-}
-</style>
-
 <script>
-console.log('Form script loading...');
+// Quill editor instances
+const quillInstances = new Map();
 
-// Load content into Trix editors when they initialize
-document.addEventListener('trix-initialize', function(event) {
-  const editor = event.target;
-  const inputId = editor.getAttribute('input');
-  const hiddenInput = document.getElementById(inputId);
+// Initialize existing editors
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('Initializing Quill editors...');
 
-  console.log('Trix initialized for:', inputId);
-  console.log('Hidden input:', hiddenInput);
-  console.log('Hidden input value:', hiddenInput ? hiddenInput.value : 'NOT FOUND');
+  document.querySelectorAll('.quill-editor').forEach(container => {
+    const editorId = container.id;
+    const index = editorId.match(/section_(\d+)_editor/)[1];
+    const hiddenInput = document.getElementById(`section_${index}_content_input`);
 
-  if (hiddenInput && hiddenInput.value) {
-    console.log('Setting Trix content...');
-    // Trix should automatically load from the input, but force it just in case
-    setTimeout(() => {
-      if (editor.editor && !editor.editor.getDocument().toString().trim()) {
-        editor.editor.loadHTML(hiddenInput.value);
-        console.log('Content loaded into Trix');
-      }
-    }, 50);
-  }
+    const quill = new Quill(`#${editorId}`, {
+      theme: 'snow',
+      modules: {
+        toolbar: [
+          [{ 'header': [1, 2, 3, false] }],
+          ['bold', 'italic', 'underline', 'strike'],
+          [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+          [{ 'indent': '-1'}, { 'indent': '+1' }],
+          ['link'],
+          ['clean']
+        ]
+      },
+      placeholder: 'Enter section content...'
+    });
+
+    // Load existing content
+    if (hiddenInput.value) {
+      quill.root.innerHTML = hiddenInput.value;
+    }
+
+    // Update hidden input on change
+    quill.on('text-change', function() {
+      hiddenInput.value = quill.root.innerHTML;
+    });
+
+    quillInstances.set(index, quill);
+    console.log(`Quill editor initialized for section ${index}`);
+  });
 });
 
 // Available documents for reference
@@ -440,12 +355,38 @@ document.getElementById('add-section').addEventListener('click', function() {
 
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Section Content</label>
-        <input type="hidden" name="sections[${sectionIndex}][content]" id="section_${sectionIndex}_content">
-        <trix-editor input="section_${sectionIndex}_content" class="trix-content"></trix-editor>
+        <input type="hidden" name="sections[${sectionIndex}][content]" id="section_${sectionIndex}_content_input">
+        <div id="section_${sectionIndex}_editor" class="quill-editor"></div>
       </div>
     </div>
   `;
+
   sectionsDiv.appendChild(newSection);
+
+  // Initialize Quill for new section
+  const editorId = `section_${sectionIndex}_editor`;
+  const hiddenInput = document.getElementById(`section_${sectionIndex}_content_input`);
+
+  const quill = new Quill(`#${editorId}`, {
+    theme: 'snow',
+    modules: {
+      toolbar: [
+        [{ 'header': [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+        [{ 'indent': '-1'}, { 'indent': '+1' }],
+        ['link'],
+        ['clean']
+      ]
+    },
+    placeholder: 'Enter section content...'
+  });
+
+  quill.on('text-change', function() {
+    hiddenInput.value = quill.root.innerHTML;
+  });
+
+  quillInstances.set(sectionIndex, quill);
   sectionIndex++;
 
   newSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -454,6 +395,13 @@ document.getElementById('add-section').addEventListener('click', function() {
 document.getElementById('sections').addEventListener('click', function(e) {
   if (e.target.classList.contains('remove-section') || e.target.closest('.remove-section')) {
     const section = e.target.closest('.section-item');
+    const index = section.dataset.index;
+
+    // Remove Quill instance
+    if (quillInstances.has(index)) {
+      quillInstances.delete(index);
+    }
+
     section.remove();
 
     // Renumber remaining sections

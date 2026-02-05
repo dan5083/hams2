@@ -31,10 +31,13 @@
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
     <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
 
-    <!-- Trix Editor CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/trix@2.0.8/dist/trix.css">
+    <!-- Quill Editor CSS -->
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
 
     <%= javascript_importmap_tags %>
+
+    <!-- Quill Editor JS -->
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
 
     <!-- Service Worker Registration with cache busting -->
     <script>
@@ -66,6 +69,73 @@
         });
       }
     </script>
+
+    <style>
+      /* Quill Editor Custom Styling */
+      .quill-editor {
+        background: white;
+        border: 1px solid #d1d5db;
+        border-radius: 0 0 6px 6px;
+      }
+
+      .ql-toolbar.ql-snow {
+        border: 1px solid #d1d5db;
+        border-radius: 6px 6px 0 0;
+        background: #f9fafb;
+      }
+
+      .ql-container.ql-snow {
+        border: 1px solid #d1d5db;
+        border-top: none;
+        font-size: 14px;
+        min-height: 200px;
+      }
+
+      .ql-editor {
+        min-height: 200px;
+        max-height: 500px;
+        overflow-y: auto;
+      }
+
+      .ql-editor p {
+        margin-bottom: 0.5rem;
+      }
+
+      .ql-editor ol, .ql-editor ul {
+        padding-left: 1.5rem;
+        margin-bottom: 0.5rem;
+      }
+
+      /* Purple theme for active states */
+      .ql-snow .ql-stroke {
+        stroke: #4b5563;
+      }
+
+      .ql-snow .ql-fill {
+        fill: #4b5563;
+      }
+
+      .ql-snow.ql-toolbar button:hover .ql-stroke,
+      .ql-snow .ql-toolbar button:hover .ql-stroke,
+      .ql-snow.ql-toolbar button.ql-active .ql-stroke,
+      .ql-snow .ql-toolbar button.ql-active .ql-stroke {
+        stroke: #7c3aed;
+      }
+
+      .ql-snow.ql-toolbar button:hover .ql-fill,
+      .ql-snow .ql-toolbar button:hover .ql-fill,
+      .ql-snow.ql-toolbar button.ql-active .ql-fill,
+      .ql-snow .ql-toolbar button.ql-active .ql-fill {
+        fill: #7c3aed;
+      }
+
+      .ql-snow.ql-toolbar button:hover,
+      .ql-snow .ql-toolbar button:hover,
+      .ql-snow.ql-toolbar button.ql-active,
+      .ql-snow .ql-toolbar button.ql-active {
+        background: #f3f4f6;
+      }
+    </style>
   </head>
 
   <body class="bg-gray-50 min-h-screen">
