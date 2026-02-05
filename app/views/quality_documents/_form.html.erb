@@ -98,6 +98,10 @@
   <div class="bg-white shadow rounded-lg p-6">
     <h3 class="text-lg font-medium text-gray-900 mb-4">Document Sections</h3>
 
+    <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+      <strong>Editor Tips:</strong> Select text first, then click formatting buttons. The 🔗 link button and Tx (remove formatting) button work on selected text.
+    </div>
+
     <div id="sections" class="space-y-4">
       <% sections = @document.content && @document.content['sections'] ? @document.content['sections'] : [] %>
       <% sections.each_with_index do |section, index| %>
@@ -155,35 +159,64 @@
 <% end %>
 
 <script>
-// Quill editor instances
-const quillInstances = new Map();
+// Quill editor instances stored globally
+window.quillInstances = window.quillInstances || new Map();
 
-// Initialize existing editors
-document.addEventListener('DOMContentLoaded', function() {
+// Initialize Quill editors on Turbo load (handles both navigation and refresh)
+document.addEventListener('turbo:load', function() {
   console.log('Initializing Quill editors...');
 
   document.querySelectorAll('.quill-editor').forEach(container => {
     const editorId = container.id;
-    const index = editorId.match(/section_(\d+)_editor/)[1];
+    const match = editorId.match(/section_(\d+)_editor/);
+
+    if (!match) return;
+
+    const index = match[1];
     const hiddenInput = document.getElementById(`section_${index}_content_input`);
 
+    if (!hiddenInput) return;
+
+    // Skip if already initialized (avoid double-init on hard refresh)
+    if (container.querySelector('.ql-toolbar')) {
+      console.log(`Editor ${index} already initialized, skipping`);
+      return;
+    }
+
+    // Initialize Quill with enhanced toolbar
     const quill = new Quill(`#${editorId}`, {
       theme: 'snow',
       modules: {
-        toolbar: [
-          [{ 'header': [1, 2, 3, false] }],
-          ['bold', 'italic', 'underline', 'strike'],
-          [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-          [{ 'indent': '-1'}, { 'indent': '+1' }],
-          ['link'],
-          ['clean']
-        ]
+        toolbar: {
+          container: [
+            [{ 'header': [1, 2, 3, false] }],
+            ['bold', 'italic', 'underline', 'strike'],
+            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+            [{ 'indent': '-1'}, { 'indent': '+1' }],
+            ['blockquote', 'code-block'],
+            ['link'],
+            ['clean']
+          ],
+          handlers: {
+            // Custom link handler with better UX
+            link: function(value) {
+              if (value) {
+                const href = prompt('Enter the URL:');
+                if (href) {
+                  this.quill.format('link', href);
+                }
+              } else {
+                this.quill.format('link', false);
+              }
+            }
+          }
+        }
       },
-      placeholder: 'Enter section content...'
+      placeholder: 'Enter section content... (Select text first, then use formatting buttons)'
     });
 
     // Load existing content
-    if (hiddenInput.value) {
+    if (hiddenInput.value && hiddenInput.value.trim()) {
       quill.root.innerHTML = hiddenInput.value;
     }
 
@@ -192,8 +225,8 @@ document.addEventListener('DOMContentLoaded', function() {
       hiddenInput.value = quill.root.innerHTML;
     });
 
-    quillInstances.set(index, quill);
-    console.log(`Quill editor initialized for section ${index}`);
+    window.quillInstances.set(index, quill);
+    console.log(`✓ Quill editor initialized for section ${index}`);
   });
 });
 
@@ -370,14 +403,29 @@ document.getElementById('add-section').addEventListener('click', function() {
   const quill = new Quill(`#${editorId}`, {
     theme: 'snow',
     modules: {
-      toolbar: [
-        [{ 'header': [1, 2, 3, false] }],
-        ['bold', 'italic', 'underline', 'strike'],
-        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-        [{ 'indent': '-1'}, { 'indent': '+1' }],
-        ['link'],
-        ['clean']
-      ]
+      toolbar: {
+        container: [
+          [{ 'header': [1, 2, 3, false] }],
+          ['bold', 'italic', 'underline', 'strike'],
+          [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+          [{ 'indent': '-1'}, { 'indent': '+1' }],
+          ['blockquote', 'code-block'],
+          ['link'],
+          ['clean']
+        ],
+        handlers: {
+          link: function(value) {
+            if (value) {
+              const href = prompt('Enter the URL:');
+              if (href) {
+                this.quill.format('link', href);
+              }
+            } else {
+              this.quill.format('link', false);
+            }
+          }
+        }
+      }
     },
     placeholder: 'Enter section content...'
   });
@@ -386,7 +434,7 @@ document.getElementById('add-section').addEventListener('click', function() {
     hiddenInput.value = quill.root.innerHTML;
   });
 
-  quillInstances.set(sectionIndex, quill);
+  window.quillInstances.set(sectionIndex, quill);
   sectionIndex++;
 
   newSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -398,8 +446,8 @@ document.getElementById('sections').addEventListener('click', function(e) {
     const index = section.dataset.index;
 
     // Remove Quill instance
-    if (quillInstances.has(index)) {
-      quillInstances.delete(index);
+    if (window.quillInstances.has(index)) {
+      window.quillInstances.delete(index);
     }
 
     section.remove();
