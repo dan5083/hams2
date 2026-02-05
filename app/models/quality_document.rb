@@ -2,6 +2,9 @@
 class QualityDocument < ApplicationRecord
   has_many :revisions, class_name: 'QualityDocumentRevision', dependent: :destroy
 
+  # Skip revision tracking during migration
+  attr_accessor :skip_revision_tracking
+
   DOCUMENT_TYPES = {
     'IP' => 'Integrated Procedure',
     'WI' => 'Works Instruction',
@@ -40,10 +43,14 @@ class QualityDocument < ApplicationRecord
   end
 
   def create_revision_if_content_changed
-    if content_changed? || current_issue_number_changed?
+    # Skip revision creation during migration
+    return if skip_revision_tracking
+
+    # Only create revision if issue number actually changed (reissue)
+    if current_issue_number_changed?
       revisions.create!(
         issue_number: current_issue_number_was || 1,
-        changed_by: Current.user&.name || 'System',  # Adjust based on your auth setup
+        changed_by: Current.user&.display_name || 'System',
         changed_at: Time.current,
         previous_content: content_was,
         change_description: "Updated to issue #{current_issue_number}"

@@ -60,14 +60,26 @@ class QualityDocumentsController < ApplicationController
     if should_reissue
       # Increment the issue number
       update_params[:current_issue_number] = @document.current_issue_number + 1
+      # Allow revision tracking for reissue
+      @document.skip_revision_tracking = false
+    else
+      # Skip revision tracking for regular updates during migration
+      @document.skip_revision_tracking = true
+      # Preserve existing timestamps
+      QualityDocument.record_timestamps = false
     end
 
     if @document.update(update_params)
+      # Re-enable timestamps
+      QualityDocument.record_timestamps = true
+
       message = should_reissue ?
         "Quality document was successfully updated and reissued as Issue #{@document.current_issue_number}." :
         'Quality document was successfully updated.'
       redirect_to @document, notice: message
     else
+      # Re-enable timestamps even on failure
+      QualityDocument.record_timestamps = true
       render :edit, status: :unprocessable_entity
     end
   end
@@ -106,10 +118,15 @@ class QualityDocumentsController < ApplicationController
     # Build sections from form params
     if params[:sections].present?
       params[:sections].each do |index, section_data|
-        content['sections'] << {
+        section = {
           'heading' => section_data[:heading],
           'content' => section_data[:content]
         }
+        # Add flowchart if present
+        if section_data[:flowchart].present?
+          section['flowchart'] = section_data[:flowchart]
+        end
+        content['sections'] << section
       end
     end
 
