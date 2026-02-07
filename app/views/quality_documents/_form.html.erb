@@ -79,7 +79,7 @@
         <button type="button" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xl hidden" id="clear-search">&times;</button>
       </div>
 
-      <div id="reference-dropdown" class="absolute z-50 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto hidden"></div>
+      <div id="reference-window.referenceDropdown" class="absolute z-50 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto hidden"></div>
 
       <div class="mt-3 flex flex-wrap gap-2 min-h-[2rem]" id="selected-references">
         <% if @document.content && @document.content['references'].present? %>
@@ -132,7 +132,7 @@
 
             <div>
               <%= label_tag "section_#{index}_content", "Section Content", class: "block text-sm font-medium text-gray-700 mb-1" %>
-              <input type="hidden" name="sections[<%= index %>][content]" id="section_<%= index %>_content_input" value="<%= h(section['content']) %>">
+              <input type="hidden" name="sections[<%= index %>][content]" id="section_<%= index %>_content_input" value="<%= section['content'].to_s.gsub('"', '&quot;') %>">
               <div id="section_<%= index %>_editor" class="quill-editor"></div>
             </div>
           </div>
@@ -242,7 +242,8 @@ document.addEventListener('turbo:load', function() {
 
     // Load existing content
     if (hiddenInput.value && hiddenInput.value.trim()) {
-      quill.root.innerHTML = hiddenInput.value;
+      // Use clipboard API to properly parse HTML (including tables)
+      quill.clipboard.dangerouslyPasteHTML(hiddenInput.value);
     }
 
     // Update hidden input on change
@@ -255,27 +256,31 @@ document.addEventListener('turbo:load', function() {
   });
 });
 
-// Available documents for reference
-const availableDocuments = <%= raw QualityDocument.where.not(id: @document.id).order(:document_type, :code).map { |d| { code: d.full_code, title: d.title } }.to_json %>;
+// Reference selection functionality - run on page load
+document.addEventListener('turbo:load', function() {
+  // Available documents for reference
+  window.availableDocuments = <%= raw QualityDocument.where.not(id: @document.id).order(:document_type, :code).map { |d: { code: d.full_code, title: d.title } }.to_json %>;
 
-// Reference selection functionality
-const searchInput = document.getElementById('reference-search');
-const clearSearchBtn = document.getElementById('clear-search');
-const dropdown = document.getElementById('reference-dropdown');
-const selectedContainer = document.getElementById('selected-references');
+  // Reference selection functionality
+  const searchInput = document.getElementById('reference-search');
+  const clearSearchBtn = document.getElementById('clear-search');
+  window.referenceDropdown = document.getElementById('reference-window.referenceDropdown');
+  window.window.selectedContainer = document.getElementById('selected-references');
 
-let selectedReferences = new Set();
+  if (!searchInput) return; // Exit if elements don't exist on this page
 
-// Initialize with existing references
+  window.window.selectedReferences = new Set();
+
+  // Initialize with existing references
 document.querySelectorAll('#selected-references [data-code]').forEach(tag => {
-  selectedReferences.add(tag.dataset.code);
+  window.window.selectedReferences.add(tag.dataset.code);
 });
 
 function filterDocuments(searchTerm) {
-  if (!searchTerm) return availableDocuments;
+  if (!searchTerm) return window.availableDocuments;
 
   const term = searchTerm.toLowerCase();
-  return availableDocuments.filter(doc =>
+  return window.availableDocuments.filter(doc =>
     doc.code.toLowerCase().includes(term) ||
     doc.title.toLowerCase().includes(term)
   );
@@ -283,10 +288,10 @@ function filterDocuments(searchTerm) {
 
 function renderDropdown(documents) {
   if (documents.length === 0) {
-    dropdown.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500 text-center italic">No documents found</div>';
+    window.referenceDropdown.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500 text-center italic">No documents found</div>';
   } else {
-    dropdown.innerHTML = documents.map(doc => `
-      <div class="px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm border-b border-gray-100 last:border-0 ${selectedReferences.has(doc.code) ? 'bg-purple-50 text-purple-800' : ''}"
+    window.referenceDropdown.innerHTML = documents.map(doc => `
+      <div class="px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm border-b border-gray-100 last:border-0 ${window.selectedReferences.has(doc.code) ? 'bg-purple-50 text-purple-800' : ''}"
            data-code="${doc.code}"
            data-title="${doc.title}">
         <strong>${doc.code}</strong> - ${doc.title}
@@ -302,33 +307,33 @@ searchInput.addEventListener('input', function() {
     clearSearchBtn.classList.remove('hidden');
     const filtered = filterDocuments(searchTerm);
     renderDropdown(filtered);
-    dropdown.classList.remove('hidden');
+    window.referenceDropdown.classList.remove('hidden');
   } else {
     clearSearchBtn.classList.add('hidden');
-    dropdown.classList.add('hidden');
+    window.referenceDropdown.classList.add('hidden');
   }
 });
 
 searchInput.addEventListener('focus', function() {
   if (this.value.trim()) {
-    dropdown.classList.remove('hidden');
+    window.referenceDropdown.classList.remove('hidden');
   }
 });
 
 clearSearchBtn.addEventListener('click', function() {
   searchInput.value = '';
   this.classList.add('hidden');
-  dropdown.classList.add('hidden');
+  window.referenceDropdown.classList.add('hidden');
   searchInput.focus();
 });
 
-dropdown.addEventListener('click', function(e) {
+window.referenceDropdown.addEventListener('click', function(e) {
   const option = e.target.closest('[data-code]');
   if (!option) return;
 
   const code = option.dataset.code;
 
-  if (selectedReferences.has(code)) {
+  if (window.selectedReferences.has(code)) {
     removeReferenceByCode(code);
   } else {
     addReference(code);
@@ -339,9 +344,9 @@ dropdown.addEventListener('click', function(e) {
 });
 
 function addReference(code) {
-  if (selectedReferences.has(code)) return;
+  if (window.selectedReferences.has(code)) return;
 
-  selectedReferences.add(code);
+  window.selectedReferences.add(code);
 
   const tag = document.createElement('span');
   tag.className = 'inline-flex items-center gap-2 bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium';
@@ -352,37 +357,42 @@ function addReference(code) {
     <input type="hidden" name="document[references][]" value="${code}">
   `;
 
-  selectedContainer.appendChild(tag);
+  window.selectedContainer.appendChild(tag);
 }
 
 window.removeReference = function(button) {
   const tag = button.closest('[data-code]');
   const code = tag.dataset.code;
-  selectedReferences.delete(code);
+  window.selectedReferences.delete(code);
   tag.remove();
 
-  const option = dropdown.querySelector(`[data-code="${code}"]`);
+  const option = window.referenceDropdown.querySelector(`[data-code="${code}"]`);
   if (option) {
     option.classList.remove('bg-purple-50', 'text-purple-800');
   }
 }
 
 function removeReferenceByCode(code) {
-  selectedReferences.delete(code);
-  const tag = selectedContainer.querySelector(`[data-code="${code}"]`);
+  window.selectedReferences.delete(code);
+  const tag = window.selectedContainer.querySelector(`[data-code="${code}"]`);
   if (tag) tag.remove();
 }
 
-document.addEventListener('click', function(e) {
-  if (!e.target.closest('#reference-search') && !e.target.closest('#reference-dropdown')) {
-    dropdown.classList.add('hidden');
-  }
-});
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('#reference-search') && !e.target.closest('#reference-window.referenceDropdown')) {
+      if (window.referenceDropdown) window.referenceDropdown.classList.add('hidden');
+    }
+  });
+}); // End turbo:load for reference search
 
-// Section management
-let sectionIndex = <%= (@document.content && @document.content['sections'] ? @document.content['sections'].length : 0) %>;
+// Section management - run on page load
+document.addEventListener('turbo:load', function() {
+  const addSectionBtn = document.getElementById('add-section');
+  if (!addSectionBtn) return; // Exit if not on edit/new page
 
-document.getElementById('add-section').addEventListener('click', function() {
+  let sectionIndex = <%= (@document.content && @document.content['sections'] ? @document.content['sections'].length : 0) %>;
+
+  addSectionBtn.addEventListener('click', function() {
   const sectionsDiv = document.getElementById('sections');
   const newSection = document.createElement('div');
   newSection.className = 'bg-gray-50 border border-gray-200 rounded-lg p-4 section-item';
@@ -503,6 +513,8 @@ document.getElementById('sections').addEventListener('click', function(e) {
     });
   }
 });
+
+}); // End turbo:load for section management
 
 console.log('Form script loaded successfully');
 </script>
