@@ -1,4 +1,7 @@
 <!-- app/views/quality_documents/_form.html.erb -->
+<link href="https://unpkg.com/quill-better-table@1.2.10/dist/quill-better-table.css" rel="stylesheet">
+<script src="https://unpkg.com/quill-better-table@1.2.10/dist/quill-better-table.js"></script>
+
 <%= form_with model: @document, local: true, class: "space-y-6" do |f| %>
   <% if @document.errors.any? %>
     <div class="bg-red-50 border border-red-200 rounded-md p-4">
@@ -166,6 +169,11 @@ window.quillInstances = window.quillInstances || new Map();
 document.addEventListener('turbo:load', function() {
   console.log('Initializing Quill editors...');
 
+  // Register Quill Better Table module
+  Quill.register({
+    'modules/better-table': QuillBetterTable
+  }, true);
+
   document.querySelectorAll('.quill-editor').forEach(container => {
     const editorId = container.id;
     const match = editorId.match(/section_(\d+)_editor/);
@@ -183,10 +191,26 @@ document.addEventListener('turbo:load', function() {
       return;
     }
 
-    // Initialize Quill with enhanced toolbar
+    // Initialize Quill with enhanced toolbar including Better Table
     const quill = new Quill(`#${editorId}`, {
       theme: 'snow',
       modules: {
+        table: false,  // Disable default table module
+        'better-table': {
+          operationMenu: {
+            items: {
+              unmergeCells: { text: 'Unmerge cells' },
+              insertColumnRight: { text: 'Insert column right' },
+              insertColumnLeft: { text: 'Insert column left' },
+              insertRowUp: { text: 'Insert row above' },
+              insertRowDown: { text: 'Insert row below' },
+              mergeCells: { text: 'Merge selected cells' },
+              deleteColumn: { text: 'Delete column' },
+              deleteRow: { text: 'Delete row' },
+              deleteTable: { text: 'Delete table' }
+            }
+          }
+        },
         toolbar: {
           container: [
             [{ 'header': [1, 2, 3, false] }],
@@ -194,6 +218,7 @@ document.addEventListener('turbo:load', function() {
             [{ 'list': 'ordered'}, { 'list': 'bullet' }],
             [{ 'indent': '-1'}, { 'indent': '+1' }],
             ['blockquote', 'code-block'],
+            ['better-table'],  // Better Table button
             ['link'],
             ['clean']
           ],
@@ -403,6 +428,22 @@ document.getElementById('add-section').addEventListener('click', function() {
   const quill = new Quill(`#${editorId}`, {
     theme: 'snow',
     modules: {
+      table: false,  // Disable default table module
+      'better-table': {
+        operationMenu: {
+          items: {
+            unmergeCells: { text: 'Unmerge cells' },
+            insertColumnRight: { text: 'Insert column right' },
+            insertColumnLeft: { text: 'Insert column left' },
+            insertRowUp: { text: 'Insert row above' },
+            insertRowDown: { text: 'Insert row below' },
+            mergeCells: { text: 'Merge selected cells' },
+            deleteColumn: { text: 'Delete column' },
+            deleteRow: { text: 'Delete row' },
+            deleteTable: { text: 'Delete table' }
+          }
+        }
+      },
       toolbar: {
         container: [
           [{ 'header': [1, 2, 3, false] }],
@@ -410,6 +451,7 @@ document.getElementById('add-section').addEventListener('click', function() {
           [{ 'list': 'ordered'}, { 'list': 'bullet' }],
           [{ 'indent': '-1'}, { 'indent': '+1' }],
           ['blockquote', 'code-block'],
+          ['better-table'],  // Better Table button
           ['link'],
           ['clean']
         ],
