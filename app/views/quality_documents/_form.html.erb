@@ -79,7 +79,7 @@
         <button type="button" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xl hidden" id="clear-search">&times;</button>
       </div>
 
-      <div id="reference-window.referenceDropdown" class="absolute z-50 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto hidden"></div>
+      <div id="reference-dropdown" class="absolute z-50 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto hidden"></div>
 
       <div class="mt-3 flex flex-wrap gap-2 min-h-[2rem]" id="selected-references">
         <% if @document.content && @document.content['references'].present? %>
@@ -132,7 +132,7 @@
 
             <div>
               <%= label_tag "section_#{index}_content", "Section Content", class: "block text-sm font-medium text-gray-700 mb-1" %>
-              <input type="hidden" name="sections[<%= index %>][content]" id="section_<%= index %>_content_input" value="<%= section['content'].to_s.gsub('"', '&quot;') %>">
+              <input type="hidden" name="sections[<%= index %>][content]" id="section_<%= index %>_content_input" value="<%= h(section['content']) %>">
               <div id="section_<%= index %>_editor" class="quill-editor"></div>
             </div>
           </div>
@@ -170,9 +170,11 @@ document.addEventListener('turbo:load', function() {
   console.log('Initializing Quill editors...');
 
   // Register Quill Better Table module
-  Quill.register({
-    'modules/better-table': QuillBetterTable
-  }, true);
+  if (typeof QuillBetterTable !== 'undefined') {
+    Quill.register({
+      'modules/better-table': QuillBetterTable
+    }, true);
+  }
 
   document.querySelectorAll('.quill-editor').forEach(container => {
     const editorId = container.id;
@@ -191,11 +193,11 @@ document.addEventListener('turbo:load', function() {
       return;
     }
 
-    // Initialize Quill with enhanced toolbar including Better Table
+    // Initialize Quill with enhanced toolbar
     const quill = new Quill(`#${editorId}`, {
       theme: 'snow',
       modules: {
-        table: false,  // Disable default table module
+        table: false,  // Disable default table
         'better-table': {
           operationMenu: {
             items: {
@@ -204,7 +206,7 @@ document.addEventListener('turbo:load', function() {
               insertColumnLeft: { text: 'Insert column left' },
               insertRowUp: { text: 'Insert row above' },
               insertRowDown: { text: 'Insert row below' },
-              mergeCells: { text: 'Merge selected cells' },
+              mergeCells: { text: 'Merge cells' },
               deleteColumn: { text: 'Delete column' },
               deleteRow: { text: 'Delete row' },
               deleteTable: { text: 'Delete table' }
@@ -218,7 +220,7 @@ document.addEventListener('turbo:load', function() {
             [{ 'list': 'ordered'}, { 'list': 'bullet' }],
             [{ 'indent': '-1'}, { 'indent': '+1' }],
             ['blockquote', 'code-block'],
-            ['better-table'],  // Better Table button
+            ['better-table'],
             ['link'],
             ['clean']
           ],
@@ -242,8 +244,7 @@ document.addEventListener('turbo:load', function() {
 
     // Load existing content
     if (hiddenInput.value && hiddenInput.value.trim()) {
-      // Use clipboard API to properly parse HTML (including tables)
-      quill.clipboard.dangerouslyPasteHTML(hiddenInput.value);
+      quill.root.innerHTML = hiddenInput.value;
     }
 
     // Update hidden input on change
@@ -256,31 +257,27 @@ document.addEventListener('turbo:load', function() {
   });
 });
 
-// Reference selection functionality - run on page load
-document.addEventListener('turbo:load', function() {
-  // Available documents for reference
-  window.availableDocuments = <%= raw QualityDocument.where.not(id: @document.id).order(:document_type, :code).map { |d: { code: d.full_code, title: d.title } }.to_json %>;
+// Available documents for reference
+const availableDocuments = <%= raw QualityDocument.where.not(id: @document.id).order(:document_type, :code).map { |d| { code: d.full_code, title: d.title } }.to_json %>;
 
-  // Reference selection functionality
-  const searchInput = document.getElementById('reference-search');
-  const clearSearchBtn = document.getElementById('clear-search');
-  window.referenceDropdown = document.getElementById('reference-window.referenceDropdown');
-  window.window.selectedContainer = document.getElementById('selected-references');
+// Reference selection functionality
+const searchInput = document.getElementById('reference-search');
+const clearSearchBtn = document.getElementById('clear-search');
+const dropdown = document.getElementById('reference-dropdown');
+const selectedContainer = document.getElementById('selected-references');
 
-  if (!searchInput) return; // Exit if elements don't exist on this page
+let selectedReferences = new Set();
 
-  window.window.selectedReferences = new Set();
-
-  // Initialize with existing references
+// Initialize with existing references
 document.querySelectorAll('#selected-references [data-code]').forEach(tag => {
-  window.window.selectedReferences.add(tag.dataset.code);
+  selectedReferences.add(tag.dataset.code);
 });
 
 function filterDocuments(searchTerm) {
-  if (!searchTerm) return window.availableDocuments;
+  if (!searchTerm) return availableDocuments;
 
   const term = searchTerm.toLowerCase();
-  return window.availableDocuments.filter(doc =>
+  return availableDocuments.filter(doc =>
     doc.code.toLowerCase().includes(term) ||
     doc.title.toLowerCase().includes(term)
   );
@@ -288,10 +285,10 @@ function filterDocuments(searchTerm) {
 
 function renderDropdown(documents) {
   if (documents.length === 0) {
-    window.referenceDropdown.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500 text-center italic">No documents found</div>';
+    dropdown.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500 text-center italic">No documents found</div>';
   } else {
-    window.referenceDropdown.innerHTML = documents.map(doc => `
-      <div class="px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm border-b border-gray-100 last:border-0 ${window.selectedReferences.has(doc.code) ? 'bg-purple-50 text-purple-800' : ''}"
+    dropdown.innerHTML = documents.map(doc => `
+      <div class="px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm border-b border-gray-100 last:border-0 ${selectedReferences.has(doc.code) ? 'bg-purple-50 text-purple-800' : ''}"
            data-code="${doc.code}"
            data-title="${doc.title}">
         <strong>${doc.code}</strong> - ${doc.title}
@@ -307,33 +304,33 @@ searchInput.addEventListener('input', function() {
     clearSearchBtn.classList.remove('hidden');
     const filtered = filterDocuments(searchTerm);
     renderDropdown(filtered);
-    window.referenceDropdown.classList.remove('hidden');
+    dropdown.classList.remove('hidden');
   } else {
     clearSearchBtn.classList.add('hidden');
-    window.referenceDropdown.classList.add('hidden');
+    dropdown.classList.add('hidden');
   }
 });
 
 searchInput.addEventListener('focus', function() {
   if (this.value.trim()) {
-    window.referenceDropdown.classList.remove('hidden');
+    dropdown.classList.remove('hidden');
   }
 });
 
 clearSearchBtn.addEventListener('click', function() {
   searchInput.value = '';
   this.classList.add('hidden');
-  window.referenceDropdown.classList.add('hidden');
+  dropdown.classList.add('hidden');
   searchInput.focus();
 });
 
-window.referenceDropdown.addEventListener('click', function(e) {
+dropdown.addEventListener('click', function(e) {
   const option = e.target.closest('[data-code]');
   if (!option) return;
 
   const code = option.dataset.code;
 
-  if (window.selectedReferences.has(code)) {
+  if (selectedReferences.has(code)) {
     removeReferenceByCode(code);
   } else {
     addReference(code);
@@ -344,9 +341,9 @@ window.referenceDropdown.addEventListener('click', function(e) {
 });
 
 function addReference(code) {
-  if (window.selectedReferences.has(code)) return;
+  if (selectedReferences.has(code)) return;
 
-  window.selectedReferences.add(code);
+  selectedReferences.add(code);
 
   const tag = document.createElement('span');
   tag.className = 'inline-flex items-center gap-2 bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium';
@@ -357,42 +354,37 @@ function addReference(code) {
     <input type="hidden" name="document[references][]" value="${code}">
   `;
 
-  window.selectedContainer.appendChild(tag);
+  selectedContainer.appendChild(tag);
 }
 
 window.removeReference = function(button) {
   const tag = button.closest('[data-code]');
   const code = tag.dataset.code;
-  window.selectedReferences.delete(code);
+  selectedReferences.delete(code);
   tag.remove();
 
-  const option = window.referenceDropdown.querySelector(`[data-code="${code}"]`);
+  const option = dropdown.querySelector(`[data-code="${code}"]`);
   if (option) {
     option.classList.remove('bg-purple-50', 'text-purple-800');
   }
 }
 
 function removeReferenceByCode(code) {
-  window.selectedReferences.delete(code);
-  const tag = window.selectedContainer.querySelector(`[data-code="${code}"]`);
+  selectedReferences.delete(code);
+  const tag = selectedContainer.querySelector(`[data-code="${code}"]`);
   if (tag) tag.remove();
 }
 
-  document.addEventListener('click', function(e) {
-    if (!e.target.closest('#reference-search') && !e.target.closest('#reference-window.referenceDropdown')) {
-      if (window.referenceDropdown) window.referenceDropdown.classList.add('hidden');
-    }
-  });
-}); // End turbo:load for reference search
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('#reference-search') && !e.target.closest('#reference-dropdown')) {
+    dropdown.classList.add('hidden');
+  }
+});
 
-// Section management - run on page load
-document.addEventListener('turbo:load', function() {
-  const addSectionBtn = document.getElementById('add-section');
-  if (!addSectionBtn) return; // Exit if not on edit/new page
+// Section management
+let sectionIndex = <%= (@document.content && @document.content['sections'] ? @document.content['sections'].length : 0) %>;
 
-  let sectionIndex = <%= (@document.content && @document.content['sections'] ? @document.content['sections'].length : 0) %>;
-
-  addSectionBtn.addEventListener('click', function() {
+document.getElementById('add-section').addEventListener('click', function() {
   const sectionsDiv = document.getElementById('sections');
   const newSection = document.createElement('div');
   newSection.className = 'bg-gray-50 border border-gray-200 rounded-lg p-4 section-item';
@@ -438,7 +430,7 @@ document.addEventListener('turbo:load', function() {
   const quill = new Quill(`#${editorId}`, {
     theme: 'snow',
     modules: {
-      table: false,  // Disable default table module
+      table: false,  // Disable default table
       'better-table': {
         operationMenu: {
           items: {
@@ -447,7 +439,7 @@ document.addEventListener('turbo:load', function() {
             insertColumnLeft: { text: 'Insert column left' },
             insertRowUp: { text: 'Insert row above' },
             insertRowDown: { text: 'Insert row below' },
-            mergeCells: { text: 'Merge selected cells' },
+            mergeCells: { text: 'Merge cells' },
             deleteColumn: { text: 'Delete column' },
             deleteRow: { text: 'Delete row' },
             deleteTable: { text: 'Delete table' }
@@ -461,7 +453,7 @@ document.addEventListener('turbo:load', function() {
           [{ 'list': 'ordered'}, { 'list': 'bullet' }],
           [{ 'indent': '-1'}, { 'indent': '+1' }],
           ['blockquote', 'code-block'],
-          ['better-table'],  // Better Table button
+          ['better-table'],
           ['link'],
           ['clean']
         ],
@@ -513,8 +505,6 @@ document.getElementById('sections').addEventListener('click', function(e) {
     });
   }
 });
-
-}); // End turbo:load for section management
 
 console.log('Form script loaded successfully');
 </script>
