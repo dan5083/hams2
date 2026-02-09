@@ -129,8 +129,9 @@
 
             <div>
               <%= label_tag "section_#{index}_content", "Section Content", class: "block text-sm font-medium text-gray-700 mb-1" %>
-              <input type="hidden" name="sections[<%= index %>][content]" id="section_<%= index %>_content_input" value="<%= section['content'].to_s.gsub('"', '&quot;') %>">
-              <div id="section_<%= index %>_editor"></div>
+              <textarea name="sections[<%= index %>][content]"
+                        id="section_<%= index %>_content"
+                        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm"><%= section['content'].to_s %></textarea>
             </div>
           </div>
         </div>
@@ -159,116 +160,93 @@
 <% end %>
 
 <script>
-// CKEditor instances stored globally
+// TinyMCE editor instances tracking
 window.editorInstances = window.editorInstances || new Map();
 
-// CKEditor configuration
-const editorConfig = {
-  toolbar: {
-    items: [
-      'heading',
-      '|',
-      'bold', 'italic', 'underline', 'strikethrough',
-      '|',
-      'link',
-      '|',
-      'bulletedList', 'numberedList',
-      '|',
-      'insertTable',
-      '|',
-      'blockQuote',
-      '|',
-      'undo', 'redo'
-    ]
-  },
-  table: {
-    contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells']
-  },
-  heading: {
-    options: [
-      { model: 'paragraph', title: 'Paragraph', class: 'ck-heading_paragraph' },
-      { model: 'heading1', view: 'h1', title: 'Heading 1', class: 'ck-heading_heading1' },
-      { model: 'heading2', view: 'h2', title: 'Heading 2', class: 'ck-heading_heading2' },
-      { model: 'heading3', view: 'h3', title: 'Heading 3', class: 'ck-heading_heading3' }
-    ]
-  },
-  htmlSupport: {
-    allow: [
-      {
-        name: /.*/,
-        attributes: true,
-        classes: true,
-        styles: true
-      }
-    ]
+// TinyMCE configuration - preserves all HTML
+const tinymceConfig = {
+  height: 400,
+  menubar: false,
+  plugins: [
+    'advlist', 'autolink', 'lists', 'link', 'table',
+    'wordcount', 'code'
+  ],
+  toolbar: 'undo redo | formatselect | bold italic underline strikethrough | ' +
+           'bullist numlist | link | table | removeformat | code',
+  content_style: 'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 14px; }',
+
+  // Critical settings for HTML preservation
+  valid_elements: '*[*]',
+  extended_valid_elements: '*[*]',
+  valid_children: '+body[style]',
+
+  // Preserve everything
+  verify_html: false,
+  cleanup: false,
+  convert_urls: false,
+
+  // Table settings - preserve all attributes
+  table_use_colgroups: false,
+  table_advtab: true,
+  table_cell_advtab: true,
+  table_row_advtab: true,
+
+  // Paste settings - keep all formatting
+  paste_retain_style_properties: 'all',
+  paste_merge_formats: false,
+  paste_remove_styles_if_webkit: false,
+  paste_remove_spans: false,
+  paste_as_text: false,
+
+  // Don't strip any attributes or styles
+  invalid_elements: '',
+  invalid_styles: {},
+
+  // Setup callback
+  setup: function(editor) {
+    editor.on('init', function() {
+      console.log('✓ TinyMCE initialized for:', editor.id);
+    });
   }
 };
 
-// Function to initialize CKEditor
-function initializeCKEditor(editorId, hiddenInputId) {
-  const container = document.getElementById(editorId);
-  const hiddenInput = document.getElementById(hiddenInputId);
+// Function to initialize TinyMCE for a specific textarea
+function initializeTinyMCE(textareaId) {
+  const textarea = document.getElementById(textareaId);
 
-  if (!container || !hiddenInput) {
-    console.error('Missing elements for editor:', editorId);
-    return null;
+  if (!textarea) {
+    console.error('Missing textarea:', textareaId);
+    return;
   }
 
   // Check if already initialized
-  if (container.querySelector('.ck-editor__editable')) {
-    console.log(`Editor ${editorId} already initialized`);
-    return null;
+  if (tinymce.get(textareaId)) {
+    console.log(`Editor ${textareaId} already initialized`);
+    return;
   }
 
-  ClassicEditor
-    .create(container, editorConfig)
-    .then(editor => {
-      // Set initial content from hidden input
-      if (hiddenInput.value && hiddenInput.value.trim()) {
-        editor.setData(hiddenInput.value);
-      }
-
-      // Update hidden input when content changes
-      editor.model.document.on('change:data', () => {
-        hiddenInput.value = editor.getData();
-      });
-
-      console.log(`✓ CKEditor initialized for ${editorId}`);
-      return editor;
-    })
-    .catch(error => {
-      console.error(`Error initializing ${editorId}:`, error);
-      return null;
-    });
+  tinymce.init({
+    ...tinymceConfig,
+    selector: `#${textareaId}`,
+    target: textarea
+  });
 }
 
 // Initialize all editors on page load
 function initializeAllEditors() {
-  console.log('Initializing CKEditor instances...');
+  console.log('Initializing TinyMCE instances...');
 
-  document.querySelectorAll('[id$="_editor"]').forEach(container => {
-    const editorId = container.id;
-    const match = editorId.match(/section_(\d+)_editor/);
-
-    if (!match) return;
-
-    const index = match[1];
-    const hiddenInputId = `section_${index}_content_input`;
-
-    const editor = initializeCKEditor(editorId, hiddenInputId);
-    if (editor) {
-      window.editorInstances.set(index, editor);
-    }
+  document.querySelectorAll('textarea[id$="_content"]').forEach(textarea => {
+    initializeTinyMCE(textarea.id);
   });
 }
 
 // Initialize on Turbo load
 document.addEventListener('turbo:load', function() {
-  // Wait for CKEditor to be available
-  if (typeof ClassicEditor !== 'undefined') {
+  if (typeof tinymce !== 'undefined') {
     setTimeout(initializeAllEditors, 100);
   } else {
-    console.error('CKEditor not loaded');
+    console.error('TinyMCE not loaded');
   }
 });
 
@@ -430,19 +408,18 @@ document.getElementById('add-section').addEventListener('click', function() {
 
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Section Content</label>
-        <input type="hidden" name="sections[${sectionIndex}][content]" id="section_${sectionIndex}_content_input">
-        <div id="section_${sectionIndex}_editor"></div>
+        <textarea name="sections[${sectionIndex}][content]"
+                  id="section_${sectionIndex}_content"
+                  class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm"></textarea>
       </div>
     </div>
   `;
 
   sectionsDiv.appendChild(newSection);
 
-  // Initialize CKEditor for new section
-  const editorId = `section_${sectionIndex}_editor`;
-  const hiddenInputId = `section_${sectionIndex}_content_input`;
-
-  initializeCKEditor(editorId, hiddenInputId);
+  // Initialize TinyMCE for new section
+  const textareaId = `section_${sectionIndex}_content`;
+  initializeTinyMCE(textareaId);
 
   sectionIndex++;
   newSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -453,13 +430,11 @@ document.getElementById('sections').addEventListener('click', function(e) {
     const section = e.target.closest('.section-item');
     const index = section.dataset.index;
 
-    // Destroy CKEditor instance if exists
-    if (window.editorInstances.has(index)) {
-      const editor = window.editorInstances.get(index);
-      if (editor && editor.destroy) {
-        editor.destroy().catch(error => console.error('Error destroying editor:', error));
-      }
-      window.editorInstances.delete(index);
+    // Remove TinyMCE instance if exists
+    const textareaId = `section_${index}_content`;
+    const editor = tinymce.get(textareaId);
+    if (editor) {
+      editor.remove();
     }
 
     section.remove();
