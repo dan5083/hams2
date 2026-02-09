@@ -1,7 +1,5 @@
 <!-- app/views/quality_documents/_form.html.erb -->
-<link href="https://unpkg.com/quill-better-table@1.2.10/dist/quill-better-table.css" rel="stylesheet">
-<script src="https://unpkg.com/quill-better-table@1.2.10/dist/quill-better-table.js"></script>
-
+<!-- NOTE: Quill and Better Table scripts should be loaded in application layout -->
 <%= form_with model: @document, local: true, class: "space-y-6" do |f| %>
   <% if @document.errors.any? %>
     <div class="bg-red-50 border border-red-200 rounded-md p-4">
@@ -132,7 +130,7 @@
 
             <div>
               <%= label_tag "section_#{index}_content", "Section Content", class: "block text-sm font-medium text-gray-700 mb-1" %>
-              <input type="hidden" name="sections[<%= index %>][content]" id="section_<%= index %>_content_input" value="<%= h(section['content']) %>">
+              <input type="hidden" name="sections[<%= index %>][content]" id="section_<%= index %>_content_input" value="<%= section['content'].to_s.gsub('"', '&quot;') %>">
               <div id="section_<%= index %>_editor" class="quill-editor"></div>
             </div>
           </div>
@@ -244,7 +242,7 @@ document.addEventListener('turbo:load', function() {
 
     // Load existing content
     if (hiddenInput.value && hiddenInput.value.trim()) {
-      quill.root.innerHTML = hiddenInput.value;
+      quill.clipboard.dangerouslyPasteHTML(hiddenInput.value);
     }
 
     // Update hidden input on change
