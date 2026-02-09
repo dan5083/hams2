@@ -1,5 +1,6 @@
 <!-- app/views/quality_documents/_form.html.erb -->
-<!-- NOTE: Quill and Better Table scripts should be loaded in application layout -->
+<link href="https://unpkg.com/quill-better-table@1.2.10/dist/quill-better-table.css" rel="stylesheet">
+
 <%= form_with model: @document, local: true, class: "space-y-6" do |f| %>
   <% if @document.errors.any? %>
     <div class="bg-red-50 border border-red-200 rounded-md p-4">
@@ -160,20 +161,125 @@
 <% end %>
 
 <script>
+// Load Better Table script dynamically
+(function() {
+  if (typeof QuillBetterTable !== 'undefined') {
+    console.log('Better Table already loaded');
+    return;
+  }
+
+  const script = document.createElement('script');
+  script.src = 'https://unpkg.com/quill-better-table@1.2.10/dist/quill-better-table.js';
+  script.onload = function() {
+    console.log('Better Table script loaded successfully');
+    // Trigger a custom event when loaded
+    document.dispatchEvent(new Event('betterTableLoaded'));
+  };
+  script.onerror = function() {
+    console.error('Failed to load Better Table script');
+  };
+  document.head.appendChild(script);
+})();
+
 // Quill editor instances stored globally
 window.quillInstances = window.quillInstances || new Map();
 
-// Initialize Quill editors on Turbo load (handles both navigation and refresh)
-document.addEventListener('turbo:load', function() {
-  console.log('Initializing Quill editors...');
+// Function to initialize Quill with Better Table
+function initializeQuillEditor(editorId, hiddenInputId) {
+  const container = document.getElementById(editorId);
+  const hiddenInput = document.getElementById(hiddenInputId);
 
-  // Register Quill Better Table module
-  if (typeof QuillBetterTable !== 'undefined') {
-    Quill.register({
-      'modules/better-table': QuillBetterTable
-    }, true);
+  if (!container || !hiddenInput) return null;
+
+  // Skip if already initialized
+  if (container.querySelector('.ql-toolbar')) {
+    console.log(`Editor ${editorId} already initialized`);
+    return null;
   }
 
+  const quillConfig = {
+    theme: 'snow',
+    modules: {
+      toolbar: {
+        container: [
+          [{ 'header': [1, 2, 3, false] }],
+          ['bold', 'italic', 'underline', 'strike'],
+          [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+          [{ 'indent': '-1'}, { 'indent': '+1' }],
+          ['blockquote', 'code-block'],
+          ['link'],
+          ['clean']
+        ],
+        handlers: {
+          link: function(value) {
+            if (value) {
+              const href = prompt('Enter the URL:');
+              if (href) {
+                this.quill.format('link', href);
+              }
+            } else {
+              this.quill.format('link', false);
+            }
+          }
+        }
+      }
+    },
+    placeholder: 'Enter section content... (Select text first, then use formatting buttons)'
+  };
+
+  // Add Better Table if available
+  if (typeof QuillBetterTable !== 'undefined') {
+    quillConfig.modules.table = false;
+    quillConfig.modules['better-table'] = {
+      operationMenu: {
+        items: {
+          unmergeCells: { text: 'Unmerge cells' },
+          insertColumnRight: { text: 'Insert column right' },
+          insertColumnLeft: { text: 'Insert column left' },
+          insertRowUp: { text: 'Insert row above' },
+          insertRowDown: { text: 'Insert row below' },
+          mergeCells: { text: 'Merge cells' },
+          deleteColumn: { text: 'Delete column' },
+          deleteRow: { text: 'Delete row' },
+          deleteTable: { text: 'Delete table' }
+        }
+      }
+    };
+    quillConfig.modules.toolbar.container.splice(5, 0, ['better-table']);
+  }
+
+  const quill = new Quill(`#${editorId}`, quillConfig);
+
+  // Load existing content
+  if (hiddenInput.value && hiddenInput.value.trim()) {
+    quill.clipboard.dangerouslyPasteHTML(hiddenInput.value);
+  }
+
+  // Update hidden input on change
+  quill.on('text-change', function() {
+    hiddenInput.value = quill.root.innerHTML;
+  });
+
+  return quill;
+}
+
+// Wait for Better Table to load before initializing editors
+function initializeAllEditors() {
+  console.log('Initializing Quill editors...');
+
+  // Register Better Table if available
+  if (typeof QuillBetterTable !== 'undefined' && typeof Quill !== 'undefined') {
+    try {
+      Quill.register({
+        'modules/better-table': QuillBetterTable
+      }, true);
+      console.log('✓ Better Table registered successfully');
+    } catch (e) {
+      console.error('Failed to register Better Table:', e);
+    }
+  }
+
+  // Initialize existing editors
   document.querySelectorAll('.quill-editor').forEach(container => {
     const editorId = container.id;
     const match = editorId.match(/section_(\d+)_editor/);
@@ -181,78 +287,36 @@ document.addEventListener('turbo:load', function() {
     if (!match) return;
 
     const index = match[1];
-    const hiddenInput = document.getElementById(`section_${index}_content_input`);
+    const hiddenInputId = `section_${index}_content_input`;
 
-    if (!hiddenInput) return;
-
-    // Skip if already initialized (avoid double-init on hard refresh)
-    if (container.querySelector('.ql-toolbar')) {
-      console.log(`Editor ${index} already initialized, skipping`);
-      return;
+    const quill = initializeQuillEditor(editorId, hiddenInputId);
+    if (quill) {
+      window.quillInstances.set(index, quill);
+      console.log(`✓ Quill editor initialized for section ${index}`);
     }
-
-    // Initialize Quill with enhanced toolbar
-    const quill = new Quill(`#${editorId}`, {
-      theme: 'snow',
-      modules: {
-        table: false,  // Disable default table
-        'better-table': {
-          operationMenu: {
-            items: {
-              unmergeCells: { text: 'Unmerge cells' },
-              insertColumnRight: { text: 'Insert column right' },
-              insertColumnLeft: { text: 'Insert column left' },
-              insertRowUp: { text: 'Insert row above' },
-              insertRowDown: { text: 'Insert row below' },
-              mergeCells: { text: 'Merge cells' },
-              deleteColumn: { text: 'Delete column' },
-              deleteRow: { text: 'Delete row' },
-              deleteTable: { text: 'Delete table' }
-            }
-          }
-        },
-        toolbar: {
-          container: [
-            [{ 'header': [1, 2, 3, false] }],
-            ['bold', 'italic', 'underline', 'strike'],
-            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-            [{ 'indent': '-1'}, { 'indent': '+1' }],
-            ['blockquote', 'code-block'],
-            ['better-table'],
-            ['link'],
-            ['clean']
-          ],
-          handlers: {
-            // Custom link handler with better UX
-            link: function(value) {
-              if (value) {
-                const href = prompt('Enter the URL:');
-                if (href) {
-                  this.quill.format('link', href);
-                }
-              } else {
-                this.quill.format('link', false);
-              }
-            }
-          }
-        }
-      },
-      placeholder: 'Enter section content... (Select text first, then use formatting buttons)'
-    });
-
-    // Load existing content
-    if (hiddenInput.value && hiddenInput.value.trim()) {
-      quill.clipboard.dangerouslyPasteHTML(hiddenInput.value);
-    }
-
-    // Update hidden input on change
-    quill.on('text-change', function() {
-      hiddenInput.value = quill.root.innerHTML;
-    });
-
-    window.quillInstances.set(index, quill);
-    console.log(`✓ Quill editor initialized for section ${index}`);
   });
+}
+
+// Initialize Quill editors on Turbo load (handles both navigation and refresh)
+// Initialize Quill editors on Turbo load
+document.addEventListener('turbo:load', function() {
+  // Wait for Better Table to load (or timeout after 2 seconds)
+  let attempts = 0;
+  const maxAttempts = 40; // 40 * 50ms = 2 seconds
+
+  const waitForBetterTable = setInterval(function() {
+    attempts++;
+
+    if (typeof QuillBetterTable !== 'undefined' || attempts >= maxAttempts) {
+      clearInterval(waitForBetterTable);
+
+      if (typeof QuillBetterTable === 'undefined') {
+        console.warn('Better Table did not load, initializing without it');
+      }
+
+      initializeAllEditors();
+    }
+  }, 50);
 });
 
 // Available documents for reference
@@ -421,64 +485,17 @@ document.getElementById('add-section').addEventListener('click', function() {
 
   sectionsDiv.appendChild(newSection);
 
-  // Initialize Quill for new section
+  // Initialize Quill for new section using shared function
   const editorId = `section_${sectionIndex}_editor`;
-  const hiddenInput = document.getElementById(`section_${sectionIndex}_content_input`);
+  const hiddenInputId = `section_${sectionIndex}_content_input`;
 
-  const quill = new Quill(`#${editorId}`, {
-    theme: 'snow',
-    modules: {
-      table: false,  // Disable default table
-      'better-table': {
-        operationMenu: {
-          items: {
-            unmergeCells: { text: 'Unmerge cells' },
-            insertColumnRight: { text: 'Insert column right' },
-            insertColumnLeft: { text: 'Insert column left' },
-            insertRowUp: { text: 'Insert row above' },
-            insertRowDown: { text: 'Insert row below' },
-            mergeCells: { text: 'Merge cells' },
-            deleteColumn: { text: 'Delete column' },
-            deleteRow: { text: 'Delete row' },
-            deleteTable: { text: 'Delete table' }
-          }
-        }
-      },
-      toolbar: {
-        container: [
-          [{ 'header': [1, 2, 3, false] }],
-          ['bold', 'italic', 'underline', 'strike'],
-          [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-          [{ 'indent': '-1'}, { 'indent': '+1' }],
-          ['blockquote', 'code-block'],
-          ['better-table'],
-          ['link'],
-          ['clean']
-        ],
-        handlers: {
-          link: function(value) {
-            if (value) {
-              const href = prompt('Enter the URL:');
-              if (href) {
-                this.quill.format('link', href);
-              }
-            } else {
-              this.quill.format('link', false);
-            }
-          }
-        }
-      }
-    },
-    placeholder: 'Enter section content...'
-  });
+  const quill = initializeQuillEditor(editorId, hiddenInputId);
+  if (quill) {
+    window.quillInstances.set(sectionIndex, quill);
+    console.log(`✓ Quill editor initialized for new section ${sectionIndex}`);
+  }
 
-  quill.on('text-change', function() {
-    hiddenInput.value = quill.root.innerHTML;
-  });
-
-  window.quillInstances.set(sectionIndex, quill);
   sectionIndex++;
-
   newSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
 });
 
