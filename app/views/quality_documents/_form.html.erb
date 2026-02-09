@@ -241,213 +241,238 @@ function initializeAllEditors() {
   });
 }
 
-// Initialize on Turbo load
-document.addEventListener('turbo:load', function() {
+// Main initialization function
+function initializePage() {
+  // Available documents for reference
+  const availableDocuments = <%= raw QualityDocument.where.not(id: @document.id).order(:document_type, :code).map { |d| { code: d.full_code, title: d.title } }.to_json %>;
+
+  // Reference selection functionality
+  const searchInput = document.getElementById('reference-search');
+  const clearSearchBtn = document.getElementById('clear-search');
+  const dropdown = document.getElementById('reference-dropdown');
+  const selectedContainer = document.getElementById('selected-references');
+
+  if (!searchInput || !dropdown || !selectedContainer) {
+    console.error('Reference elements not found');
+    return;
+  }
+
+  let selectedReferences = new Set();
+
+  // Initialize with existing references
+  document.querySelectorAll('#selected-references [data-code]').forEach(tag => {
+    selectedReferences.add(tag.dataset.code);
+  });
+
+  function filterDocuments(searchTerm) {
+    if (!searchTerm) return availableDocuments;
+
+    const term = searchTerm.toLowerCase();
+    return availableDocuments.filter(doc =>
+      doc.code.toLowerCase().includes(term) ||
+      doc.title.toLowerCase().includes(term)
+    );
+  }
+
+  function renderDropdown(documents) {
+    if (documents.length === 0) {
+      dropdown.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500 text-center italic">No documents found</div>';
+    } else {
+      dropdown.innerHTML = documents.map(doc => `
+        <div class="px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm border-b border-gray-100 last:border-0 ${selectedReferences.has(doc.code) ? 'bg-purple-50 text-purple-800' : ''}"
+             data-code="${doc.code}"
+             data-title="${doc.title}">
+          <strong>${doc.code}</strong> - ${doc.title}
+        </div>
+      `).join('');
+    }
+  }
+
+  searchInput.addEventListener('input', function() {
+    const searchTerm = this.value.trim();
+
+    if (searchTerm) {
+      clearSearchBtn.classList.remove('hidden');
+      const filtered = filterDocuments(searchTerm);
+      renderDropdown(filtered);
+      dropdown.classList.remove('hidden');
+    } else {
+      clearSearchBtn.classList.add('hidden');
+      dropdown.classList.add('hidden');
+    }
+  });
+
+  searchInput.addEventListener('focus', function() {
+    if (this.value.trim()) {
+      dropdown.classList.remove('hidden');
+    }
+  });
+
+  clearSearchBtn.addEventListener('click', function() {
+    searchInput.value = '';
+    this.classList.add('hidden');
+    dropdown.classList.add('hidden');
+    searchInput.focus();
+  });
+
+  dropdown.addEventListener('click', function(e) {
+    const option = e.target.closest('[data-code]');
+    if (!option) return;
+
+    const code = option.dataset.code;
+
+    if (selectedReferences.has(code)) {
+      removeReferenceByCode(code);
+    } else {
+      addReference(code);
+    }
+
+    option.classList.toggle('bg-purple-50');
+    option.classList.toggle('text-purple-800');
+  });
+
+  function addReference(code) {
+    if (selectedReferences.has(code)) return;
+
+    selectedReferences.add(code);
+
+    const tag = document.createElement('span');
+    tag.className = 'inline-flex items-center gap-2 bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium';
+    tag.dataset.code = code;
+    tag.innerHTML = `
+      ${code}
+      <button type="button" onclick="removeReference(this)" class="hover:text-purple-900 text-lg leading-none">&times;</button>
+      <input type="hidden" name="document[references][]" value="${code}">
+    `;
+
+    selectedContainer.appendChild(tag);
+  }
+
+  window.removeReference = function(button) {
+    const tag = button.closest('[data-code]');
+    const code = tag.dataset.code;
+    selectedReferences.delete(code);
+    tag.remove();
+
+    const option = dropdown.querySelector(`[data-code="${code}"]`);
+    if (option) {
+      option.classList.remove('bg-purple-50', 'text-purple-800');
+    }
+  }
+
+  function removeReferenceByCode(code) {
+    selectedReferences.delete(code);
+    const tag = selectedContainer.querySelector(`[data-code="${code}"]`);
+    if (tag) tag.remove();
+  }
+
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('#reference-search') && !e.target.closest('#reference-dropdown')) {
+      dropdown.classList.add('hidden');
+    }
+  });
+
+  // Section management
+  window.sectionIndex = <%= (@document.content && @document.content['sections'] ? @document.content['sections'].length : 0) %>;
+
+  const addSectionBtn = document.getElementById('add-section');
+  const sectionsContainer = document.getElementById('sections');
+
+  if (addSectionBtn && sectionsContainer) {
+    // Remove any existing listeners by cloning the button
+    const newAddSectionBtn = addSectionBtn.cloneNode(true);
+    addSectionBtn.parentNode.replaceChild(newAddSectionBtn, addSectionBtn);
+
+    newAddSectionBtn.addEventListener('click', function() {
+      const sectionsDiv = document.getElementById('sections');
+      const newSection = document.createElement('div');
+      newSection.className = 'bg-gray-50 border border-gray-200 rounded-lg p-4 section-item';
+      newSection.dataset.index = window.sectionIndex;
+
+      const sectionNumber = document.querySelectorAll('#sections .section-item').length + 1;
+
+      newSection.innerHTML = `
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-3">
+            <span class="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 text-white text-sm font-semibold section-number">
+              ${sectionNumber}
+            </span>
+            <span class="text-sm font-medium text-gray-700">Section ${sectionNumber}</span>
+          </div>
+          <button type="button" class="remove-section bg-red-500 hover:bg-red-700 text-white text-sm font-bold py-1 px-3 rounded">
+            Remove
+          </button>
+        </div>
+
+        <div class="space-y-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Section Heading</label>
+            <input type="text" name="sections[${window.sectionIndex}][heading]"
+                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                   required placeholder="e.g., Purpose, Scope, Procedure">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Section Content</label>
+            <textarea name="sections[${window.sectionIndex}][content]"
+                      id="section_${window.sectionIndex}_content"
+                      class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm"></textarea>
+          </div>
+        </div>
+      `;
+
+      sectionsDiv.appendChild(newSection);
+
+      // Initialize TinyMCE for new section
+      const textareaId = `section_${window.sectionIndex}_content`;
+      initializeTinyMCE(textareaId);
+
+      window.sectionIndex++;
+      newSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+
+    // Use event delegation for remove buttons
+    sectionsContainer.addEventListener('click', function(e) {
+      if (e.target.classList.contains('remove-section') || e.target.closest('.remove-section')) {
+        const section = e.target.closest('.section-item');
+        const index = section.dataset.index;
+
+        // Remove TinyMCE instance if exists
+        const textareaId = `section_${index}_content`;
+        const editor = tinymce.get(textareaId);
+        if (editor) {
+          editor.remove();
+        }
+
+        section.remove();
+
+        // Renumber remaining sections
+        document.querySelectorAll('#sections .section-item').forEach((section, index) => {
+          const numberBadge = section.querySelector('.section-number');
+          const label = section.querySelector('.text-sm.font-medium');
+          if (numberBadge) numberBadge.textContent = index + 1;
+          if (label) label.textContent = `Section ${index + 1}`;
+        });
+      }
+    });
+  }
+
+  // Initialize TinyMCE
   if (typeof tinymce !== 'undefined') {
     setTimeout(initializeAllEditors, 100);
   } else {
     console.error('TinyMCE not loaded');
   }
-});
 
-// Available documents for reference
-const availableDocuments = <%= raw QualityDocument.where.not(id: @document.id).order(:document_type, :code).map { |d| { code: d.full_code, title: d.title } }.to_json %>;
-
-// Reference selection functionality
-const searchInput = document.getElementById('reference-search');
-const clearSearchBtn = document.getElementById('clear-search');
-const dropdown = document.getElementById('reference-dropdown');
-const selectedContainer = document.getElementById('selected-references');
-
-let selectedReferences = new Set();
-
-// Initialize with existing references
-document.querySelectorAll('#selected-references [data-code]').forEach(tag => {
-  selectedReferences.add(tag.dataset.code);
-});
-
-function filterDocuments(searchTerm) {
-  if (!searchTerm) return availableDocuments;
-
-  const term = searchTerm.toLowerCase();
-  return availableDocuments.filter(doc =>
-    doc.code.toLowerCase().includes(term) ||
-    doc.title.toLowerCase().includes(term)
-  );
+  console.log('Form script loaded successfully');
 }
 
-function renderDropdown(documents) {
-  if (documents.length === 0) {
-    dropdown.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500 text-center italic">No documents found</div>';
-  } else {
-    dropdown.innerHTML = documents.map(doc => `
-      <div class="px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm border-b border-gray-100 last:border-0 ${selectedReferences.has(doc.code) ? 'bg-purple-50 text-purple-800' : ''}"
-           data-code="${doc.code}"
-           data-title="${doc.title}">
-        <strong>${doc.code}</strong> - ${doc.title}
-      </div>
-    `).join('');
-  }
+// Initialize on both DOMContentLoaded and Turbo load
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializePage);
+} else {
+  initializePage();
 }
 
-searchInput.addEventListener('input', function() {
-  const searchTerm = this.value.trim();
-
-  if (searchTerm) {
-    clearSearchBtn.classList.remove('hidden');
-    const filtered = filterDocuments(searchTerm);
-    renderDropdown(filtered);
-    dropdown.classList.remove('hidden');
-  } else {
-    clearSearchBtn.classList.add('hidden');
-    dropdown.classList.add('hidden');
-  }
-});
-
-searchInput.addEventListener('focus', function() {
-  if (this.value.trim()) {
-    dropdown.classList.remove('hidden');
-  }
-});
-
-clearSearchBtn.addEventListener('click', function() {
-  searchInput.value = '';
-  this.classList.add('hidden');
-  dropdown.classList.add('hidden');
-  searchInput.focus();
-});
-
-dropdown.addEventListener('click', function(e) {
-  const option = e.target.closest('[data-code]');
-  if (!option) return;
-
-  const code = option.dataset.code;
-
-  if (selectedReferences.has(code)) {
-    removeReferenceByCode(code);
-  } else {
-    addReference(code);
-  }
-
-  option.classList.toggle('bg-purple-50');
-  option.classList.toggle('text-purple-800');
-});
-
-function addReference(code) {
-  if (selectedReferences.has(code)) return;
-
-  selectedReferences.add(code);
-
-  const tag = document.createElement('span');
-  tag.className = 'inline-flex items-center gap-2 bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium';
-  tag.dataset.code = code;
-  tag.innerHTML = `
-    ${code}
-    <button type="button" onclick="removeReference(this)" class="hover:text-purple-900 text-lg leading-none">&times;</button>
-    <input type="hidden" name="document[references][]" value="${code}">
-  `;
-
-  selectedContainer.appendChild(tag);
-}
-
-window.removeReference = function(button) {
-  const tag = button.closest('[data-code]');
-  const code = tag.dataset.code;
-  selectedReferences.delete(code);
-  tag.remove();
-
-  const option = dropdown.querySelector(`[data-code="${code}"]`);
-  if (option) {
-    option.classList.remove('bg-purple-50', 'text-purple-800');
-  }
-}
-
-function removeReferenceByCode(code) {
-  selectedReferences.delete(code);
-  const tag = selectedContainer.querySelector(`[data-code="${code}"]`);
-  if (tag) tag.remove();
-}
-
-document.addEventListener('click', function(e) {
-  if (!e.target.closest('#reference-search') && !e.target.closest('#reference-dropdown')) {
-    dropdown.classList.add('hidden');
-  }
-});
-
-// Section management
-let sectionIndex = <%= (@document.content && @document.content['sections'] ? @document.content['sections'].length : 0) %>;
-
-document.getElementById('add-section').addEventListener('click', function() {
-  const sectionsDiv = document.getElementById('sections');
-  const newSection = document.createElement('div');
-  newSection.className = 'bg-gray-50 border border-gray-200 rounded-lg p-4 section-item';
-  newSection.dataset.index = sectionIndex;
-
-  const sectionNumber = document.querySelectorAll('#sections .section-item').length + 1;
-
-  newSection.innerHTML = `
-    <div class="flex items-center justify-between mb-3">
-      <div class="flex items-center gap-3">
-        <span class="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 text-white text-sm font-semibold section-number">
-          ${sectionNumber}
-        </span>
-        <span class="text-sm font-medium text-gray-700">Section ${sectionNumber}</span>
-      </div>
-      <button type="button" class="remove-section bg-red-500 hover:bg-red-700 text-white text-sm font-bold py-1 px-3 rounded">
-        Remove
-      </button>
-    </div>
-
-    <div class="space-y-3">
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Section Heading</label>
-        <input type="text" name="sections[${sectionIndex}][heading]"
-               class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-               required placeholder="e.g., Purpose, Scope, Procedure">
-      </div>
-
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">Section Content</label>
-        <textarea name="sections[${sectionIndex}][content]"
-                  id="section_${sectionIndex}_content"
-                  class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm"></textarea>
-      </div>
-    </div>
-  `;
-
-  sectionsDiv.appendChild(newSection);
-
-  // Initialize TinyMCE for new section
-  const textareaId = `section_${sectionIndex}_content`;
-  initializeTinyMCE(textareaId);
-
-  sectionIndex++;
-  newSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-});
-
-document.getElementById('sections').addEventListener('click', function(e) {
-  if (e.target.classList.contains('remove-section') || e.target.closest('.remove-section')) {
-    const section = e.target.closest('.section-item');
-    const index = section.dataset.index;
-
-    // Remove TinyMCE instance if exists
-    const textareaId = `section_${index}_content`;
-    const editor = tinymce.get(textareaId);
-    if (editor) {
-      editor.remove();
-    }
-
-    section.remove();
-
-    // Renumber remaining sections
-    document.querySelectorAll('#sections .section-item').forEach((section, index) => {
-      const numberBadge = section.querySelector('.section-number');
-      const label = section.querySelector('.text-sm.font-medium');
-      if (numberBadge) numberBadge.textContent = index + 1;
-      if (label) label.textContent = `Section ${index + 1}`;
-    });
-  }
-});
-
-console.log('Form script loaded successfully');
+document.addEventListener('turbo:load', initializePage);
 </script>
