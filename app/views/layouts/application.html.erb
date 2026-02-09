@@ -31,13 +31,20 @@
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
     <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
 
-    <!-- Quill Editor CSS -->
-    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <!-- TipTap Editor CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tiptap/pm@2.1.13/style.min.css">
 
     <%= javascript_importmap_tags %>
 
-    <!-- Quill Editor JS -->
-    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+    <!-- TipTap Editor JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tiptap/pm@2.1.13/dist/index.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tiptap/core@2.1.13/dist/index.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tiptap/starter-kit@2.1.13/dist/index.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tiptap/extension-table@2.1.13/dist/index.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tiptap/extension-table-row@2.1.13/dist/index.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tiptap/extension-table-header@2.1.13/dist/index.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tiptap/extension-table-cell@2.1.13/dist/index.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tiptap/extension-link@2.1.13/dist/index.umd.min.js"></script>
 
     <!-- Service Worker Registration with cache busting -->
     <script>
@@ -71,69 +78,188 @@
     </script>
 
     <style>
-      /* Quill Editor Custom Styling */
-      .quill-editor {
+      /* TipTap Editor Custom Styling */
+      .tiptap-editor {
         background: white;
         border: 1px solid #d1d5db;
-        border-radius: 0 0 6px 6px;
+        border-radius: 6px;
       }
 
-      .ql-toolbar.ql-snow {
+      .tiptap-toolbar {
         border: 1px solid #d1d5db;
+        border-bottom: none;
         border-radius: 6px 6px 0 0;
         background: #f9fafb;
+        padding: 8px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
       }
 
-      .ql-container.ql-snow {
+      .tiptap-toolbar button {
+        padding: 6px 10px;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        background: white;
+        cursor: pointer;
+        font-size: 14px;
+        color: #4b5563;
+        transition: all 0.2s;
+      }
+
+      .tiptap-toolbar button:hover {
+        background: #f3f4f6;
+        color: #7c3aed;
+        border-color: #7c3aed;
+      }
+
+      .tiptap-toolbar button.is-active {
+        background: #7c3aed;
+        color: white;
+        border-color: #7c3aed;
+      }
+
+      .tiptap-toolbar .divider {
+        width: 1px;
+        background: #d1d5db;
+        margin: 0 4px;
+      }
+
+      .tiptap-content {
         border: 1px solid #d1d5db;
         border-top: none;
-        font-size: 14px;
-        min-height: 200px;
-      }
-
-      .ql-editor {
+        border-radius: 0 0 6px 6px;
+        padding: 12px;
         min-height: 200px;
         max-height: 500px;
         overflow-y: auto;
       }
 
-      .ql-editor p {
+      /* TipTap content styling */
+      .ProseMirror {
+        outline: none;
+        min-height: 200px;
+      }
+
+      .ProseMirror p {
         margin-bottom: 0.5rem;
       }
 
-      .ql-editor ol, .ql-editor ul {
+      .ProseMirror h1,
+      .ProseMirror h2,
+      .ProseMirror h3 {
+        font-weight: 600;
+        margin: 1rem 0 0.5rem 0;
+      }
+
+      .ProseMirror h1 { font-size: 1.5rem; }
+      .ProseMirror h2 { font-size: 1.25rem; }
+      .ProseMirror h3 { font-size: 1.125rem; }
+
+      .ProseMirror ul,
+      .ProseMirror ol {
         padding-left: 1.5rem;
         margin-bottom: 0.5rem;
       }
 
-      /* Purple theme for active states */
-      .ql-snow .ql-stroke {
-        stroke: #4b5563;
+      .ProseMirror ul {
+        list-style-type: disc;
       }
 
-      .ql-snow .ql-fill {
-        fill: #4b5563;
+      .ProseMirror ol {
+        list-style-type: decimal;
       }
 
-      .ql-snow.ql-toolbar button:hover .ql-stroke,
-      .ql-snow .ql-toolbar button:hover .ql-stroke,
-      .ql-snow.ql-toolbar button.ql-active .ql-stroke,
-      .ql-snow .ql-toolbar button.ql-active .ql-stroke {
-        stroke: #7c3aed;
+      .ProseMirror blockquote {
+        border-left: 4px solid #e5e7eb;
+        padding-left: 1rem;
+        margin: 1rem 0;
+        color: #6b7280;
+        font-style: italic;
       }
 
-      .ql-snow.ql-toolbar button:hover .ql-fill,
-      .ql-snow .ql-toolbar button:hover .ql-fill,
-      .ql-snow.ql-toolbar button.ql-active .ql-fill,
-      .ql-snow .ql-toolbar button.ql-active .ql-fill {
-        fill: #7c3aed;
+      .ProseMirror code {
+        background-color: #f3f4f6;
+        padding: 0.125rem 0.25rem;
+        border-radius: 0.25rem;
+        font-size: 0.875em;
+        font-family: monospace;
       }
 
-      .ql-snow.ql-toolbar button:hover,
-      .ql-snow .ql-toolbar button:hover,
-      .ql-snow.ql-toolbar button.ql-active,
-      .ql-snow .ql-toolbar button.ql-active {
-        background: #f3f4f6;
+      .ProseMirror pre {
+        background-color: #1f2937;
+        color: #f3f4f6;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        overflow-x: auto;
+        margin: 1rem 0;
+      }
+
+      .ProseMirror pre code {
+        background: none;
+        padding: 0;
+        color: inherit;
+      }
+
+      .ProseMirror a {
+        color: #7c3aed;
+        text-decoration: underline;
+      }
+
+      .ProseMirror a:hover {
+        color: #6d28d9;
+      }
+
+      /* Table styles */
+      .ProseMirror table {
+        border-collapse: collapse;
+        table-layout: fixed;
+        width: 100%;
+        margin: 1rem 0;
+        overflow: hidden;
+      }
+
+      .ProseMirror td,
+      .ProseMirror th {
+        min-width: 1em;
+        border: 2px solid #d1d5db;
+        padding: 8px;
+        vertical-align: top;
+        box-sizing: border-box;
+        position: relative;
+      }
+
+      .ProseMirror th {
+        font-weight: bold;
+        text-align: left;
+        background-color: #f9fafb;
+      }
+
+      .ProseMirror .selectedCell:after {
+        z-index: 2;
+        position: absolute;
+        content: "";
+        left: 0;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        background: rgba(124, 58, 237, 0.1);
+        pointer-events: none;
+      }
+
+      .ProseMirror .column-resize-handle {
+        position: absolute;
+        right: -2px;
+        top: 0;
+        bottom: -2px;
+        width: 4px;
+        background-color: #7c3aed;
+        pointer-events: none;
+      }
+
+      .ProseMirror.resize-cursor {
+        cursor: ew-resize;
+        cursor: col-resize;
       }
     </style>
   </head>

@@ -1,17 +1,4 @@
 <!-- app/views/quality_documents/_form.html.erb -->
-<link href="https://unpkg.com/quill-better-table@1.2.10/dist/quill-better-table.css" rel="stylesheet">
-
-<script>
-// Load Better Table script immediately
-if (typeof window.betterTableLoaded === 'undefined') {
-  window.betterTableLoaded = false;
-  const script = document.createElement('script');
-  script.src = 'https://unpkg.com/quill-better-table@1.2.10/dist/quill-better-table.js';
-  script.onload = () => { window.betterTableLoaded = true; };
-  document.head.appendChild(script);
-}
-</script>
-
 <%= form_with model: @document, local: true, class: "space-y-6" do |f| %>
   <% if @document.errors.any? %>
     <div class="bg-red-50 border border-red-200 rounded-md p-4">
@@ -111,6 +98,10 @@ if (typeof window.betterTableLoaded === 'undefined') {
   <div class="bg-white shadow rounded-lg p-6">
     <h3 class="text-lg font-medium text-gray-900 mb-4">Document Sections</h3>
 
+    <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+      <strong>Editor Tips:</strong> Use the toolbar buttons to format text. Click the 📋 button to insert tables. Right-click table cells for more options.
+    </div>
+
     <div id="sections" class="space-y-4">
       <% sections = @document.content && @document.content['sections'] ? @document.content['sections'] : [] %>
       <% sections.each_with_index do |section, index| %>
@@ -138,8 +129,11 @@ if (typeof window.betterTableLoaded === 'undefined') {
 
             <div>
               <%= label_tag "section_#{index}_content", "Section Content", class: "block text-sm font-medium text-gray-700 mb-1" %>
-              <input type="hidden" name="sections[<%= index %>][content]" id="section_<%= index %>_content_input" value="<%= section['content'].to_s.gsub('"', '&quot;').gsub("'", '&#39;') %>">
-              <div id="section_<%= index %>_editor" class="quill-editor"></div>
+              <input type="hidden" name="sections[<%= index %>][content]" id="section_<%= index %>_content_input" value="<%= section['content'].to_s.gsub('"', '&quot;') %>">
+              <div class="tiptap-editor">
+                <div class="tiptap-toolbar" id="section_<%= index %>_toolbar"></div>
+                <div class="tiptap-content" id="section_<%= index %>_editor"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -168,244 +162,349 @@ if (typeof window.betterTableLoaded === 'undefined') {
 <% end %>
 
 <script>
-(function() {
-  'use strict';
+// TipTap editor instances stored globally
+window.tiptapInstances = window.tiptapInstances || new Map();
 
-  // Prevent multiple initializations
-  if (window.qualityDocFormInitialized) return;
-  window.qualityDocFormInitialized = true;
+// Function to create toolbar
+function createToolbar(toolbar, editor) {
+  toolbar.innerHTML = '';
 
-  window.quillInstances = window.quillInstances || new Map();
-
-  // Wait for Better Table and initialize
-  function initForm() {
-    let attempts = 0;
-    const checkInterval = setInterval(() => {
-      attempts++;
-      if (typeof QuillBetterTable !== 'undefined' || attempts > 40) {
-        clearInterval(checkInterval);
-
-        if (typeof QuillBetterTable !== 'undefined') {
-          try {
-            Quill.register({ 'modules/better-table': QuillBetterTable }, true);
-            console.log('✓ Better Table registered');
-          } catch(e) { console.error('Better Table registration failed:', e); }
-        }
-
-        initializeEditors();
-        initializeReferences();
-        initializeSections();
+  const buttons = [
+    { icon: 'B', title: 'Bold', command: () => editor.chain().focus().toggleBold().run(), isActive: () => editor.isActive('bold') },
+    { icon: 'I', title: 'Italic', command: () => editor.chain().focus().toggleItalic().run(), isActive: () => editor.isActive('italic') },
+    { icon: 'U', title: 'Underline', command: () => editor.chain().focus().toggleUnderline().run(), isActive: () => editor.isActive('underline') },
+    { icon: 'S', title: 'Strike', command: () => editor.chain().focus().toggleStrike().run(), isActive: () => editor.isActive('strike') },
+    { divider: true },
+    { icon: 'H1', title: 'Heading 1', command: () => editor.chain().focus().toggleHeading({ level: 1 }).run(), isActive: () => editor.isActive('heading', { level: 1 }) },
+    { icon: 'H2', title: 'Heading 2', command: () => editor.chain().focus().toggleHeading({ level: 2 }).run(), isActive: () => editor.isActive('heading', { level: 2 }) },
+    { icon: 'H3', title: 'Heading 3', command: () => editor.chain().focus().toggleHeading({ level: 3 }).run(), isActive: () => editor.isActive('heading', { level: 3 }) },
+    { divider: true },
+    { icon: '•', title: 'Bullet List', command: () => editor.chain().focus().toggleBulletList().run(), isActive: () => editor.isActive('bulletList') },
+    { icon: '1.', title: 'Numbered List', command: () => editor.chain().focus().toggleOrderedList().run(), isActive: () => editor.isActive('orderedList') },
+    { divider: true },
+    { icon: '📋', title: 'Insert Table', command: () => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() },
+    { icon: '🔗', title: 'Link', command: () => {
+      const url = window.prompt('Enter URL:');
+      if (url) {
+        editor.chain().focus().setLink({ href: url }).run();
       }
-    }, 50);
+    }, isActive: () => editor.isActive('link') },
+    { divider: true },
+    { icon: '↶', title: 'Undo', command: () => editor.chain().focus().undo().run() },
+    { icon: '↷', title: 'Redo', command: () => editor.chain().focus().redo().run() },
+    { icon: '✕', title: 'Clear Formatting', command: () => editor.chain().focus().clearNodes().unsetAllMarks().run() }
+  ];
+
+  buttons.forEach(btn => {
+    if (btn.divider) {
+      const divider = document.createElement('div');
+      divider.className = 'divider';
+      toolbar.appendChild(divider);
+    } else {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.innerHTML = btn.icon;
+      button.title = btn.title;
+      button.onclick = btn.command;
+
+      if (btn.isActive && btn.isActive()) {
+        button.classList.add('is-active');
+      }
+
+      toolbar.appendChild(button);
+    }
+  });
+}
+
+// Function to initialize TipTap editor
+function initializeTipTapEditor(editorId, hiddenInputId) {
+  const container = document.getElementById(editorId);
+  const hiddenInput = document.getElementById(hiddenInputId);
+  const toolbarId = editorId.replace('_editor', '_toolbar');
+  const toolbar = document.getElementById(toolbarId);
+
+  if (!container || !hiddenInput || !toolbar) {
+    console.error('Missing elements for editor:', editorId);
+    return null;
   }
 
-  function initializeEditors() {
-    document.querySelectorAll('.quill-editor').forEach(container => {
-      if (container.querySelector('.ql-toolbar')) return;
-
-      const match = container.id.match(/section_(\d+)_editor/);
-      if (!match) return;
-
-      const index = match[1];
-      const input = document.getElementById(`section_${index}_content_input`);
-      if (!input) return;
-
-      const config = {
-        theme: 'snow',
-        modules: {
-          toolbar: [
-            [{ 'header': [1, 2, 3, false] }],
-            ['bold', 'italic', 'underline'],
-            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-            ['link'], ['clean']
-          ]
-        },
-        placeholder: 'Enter section content...'
-      };
-
-      if (typeof QuillBetterTable !== 'undefined') {
-        config.modules.table = false;
-        config.modules['better-table'] = {
-          operationMenu: {
-            items: {
-              unmergeCells: { text: 'Unmerge' },
-              insertColumnRight: { text: 'Insert column right' },
-              insertColumnLeft: { text: 'Insert column left' },
-              insertRowUp: { text: 'Insert row above' },
-              insertRowDown: { text: 'Insert row below' },
-              mergeCells: { text: 'Merge' },
-              deleteColumn: { text: 'Delete column' },
-              deleteRow: { text: 'Delete row' },
-              deleteTable: { text: 'Delete table' }
-            }
-          }
-        };
-        config.modules.toolbar.splice(4, 0, ['better-table']);
-      }
-
-      const quill = new Quill(`#section_${index}_editor`, config);
-
-      // Load content
-      if (input.value) {
-        try {
-          quill.clipboard.dangerouslyPasteHTML(0, input.value);
-        } catch(e) {
-          console.error('Failed to load content:', e);
-        }
-      }
-
-      quill.on('text-change', () => { input.value = quill.root.innerHTML; });
-      window.quillInstances.set(index, quill);
-    });
+  // Check if already initialized
+  if (container.querySelector('.ProseMirror')) {
+    console.log(`Editor ${editorId} already initialized`);
+    return null;
   }
 
-  function initializeReferences() {
-    const docs = <%= raw QualityDocument.where.not(id: @document.id).order(:document_type, :code).map { |d| { code: d.full_code, title: d.title } }.to_json %>;
-    const search = document.getElementById('reference-search');
-    const clear = document.getElementById('clear-search');
-    const dropdown = document.getElementById('reference-dropdown');
-    const container = document.getElementById('selected-references');
+  const { Editor } = window.TiptapCore;
+  const { StarterKit } = window.TiptapStarterKit;
+  const { Table } = window.TiptapTable;
+  const { TableRow } = window.TiptapTableRow;
+  const { TableHeader } = window.TiptapTableHeader;
+  const { TableCell } = window.TiptapTableCell;
+  const { Link } = window.TiptapLink;
 
-    if (!search) return;
+  const editor = new Editor({
+    element: container,
+    extensions: [
+      StarterKit,
+      Table.configure({
+        resizable: true,
+      }),
+      TableRow,
+      TableHeader,
+      TableCell,
+      Link.configure({
+        openOnClick: false,
+      }),
+    ],
+    content: hiddenInput.value || '',
+    onUpdate: ({ editor }) => {
+      hiddenInput.value = editor.getHTML();
+    },
+    onSelectionUpdate: ({ editor }) => {
+      // Update toolbar button states
+      createToolbar(toolbar, editor);
+    },
+  });
 
-    const selected = new Set(Array.from(container.querySelectorAll('[data-code]')).map(el => el.dataset.code));
+  // Initial toolbar creation
+  createToolbar(toolbar, editor);
 
-    search.addEventListener('input', function() {
-      const term = this.value.trim().toLowerCase();
-      if (!term) {
-        clear.classList.add('hidden');
-        dropdown.classList.add('hidden');
-        return;
-      }
+  console.log(`✓ TipTap editor initialized for ${editorId}`);
+  return editor;
+}
 
-      clear.classList.remove('hidden');
-      const filtered = docs.filter(d =>
-        d.code.toLowerCase().includes(term) || d.title.toLowerCase().includes(term)
-      );
+// Initialize all editors on page load
+function initializeAllEditors() {
+  console.log('Initializing TipTap editors...');
 
-      dropdown.innerHTML = filtered.length ? filtered.map(d => `
-        <div class="px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm border-b ${selected.has(d.code) ? 'bg-purple-50' : ''}"
-             data-code="${d.code}">
-          <strong>${d.code}</strong> - ${d.title}
+  document.querySelectorAll('[id$="_editor"]').forEach(container => {
+    const editorId = container.id;
+    const match = editorId.match(/section_(\d+)_editor/);
+
+    if (!match) return;
+
+    const index = match[1];
+    const hiddenInputId = `section_${index}_content_input`;
+
+    const editor = initializeTipTapEditor(editorId, hiddenInputId);
+    if (editor) {
+      window.tiptapInstances.set(index, editor);
+    }
+  });
+}
+
+// Initialize on Turbo load
+document.addEventListener('turbo:load', function() {
+  // Wait a brief moment for DOM to be ready
+  setTimeout(initializeAllEditors, 100);
+});
+
+// Available documents for reference
+const availableDocuments = <%= raw QualityDocument.where.not(id: @document.id).order(:document_type, :code).map { |d| { code: d.full_code, title: d.title } }.to_json %>;
+
+// Reference selection functionality
+const searchInput = document.getElementById('reference-search');
+const clearSearchBtn = document.getElementById('clear-search');
+const dropdown = document.getElementById('reference-dropdown');
+const selectedContainer = document.getElementById('selected-references');
+
+let selectedReferences = new Set();
+
+// Initialize with existing references
+document.querySelectorAll('#selected-references [data-code]').forEach(tag => {
+  selectedReferences.add(tag.dataset.code);
+});
+
+function filterDocuments(searchTerm) {
+  if (!searchTerm) return availableDocuments;
+
+  const term = searchTerm.toLowerCase();
+  return availableDocuments.filter(doc =>
+    doc.code.toLowerCase().includes(term) ||
+    doc.title.toLowerCase().includes(term)
+  );
+}
+
+function renderDropdown(documents) {
+  if (documents.length === 0) {
+    dropdown.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500 text-center italic">No documents found</div>';
+  } else {
+    dropdown.innerHTML = documents.map(doc => `
+      <div class="px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm border-b border-gray-100 last:border-0 ${selectedReferences.has(doc.code) ? 'bg-purple-50 text-purple-800' : ''}"
+           data-code="${doc.code}"
+           data-title="${doc.title}">
+        <strong>${doc.code}</strong> - ${doc.title}
+      </div>
+    `).join('');
+  }
+}
+
+searchInput.addEventListener('input', function() {
+  const searchTerm = this.value.trim();
+
+  if (searchTerm) {
+    clearSearchBtn.classList.remove('hidden');
+    const filtered = filterDocuments(searchTerm);
+    renderDropdown(filtered);
+    dropdown.classList.remove('hidden');
+  } else {
+    clearSearchBtn.classList.add('hidden');
+    dropdown.classList.add('hidden');
+  }
+});
+
+searchInput.addEventListener('focus', function() {
+  if (this.value.trim()) {
+    dropdown.classList.remove('hidden');
+  }
+});
+
+clearSearchBtn.addEventListener('click', function() {
+  searchInput.value = '';
+  this.classList.add('hidden');
+  dropdown.classList.add('hidden');
+  searchInput.focus();
+});
+
+dropdown.addEventListener('click', function(e) {
+  const option = e.target.closest('[data-code]');
+  if (!option) return;
+
+  const code = option.dataset.code;
+
+  if (selectedReferences.has(code)) {
+    removeReferenceByCode(code);
+  } else {
+    addReference(code);
+  }
+
+  option.classList.toggle('bg-purple-50');
+  option.classList.toggle('text-purple-800');
+});
+
+function addReference(code) {
+  if (selectedReferences.has(code)) return;
+
+  selectedReferences.add(code);
+
+  const tag = document.createElement('span');
+  tag.className = 'inline-flex items-center gap-2 bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium';
+  tag.dataset.code = code;
+  tag.innerHTML = `
+    ${code}
+    <button type="button" onclick="removeReference(this)" class="hover:text-purple-900 text-lg leading-none">&times;</button>
+    <input type="hidden" name="document[references][]" value="${code}">
+  `;
+
+  selectedContainer.appendChild(tag);
+}
+
+window.removeReference = function(button) {
+  const tag = button.closest('[data-code]');
+  const code = tag.dataset.code;
+  selectedReferences.delete(code);
+  tag.remove();
+
+  const option = dropdown.querySelector(`[data-code="${code}"]`);
+  if (option) {
+    option.classList.remove('bg-purple-50', 'text-purple-800');
+  }
+}
+
+function removeReferenceByCode(code) {
+  selectedReferences.delete(code);
+  const tag = selectedContainer.querySelector(`[data-code="${code}"]`);
+  if (tag) tag.remove();
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('#reference-search') && !e.target.closest('#reference-dropdown')) {
+    dropdown.classList.add('hidden');
+  }
+});
+
+// Section management
+let sectionIndex = <%= (@document.content && @document.content['sections'] ? @document.content['sections'].length : 0) %>;
+
+document.getElementById('add-section').addEventListener('click', function() {
+  const sectionsDiv = document.getElementById('sections');
+  const newSection = document.createElement('div');
+  newSection.className = 'bg-gray-50 border border-gray-200 rounded-lg p-4 section-item';
+  newSection.dataset.index = sectionIndex;
+
+  const sectionNumber = document.querySelectorAll('#sections .section-item').length + 1;
+
+  newSection.innerHTML = `
+    <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center gap-3">
+        <span class="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 text-white text-sm font-semibold section-number">
+          ${sectionNumber}
+        </span>
+        <span class="text-sm font-medium text-gray-700">Section ${sectionNumber}</span>
+      </div>
+      <button type="button" class="remove-section bg-red-500 hover:bg-red-700 text-white text-sm font-bold py-1 px-3 rounded">
+        Remove
+      </button>
+    </div>
+
+    <div class="space-y-3">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Section Heading</label>
+        <input type="text" name="sections[${sectionIndex}][heading]"
+               class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+               required placeholder="e.g., Purpose, Scope, Procedure">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Section Content</label>
+        <input type="hidden" name="sections[${sectionIndex}][content]" id="section_${sectionIndex}_content_input">
+        <div class="tiptap-editor">
+          <div class="tiptap-toolbar" id="section_${sectionIndex}_toolbar"></div>
+          <div class="tiptap-content" id="section_${sectionIndex}_editor"></div>
         </div>
-      `).join('') : '<div class="px-4 py-3 text-sm text-gray-500 text-center">No documents found</div>';
-      dropdown.classList.remove('hidden');
-    });
+      </div>
+    </div>
+  `;
 
-    clear.addEventListener('click', () => {
-      search.value = '';
-      clear.classList.add('hidden');
-      dropdown.classList.add('hidden');
-    });
+  sectionsDiv.appendChild(newSection);
 
-    dropdown.addEventListener('click', e => {
-      const opt = e.target.closest('[data-code]');
-      if (!opt) return;
+  // Initialize TipTap for new section
+  const editorId = `section_${sectionIndex}_editor`;
+  const hiddenInputId = `section_${sectionIndex}_content_input`;
 
-      const code = opt.dataset.code;
-      if (selected.has(code)) {
-        selected.delete(code);
-        container.querySelector(`[data-code="${code}"]`).remove();
-        opt.classList.remove('bg-purple-50');
-      } else {
-        selected.add(code);
-        container.insertAdjacentHTML('beforeend', `
-          <span class="inline-flex items-center gap-2 bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium" data-code="${code}">
-            ${code}
-            <button type="button" onclick="this.closest('span').remove()" class="hover:text-purple-900 text-lg">&times;</button>
-            <input type="hidden" name="document[references][]" value="${code}">
-          </span>
-        `);
-        opt.classList.add('bg-purple-50');
-      }
-    });
-
-    document.addEventListener('click', e => {
-      if (!e.target.closest('#reference-search') && !e.target.closest('#reference-dropdown')) {
-        dropdown.classList.add('hidden');
-      }
-    });
+  const editor = initializeTipTapEditor(editorId, hiddenInputId);
+  if (editor) {
+    window.tiptapInstances.set(sectionIndex.toString(), editor);
+    console.log(`✓ TipTap editor initialized for new section ${sectionIndex}`);
   }
 
-  function initializeSections() {
-    let sectionIndex = <%= (@document.content && @document.content['sections'] ? @document.content['sections'].length : 0) %>;
+  sectionIndex++;
+  newSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
 
-    document.getElementById('add-section')?.addEventListener('click', function() {
-      const container = document.getElementById('sections');
-      const num = container.querySelectorAll('.section-item').length + 1;
+document.getElementById('sections').addEventListener('click', function(e) {
+  if (e.target.classList.contains('remove-section') || e.target.closest('.remove-section')) {
+    const section = e.target.closest('.section-item');
+    const index = section.dataset.index;
 
-      container.insertAdjacentHTML('beforeend', `
-        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 section-item">
-          <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center gap-3">
-              <span class="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 text-white text-sm font-semibold">${num}</span>
-              <span class="text-sm font-medium text-gray-700">Section ${num}</span>
-            </div>
-            <button type="button" onclick="this.closest('.section-item').remove()" class="bg-red-500 hover:bg-red-700 text-white text-sm font-bold py-1 px-3 rounded">Remove</button>
-          </div>
-          <div class="space-y-3">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Section Heading</label>
-              <input type="text" name="sections[${sectionIndex}][heading]" required
-                     class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                     placeholder="e.g., Purpose, Scope, Procedure">
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Section Content</label>
-              <input type="hidden" name="sections[${sectionIndex}][content]" id="section_${sectionIndex}_content_input">
-              <div id="section_${sectionIndex}_editor" class="quill-editor"></div>
-            </div>
-          </div>
-        </div>
-      `);
+    // Destroy TipTap instance
+    if (window.tiptapInstances.has(index)) {
+      const editor = window.tiptapInstances.get(index);
+      editor.destroy();
+      window.tiptapInstances.delete(index);
+    }
 
-      const config = {
-        theme: 'snow',
-        modules: {
-          toolbar: [
-            [{ 'header': [1, 2, 3, false] }],
-            ['bold', 'italic', 'underline'],
-            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-            ['link'], ['clean']
-          ]
-        },
-        placeholder: 'Enter section content...'
-      };
+    section.remove();
 
-      if (typeof QuillBetterTable !== 'undefined') {
-        config.modules.table = false;
-        config.modules['better-table'] = {
-          operationMenu: {
-            items: {
-              unmergeCells: { text: 'Unmerge' },
-              insertColumnRight: { text: 'Insert column right' },
-              insertColumnLeft: { text: 'Insert column left' },
-              insertRowUp: { text: 'Insert row above' },
-              insertRowDown: { text: 'Insert row below' },
-              mergeCells: { text: 'Merge' },
-              deleteColumn: { text: 'Delete column' },
-              deleteRow: { text: 'Delete row' },
-              deleteTable: { text: 'Delete table' }
-            }
-          }
-        };
-        config.modules.toolbar.splice(4, 0, ['better-table']);
-      }
-
-      const quill = new Quill(`#section_${sectionIndex}_editor`, config);
-      const input = document.getElementById(`section_${sectionIndex}_content_input`);
-      quill.on('text-change', () => { input.value = quill.root.innerHTML; });
-      window.quillInstances.set(sectionIndex, quill);
-      sectionIndex++;
+    // Renumber remaining sections
+    document.querySelectorAll('#sections .section-item').forEach((section, index) => {
+      const numberBadge = section.querySelector('.section-number');
+      const label = section.querySelector('.text-sm.font-medium');
+      if (numberBadge) numberBadge.textContent = index + 1;
+      if (label) label.textContent = `Section ${index + 1}`;
     });
   }
+});
 
-  // Initialize on Turbo load
-  document.addEventListener('turbo:load', initForm);
-
-  // Also initialize immediately if Turbo already loaded
-  if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    setTimeout(initForm, 100);
-  }
-})();
+console.log('Form script loaded successfully');
 </script>
