@@ -210,7 +210,9 @@ const tinymceConfig = {
   }
 };
 
-// Function to initialize TinyMCE for a specific textarea
+// FIX 1: Destroy any stale instance before initialising, rather than returning
+// early. Stale instances are left behind when Turbo navigates without a full
+// page reload, causing TinyMCE to skip init and leave raw HTML visible.
 function initializeTinyMCE(textareaId) {
   const textarea = document.getElementById(textareaId);
 
@@ -219,10 +221,10 @@ function initializeTinyMCE(textareaId) {
     return;
   }
 
-  // Check if already initialized
-  if (tinymce.get(textareaId)) {
-    console.log(`Editor ${textareaId} already initialized`);
-    return;
+  // Remove any stale instance left over from a previous Turbo navigation
+  const existing = tinymce.get(textareaId);
+  if (existing) {
+    existing.remove();
   }
 
   tinymce.init({
@@ -283,6 +285,7 @@ function initializePage() {
              data-code="${doc.code}"
              data-title="${doc.title}">
           <strong>${doc.code}</strong> - ${doc.title}
+          <div class="text-gray-500 text-xs mt-0.5">${doc.title}</div>
         </div>
       `).join('');
     }
@@ -465,6 +468,17 @@ function initializePage() {
   }
 
   console.log('Form script loaded successfully');
+}
+
+// FIX 2: Tear down all TinyMCE editors before Turbo swaps the body.
+// Registered once via a flag so it doesn't stack up across navigations.
+if (!window._tinymceTurboCleanupRegistered) {
+  window._tinymceTurboCleanupRegistered = true;
+  document.addEventListener('turbo:before-render', function() {
+    if (typeof tinymce !== 'undefined') {
+      tinymce.remove();
+    }
+  });
 }
 
 // Initialize on both DOMContentLoaded and Turbo load
