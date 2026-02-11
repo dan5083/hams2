@@ -415,7 +415,7 @@
       if @release_note.works_order.customer_reference.present?
         ref = @release_note.works_order.customer_reference
         cs_order = ref.match(/CS-?Order[:\s]+([^\s\/]+)/i)&.captures&.first
-        serial_no = ref.match(/S\/N[:\s]+([^\s\/]+)/i)&.captures&.first
+        serial_no = ref.match(/(?:S\/N|SerialNo\.)[:\s]+([^\s\/]+)/i)&.captures&.first
       end
     %>
 
