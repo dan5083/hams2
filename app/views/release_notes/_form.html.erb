@@ -85,7 +85,7 @@
                 <% selected_charges.each do |charge| %>
                   <%
                     custom_amount = @works_order.get_custom_amount(charge.id)
-                    amount = charge.is_variable? && custom_amount.present? ? custom_amount.to_f : charge.amount
+                    amount = (charge.is_variable? && custom_amount.present? ? custom_amount.to_f : (charge.amount || 0).to_f)
                   %>
                   <li><strong><%= charge.name %></strong>: £<%= sprintf("%.2f", amount) %></li>
                 <% end %>
