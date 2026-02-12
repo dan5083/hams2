@@ -160,15 +160,15 @@
               <dd class="text-sm text-gray-900 font-medium">
                 <%
                   if charge.is_variable?
-                    custom_amount = @works_order.get_custom_amount(charge.id)&.to_f
-                    display_amount = custom_amount.present? && custom_amount > 0 ? custom_amount : charge.amount
+                    custom_amount = @works_order.get_custom_amount(charge.id).to_f
+                    display_amount = custom_amount > 0 ? custom_amount : (charge.amount || 0).to_f
                     total_additional_charges += display_amount
                 %>
                   £<%= sprintf("%.2f", display_amount) %>
                 <% else
-                    total_additional_charges += charge.amount
+                    total_additional_charges += (charge.amount || 0).to_f
                 %>
-                  £<%= sprintf("%.2f", charge.amount) %>
+                  £<%= sprintf("%.2f", charge.amount || 0) %>
                 <% end %>
               </dd>
             </div>
