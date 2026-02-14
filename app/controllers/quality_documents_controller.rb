@@ -60,8 +60,10 @@ class QualityDocumentsController < ApplicationController
     if should_reissue
       # Increment the issue number
       update_params[:current_issue_number] = @document.current_issue_number + 1
-      # Allow revision tracking for reissue
+      # Pass reissue metadata for the revision record
       @document.skip_revision_tracking = false
+      @document.reissue_change_description = params[:reissue_change_description]
+      @document.reissue_authorised_by = params[:reissue_authorised_by]
     else
       # Skip revision tracking for regular updates during migration
       @document.skip_revision_tracking = true

@@ -5,6 +5,9 @@ class QualityDocument < ApplicationRecord
   # Skip revision tracking during migration
   attr_accessor :skip_revision_tracking
 
+  # Reissue metadata (set by controller from modal form)
+  attr_accessor :reissue_change_description, :reissue_authorised_by
+
   DOCUMENT_TYPES = {
     'IP' => 'Integrated Procedure',
     'WI' => 'Works Instruction',
@@ -49,11 +52,11 @@ class QualityDocument < ApplicationRecord
     # Only create revision if issue number actually changed (reissue)
     if current_issue_number_changed?
       revisions.create!(
-        issue_number: current_issue_number_was || 1,
-        changed_by: Current.user&.display_name || 'System',
+        issue_number: current_issue_number,
+        changed_by: reissue_authorised_by.presence || Current.user&.display_name || 'System',
         changed_at: Time.current,
         previous_content: content_was,
-        change_description: "Updated to issue #{current_issue_number}"
+        change_description: reissue_change_description.presence || "Updated to issue #{current_issue_number}"
       )
     end
   end
