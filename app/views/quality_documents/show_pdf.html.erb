@@ -93,7 +93,6 @@
     /* ── Sections ── */
     .section {
       margin-bottom: 24px;
-      page-break-inside: avoid;
     }
 
     .section h2 {
@@ -102,6 +101,7 @@
       border-bottom: 1px solid #999;
       padding-bottom: 4px;
       margin-bottom: 8px;
+      page-break-after: avoid;
     }
 
     /* ── Content prose ── */
@@ -259,19 +259,19 @@
         font-size: 11pt;
       }
 
-      .section {
-        page-break-inside: avoid;
+      /* Keep headings with their content */
+      h2, h3, h4 {
+        page-break-after: avoid;
       }
 
+      /* Only avoid breaks inside tables (not whole sections) */
       .content table {
         page-break-inside: avoid;
       }
 
+      /* Footer on last page only, not fixed */
       .document-footer {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
+        margin-top: 30px;
       }
     }
   </style>
