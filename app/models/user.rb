@@ -95,6 +95,13 @@ class User < ApplicationRecord
     end
   end
 
+  def can_reissue_documents?
+    email_address.in?([
+      'quality@hardanodisingstl.com',    # Jim Ledger
+      'chris@hardanodisingstl.com'       # Chris Connon
+    ])
+  end
+
   # Returns filtering criteria for e-cards based on user role
   def ecard_filter_criteria
     return {} unless sees_ecards?

@@ -1,14 +1,33 @@
 <%# app/views/quality_documents/index.html.erb %>
 <div class="container mx-auto px-4 py-6">
   <div class="flex justify-between items-center mb-6">
-    <h1 class="text-3xl font-bold text-gray-900">Quality Documents</h1>
-    <%= link_to "New Quality Document", new_quality_document_path,
-        class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" %>
+    <h1 class="text-3xl font-bold text-gray-900">
+      <%= @show_amendments ? "Amendment Record" : "Quality Documents" %>
+      <% if params[:document_type].present? %>
+        <span class="text-lg font-normal text-gray-500">— <%= QualityDocument::DOCUMENT_TYPES[params[:document_type]] %></span>
+      <% end %>
+    </h1>
+    <div class="flex gap-2">
+      <% if @show_amendments %>
+        <%= link_to "← Document List",
+            quality_documents_path(document_type: params[:document_type], search: params[:search]),
+            class: "bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" %>
+      <% else %>
+        <%= link_to "Amendment Record",
+            quality_documents_path(document_type: params[:document_type], search: params[:search], view: 'amendments'),
+            class: "bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded" %>
+      <% end %>
+      <%= link_to "New Quality Document", new_quality_document_path,
+          class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" %>
+    </div>
   </div>
 
   <!-- Filter -->
   <div class="bg-white p-4 rounded-lg shadow mb-6">
     <%= form_with url: quality_documents_path, method: :get, local: true, class: "flex items-end gap-4" do |form| %>
+      <% if @show_amendments %>
+        <input type="hidden" name="view" value="amendments">
+      <% end %>
       <div class="flex-1">
         <%= form.label :document_type, "Filter by Type", class: "block text-sm font-medium text-gray-700 mb-1" %>
         <%= form.select :document_type,
@@ -32,6 +51,61 @@
     <% end %>
   </div>
 
+  <% if @show_amendments %>
+    <!-- Amendment Records Table -->
+    <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Procedure No.
+            </th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Issue
+            </th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Amendment Details
+            </th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Authorised
+            </th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Date
+            </th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+          <% @amendments.each do |amendment| %>
+            <tr class="hover:bg-gray-50">
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                <%= link_to amendment.quality_document.full_code,
+                    quality_document_path(amendment.quality_document),
+                    class: "text-blue-600 hover:text-blue-900" %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <%= amendment.issue_number %>
+              </td>
+              <td class="px-6 py-4 text-sm text-gray-900">
+                <%= amendment.change_description %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <%= amendment.changed_by %>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <%= amendment.changed_at.strftime('%d/%m/%Y') %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+
+      <% if @amendments.empty? %>
+        <div class="text-center py-8">
+          <p class="text-gray-500">No amendment records found<%= " for #{QualityDocument::DOCUMENT_TYPES[params[:document_type]]}" if params[:document_type].present? %>.</p>
+        </div>
+      <% end %>
+    </div>
+  <% else %>
   <!-- Documents Table -->
   <div class="bg-white shadow overflow-hidden sm:rounded-lg">
     <table class="min-w-full divide-y divide-gray-200">
@@ -128,6 +202,7 @@
       </div>
     <% end %>
   </div>
+  <% end %>
 
   <!-- Info Box -->
   <div class="mt-6 bg-blue-50 border border-blue-200 rounded-md p-4">

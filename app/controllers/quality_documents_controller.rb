@@ -20,6 +20,16 @@ class QualityDocumentsController < ApplicationController
     end
 
     @documents = @documents.order(:document_type, :code)
+
+    # Load amendment records if requested
+    @show_amendments = params[:view] == 'amendments'
+    if @show_amendments
+      amendment_scope = QualityDocumentRevision.joins(:quality_document)
+      if params[:document_type].present?
+        amendment_scope = amendment_scope.where(quality_documents: { document_type: params[:document_type] })
+      end
+      @amendments = amendment_scope.includes(:quality_document).order(changed_at: :desc, issue_number: :desc)
+    end
   end
 
   def show
@@ -58,12 +68,18 @@ class QualityDocumentsController < ApplicationController
     update_params = document_params.except(:content).merge(content: updated_content)
 
     if should_reissue
+      # Only Jim Ledger and Chris Connon can reissue
+      unless Current.user&.can_reissue_documents?
+        redirect_to @document, alert: 'You are not authorised to reissue documents.'
+        return
+      end
+
       # Increment the issue number
       update_params[:current_issue_number] = @document.current_issue_number + 1
       # Pass reissue metadata for the revision record
       @document.skip_revision_tracking = false
       @document.reissue_change_description = params[:reissue_change_description]
-      @document.reissue_authorised_by = params[:reissue_authorised_by]
+      @document.reissue_authorised_by = params[:reissue_authorised_by].presence || Current.user&.display_name
     else
       # Skip revision tracking for regular updates during migration
       @document.skip_revision_tracking = true
