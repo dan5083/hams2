@@ -1,3 +1,4 @@
+<!-- app/views/quality_documents/show_pdf.html.erb -->
 <!DOCTYPE html>
 <html>
 <head>
@@ -7,8 +8,63 @@
     body {
       font-family: Arial, sans-serif;
       margin: 20px;
+      color: #000;
+      font-size: 12pt;
+      line-height: 1.5;
     }
 
+    /* ── Print button bar (hidden when printing) ── */
+    .print-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: #2d2d2d;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    .print-bar button {
+      background: #7c3aed;
+      color: #fff;
+      border: none;
+      padding: 8px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .print-bar button:hover {
+      background: #6d28d9;
+    }
+
+    .print-bar .back-link {
+      color: #ccc;
+      text-decoration: none;
+      font-size: 13px;
+      margin-left: auto;
+    }
+
+    .print-bar .back-link:hover {
+      color: #fff;
+    }
+
+    .print-bar .doc-title {
+      color: #aaa;
+      font-size: 13px;
+    }
+
+    /* Push body content below the fixed bar */
+    .document-body {
+      margin-top: 50px;
+    }
+
+    /* ── Document header ── */
     .document-header {
       border-bottom: 2px solid #000;
       padding-bottom: 10px;
@@ -17,15 +73,15 @@
 
     .document-header h1 {
       margin: 0 0 10px 0;
-      font-size: 24px;
+      font-size: 22pt;
     }
 
     .metadata {
-      font-size: 12px;
+      font-size: 10pt;
     }
 
     .metadata p {
-      margin: 5px 0;
+      margin: 4px 0;
     }
 
     .metadata .issue-history {
@@ -34,100 +90,243 @@
       border-top: 1px solid #ccc;
     }
 
+    /* ── Sections ── */
     .section {
-      margin-bottom: 30px;
+      margin-bottom: 24px;
+      page-break-inside: avoid;
     }
 
     .section h2 {
-      font-size: 18px;
-      border-bottom: 1px solid #ccc;
-      padding-bottom: 5px;
-      margin-bottom: 10px;
+      font-size: 14pt;
+      font-weight: bold;
+      border-bottom: 1px solid #999;
+      padding-bottom: 4px;
+      margin-bottom: 8px;
     }
 
+    /* ── Content prose ── */
     .content {
       line-height: 1.6;
+      font-size: 11pt;
+    }
+
+    .content p {
+      margin: 0.4em 0;
     }
 
     .content ul, .content ol {
-      margin-left: 20px;
-      margin-bottom: 10px;
+      margin: 0.5em 0 0.5em 24px;
     }
 
+    .content ul {
+      list-style-type: disc;
+    }
+
+    .content ol {
+      list-style-type: decimal;
+    }
+
+    .content li {
+      margin: 0.2em 0;
+    }
+
+    .content strong, .content b {
+      font-weight: bold;
+    }
+
+    .content em, .content i {
+      font-style: italic;
+    }
+
+    .content u {
+      text-decoration: underline;
+    }
+
+    .content h1, .content h2, .content h3, .content h4 {
+      font-weight: bold;
+      margin: 0.8em 0 0.3em 0;
+    }
+
+    .content h1 { font-size: 14pt; }
+    .content h2 { font-size: 13pt; }
+    .content h3 { font-size: 12pt; }
+    .content h4 { font-size: 11pt; }
+
+    .content blockquote {
+      border-left: 3px solid #999;
+      padding-left: 12px;
+      margin: 0.5em 0;
+      color: #333;
+    }
+
+    /* ── Table styles (handles messy/migrated HTML tables) ── */
     .content table {
       border-collapse: collapse;
       width: 100%;
       margin: 10px 0;
+      font-size: 10pt;
+      page-break-inside: avoid;
     }
 
-    .content table td, .content table th {
+    .content td,
+    .content th {
       border: 1px solid #000;
-      padding: 5px;
+      padding: 4px 6px;
+      text-align: left;
+      vertical-align: top;
     }
 
-    .content strong {
+    .content th {
+      background-color: #e8e8e8;
       font-weight: bold;
     }
 
+    .content thead th,
+    .content thead td {
+      background-color: #e8e8e8;
+      font-weight: bold;
+    }
+
+    /* Handle tables that use inline bgcolor or style attributes */
+    .content td[bgcolor],
+    .content th[bgcolor] {
+      /* Let inline bgcolor show through, just ensure border */
+      border: 1px solid #000;
+    }
+
+    /* Nested tables (some migrated docs have these) */
+    .content table table {
+      margin: 0;
+      width: 100%;
+    }
+
+    .content table table td,
+    .content table table th {
+      border: 1px solid #666;
+    }
+
+    /* Empty cells shouldn't collapse */
+    .content td:empty::after,
+    .content th:empty::after {
+      content: '\00a0';
+    }
+
+    /* ── References ── */
     .references {
-      margin-top: 30px;
-      padding-top: 20px;
-      border-top: 1px solid #ccc;
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid #999;
     }
 
     .references h2 {
-      font-size: 16px;
-      margin-bottom: 10px;
+      font-size: 13pt;
+      font-weight: bold;
+      margin-bottom: 8px;
     }
 
     .references ul {
       margin-left: 20px;
+      list-style-type: disc;
     }
 
+    .references li {
+      margin: 3px 0;
+      font-size: 10pt;
+    }
+
+    /* ── Footer ── */
+    .document-footer {
+      margin-top: 30px;
+      padding-top: 10px;
+      border-top: 1px solid #ccc;
+      font-size: 9pt;
+      color: #666;
+      text-align: center;
+    }
+
+    /* ── Print styles ── */
     @media print {
+      .print-bar {
+        display: none !important;
+      }
+
+      .document-body {
+        margin-top: 0;
+      }
+
       body {
         margin: 0;
+        font-size: 11pt;
+      }
+
+      .section {
+        page-break-inside: avoid;
+      }
+
+      .content table {
+        page-break-inside: avoid;
+      }
+
+      .document-footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
       }
     }
   </style>
 </head>
 <body>
-  <div class="document-header">
-    <h1><%= @document.full_code %> - <%= @document.title %></h1>
-    <div class="metadata">
-      <p><strong>Issue:</strong> <%= @document.current_issue_number %></p>
-      <p><strong>Approved by:</strong> <%= @document.approved_by %></p>
-      <p><strong>Date:</strong> <%= @document.updated_at.strftime('%d/%m/%Y') %></p>
-
-      <% if @document.content['issue_history'].present? %>
-        <div class="issue-history">
-          <strong>Issue History:</strong><br>
-          <% @document.content['issue_history'].each do |history| %>
-            Issue <%= history['issue'] %>: <%= Date.parse(history['date']).strftime('%d/%m/%Y') rescue history['date'] %><br>
-          <% end %>
-        </div>
-      <% end %>
-    </div>
+  <!-- Print toolbar (hidden in print output) -->
+  <div class="print-bar">
+    <button onclick="window.print()">🖨️ Print / Save PDF</button>
+    <span class="doc-title"><%= @document.full_code %> - <%= @document.title %></span>
+    <%= link_to '← Back to document', quality_document_path(@document), class: 'back-link' %>
   </div>
 
-  <% (@document.content['sections'] || []).each do |section| %>
-    <div class="section">
-      <h2><%= section['heading'] %></h2>
-      <div class="content">
-        <%= sanitize(section['content']) %>
+  <div class="document-body">
+    <div class="document-header">
+      <h1><%= @document.full_code %> - <%= @document.title %></h1>
+      <div class="metadata">
+        <p><strong>Document Type:</strong> <%= @document.type_description %></p>
+        <p><strong>Issue:</strong> <%= @document.current_issue_number %></p>
+        <p><strong>Approved by:</strong> <%= @document.approved_by %></p>
+        <p><strong>Date:</strong> <%= @document.updated_at.strftime('%d/%m/%Y') %></p>
+
+        <% if @document.content['issue_history'].present? %>
+          <div class="issue-history">
+            <strong>Issue History:</strong><br>
+            <% @document.content['issue_history'].each do |history| %>
+              Issue <%= history['issue'] %>: <%= Date.parse(history['date']).strftime('%d/%m/%Y') rescue history['date'] %><br>
+            <% end %>
+          </div>
+        <% end %>
       </div>
     </div>
-  <% end %>
 
-  <% if @document.content['references'].present? %>
-    <div class="references">
-      <h2>References</h2>
-      <ul>
-        <% @document.content['references'].each do |ref| %>
-          <li><%= ref %></li>
-        <% end %>
-      </ul>
+    <% (@document.content['sections'] || []).each do |section| %>
+      <div class="section">
+        <h2><%= section['heading'] %></h2>
+        <div class="content">
+          <%= raw section['content'] %>
+        </div>
+      </div>
+    <% end %>
+
+    <% if @document.content['references'].present? && @document.content['references'].any? %>
+      <div class="references">
+        <h2>References</h2>
+        <ul>
+          <% @document.content['references'].each do |ref| %>
+            <li><%= ref %></li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <div class="document-footer">
+      <%= @document.full_code %> - <%= @document.title %> | Issue <%= @document.current_issue_number %> | <%= @document.updated_at.strftime('%d/%m/%Y') %>
     </div>
-  <% end %>
+  </div>
 </body>
 </html>
