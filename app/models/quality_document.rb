@@ -13,7 +13,8 @@ class QualityDocument < ApplicationRecord
     'WI' => 'Works Instruction',
     'PCD' => 'Process Control',
     'F' => 'Form',
-    'PM' => 'Process Mapping Process'
+    'PM' => 'Process Mapping Process',
+    'IM' => 'Integrated Manual'
   }.freeze
 
   validates :document_type, presence: true, inclusion: { in: DOCUMENT_TYPES.keys }
