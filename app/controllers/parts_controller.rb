@@ -113,6 +113,22 @@ class PartsController < ApplicationController
       @part.customisation_data["operation_selection"]["locked"] = true
       @part.customisation_data["operation_selection"]["locked_operations"] = locked_ops
 
+      # Copy treatment metadata from the source part (aerospace flag, treatment types,
+      # ENP settings etc.) so the new part knows what processes it uses.
+      # This drives film reading requirements during booking out.
+      if params[:source_part_id].present?
+        source_part = Part.find_by(id: params[:source_part_id])
+        if source_part
+          source_op_sel = source_part.customisation_data.dig("operation_selection") || {}
+          @part.customisation_data["operation_selection"]["treatments"] = source_op_sel["treatments"] if source_op_sel["treatments"].present?
+          @part.customisation_data["operation_selection"]["aerospace_defense"] = source_part.aerospace_defense?
+          @part.customisation_data["operation_selection"]["selected_enp_pre_heat_treatment"] = source_part.selected_enp_pre_heat_treatment if source_part.enp_pre_heat_treatment_selected?
+          @part.customisation_data["operation_selection"]["selected_enp_heat_treatment"] = source_part.selected_enp_heat_treatment if source_part.enp_heat_treatment_selected?
+          @part.customisation_data["operation_selection"]["enp_strip_type"] = source_op_sel["enp_strip_type"] if source_op_sel["enp_strip_type"].present?
+          @part.process_type = source_part.process_type if source_part.process_type.present?
+        end
+      end
+
     rescue => e
       @part.errors.add(:base, "Failed to switch to manual mode: #{e.message}")
       load_form_data_for_errors

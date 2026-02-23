@@ -868,7 +868,7 @@ function initializeCopyFromPartAutocomplete() {
     .then(data => {
       if (data.success) {
         // Switch to manual mode and populate operations
-        switchToManualModeWithOperations(data.operations, partName);
+        switchToManualModeWithOperations(data.operations, partName, partId);
       } else {
         alert('Failed to copy operations: ' + data.error);
         copyAutocompleteInput.disabled = false;
@@ -890,11 +890,25 @@ function initializeCopyFromPartAutocomplete() {
   });
 }
 
-function switchToManualModeWithOperations(operations, sourcePart) {
+function switchToManualModeWithOperations(operations, sourcePart, sourcePartId) {
   // Hide the treatment selection section
   const treatmentSection = document.querySelector('.bg-white.shadow.rounded-lg.p-6:last-of-type');
   if (treatmentSection) {
     treatmentSection.style.display = 'none';
+  }
+
+  // Store the source part ID so the controller can copy treatment metadata
+  // (aerospace flag, treatment types, ENP settings etc.)
+  if (sourcePartId) {
+    let hiddenInput = document.getElementById('source_part_id_field');
+    if (!hiddenInput) {
+      hiddenInput = document.createElement('input');
+      hiddenInput.type = 'hidden';
+      hiddenInput.name = 'source_part_id';
+      hiddenInput.id = 'source_part_id_field';
+      document.querySelector('form').appendChild(hiddenInput);
+    }
+    hiddenInput.value = sourcePartId;
   }
 
   // Create and show manual operations section
