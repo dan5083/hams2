@@ -31,7 +31,8 @@ module OperationLibrary
         {
           id: 'FERROUS_CLEANING_KEYCOTE_245_5_20_MIN',
           process_type: 'enp_pretreatment',
-          operation_text: 'Immerse in Keycote 245 at 35-80°C for 5-20 minutes'
+          operation_text: 'Immerse in Keycote 245 at 35-80°C for 5-20 minutes',
+          is_cleaning_step: true
         },
 
         # Electroclean Operations
@@ -77,7 +78,8 @@ module OperationLibrary
         {
           id: 'ALUMINIUM_CLEAN_KEYCOTE_245_30_60SEC',
           process_type: 'enp_pretreatment',
-          operation_text: 'Clean aluminium in Keycote 245 at 35-80°C for 30-60 seconds'
+          operation_text: 'Clean aluminium in Keycote 245 at 35-80°C for 30-60 seconds',
+          is_cleaning_step: true
         },
 
         # DESMUT Operations
@@ -172,7 +174,8 @@ module OperationLibrary
         Operation.new(
           id: op_data[:id],
           process_type: op_data[:process_type],
-          operation_text: operation_text
+          operation_text: operation_text,
+          is_cleaning_step: op_data[:is_cleaning_step] || false
         )
       end
     end

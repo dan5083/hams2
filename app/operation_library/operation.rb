@@ -1,11 +1,12 @@
 # app/operation_library/operation.rb - Updated to handle stripping operations with E28
 class Operation
   attr_accessor :id, :alloys, :process_type, :anodic_classes, :target_thickness, :vat_numbers,
-                :operation_text, :specifications, :enp_type, :deposition_rate_range, :time
+                :operation_text, :specifications, :enp_type, :deposition_rate_range, :time,
+                :is_cleaning_step
 
   def initialize(id:, process_type:, operation_text:, specifications: nil, alloys: [],
                  anodic_classes: [], target_thickness: 0, vat_numbers: [],
-                 enp_type: nil, deposition_rate_range: nil, time: nil)
+                 enp_type: nil, deposition_rate_range: nil, time: nil, is_cleaning_step: false)
     @id = id
     @alloys = alloys
     @process_type = process_type
@@ -17,6 +18,7 @@ class Operation
     @enp_type = enp_type
     @deposition_rate_range = deposition_rate_range
     @time = time
+    @is_cleaning_step = is_cleaning_step
   end
 
   # Class methods to get all operations from all files
@@ -504,6 +506,13 @@ class Operation
 
   def degrease?
     process_type == 'degrease'
+  end
+
+  # Returns true if this operation functionally acts as a cleaning/degreasing step,
+  # regardless of its process_type. Used by water break test logic to detect cleaning
+  # operations like Keycote 245 ferrous cleaning that aren't typed as 'degrease'.
+  def cleaning_step?
+    process_type == 'degrease' || is_cleaning_step
   end
 
   def water_break_test?
