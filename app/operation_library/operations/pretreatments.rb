@@ -39,7 +39,8 @@ module OperationLibrary
         {
           id: 'ELECTROCLEAN_METEX_EMPHAX_4_10_AMP_2_3_MIN',
           process_type: 'enp_pretreatment',
-          operation_text: 'Electroclean in Metex Emphax at 60-95°C for 2-3 minutes'
+          operation_text: 'Electroclean in Metex Emphax at 60-95°C for 2-3 minutes',
+          is_electrolytic: true
         },
 
         # Activation Operations
@@ -65,13 +66,15 @@ module OperationLibrary
         {
           id: 'WOODS_NICKEL_STRIKE_6_10_MIN_2_10V_REDUCE_OUTGASSING',
           process_type: 'enp_pretreatment',
-          operation_text: 'Woods nickel strike for 6-10 minutes from 2 to 10 Volts to reduce outgassing'
+          operation_text: 'Woods nickel strike for 6-10 minutes from 2 to 10 Volts to reduce outgassing',
+          is_electrolytic: true
         },
 
         {
           id: 'WOODS_NICKEL_STRIKE_6_10_MIN_2_10V_INDUCE_OUTGASSING',
           process_type: 'enp_pretreatment',
-          operation_text: 'Woods nickel strike for 6-10 minutes from 2 to 10 Volts to induce outgassing'
+          operation_text: 'Woods nickel strike for 6-10 minutes from 2 to 10 Volts to induce outgassing',
+          is_electrolytic: true
         },
 
         # Aluminium Cleaning Operations
@@ -161,12 +164,13 @@ module OperationLibrary
         }
       ]
 
-      # Append OCV monitoring for aerospace/defense
+      # Append OCV monitoring for aerospace/defense (with voltage for electrolytic processes)
       base_operations.map do |op_data|
         operation_text = op_data[:operation_text]
 
         if aerospace_defense
-          ocv_text = build_time_temp_monitoring_text
+          is_electrolytic = op_data[:is_electrolytic] || false
+          ocv_text = build_time_temp_monitoring_text(electrolytic: is_electrolytic)
           operation_text += "\n\n**OCV Monitoring:**\n#{ocv_text}"
         end
 
@@ -179,11 +183,13 @@ module OperationLibrary
       end
     end
 
-    # Build time/temp monitoring text (no voltage for non-electrolytic processes)
-    def self.build_time_temp_monitoring_text
+    # Build time/temp monitoring text (voltage included for electrolytic processes)
+    def self.build_time_temp_monitoring_text(electrolytic: false)
       text_lines = []
       (1..3).each do |batch|
-        text_lines << "Batch ___: Time ___m ___s    Temp ___°C"
+        line = "Batch ___: Time ___m ___s    Temp ___°C"
+        line += "    Voltage ___V" if electrolytic
+        text_lines << line
       end
       text_lines.join("\n")
     end
