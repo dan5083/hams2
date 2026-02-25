@@ -78,8 +78,7 @@ module OperationLibrary
         {
           id: 'ALUMINIUM_CLEAN_KEYCOTE_245_30_60SEC',
           process_type: 'enp_pretreatment',
-          operation_text: 'Clean aluminium in Keycote 245 at 35-80°C for 30-60 seconds',
-          is_cleaning_step: true
+          operation_text: 'Clean aluminium in Keycote 245 at 35-80°C for 30-60 seconds'
         },
 
         # DESMUT Operations
