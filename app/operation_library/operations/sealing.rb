@@ -1,97 +1,88 @@
-# app/operation_library/operations/stripping.rb
+# app/operation_library/operations/sealing.rb
 module OperationLibrary
-  class Stripping
-    # Available stripping types and methods
-    STRIPPING_TYPES = [
-      { value: 'anodising_stripping', label: 'Anodising Stripping' },
-      { value: 'enp_stripping', label: 'ENP Stripping' },
-      { value: 'general_stripping', label: 'General Stripping' }
-    ].freeze
-
-    ANODISING_STRIPPING_METHODS = [
-      { value: 'chromic_phosphoric', label: 'Chromic-Phosphoric Acid' },
-      { value: 'E28', label: 'Oxidite E28' }
-    ].freeze
-
-    ENP_STRIPPING_METHODS = [
-      { value: 'nitric', label: 'Nitric Acid' },
-      { value: 'metex_dekote', label: 'Metex Dekote' }
-    ].freeze
-
-    GENERAL_STRIPPING_METHODS = [
-      { value: 'E28', label: 'Oxidite E28' },
-      { value: 'chromic_phosphoric', label: 'Chromic-Phosphoric Acid' },
-      { value: 'nitric', label: 'Nitric Acid' },
-      { value: 'metex_dekote', label: 'Metex Dekote' }
-    ].freeze
-
-    def self.operations(stripping_type = nil, stripping_method = nil, aerospace_defense: false)
-      operation_text = build_stripping_text(stripping_type, stripping_method)
-
-      # Append OCV monitoring for aerospace/defense
-      if aerospace_defense
-        ocv_text = build_time_temp_monitoring_text
-        operation_text += "\n\n**OCV Monitoring:**\n#{ocv_text}"
-      end
-
+  class Sealing
+    def self.operations(aerospace_defense: false)
       [
+        # Sodium Dichromate Sealing - high temperature process (extreme pH)
         Operation.new(
-          id: 'STRIPPING',
-          process_type: 'stripping',
-          operation_text: operation_text
+          id: 'SODIUM_DICHROMATE_SEAL',
+          process_type: 'dichromate_sealing',
+          operation_text: build_operation_text(
+            'Seal in sodium dichromate at 93°C - 99°C for 2-3 minutes per μm of Measured Film Thickness (with a maximum of 30 minutes)',
+            aerospace_defense
+          )
+        ),
+
+        # Oxidite SE-CO Sealing - ambient temperature process
+        Operation.new(
+          id: 'OXIDITE_SECO_SEAL',
+          process_type: 'sealing',
+          operation_text: build_operation_text(
+            'Seal in Oxidite SE-CO at 25-32°C for 0.5-1 minute per μm of Measured Film Thickness (with a maximum of 20 minutes)',
+            aerospace_defense
+          )
+        ),
+
+        # Hot Water Dip - quick process
+        Operation.new(
+          id: 'HOT_WATER_DIP',
+          process_type: 'sealing',
+          operation_text: build_operation_text(
+            'Hot water dip for 15-30 seconds.',
+            aerospace_defense
+          )
+        ),
+
+        # Hot Seal - high temperature water sealing
+        Operation.new(
+          id: 'HOT_SEAL',
+          process_type: 'sealing',
+          operation_text: build_operation_text(
+            'Seal in hot seal at 96°C for 2-3 minutes per μm of Measured Film Thickness (with a minimum of 10 mins, and a maximum of 40 mins)',
+            aerospace_defense
+          )
+        ),
+
+        # SurTec 650V Sealing - mid temperature process
+        Operation.new(
+          id: 'SURTEC_650V_SEAL',
+          process_type: 'sealing',
+          operation_text: build_operation_text(
+            'Seal in SurTec 650V at 28-32°C for 0.5-1 minute per μm of Measured Film Thickness (with a maximum of 20 minutes)',
+            aerospace_defense
+          )
+        ),
+
+        # Laboratory Deionised Water Sealing
+        Operation.new(
+          id: 'DEIONISED_WATER_SEAL',
+          process_type: 'sealing',
+          operation_text: build_operation_text(
+            'Seal in deionised water at 75-85°C for 4-5 minutes per μm of Measured Film Thickness (in works laboratory)',
+            aerospace_defense
+          )
         )
       ]
     end
 
-    # Get available stripping types for form selection
-    def self.available_types
-      STRIPPING_TYPES
+    # Get available sealing types for form selection
+    def self.available_sealing_types
+      [
+        { value: 'SODIUM_DICHROMATE_SEAL', label: 'Sodium Dichromate Seal' },
+        { value: 'OXIDITE_SECO_SEAL', label: 'Oxidite SE-CO Seal' },
+        { value: 'HOT_WATER_DIP', label: 'Hot Water Dip' },
+        { value: 'HOT_SEAL', label: 'Hot Seal' },
+        { value: 'SURTEC_650V_SEAL', label: 'SurTec 650V Seal' },
+        { value: 'DEIONISED_WATER_SEAL', label: 'Deionised Water Seal' }
+      ]
     end
 
-    # Get available methods for a given stripping type
-    def self.available_methods_for_type(stripping_type)
-      case stripping_type
-      when 'anodising_stripping'
-        ANODISING_STRIPPING_METHODS
-      when 'enp_stripping'
-        ENP_STRIPPING_METHODS
-      when 'general_stripping'
-        GENERAL_STRIPPING_METHODS
-      else
-        []
-      end
+    # Get specific sealing operation by ID with aerospace flag
+    def self.get_sealing_operation(sealing_id, aerospace_defense: false)
+      operations(aerospace_defense: aerospace_defense).find { |op| op.id == sealing_id }
     end
 
-    # Build the operation text based on stripping type and method
-    def self.build_stripping_text(stripping_type = nil, stripping_method = nil)
-      return 'Strip as specified' if stripping_type.blank? || stripping_method.blank?
-
-      case stripping_type
-      when 'anodising_stripping'
-        build_anodising_stripping_text(stripping_method)
-      when 'enp_stripping'
-        build_enp_stripping_text(stripping_method)
-      when 'general_stripping'
-        build_general_stripping_text(stripping_method)
-      else
-        'Strip as specified'
-      end
-    end
-
-    # Get the stripping operation with interpolated text
-    def self.get_stripping_operation(stripping_type = nil, stripping_method = nil, aerospace_defense: false)
-      Rails.logger.info "🔍 Stripping called with type=#{stripping_type}, method=#{stripping_method}, aerospace_defense=#{aerospace_defense}"
-      result = operations(stripping_type, stripping_method, aerospace_defense: aerospace_defense).first
-      Rails.logger.info "🔍 Stripping result: #{result.inspect}"
-      result
-    end
-
-    # Check if stripping is configured
-    def self.stripping_configured?(stripping_type, stripping_method)
-      stripping_type.present? && stripping_method.present?
-    end
-
-    # Build time/temp monitoring text (no voltage for stripping)
+    # Build time/temp monitoring text (no voltage for sealing)
     def self.build_time_temp_monitoring_text
       text_lines = []
       (1..3).each do |batch|
@@ -102,41 +93,21 @@ module OperationLibrary
 
     private
 
-    def self.build_anodising_stripping_text(method)
-      case method
-      when 'chromic_phosphoric'
-        'Strip anodising in chromic-phosphoric acid solution'
-      when 'E28'
-        'Strip in E28 - wait till fizzing starts and hold for 30 seconds'
+    # Build operation text with optional aerospace calculation prompt and OCV monitoring
+    def self.build_operation_text(base_text, aerospace_defense)
+      operation_text = if aerospace_defense
+        "#{base_text}. Please calculate time range and record: _____m to _____m"
       else
-        'Strip anodising as specified'
+        base_text
       end
-    end
 
-    def self.build_enp_stripping_text(method)
-      case method
-      when 'nitric'
-        'Strip ENP in nitric acid solution 30 to 40 minutes per 25 microns [or until black smut dissolves]'
-      when 'metex_dekote'
-        'Strip ENP in Metex Dekote at 80 to 90°C, for approximately 20 microns per hour strip rate'
-      else
-        'Strip ENP as specified'
+      # Append OCV monitoring for aerospace/defense
+      if aerospace_defense
+        ocv_text = build_time_temp_monitoring_text
+        operation_text += "\n\n**OCV Monitoring:**\n#{ocv_text}"
       end
-    end
 
-    def self.build_general_stripping_text(method)
-      case method
-      when 'E28'
-        'Strip in Oxidite E28 - wait till fizzing starts and hold for 30 seconds'
-      when 'chromic_phosphoric'
-        'Strip in chromic-phosphoric acid solution'
-      when 'nitric'
-        'Strip in nitric acid solution'
-      when 'metex_dekote'
-        'Strip in Metex Dekote at 80 to 90°C'
-      else
-        'Strip as specified'
-      end
+      operation_text
     end
   end
 end
