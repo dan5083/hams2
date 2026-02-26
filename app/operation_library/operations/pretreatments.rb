@@ -187,7 +187,7 @@ module OperationLibrary
     def self.build_time_temp_monitoring_text(electrolytic: false)
       text_lines = []
       (1..3).each do |batch|
-        line = "Batch ___: Time ___m ___s    Temp ___°C"
+        line = "Batch ___: Time ___    Temp ___°C"
         line += "    Voltage ___V" if electrolytic
         text_lines << line
       end

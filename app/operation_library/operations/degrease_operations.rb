@@ -73,7 +73,7 @@ module OperationLibrary
     def self.build_time_temp_monitoring_text
       text_lines = []
       (1..3).each do |batch|
-        text_lines << "Batch ___: Time ___m ___s    Temp ___°C"
+        text_lines << "Batch ___: Time ___    Temp ___°C"
       end
       text_lines.join("\n")
     end

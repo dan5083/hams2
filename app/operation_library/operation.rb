@@ -58,11 +58,11 @@ class Operation
     operations += OperationLibrary::ChemicalConversions.operations(aerospace_defense: aerospace_defense) if defined?(OperationLibrary::ChemicalConversions)
     # Pass thickness to ENP operations for time interpolation
     if defined?(OperationLibrary::ElectrolessNickelPlate)
-      operations += OperationLibrary::ElectrolessNickelPlate.operations(target_thickness)
+      operations += OperationLibrary::ElectrolessNickelPlate.operations(target_thickness, aerospace_defense: aerospace_defense)
     end
 
     # Add ENP heat treatments
-    operations += OperationLibrary::EnpHeatTreatments.operations if defined?(OperationLibrary::EnpHeatTreatments)
+    operations += OperationLibrary::EnpHeatTreatments.operations(aerospace_defense: aerospace_defense) if defined?(OperationLibrary::EnpHeatTreatments)
 
     # Add ENP Strip Mask operations (default to nitric strip type)
     if defined?(OperationLibrary::EnpStripMask)
