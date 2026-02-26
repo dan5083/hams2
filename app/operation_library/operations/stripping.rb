@@ -107,7 +107,7 @@ module OperationLibrary
       when 'chromic_phosphoric'
         'Strip anodising in chromic-phosphoric acid solution'
       when 'E28'
-        'Strip in E28 - wait till fizzing starts and hold for 30 seconds'
+        'Strip in E28 at 20-70°C - wait till fizzing starts and hold for 30 seconds'
       else
         'Strip anodising as specified'
       end
@@ -127,7 +127,7 @@ module OperationLibrary
     def self.build_general_stripping_text(method)
       case method
       when 'E28'
-        'Strip in Oxidite E28 - wait till fizzing starts and hold for 30 seconds'
+        'Strip in Oxidite E28 at 20-70°C - wait till fizzing starts and hold for 30 seconds'
       when 'chromic_phosphoric'
         'Strip in chromic-phosphoric acid solution'
       when 'nitric'
