@@ -19,12 +19,15 @@ def working_days_between(start_date, end_date)
   days
 end
 
-october_start = Date.new(2025, 10, 1)
-october_end = Date.new(2025, 10, 31)
+# Dynamically calculate the last fully completed month
+today = Date.today
+last_month_end = today.beginning_of_month - 1
+last_month_start = last_month_end.beginning_of_month
+month_label = last_month_start.strftime('%B %Y')
 
 customer_orders = CustomerOrder.includes(:customer, works_orders: [:part, :release_notes])
                                 .where(voided: false)
-                                .where(date_received: october_start..october_end)
+                                .where(date_received: last_month_start..last_month_end)
                                 .order(Arel.sql('CASE WHEN EXISTS (SELECT 1 FROM works_orders wo JOIN release_notes rn ON rn.works_order_id = wo.id WHERE wo.customer_order_id = customer_orders.id AND rn.voided = false) THEN 0 ELSE 1 END, date_received'))
 
 csv_data = CSV.generate do |csv|
@@ -40,13 +43,12 @@ end
 
 puts csv_data
 
-# Now generate the summary statistics
+# Summary statistics
 puts "\n"
 puts "=" * 60
-puts "PERFORMANCE ANALYSIS"
+puts "PERFORMANCE ANALYSIS — #{month_label}"
 puts "=" * 60
 
-# Parse the CSV data we just generated
 rows = CSV.parse(csv_data, headers: true)
 completed = rows.select { |r| r['Date Released'].present? && r['Duration (Working Days)'].present? }
 
@@ -62,7 +64,8 @@ non_aerospace_failure = non_aerospace_orders.select { |r| r['Duration (Working D
 total_success = aerospace_success.size + non_aerospace_success.size
 total_failure = aerospace_failure.size + non_aerospace_failure.size
 
-puts "\nDEADLINES:"
+puts "\nREPORT PERIOD: #{last_month_start.strftime('%d/%m/%Y')} - #{last_month_end.strftime('%d/%m/%Y')}"
+puts "DEADLINES:"
 puts "  Non-Aerospace: 10 working days"
 puts "  Aerospace:     15 working days"
 puts "\n" + "=" * 60
@@ -71,16 +74,18 @@ puts "=" * 60
 puts "Total completed orders: #{completed.size}"
 puts "Orders not yet released: #{rows.size - completed.size}"
 puts ""
-puts "Met deadline:    #{total_success} (#{'%.1f' % (total_success.to_f / completed.size * 100)}%)"
-puts "Missed deadline: #{total_failure} (#{'%.1f' % (total_failure.to_f / completed.size * 100)}%)"
+if completed.any?
+  puts "Met deadline:    #{total_success} (#{'%.1f' % (total_success.to_f / completed.size * 100)}%)"
+  puts "Missed deadline: #{total_failure} (#{'%.1f' % (total_failure.to_f / completed.size * 100)}%)"
+end
 
 puts "\n" + "=" * 60
 puts "NON-AEROSPACE ORDERS (<=10 days target)"
 puts "=" * 60
 puts "Total: #{non_aerospace_orders.size}"
-puts "Met deadline:    #{non_aerospace_success.size} (#{'%.1f' % (non_aerospace_success.size.to_f / non_aerospace_orders.size * 100)}%)"
-puts "Missed deadline: #{non_aerospace_failure.size} (#{'%.1f' % (non_aerospace_failure.size.to_f / non_aerospace_orders.size * 100)}%)"
 if non_aerospace_orders.any?
+  puts "Met deadline:    #{non_aerospace_success.size} (#{'%.1f' % (non_aerospace_success.size.to_f / non_aerospace_orders.size * 100)}%)"
+  puts "Missed deadline: #{non_aerospace_failure.size} (#{'%.1f' % (non_aerospace_failure.size.to_f / non_aerospace_orders.size * 100)}%)"
   durations = non_aerospace_orders.map { |r| r['Duration (Working Days)'].to_i }
   puts "Average duration:   #{'%.1f' % (durations.sum.to_f / durations.size)} days"
   puts "Median duration:    #{durations.sort[durations.size / 2]} days"
@@ -91,9 +96,9 @@ puts "\n" + "=" * 60
 puts "AEROSPACE ORDERS (<=15 days target)"
 puts "=" * 60
 puts "Total: #{aerospace_orders.size}"
-puts "Met deadline:    #{aerospace_success.size} (#{'%.1f' % (aerospace_success.size.to_f / aerospace_orders.size * 100)}%)"
-puts "Missed deadline: #{aerospace_failure.size} (#{'%.1f' % (aerospace_failure.size.to_f / aerospace_orders.size * 100)}%)"
 if aerospace_orders.any?
+  puts "Met deadline:    #{aerospace_success.size} (#{'%.1f' % (aerospace_success.size.to_f / aerospace_orders.size * 100)}%)"
+  puts "Missed deadline: #{aerospace_failure.size} (#{'%.1f' % (aerospace_failure.size.to_f / aerospace_orders.size * 100)}%)"
   durations = aerospace_orders.map { |r| r['Duration (Working Days)'].to_i }
   puts "Average duration:   #{'%.1f' % (durations.sum.to_f / durations.size)} days"
   puts "Median duration:    #{durations.sort[durations.size / 2]} days"
@@ -121,7 +126,7 @@ if all_failures.any?
 end
 
 EOF
-)" > october_orders.csv
+)" > last_month_orders.csv
 
 <!-- HOW Find and Fix Lufthansa parts that don't require thickness measurements -->
 
