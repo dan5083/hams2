@@ -95,6 +95,10 @@ class User < ApplicationRecord
     end
   end
 
+  def can_use_ai_assistant?
+    email_address == 'daniel@hardanodisingstl.com'
+  end
+
   def can_reissue_documents?
     email_address.in?([
       'quality@hardanodisingstl.com',    # Jim Ledger

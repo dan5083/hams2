@@ -137,5 +137,10 @@
         <p>&copy; <%= Date.current.year %> Hard Anodising Surface Treatments Ltd. All rights reserved.</p>
       </div>
     </footer>
+
+    <!-- AI Assistant (Daniel only) -->
+    <% if Current.user&.can_use_ai_assistant? %>
+      <%= render partial: 'shared/ai_assistant' %>
+    <% end %>
   </body>
 </html>

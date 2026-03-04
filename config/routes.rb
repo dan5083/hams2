@@ -9,6 +9,9 @@ Rails.application.routes.draw do
   get '/auth/xero/callback', to: 'xero_auth#callback'
   get '/test_xero_api', to: 'xero_auth#test_api'
 
+  # AI Assistant
+  post '/ai_assistant/chat', to: 'ai_assistant#chat'
+
   # Magic link route - AFTER Xero routes
   get '/auth/:token', to: 'sessions#magic_link', as: :magic_link
 
