@@ -1,4 +1,8 @@
 # app/controllers/ai_assistant_controller.rb
+require "net/http"
+require "uri"
+require "json"
+
 class AiAssistantController < ApplicationController
   before_action :require_authentication
   before_action :require_ai_access
