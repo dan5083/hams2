@@ -84,7 +84,7 @@ class AiAssistantController < ApplicationController
   private
 
   def require_ai_access
-    render json: { error: "Access denied." }, status: :forbidden unless current_user.can_use_ai_assistant?
+    render json: { error: "Access denied." }, status: :forbidden unless Current.user&.can_use_ai_assistant?
   end
 
   # ── Agentic loop ──────────────────────────────────────────────────────────
@@ -205,7 +205,7 @@ class AiAssistantController < ApplicationController
     # ── 1. Hard block ──────────────────────────────────────────────────────
     blocked = BLOCKED_PATTERNS.find { |p| code.match?(p) }
     if blocked
-      Rails.logger.warn "[AI Assistant] BLOCKED — user: #{current_user.email_address} | pattern: #{blocked.source} | code: #{code}"
+      Rails.logger.warn "[AI Assistant] BLOCKED — user: #{Current.user&.email_address} | pattern: #{blocked.source} | code: #{code}"
       return {
         blocked: true,
         reason: "This operation is not permitted (matched: #{blocked.source})",
@@ -217,9 +217,9 @@ class AiAssistantController < ApplicationController
     is_write = WRITE_PATTERNS.any? { |p| code.match?(p) }
 
     if is_write
-      Rails.logger.warn "[AI Assistant] WRITE — user: #{current_user.email_address} | code: #{code}"
+      Rails.logger.warn "[AI Assistant] WRITE — user: #{Current.user&.email_address} | code: #{code}"
     else
-      Rails.logger.info  "[AI Assistant] READ  — user: #{current_user.email_address} | code: #{code}"
+      Rails.logger.info  "[AI Assistant] READ  — user: #{Current.user&.email_address} | code: #{code}"
     end
 
     # ── 3. Execute ────────────────────────────────────────────────────────
