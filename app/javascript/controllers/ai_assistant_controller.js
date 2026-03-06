@@ -7,12 +7,15 @@ export default class extends Controller {
   connect() {
     this.messages = []
     this.isOpen = false
-    this.pendingFile = null // { base64, mediaType, name }
+    this.pendingFile = null
+    this.pollInterval = null
   }
 
-  toggle() {
-    this.isOpen ? this.close() : this.open()
+  disconnect() {
+    this.stopPolling()
   }
+
+  toggle() { this.isOpen ? this.close() : this.open() }
 
   open() {
     this.isOpen = true
@@ -30,21 +33,18 @@ export default class extends Controller {
 
   // ── File handling ─────────────────────────────────────────────────────
 
-  triggerFileUpload() {
-    this.fileInputTarget.click()
-  }
+  triggerFileUpload() { this.fileInputTarget.click() }
 
   async handleFileChange(event) {
     const file = event.target.files[0]
     if (!file) return
 
-    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"]
-    if (!allowedTypes.includes(file.type)) {
+    const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"]
+    if (!allowed.includes(file.type)) {
       this.addMessage("error", "Only images (JPEG, PNG, GIF, WEBP) and PDFs are supported.")
       event.target.value = ""
       return
     }
-
     if (file.size > 10 * 1024 * 1024) {
       this.addMessage("error", "File too large — maximum 10MB.")
       event.target.value = ""
@@ -53,12 +53,8 @@ export default class extends Controller {
 
     const base64 = await this.readFileAsBase64(file)
     this.pendingFile = { base64, mediaType: file.type, name: file.name }
-
-    // Show preview badge
     this.filePreviewTarget.classList.remove("hidden")
     this.filePreviewTarget.querySelector("[data-filename]").textContent = file.name
-
-    // Reset input so same file can be re-selected
     event.target.value = ""
   }
 
@@ -71,7 +67,7 @@ export default class extends Controller {
   readFileAsBase64(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
-      reader.onload = () => resolve(reader.result.split(",")[1])
+      reader.onload  = () => resolve(reader.result.split(",")[1])
       reader.onerror = reject
       reader.readAsDataURL(file)
     })
@@ -85,29 +81,19 @@ export default class extends Controller {
 
     this.inputTarget.value = ""
 
-    // Build the user message content — string for text-only, array if file attached
     let userContent
     let userDisplayText = text || "📎 File attached"
 
     if (this.pendingFile) {
-      const contentParts = []
-
+      const parts = []
       if (this.pendingFile.mediaType === "application/pdf") {
-        contentParts.push({
-          type: "document",
-          source: { type: "base64", media_type: "application/pdf", data: this.pendingFile.base64 }
-        })
+        parts.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: this.pendingFile.base64 } })
       } else {
-        contentParts.push({
-          type: "image",
-          source: { type: "base64", media_type: this.pendingFile.mediaType, data: this.pendingFile.base64 }
-        })
+        parts.push({ type: "image", source: { type: "base64", media_type: this.pendingFile.mediaType, data: this.pendingFile.base64 } })
       }
-
-      if (text) contentParts.push({ type: "text", text })
-      userContent = contentParts
+      if (text) parts.push({ type: "text", text })
+      userContent    = parts
       userDisplayText = (text ? text + " " : "") + `📎 ${this.pendingFile.name}`
-
       this.removePendingFile()
     } else {
       userContent = text
@@ -115,33 +101,63 @@ export default class extends Controller {
 
     this.addMessage("user", userDisplayText)
     this.messages.push({ role: "user", content: userContent })
-
     this.setSending(true)
 
     try {
-      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
-
-      const response = await fetch("/ai_assistant/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRF-Token": csrfToken
-        },
-        body: JSON.stringify({ messages: this.messages })
+      const csrf = document.querySelector('meta[name="csrf-token"]')?.content
+      const res  = await fetch("/ai_assistant/chat", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
+        body:    JSON.stringify({ messages: this.messages })
       })
 
-      const data = await response.json()
+      const data = await res.json()
 
       if (data.error) {
         this.addMessage("error", data.error)
+        this.setSending(false)
       } else {
-        const assistantText = data.response
-        this.messages.push({ role: "assistant", content: assistantText })
-        this.addMessage("assistant", assistantText)
+        // Got a request_id — start polling
+        this.startPolling(data.request_id)
       }
     } catch (err) {
       this.addMessage("error", "Network error — please try again.")
-    } finally {
+      this.setSending(false)
+    }
+  }
+
+  // ── Polling ───────────────────────────────────────────────────────────
+
+  startPolling(requestId) {
+    this.pollInterval = setInterval(() => this.checkStatus(requestId), 2000)
+  }
+
+  stopPolling() {
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval)
+      this.pollInterval = null
+    }
+  }
+
+  async checkStatus(requestId) {
+    try {
+      const res  = await fetch(`/ai_assistant/status/${requestId}`)
+      const data = await res.json()
+
+      if (data.status === "complete") {
+        this.stopPolling()
+        this.messages.push({ role: "assistant", content: data.response })
+        this.addMessage("assistant", data.response)
+        this.setSending(false)
+      } else if (data.status === "error") {
+        this.stopPolling()
+        this.addMessage("error", data.error || "Something went wrong.")
+        this.setSending(false)
+      }
+      // if still "pending", just keep polling
+    } catch (err) {
+      this.stopPolling()
+      this.addMessage("error", "Lost connection while waiting for response.")
       this.setSending(false)
     }
   }
@@ -154,6 +170,7 @@ export default class extends Controller {
   }
 
   clearHistory() {
+    this.stopPolling()
     this.messages = []
     this.pendingFile = null
     this.filePreviewTarget.classList.add("hidden")
@@ -211,9 +228,7 @@ export default class extends Controller {
     }
   }
 
-  scrollToBottom() {
-    this.messagesTarget.scrollTop = this.messagesTarget.scrollHeight
-  }
+  scrollToBottom() { this.messagesTarget.scrollTop = this.messagesTarget.scrollHeight }
 
   emptyStateHTML() {
     return `<div data-placeholder class="flex flex-col items-center justify-center h-full text-gray-400 text-sm gap-2">

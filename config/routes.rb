@@ -9,9 +9,6 @@ Rails.application.routes.draw do
   get '/auth/xero/callback', to: 'xero_auth#callback'
   get '/test_xero_api', to: 'xero_auth#test_api'
 
-  # AI Assistant
-  post '/ai_assistant/chat', to: 'ai_assistant#chat'
-
   # Magic link route - AFTER Xero routes
   get '/auth/:token', to: 'sessions#magic_link', as: :magic_link
 
@@ -226,6 +223,10 @@ Rails.application.routes.draw do
   # PWA routes
   get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
+
+  # AI Assistant
+  post '/ai_assistant/chat', to: 'ai_assistant#chat'
+  get  '/ai_assistant/status/:id', to: 'ai_assistant#status', as: :ai_assistant_status
 
   # Root route - Dashboard for authenticated users, login for unauthenticated
   root "dashboard#index"

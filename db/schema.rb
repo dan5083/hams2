@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_02_02_124520) do
+ActiveRecord::Schema[8.0].define(version: 2026_03_06_121102) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -55,6 +55,19 @@ ActiveRecord::Schema[8.0].define(version: 2026_02_02_124520) do
     t.index ["enabled"], name: "index_additional_charge_presets_on_enabled"
     t.index ["is_variable"], name: "index_additional_charge_presets_on_is_variable"
     t.index ["name"], name: "index_additional_charge_presets_on_name", unique: true
+  end
+
+  create_table "ai_assistant_requests", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "user_id", null: false
+    t.string "status", default: "pending", null: false
+    t.jsonb "messages", default: [], null: false
+    t.text "response"
+    t.text "error"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["created_at"], name: "index_ai_assistant_requests_on_created_at"
+    t.index ["status"], name: "index_ai_assistant_requests_on_status"
+    t.index ["user_id"], name: "index_ai_assistant_requests_on_user_id"
   end
 
   create_table "buyers", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
