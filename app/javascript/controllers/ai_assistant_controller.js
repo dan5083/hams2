@@ -2,11 +2,12 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["panel", "input", "messages", "button", "sendBtn", "spinner"]
+  static targets = ["panel", "input", "messages", "button", "sendBtn", "spinner", "fileInput", "filePreview"]
 
   connect() {
-    this.messages = [] // conversation history
+    this.messages = []
     this.isOpen = false
+    this.pendingFile = null // { base64, mediaType, name }
   }
 
   toggle() {
@@ -18,7 +19,6 @@ export default class extends Controller {
     this.panelTarget.classList.remove("hidden")
     this.panelTarget.classList.add("flex")
     this.inputTarget.focus()
-    // Scroll to bottom of messages
     this.scrollToBottom()
   }
 
@@ -28,13 +28,93 @@ export default class extends Controller {
     this.panelTarget.classList.remove("flex")
   }
 
+  // ── File handling ─────────────────────────────────────────────────────
+
+  triggerFileUpload() {
+    this.fileInputTarget.click()
+  }
+
+  async handleFileChange(event) {
+    const file = event.target.files[0]
+    if (!file) return
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"]
+    if (!allowedTypes.includes(file.type)) {
+      this.addMessage("error", "Only images (JPEG, PNG, GIF, WEBP) and PDFs are supported.")
+      event.target.value = ""
+      return
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      this.addMessage("error", "File too large — maximum 10MB.")
+      event.target.value = ""
+      return
+    }
+
+    const base64 = await this.readFileAsBase64(file)
+    this.pendingFile = { base64, mediaType: file.type, name: file.name }
+
+    // Show preview badge
+    this.filePreviewTarget.classList.remove("hidden")
+    this.filePreviewTarget.querySelector("[data-filename]").textContent = file.name
+
+    // Reset input so same file can be re-selected
+    event.target.value = ""
+  }
+
+  removePendingFile() {
+    this.pendingFile = null
+    this.filePreviewTarget.classList.add("hidden")
+    this.filePreviewTarget.querySelector("[data-filename]").textContent = ""
+  }
+
+  readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result.split(",")[1])
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
+
+  // ── Send ──────────────────────────────────────────────────────────────
+
   async send() {
     const text = this.inputTarget.value.trim()
-    if (!text || this.sending) return
+    if ((!text && !this.pendingFile) || this.sending) return
 
     this.inputTarget.value = ""
-    this.addMessage("user", text)
-    this.messages.push({ role: "user", content: text })
+
+    // Build the user message content — string for text-only, array if file attached
+    let userContent
+    let userDisplayText = text || "📎 File attached"
+
+    if (this.pendingFile) {
+      const contentParts = []
+
+      if (this.pendingFile.mediaType === "application/pdf") {
+        contentParts.push({
+          type: "document",
+          source: { type: "base64", media_type: "application/pdf", data: this.pendingFile.base64 }
+        })
+      } else {
+        contentParts.push({
+          type: "image",
+          source: { type: "base64", media_type: this.pendingFile.mediaType, data: this.pendingFile.base64 }
+        })
+      }
+
+      if (text) contentParts.push({ type: "text", text })
+      userContent = contentParts
+      userDisplayText = (text ? text + " " : "") + `📎 ${this.pendingFile.name}`
+
+      this.removePendingFile()
+    } else {
+      userContent = text
+    }
+
+    this.addMessage("user", userDisplayText)
+    this.messages.push({ role: "user", content: userContent })
 
     this.setSending(true)
 
@@ -67,7 +147,6 @@ export default class extends Controller {
   }
 
   handleKeydown(event) {
-    // Send on Enter, new line on Shift+Enter
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault()
       this.send()
@@ -76,13 +155,14 @@ export default class extends Controller {
 
   clearHistory() {
     this.messages = []
+    this.pendingFile = null
+    this.filePreviewTarget.classList.add("hidden")
     this.messagesTarget.innerHTML = this.emptyStateHTML()
   }
 
-  // ── Private helpers ──────────────────────────────────────────────────
+  // ── Helpers ───────────────────────────────────────────────────────────
 
   addMessage(role, text) {
-    // Remove empty state placeholder if present
     const placeholder = this.messagesTarget.querySelector("[data-placeholder]")
     if (placeholder) placeholder.remove()
 
@@ -112,7 +192,6 @@ export default class extends Controller {
     this.spinnerTarget.classList.toggle("hidden", !state)
 
     if (state) {
-      // Show typing indicator
       const indicator = document.createElement("div")
       indicator.id = "typing-indicator"
       indicator.classList.add("flex", "justify-start", "mb-3")

@@ -1,226 +1,274 @@
-// app/javascript/controllers/ai_assistant_controller.js
-import { Controller } from "@hotwired/stimulus"
+# app/controllers/ai_assistant_controller.rb
+require "net/http"
+require "uri"
+require "json"
 
-export default class extends Controller {
-  static targets = ["panel", "input", "messages", "button", "sendBtn", "spinner", "fileInput", "filePreview"]
+class AiAssistantController < ApplicationController
+  before_action :require_authentication
+  before_action :require_ai_access
 
-  connect() {
-    this.messages = []
-    this.isOpen = false
-    this.pendingFile = null // { base64, mediaType, name }
-  }
+  ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages".freeze
+  MODEL             = "claude-opus-4-6".freeze
 
-  toggle() {
-    this.isOpen ? this.close() : this.open()
-  }
+  # Hard blocked — catastrophic / irreversible bulk operations and shell escape.
+  # These raise an error and are never executed under any circumstances.
+  BLOCKED_PATTERNS = [
+    /destroy_all/,
+    /delete_all/,
+    /drop_table/,
+    /truncate/i,
+    /\.execute\s*\(/,               # raw SQL via connection.execute
+    /`[^`]+`/,                      # shell backticks
+    /\bsystem\s*\(/,                # system()
+    /\bexec\s*\(/,                  # exec()
+    /Kernel\.(system|exec)/,
+    /File\.(write|delete|unlink|rename)/,
+    /FileUtils\./,
+    /IO\.popen/,
+    /Open3\./,
+  ].freeze
 
-  open() {
-    this.isOpen = true
-    this.panelTarget.classList.remove("hidden")
-    this.panelTarget.classList.add("flex")
-    this.inputTarget.focus()
-    this.scrollToBottom()
-  }
+  # Write operations — permitted but logged loudly for audit trail.
+  WRITE_PATTERNS = [
+    /\.save[!\s(]/,
+    /\.update[!\s(]/,
+    /\.create[!\s(]/,
+    /\.destroy(?!_all)/,
+    /\.delete(?!_all)/,
+    /\.increment/,
+    /\.decrement/,
+    /\.toggle/,
+  ].freeze
 
-  close() {
-    this.isOpen = false
-    this.panelTarget.classList.add("hidden")
-    this.panelTarget.classList.remove("flex")
-  }
+  TOOLS = [
+    {
+      name: "execute_query",
+      description: <<~DESC,
+        Execute Ruby / ActiveRecord against the live HAMS database.
+        All models are available: Organization, CustomerOrder, WorksOrder, Part,
+        ReleaseNote, Invoice, InvoiceItem, ExternalNcr, Specification,
+        QualityDocument, User, Buyer, and any other model in the app.
+        Use standard ActiveRecord — scopes, associations, calculations, anything.
+        Return a serialisable value (Array, Hash, ActiveRecord result, scalar).
 
-  // ── File handling ─────────────────────────────────────────────────────
-
-  triggerFileUpload() {
-    this.fileInputTarget.click()
-  }
-
-  async handleFileChange(event) {
-    const file = event.target.files[0]
-    if (!file) return
-
-    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"]
-    if (!allowedTypes.includes(file.type)) {
-      this.addMessage("error", "Only images (JPEG, PNG, GIF, WEBP) and PDFs are supported.")
-      event.target.value = ""
-      return
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      this.addMessage("error", "File too large — maximum 10MB.")
-      event.target.value = ""
-      return
-    }
-
-    const base64 = await this.readFileAsBase64(file)
-    this.pendingFile = { base64, mediaType: file.type, name: file.name }
-
-    // Show preview badge
-    this.filePreviewTarget.classList.remove("hidden")
-    this.filePreviewTarget.querySelector("[data-filename]").textContent = file.name
-
-    // Reset input so same file can be re-selected
-    event.target.value = ""
-  }
-
-  removePendingFile() {
-    this.pendingFile = null
-    this.filePreviewTarget.classList.add("hidden")
-    this.filePreviewTarget.querySelector("[data-filename]").textContent = ""
-  }
-
-  readFileAsBase64(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result.split(",")[1])
-      reader.onerror = reject
-      reader.readAsDataURL(file)
-    })
-  }
-
-  // ── Send ──────────────────────────────────────────────────────────────
-
-  async send() {
-    const text = this.inputTarget.value.trim()
-    if ((!text && !this.pendingFile) || this.sending) return
-
-    this.inputTarget.value = ""
-
-    // Build the user message content — string for text-only, array if file attached
-    let userContent
-    let userDisplayText = text || "📎 File attached"
-
-    if (this.pendingFile) {
-      const contentParts = []
-
-      if (this.pendingFile.mediaType === "application/pdf") {
-        contentParts.push({
-          type: "document",
-          source: { type: "base64", media_type: "application/pdf", data: this.pendingFile.base64 }
-        })
-      } else {
-        contentParts.push({
-          type: "image",
-          source: { type: "base64", media_type: this.pendingFile.mediaType, data: this.pendingFile.base64 }
-        })
-      }
-
-      if (text) contentParts.push({ type: "text", text })
-      userContent = contentParts
-      userDisplayText = (text ? text + " " : "") + `📎 ${this.pendingFile.name}`
-
-      this.removePendingFile()
-    } else {
-      userContent = text
-    }
-
-    this.addMessage("user", userDisplayText)
-    this.messages.push({ role: "user", content: userContent })
-
-    this.setSending(true)
-
-    try {
-      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
-
-      const response = await fetch("/ai_assistant/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRF-Token": csrfToken
+        Examples:
+          Organization.where(is_customer: true).count
+          CustomerOrder.includes(:customer).where(voided: false).order(date_received: :desc).limit(10).map { |o| { number: o.number, customer: o.customer&.name, open_wos: o.open_works_orders_count } }
+          WorksOrder.where(is_open: true).joins(customer_order: :customer).group("organizations.name").count
+          Part.where(customer: Organization.find_by(name: "Alutec")).where(enabled: true).pluck(:part_number, :description)
+      DESC
+      input_schema: {
+        type: "object",
+        properties: {
+          code: {
+            type: "string",
+            description: "Ruby/ActiveRecord expression to evaluate. Last value is returned."
+          }
         },
-        body: JSON.stringify({ messages: this.messages })
-      })
-
-      const data = await response.json()
-
-      if (data.error) {
-        this.addMessage("error", data.error)
-      } else {
-        const assistantText = data.response
-        this.messages.push({ role: "assistant", content: assistantText })
-        this.addMessage("assistant", assistantText)
+        required: ["code"]
       }
-    } catch (err) {
-      this.addMessage("error", "Network error — please try again.")
-    } finally {
-      this.setSending(false)
     }
-  }
+  ].freeze
 
-  handleKeydown(event) {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault()
-      this.send()
-    }
-  }
+  def chat
+    messages = params[:messages]
 
-  clearHistory() {
-    this.messages = []
-    this.pendingFile = null
-    this.filePreviewTarget.classList.add("hidden")
-    this.messagesTarget.innerHTML = this.emptyStateHTML()
-  }
+    unless messages.is_a?(Array) && messages.any?
+      render json: { error: "No messages provided" }, status: :bad_request
+      return
+    end
 
-  // ── Helpers ───────────────────────────────────────────────────────────
+    result = run_agentic_loop(messages)
+    render json: { response: result }
+  rescue => e
+    Rails.logger.error "[AI Assistant] Unhandled error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+    render json: { error: "Something went wrong — check Rails logs." }, status: :internal_server_error
+  end
 
-  addMessage(role, text) {
-    const placeholder = this.messagesTarget.querySelector("[data-placeholder]")
-    if (placeholder) placeholder.remove()
+  private
 
-    const wrapper = document.createElement("div")
-    wrapper.classList.add("flex", role === "user" ? "justify-end" : "justify-start", "mb-3")
+  def require_ai_access
+    render json: { error: "Access denied." }, status: :forbidden unless Current.user&.can_use_ai_assistant?
+  end
 
-    const bubble = document.createElement("div")
-    bubble.classList.add("max-w-[85%]", "rounded-xl", "px-3", "py-2", "text-sm", "leading-relaxed", "whitespace-pre-wrap")
+  # ── Agentic loop ──────────────────────────────────────────────────────────
+  # Calls Claude repeatedly until it produces a final text response,
+  # executing any tool_use blocks in between.
 
-    if (role === "user") {
-      bubble.classList.add("bg-blue-600", "text-white", "rounded-br-sm")
-    } else if (role === "error") {
-      bubble.classList.add("bg-red-50", "text-red-700", "border", "border-red-200", "rounded-bl-sm")
-    } else {
-      bubble.classList.add("bg-white", "text-gray-800", "border", "border-gray-200", "rounded-bl-sm", "shadow-sm")
-    }
+  def run_agentic_loop(messages)
+    loop_messages = messages.dup
+    iterations    = 0
 
-    bubble.textContent = text
-    wrapper.appendChild(bubble)
-    this.messagesTarget.appendChild(wrapper)
-    this.scrollToBottom()
-  }
+    loop do
+      iterations += 1
+      raise "Exceeded maximum tool iterations" if iterations > 10
 
-  setSending(state) {
-    this.sending = state
-    this.sendBtnTarget.disabled = state
-    this.spinnerTarget.classList.toggle("hidden", !state)
+      response    = call_anthropic(loop_messages)
+      stop_reason = response["stop_reason"]
+      content     = response["content"] || []
+      text        = content.select { |b| b["type"] == "text" }.map { |b| b["text"] }.join("\n")
 
-    if (state) {
-      const indicator = document.createElement("div")
-      indicator.id = "typing-indicator"
-      indicator.classList.add("flex", "justify-start", "mb-3")
-      indicator.innerHTML = `
-        <div class="bg-white border border-gray-200 rounded-xl rounded-bl-sm px-3 py-2 shadow-sm">
-          <div class="flex space-x-1 items-center h-4">
-            <div class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style="animation-delay:0ms"></div>
-            <div class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style="animation-delay:150ms"></div>
-            <div class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style="animation-delay:300ms"></div>
-          </div>
-        </div>
-      `
-      this.messagesTarget.appendChild(indicator)
-      this.scrollToBottom()
-    } else {
-      document.getElementById("typing-indicator")?.remove()
-    }
-  }
+      return text.presence || "Done." if stop_reason == "end_turn"
 
-  scrollToBottom() {
-    this.messagesTarget.scrollTop = this.messagesTarget.scrollHeight
-  }
+      if stop_reason == "tool_use"
+        tool_uses = content.select { |b| b["type"] == "tool_use" }
+        loop_messages << { role: "assistant", content: content }
 
-  emptyStateHTML() {
-    return `<div data-placeholder class="flex flex-col items-center justify-center h-full text-gray-400 text-sm gap-2">
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
-      </svg>
-      <p>Ask me anything about HAMS data</p>
-    </div>`
-  }
-}
+        tool_results = tool_uses.map do |tu|
+          outcome = dispatch_tool(tu["name"], tu["input"] || {})
+          { type: "tool_result", tool_use_id: tu["id"], content: outcome.to_json }
+        end
+
+        loop_messages << { role: "user", content: tool_results }
+      else
+        return text.presence || "No response generated."
+      end
+    end
+  end
+
+  # ── Anthropic API ─────────────────────────────────────────────────────────
+
+  def call_anthropic(messages)
+    uri  = URI(ANTHROPIC_API_URL)
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl      = true
+    http.read_timeout = 90
+
+    req = Net::HTTP::Post.new(uri)
+    req["Content-Type"]      = "application/json"
+    req["x-api-key"]         = ENV["ANTHROPIC_API_KEY"]
+    req["anthropic-version"] = "2023-06-01"
+    req.body = {
+      model:      MODEL,
+      max_tokens: 4096,
+      system:     build_system_prompt,
+      tools:      TOOLS,
+      messages:   messages
+    }.to_json
+
+    res = http.request(req)
+    raise "Anthropic API error #{res.code}: #{res.body}" unless res.is_a?(Net::HTTPSuccess)
+
+    JSON.parse(res.body)
+  end
+
+  # ── System prompt ─────────────────────────────────────────────────────────
+
+  def build_system_prompt
+    schema = File.read(Rails.root.join("db", "schema.rb")) rescue "Schema unavailable."
+
+    <<~PROMPT
+      You are an internal data assistant embedded in HAMS 2.0 — the management system for
+      Hard Anodising Surface Treatments Limited (HASTL).
+
+      You are talking to Daniel Bayliss: the developer, consultant, and minority shareholder.
+      He is technical. Do not over-explain. Be direct.
+
+      YOUR CAPABILITY:
+      You have one tool — execute_query — which evaluates Ruby/ActiveRecord against the live
+      production database. Use it freely for both reads AND writes.
+      You can call it multiple times per response if needed.
+
+      READS: Query anything — counts, searches, associations, calculations.
+      WRITES: You CAN and SHOULD perform writes when asked — save!, update!, create!, etc.
+      Write operations are logged server-side for audit purposes but are fully permitted.
+      The only things blocked are bulk destructive operations (destroy_all, delete_all, truncate)
+      and shell access. Everything else is fair game.
+
+      Always query before answering questions about specific records. Do not guess at IDs or counts.
+      For writes, fetch the record first, then modify it — don't assume IDs.
+
+      BUSINESS CONTEXT:
+      - Core workflow: Customer PO → CustomerOrder → WorksOrders (one per line item) →
+        shop floor processing through VATs → ReleaseNotes on completion → Invoices raised
+      - Organizations: customers and suppliers synced from Xero
+      - Parts: master records for each customer's components — hold processing instructions
+      - WorksOrders: live jobs referencing a Part, carrying qty, pricing, open/closed status
+      - Process types: hard_anodising, standard_anodising, chromic_anodising,
+        chemical_conversion, electroless_nickel_plating
+      - VATs are the treatment tanks, numbered approximately 1–12
+      - ReleaseNotes record accepted/rejected quantities when work is completed
+      - Invoices sync to Xero via xero_id
+
+      RESPONSE STYLE:
+      - Concise. No hand-holding.
+      - Tables or lists for multiple records.
+      - Summarise large result sets and offer to drill in.
+      - If something looks wrong in the data, say so.
+      - Today is #{Date.current.strftime("%A, %d %B %Y")}.
+
+      CURRENT SCHEMA:
+      #{schema}
+    PROMPT
+  end
+
+  # ── Tool dispatch ─────────────────────────────────────────────────────────
+
+  def dispatch_tool(name, input)
+    case name
+    when "execute_query" then run_query(input["code"].to_s.strip)
+    else { error: "Unknown tool: #{name}" }
+    end
+  end
+
+  def run_query(code)
+    return { error: "Empty query." } if code.blank?
+
+    # ── 1. Hard block ──────────────────────────────────────────────────────
+    blocked = BLOCKED_PATTERNS.find { |p| code.match?(p) }
+    if blocked
+      Rails.logger.warn "[AI Assistant] BLOCKED — user: #{Current.user&.email_address} | pattern: #{blocked.source} | code: #{code}"
+      return {
+        blocked: true,
+        reason: "This operation is not permitted (matched: #{blocked.source})",
+        code: code
+      }
+    end
+
+    # ── 2. Classify and log ────────────────────────────────────────────────
+    is_write = WRITE_PATTERNS.any? { |p| code.match?(p) }
+
+    if is_write
+      Rails.logger.warn "[AI Assistant] WRITE — user: #{Current.user&.email_address} | code: #{code}"
+    else
+      Rails.logger.info  "[AI Assistant] READ  — user: #{Current.user&.email_address} | code: #{code}"
+    end
+
+    # ── 3. Execute ────────────────────────────────────────────────────────
+    # Writes run in a normal transaction (commits).
+    # Reads run in a transaction that always rolls back — belt and braces
+    # to prevent accidental mutations from pure-looking queries.
+    result = if is_write
+      ActiveRecord::Base.transaction { eval(code) } # rubocop:disable Security/Eval
+    else
+      outcome = nil
+      ActiveRecord::Base.transaction do
+        outcome = eval(code) # rubocop:disable Security/Eval
+        raise ActiveRecord::Rollback
+      end
+      outcome
+    end
+
+    serialise(result)
+  rescue SyntaxError => e
+    { error: "Syntax error", detail: e.message }
+  rescue ActiveRecord::StatementInvalid => e
+    { error: "Database error", detail: e.message }
+  rescue => e
+    Rails.logger.error "[AI Assistant] Query error: #{e.class} — #{e.message} | Code: #{code}"
+    { error: e.class.to_s, detail: e.message }
+  end
+
+  def serialise(value)
+    case value
+    when ActiveRecord::Relation  then value.as_json
+    when ActiveRecord::Base      then value.as_json
+    when Array                   then value.map { |v| v.respond_to?(:as_json) ? v.as_json : v }
+    when Hash, Numeric, String,
+         TrueClass, FalseClass,
+         NilClass                then value
+    else
+      value.respond_to?(:as_json) ? value.as_json : value.to_s
+    end
+  end
+end
