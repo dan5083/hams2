@@ -196,21 +196,30 @@ class AiAssistantJob < ApplicationJob
       When a part requires multiple surface treatments, they are separate sequential operations
       with masking, stripping, and re-prep between them — NOT a single operation with notes.
 
-      Key ordering rules:
-      - Chemical conversion (chromate) is always done BEFORE any Type II or Type III anodise
-        when both are present. It is thin and acts as a primer; anodising over it would destroy it.
-      - Chromic anodise is done FIRST on multi-treatment parts. It is thin (so stripping
-        unwanted areas loses minimal material) and "searching" — it penetrates gaps that
-        stopping-off lacquer cannot reliably seal, making it very difficult to mask selectively.
-        Do it first unmasked, then strip where it is not wanted.
-      - When a part has two hard anodise thicknesses (e.g. thin hard ~8–15μm and thick hard
-        ~46–65μm), these are two separate anodise passes. The thick hard is applied first with
-        the thin-hard areas masked off — the thick coating itself then acts as masking for the
-        subsequent thin hard pass.
-      - If a drawing references multiple anodise specs by note (e.g. Note 4, Note 5), assume
-        these are separate sequential treatments unless they are clearly the same process type
-        and thickness range.
-      - VS spec references on Eaton/aerospace drawings often map to MIL specs:
+      MANDATORY TREATMENT ORDERING — FOLLOW THIS EXACTLY, NO EXCEPTIONS:
+
+      When a part requires both hard anodise (Type II or III) and chromate conversion (MIL-DTL-5541):
+        ALWAYS in this order:
+        1. Chromate conversion FIRST (it is thin; anodising over it destroys it)
+        2. Mask the chromate areas
+        3. Hard anodise the remaining areas
+
+      When a part requires chromic anodise (Type I) alongside any other treatment:
+        ALWAYS do chromic anodise FIRST, unmasked across the whole part.
+        Then strip it from areas where it is not wanted (it is thin so little material is lost).
+        Chromic is "searching" — stopping-off lacquer cannot reliably seal against it, so
+        you cannot mask selectively before chromic. Do it first, strip afterwards.
+
+      When a part has two hard anodise thicknesses (e.g. thin ~8–15μm and thick ~46–65μm):
+        ALWAYS apply thick hard FIRST with thin-hard areas masked off.
+        Then apply thin hard — the thick coating itself acts as masking for this pass.
+        These are always two separate sequential operations, never one operation with notes.
+
+      When a drawing references multiple anodise specs by note (e.g. Note 4, Note 5):
+        Treat each as a separate sequential treatment unless they are clearly the same
+        process type and thickness range.
+
+      VS spec references on Eaton/aerospace drawings map to MIL specs:
         VS 1-3-1-1 = chromic anodise (Type I), VS 1-3-1-4 = hard anodise (Type III),
         VS 1-3-1-176 = chemical conversion. Treat these accordingly.
 
