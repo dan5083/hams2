@@ -178,7 +178,7 @@ class AiAssistantJob < ApplicationJob
           "operation_id"              => "7XXX_HARD_50_VAT5", # from step 1
           "selected_jig_type"         => "Double Strap Jig", # or whatever is appropriate
           "masking_methods"           => {},               # hash of masking method => description, or {}
-          "sealing_method"            => "SURTEC_650V_SEAL", # or "HOT_SEAL", "none", etc.
+          "sealing_method"            => "COLD_SEAL", # see sealing rules below
           "dye_color"                 => "BLACK_DYE",      # or "none"
           "stripping_enabled"         => false,
           "stripping_type_secondary"  => "none",
@@ -219,6 +219,26 @@ class AiAssistantJob < ApplicationJob
       auto_lock_for_editing! — the method sets it to true itself. Do not set locked: true manually.
 
       Always look up the Organization first to get the correct customer_id UUID — never guess it.
+
+      SEALING SELECTION:
+      Always check the drawing and spec for sealing requirements first. If stated, follow exactly.
+      - Hard anodise (Type III) default: COLD_SEAL
+      - Hard anodise with black dye default: COLD_SEAL
+      - Hard anodise, nickel acetate specified: NICKEL_ACETATE_SEAL
+      - Hard anodise, duplex seal specified (nickel acetate + dichromate): NICKEL_ACETATE_SEAL then SODIUM_DICHROMATE_SEAL as two separate sealing operations
+      - Standard anodise (Type II) default: SURTEC_650V_SEAL
+      - Chromic anodise default: HOT_SEAL
+      - SurTec 650V (SURTEC_650V_SEAL) is a chromate conversion post-treatment — only appropriate after standard or chromic anodise, never after hard anodise
+
+      DEFAULT THICKNESSES BY SPECIFICATION:
+      If a drawing omits a thickness callout, the specification itself defines a default — do not leave thickness as 0 or null.
+      - MIL-PRF-8625 Type III Class 1 (hard anodise, natural): 25μm default
+      - MIL-PRF-8625 Type III Class 2 (hard anodise, black dye): 25μm default
+      - MIL-PRF-8625 Type II (standard anodise): 18μm default
+      - MIL-A-8625 references are equivalent to MIL-PRF-8625
+      - Chromic anodise (Type I): no significant thickness, use 0
+      - Chemical conversion (MIL-DTL-5541): no significant thickness, use 0
+      If a drawing gives an explicit thickness range, use the midpoint as target_thickness.
 
       MANDATORY TREATMENT ORDERING — FOLLOW THIS EXACTLY, NO EXCEPTIONS:
 
