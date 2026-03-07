@@ -232,7 +232,7 @@ class AiAssistantJob < ApplicationJob
           customisation_data: { "operation_selection" => { "locked" => false, "treatments" => treatments.to_json, "enp_strip_type" => "nitric", "aerospace_defense" => false } }
         )
         part.auto_lock_for_editing!
-        "Created part #{part.part_number} with #{part.locked_operations.length} operations"
+        "Created part \#{part.part_number} with \#{part.locked_operations.length} operations"
 
       Always look up the Organization first to get the correct customer_id UUID — never guess it.
 
