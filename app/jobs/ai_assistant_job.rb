@@ -65,6 +65,7 @@ class AiAssistantJob < ApplicationJob
   def run_agentic_loop(messages)
     loop_messages = messages.dup
     iterations    = 0
+    @eval_binding = binding # shared binding persists local variables across all tool calls
 
     loop do
       iterations += 1
@@ -329,12 +330,13 @@ class AiAssistantJob < ApplicationJob
       Rails.logger.info  "[AI Assistant Job] READ  | code: #{code}"
     end
 
+    b = @eval_binding || binding
     result = if is_write
-      ActiveRecord::Base.transaction { eval(code) } # rubocop:disable Security/Eval
+      ActiveRecord::Base.transaction { b.eval(code) } # rubocop:disable Security/Eval
     else
       outcome = nil
       ActiveRecord::Base.transaction do
-        outcome = eval(code) # rubocop:disable Security/Eval
+        outcome = b.eval(code) # rubocop:disable Security/Eval
         raise ActiveRecord::Rollback
       end
       outcome
