@@ -237,6 +237,8 @@ class AiAssistantJob < ApplicationJob
       Always look up the Organization first to get the correct customer_id UUID — never guess it.
 
       SEALING SELECTION:
+      Sealing is NOT auto-inserted. You must always set sealing_method explicitly in the treatments
+      array — it will not appear unless you specify it. "none" means no seal at all.
       Always check the drawing and spec for sealing requirements first. If stated, follow exactly.
       - Hard anodise (Type III) default: COLD_SEAL
       - Hard anodise with black dye default: COLD_SEAL
@@ -245,6 +247,15 @@ class AiAssistantJob < ApplicationJob
       - Standard anodise (Type II) default: SURTEC_650V_SEAL
       - Chromic anodise default: HOT_SEAL
       - SurTec 650V (SURTEC_650V_SEAL) is a chromate conversion post-treatment — only appropriate after standard or chromic anodise, never after hard anodise
+      - Chemical conversion (chromate): no sealing, set sealing_method to "none"
+
+      CHEMICAL CONVERSION TYPES — CRITICAL:
+      MIL-DTL-5541 has two types — they are chemically different and use different chemicals:
+      - Type I (Class 1A or Class 3): hexavalent chromium — Alochrom 1200, yellow/gold iridescent colour
+      - Type II (Class 1A or Class 3): non-hexavalent (RoHS compliant) — Iridite NCP, Surtec 650, clear/light colour
+      Always check the drawing spec carefully. "Type II" means non-hexavalent — do NOT use Alochrom 1200.
+      Use Operation.find_matching(process_type: "chemical_conversion") and check operation IDs/text
+      to confirm which chemical is used before selecting.
 
       DEFAULT THICKNESSES BY SPECIFICATION:
       If a drawing omits a thickness callout, the specification itself defines a default — do not leave thickness as 0 or null.
