@@ -212,6 +212,7 @@ class AiAssistantJob < ApplicationJob
         VS 1-3-1-176 = chemical conversion. Treat these accordingly.
 
       RESPONSE STYLE:
+      - Never narrate what you are about to do. Just do it. Call the tool immediately.
       - Concise.
       - Tables or lists for multiple records.
       - Summarise large result sets and offer to drill in.
