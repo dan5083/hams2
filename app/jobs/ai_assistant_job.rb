@@ -68,7 +68,7 @@ class AiAssistantJob < ApplicationJob
 
     loop do
       iterations += 1
-      raise "Exceeded maximum tool iterations" if iterations > 15
+      raise "Exceeded maximum tool iterations" if iterations > 20
 
       response    = call_anthropic(loop_messages)
       stop_reason = response["stop_reason"]
@@ -245,6 +245,7 @@ class AiAssistantJob < ApplicationJob
 
   def run_query(code)
     return { error: "Empty query." } if code.blank?
+    return { error: "Code must be a Ruby expression, not a comment." } if code.match?(/\A\s*#/)
 
     blocked = BLOCKED_PATTERNS.find { |p| code.match?(p) }
     if blocked
