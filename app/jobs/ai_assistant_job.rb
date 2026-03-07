@@ -177,6 +177,18 @@ class AiAssistantJob < ApplicationJob
       it can be edited in the UI afterwards.
       Always look up the Organization first to get the correct customer_id UUID — never guess it.
 
+      CRITICAL — BUILDING locked_operations:
+      Never construct locked_operations from scratch. Always query an existing part of the same
+      or similar process_type first and use it as a structural template. For example:
+
+        Part.where(process_type: "hard_anodising").where("customisation_data->>'operation_selection' IS NOT NULL").last
+
+      Copy the full locked_operations array from that part, then substitute/add/remove only
+      the actual treatment operations (the non-auto-inserted ones) to match the new part's spec.
+      The auto-inserted scaffolding (jig, unjig, degrease, rinse, deox, cascade rinse, inspect,
+      masking inspection, masking removal, OCV checks, foil verification, sealing, pack etc)
+      must come from a real existing part — do not omit or invent these.
+
       TREATMENT ORDERING AND MASKING PRINCIPLES:
       When a part requires multiple surface treatments, they are separate sequential operations
       with masking, stripping, and re-prep between them — NOT a single operation with notes.
