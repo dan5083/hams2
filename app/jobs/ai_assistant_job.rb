@@ -218,6 +218,21 @@ class AiAssistantJob < ApplicationJob
       CRITICAL — customisation_data MUST include "locked" => false before calling
       auto_lock_for_editing! — the method sets it to true itself. Do not set locked: true manually.
 
+      CRITICAL — eval does not persist local variables between tool calls. Each execute_query
+      call is a completely fresh context. Any multi-step operation (create then auto_lock,
+      find then update, etc.) MUST be done in a single execute_query call as a multi-line
+      Ruby block. For example, steps 3 and 4 must be one single tool call:
+
+        customer = Organization.find_by!("name ILIKE ?", "%24 Locks%")
+        treatments = [{ "id" => "treatment_1", ... }]
+        part = Part.create!(
+          customer_id: customer.id,
+          ...
+          customisation_data: { "operation_selection" => { "locked" => false, "treatments" => treatments.to_json, "enp_strip_type" => "nitric", "aerospace_defense" => false } }
+        )
+        part.auto_lock_for_editing!
+        "Created part #{part.part_number} with #{part.locked_operations.length} operations"
+
       Always look up the Organization first to get the correct customer_id UUID — never guess it.
 
       SEALING SELECTION:
