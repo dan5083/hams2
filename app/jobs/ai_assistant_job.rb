@@ -68,7 +68,7 @@ class AiAssistantJob < ApplicationJob
 
     loop do
       iterations += 1
-      raise "Exceeded maximum tool iterations" if iterations > 10
+      raise "Exceeded maximum tool iterations" if iterations > 15
 
       response    = call_anthropic(loop_messages)
       stop_reason = response["stop_reason"]
@@ -178,16 +178,19 @@ class AiAssistantJob < ApplicationJob
       Always look up the Organization first to get the correct customer_id UUID — never guess it.
 
       CRITICAL — BUILDING locked_operations:
-      Never construct locked_operations from scratch. Always query an existing part of the same
-      or similar process_type first and use it as a structural template. For example:
+      Never construct locked_operations from scratch. Always find a template part first.
+      Template search strategy (in order, stop at first hit):
+      1. Same process_type with locked_operations:
+           Part.where(process_type: "<type>").where("customisation_data->'operation_selection' IS NOT NULL").last
+      2. Any part with locked_operations:
+           Part.where("customisation_data->'operation_selection' IS NOT NULL").last
 
-        Part.where(process_type: "hard_anodising").where("customisation_data->>'operation_selection' IS NOT NULL").last
-
-      Copy the full locked_operations array from that part, then substitute/add/remove only
+      Copy the full locked_operations array from the template, then substitute/add/remove only
       the actual treatment operations (the non-auto-inserted ones) to match the new part's spec.
       The auto-inserted scaffolding (jig, unjig, degrease, rinse, deox, cascade rinse, inspect,
       masking inspection, masking removal, OCV checks, foil verification, sealing, pack etc)
       must come from a real existing part — do not omit or invent these.
+      Find a template in ONE query — do not make multiple attempts with different filters.
 
       TREATMENT ORDERING AND MASKING PRINCIPLES:
       When a part requires multiple surface treatments, they are separate sequential operations
