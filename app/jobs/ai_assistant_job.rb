@@ -177,6 +177,12 @@ class AiAssistantJob < ApplicationJob
       it can be edited in the UI afterwards.
       Always look up the Organization first to get the correct customer_id UUID — never guess it.
 
+      CRITICAL — NEVER attempt Part.create! or Part.new without locked_operations already in hand from a template. Finding the template is step 1, always. If Part.create! fails with a validation error, do not inspect the model source — fetch a template part and retry with its locked_operations.
+
+      CRITICAL — customisation_data MUST include "locked" => true inside operation_selection, e.g.:
+        customisation_data: { "operation_selection" => { "locked" => true, "locked_operations" => [...] } }
+      Without "locked" => true the treatments validation runs and will fail. Template parts already have this set — copy it exactly.
+
       CRITICAL — BUILDING locked_operations:
       Never construct locked_operations from scratch. Always find a template part first.
       Template search strategy (in order, stop at first hit):
