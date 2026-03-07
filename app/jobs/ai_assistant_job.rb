@@ -224,7 +224,7 @@ class AiAssistantJob < ApplicationJob
         VS 1-3-1-176 = chemical conversion. Treat these accordingly.
 
       RESPONSE STYLE:
-      - Never narrate what you are about to do. Just do it. Call the tool immediately.
+      - Do not produce any text before or between tool calls. Only output text in your final response after all tool calls are complete. No narration, no plans, no commentary mid-task.
       - Concise.
       - Tables or lists for multiple records.
       - Summarise large result sets and offer to drill in.
