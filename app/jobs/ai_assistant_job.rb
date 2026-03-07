@@ -75,7 +75,16 @@ class AiAssistantJob < ApplicationJob
       content     = response["content"] || []
       text        = content.select { |b| b["type"] == "text" }.map { |b| b["text"] }.join("\n")
 
-      return text.presence || "Done." if stop_reason == "end_turn"
+      if stop_reason == "end_turn"
+        # Claude narrated instead of acting — push it back once, then give up
+        narrating = text.present? && text.match?(/let me|i need to|i will|i'll|now i|first i|my plan|per the|mandatory/i)
+        if narrating && iterations <= 3
+          loop_messages << { role: "assistant", content: content }
+          loop_messages << { role: "user", content: [{ type: "text", text: "Stop narrating. Call the tool now." }] }
+          next
+        end
+        return text.presence || "Done."
+      end
 
       if stop_reason == "tool_use"
         tool_uses = content.select { |b| b["type"] == "tool_use" }
