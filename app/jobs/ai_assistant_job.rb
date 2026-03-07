@@ -160,64 +160,83 @@ class AiAssistantJob < ApplicationJob
       - Invoices sync to Xero via xero_id
 
       CREATING PARTS — IMPORTANT:
-      Parts have a validation: "Must configure at least one treatment before creating the part".
-      customisation_data must include at least one locked_operation when saving. Always include
-      a structure like this, adapted to the part's process_type and any available spec details:
+      Never construct locked_operations by hand or copy them from a template part.
+      The app generates the full operation scaffold automatically via auto_lock_for_editing!
+      This is the ONLY correct way to create a part. Follow these steps exactly:
 
-        customisation_data: {
-          "operation_selection" => {
-            "locked_operations" => [
-              {
-                "id" => "OP_1",
-                "position" => 1,
-                "vat_numbers" => [],
-                "display_name" => "Hard Anodise",
-                "process_type" => "hard_anodising",
-                "auto_inserted" => false,
-                "operation_text" => "Hard anodise per specification",
-                "specifications" => "",
-                "target_thickness" => 0
-              }
-            ]
-          }
+      STEP 1 — Find the right operation_id(s) using the operation library:
+        Operation.find_matching(process_type: "hard_anodising")
+        Operation.find_matching(process_type: "chemical_conversion")
+        Operation.find_matching(process_type: "chromic_anodising")
+        etc.
+        Pick the operation whose id, alloys, and target_thickness best matches the drawing.
+
+      STEP 2 — Build a treatments array. Each treatment is a hash with these keys:
+        {
+          "id"                        => "treatment_1",   # unique per treatment
+          "type"                      => "hard_anodising", # must match process_type
+          "operation_id"              => "7XXX_HARD_50_VAT5", # from step 1
+          "selected_jig_type"         => "Double Strap Jig", # or whatever is appropriate
+          "masking_methods"           => {},               # hash of masking method => description, or {}
+          "sealing_method"            => "SURTEC_650V_SEAL", # or "HOT_SEAL", "none", etc.
+          "dye_color"                 => "BLACK_DYE",      # or "none"
+          "stripping_enabled"         => false,
+          "stripping_type_secondary"  => "none",
+          "stripping_method_secondary"=> "none",
+          "ptfe_enabled"              => false,
+          "local_treatment_type"      => "none"
         }
+      For multi-treatment parts, build one hash per treatment in the correct order (see below).
 
-      If unsure of exact operation details, make a reasonable attempt from the process_type —
-      it can be edited in the UI afterwards.
+      STEP 3 — Create the part with locked: false and treatments as JSON:
+        part = Part.create!(
+          customer_id:         customer.id,
+          part_number:         "...",
+          part_issue:          "...",
+          description:         "...",
+          material:            "...",
+          specification:       "...",
+          special_instructions:"...",
+          process_type:        "hard_anodising",
+          customisation_data:  {
+            "operation_selection" => {
+              "locked"           => false,
+              "treatments"       => treatments.to_json,
+              "enp_strip_type"   => "nitric",
+              "aerospace_defense"=> false
+            }
+          }
+        )
+
+      STEP 4 — Call auto_lock_for_editing! to generate all operations:
+        part.auto_lock_for_editing!
+
+      This single call generates the complete locked_operations array including all
+      auto-inserted steps (jig, unjig, degrease, rinse, deox, masking inspection,
+      masking removal, OCV checks, foil verification, sealing, pack etc) in the correct order.
+
+      CRITICAL — customisation_data MUST include "locked" => false before calling
+      auto_lock_for_editing! — the method sets it to true itself. Do not set locked: true manually.
+
       Always look up the Organization first to get the correct customer_id UUID — never guess it.
-
-      CRITICAL — NEVER attempt Part.create! or Part.new without locked_operations already in hand from a template. Finding the template is step 1, always. If Part.create! fails with a validation error, do not inspect the model source — fetch a template part and retry with its locked_operations.
-
-      CRITICAL — customisation_data MUST include "locked" => true inside operation_selection, e.g.:
-        customisation_data: { "operation_selection" => { "locked" => true, "locked_operations" => [...] } }
-      Without "locked" => true the treatments validation runs and will fail. Template parts already have this set — copy it exactly.
-
-      CRITICAL — BUILDING locked_operations:
-      Never construct locked_operations from scratch. Always find a template part first.
-      Template search strategy (in order, stop at first hit):
-      1. Same process_type with locked_operations:
-           Part.where(process_type: "<type>").where("customisation_data->'operation_selection' IS NOT NULL").last
-      2. Any part with locked_operations:
-           Part.where("customisation_data->'operation_selection' IS NOT NULL").last
-
-      Copy the full locked_operations array from the template, then substitute/add/remove only
-      the actual treatment operations (the non-auto-inserted ones) to match the new part's spec.
-      The auto-inserted scaffolding (jig, unjig, degrease, rinse, deox, cascade rinse, inspect,
-      masking inspection, masking removal, OCV checks, foil verification, sealing, pack etc)
-      must come from a real existing part — do not omit or invent these.
-      Find a template in ONE query — do not make multiple attempts with different filters.
-
-      TREATMENT ORDERING AND MASKING PRINCIPLES:
-      When a part requires multiple surface treatments, they are separate sequential operations
-      with masking, stripping, and re-prep between them — NOT a single operation with notes.
 
       MANDATORY TREATMENT ORDERING — FOLLOW THIS EXACTLY, NO EXCEPTIONS:
 
       When a part requires both hard anodise (Type II or III) and chromate conversion (MIL-DTL-5541):
         ALWAYS in this order:
-        1. Chromate conversion FIRST (it is thin; anodising over it destroys it)
-        2. Mask the chromate areas
-        3. Hard anodise the remaining areas
+        1. Chromate conversion applied to the WHOLE part — no masking beforehand
+        2. Unjig
+        3. Mask the chromate areas (to protect them)
+        4. Jig, prep, hard anodise the remaining areas
+
+      MASKING COUNT RULE — CRITICAL:
+      For N treatments, there are exactly N-1 masking steps. Never mask before the first treatment.
+      The first treatment always goes on the whole part unmasked. Then mask to protect treatment 1
+      before applying treatment 2. Then mask to protect treatments 1+2 before treatment 3. Etc.
+      Example: 2 treatments = 1 masking step. 3 treatments = 2 masking steps.
+      The only exception is where a treatment must be selectively applied on first pass due to
+      geometry constraints — this is rare and should only be done if the drawing explicitly
+      requires it.
 
       When a part requires chromic anodise (Type I) alongside any other treatment:
         ALWAYS do chromic anodise FIRST, unmasked across the whole part.
