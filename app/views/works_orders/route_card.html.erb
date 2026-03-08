@@ -534,7 +534,7 @@
         function walkNode(node) {
           if (node.nodeType === 3) {
             highlightTextNode(node);
-          } else if (node.nodeType === 1 && node.tagName !== 'SCRIPT' && node.tagName !== 'STYLE') {
+          } else if (node.nodeType === 1 && node.tagName !== 'SCRIPT' && node.tagName !== 'STYLE' && !node.classList.contains('no-colour-highlight')) {
             // Work on a snapshot so replacements don't affect iteration
             var children = Array.prototype.slice.call(node.childNodes);
             children.forEach(walkNode);
