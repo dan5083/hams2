@@ -279,6 +279,38 @@
       .checklist-table tbody td {
         min-height: 0.8cm;
       }
+
+      /* Colour word highlights */
+      .colour-word-black {
+        background-color: #000000;
+        color: #ffffff;
+        padding: 0 2px;
+        border-radius: 2px;
+      }
+      .colour-word-gold {
+        background-color: #FFD700;
+        color: #000000;
+        padding: 0 2px;
+        border-radius: 2px;
+      }
+      .colour-word-yellow {
+        background-color: #FFFF00;
+        color: #000000;
+        padding: 0 2px;
+        border-radius: 2px;
+      }
+      .colour-word-green {
+        background-color: #1a7a1a;
+        color: #ffffff;
+        padding: 0 2px;
+        border-radius: 2px;
+      }
+      .colour-word-blue {
+        background-color: #0055cc;
+        color: #ffffff;
+        padding: 0 2px;
+        border-radius: 2px;
+      }
     </style>
   </head>
   <body>
@@ -452,5 +484,60 @@
       </div>
       <% end %>
     <% end %>
+    <script>
+      (function() {
+        var colours = {
+          'black':  'colour-word-black',
+          'gold':   'colour-word-gold',
+          'yellow': 'colour-word-yellow',
+          'green':  'colour-word-green',
+          'blue':   'colour-word-blue'
+        };
+
+        var pattern = new RegExp('\\b(' + Object.keys(colours).join('|') + ')\\b', 'gi');
+
+        function highlightTextNode(node) {
+          var text = node.nodeValue;
+          if (!pattern.test(text)) return;
+          pattern.lastIndex = 0;
+
+          var frag = document.createDocumentFragment();
+          var lastIndex = 0;
+          var match;
+
+          while ((match = pattern.exec(text)) !== null) {
+            if (match.index > lastIndex) {
+              frag.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+            }
+            var word = match[1].toLowerCase();
+            var span = document.createElement('span');
+            span.className = colours[word];
+            span.textContent = match[1];
+            frag.appendChild(span);
+            lastIndex = pattern.lastIndex;
+          }
+
+          if (lastIndex < text.length) {
+            frag.appendChild(document.createTextNode(text.slice(lastIndex)));
+          }
+
+          node.parentNode.replaceChild(frag, node);
+        }
+
+        function walkNode(node) {
+          if (node.nodeType === 3) {
+            highlightTextNode(node);
+          } else if (node.nodeType === 1 && node.tagName !== 'SCRIPT' && node.tagName !== 'STYLE') {
+            // Work on a snapshot so replacements don't affect iteration
+            var children = Array.prototype.slice.call(node.childNodes);
+            children.forEach(walkNode);
+          }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+          walkNode(document.body);
+        });
+      })();
+    </script>
   </body>
 </html>
