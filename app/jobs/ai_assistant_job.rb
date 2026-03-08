@@ -182,9 +182,15 @@ class AiAssistantJob < ApplicationJob
       Then fetch the full part: Part.find("<id>").customisation_data
 
       STEP 2 (write) — Clone and create in a single tool call:
-      Copy the entire customisation_data from the matched part. Update only the
-      operation_text fields on the non-auto-inserted operations to reflect the new
-      part's spec (e.g. correct MIL spec reference, thickness, chemical name).
+      Copy the entire customisation_data from the matched part. For each non-auto-inserted
+      operation that differs from the template (different spec, alloy, thickness, or chemical),
+      replace the operation_text and specifications fields by fetching them from the operation
+      library — never write process parameters (voltage, duration, vat, temperature, deposition
+      rate) from scratch:
+
+        op_text = Operation.all_operations.find { |o| o.id == "TARGET_OPERATION_ID" }&.operation_text
+
+      Then append the spec reference to the operation_text if not already present.
       Do not change the structure, order, or auto-inserted operations.
       Then create the part with the cloned customisation_data, setting locked: true.
 

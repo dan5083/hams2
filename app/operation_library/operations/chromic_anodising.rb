@@ -1,307 +1,102 @@
-# app/jobs/ai_assistant_job.rb
-require "net/http"
-require "uri"
-require "json"
+# app/operation_library/anodising/chromic_anodising.rb
+module OperationLibrary
+  class AnodisingChromic
+    def self.operations(aerospace_defense = nil)
+      # Default to aerospace/defense true if not specified to maintain existing behavior
+      aerospace_defense = true if aerospace_defense.nil?
 
-class AiAssistantJob < ApplicationJob
-  queue_as :default
-
-  ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages".freeze
-  MODEL             = "claude-opus-4-6".freeze
-
-  BLOCKED_PATTERNS = [
-    /destroy_all/, /delete_all/, /drop_table/, /truncate/i,
-    /\.execute\s*\(/, /`[^`]+`/, /\bsystem\s*\(/, /\bexec\s*\(/,
-    /Kernel\.(system|exec)/,
-    /File\.(write|delete|unlink|rename)/, /FileUtils\./, /IO\.popen/, /Open3\./,
-  ].freeze
-
-  WRITE_PATTERNS = [
-    /\.save[!\s(]/, /\.update[!\s(]/, /\.create[!\s(]/,
-    /\.destroy(?!_all)/, /\.delete(?!_all)/,
-    /\.increment/, /\.decrement/, /\.toggle/,
-  ].freeze
-
-  TOOLS = [
-    {
-      name: "execute_query",
-      description: <<~DESC,
-        Execute Ruby / ActiveRecord against the live HAMS database.
-        All models are available: Organization, CustomerOrder, WorksOrder, Part,
-        ReleaseNote, Invoice, InvoiceItem, ExternalNcr, Specification,
-        QualityDocument, User, Buyer, and any other model in the app.
-        Use standard ActiveRecord — scopes, associations, calculations, anything.
-        Return a serialisable value (Array, Hash, ActiveRecord result, scalar).
-
-        Examples:
-          Organization.where(is_customer: true).count
-          CustomerOrder.includes(:customer).where(voided: false).order(date_received: :desc).limit(10).map { |o| { number: o.number, customer: o.customer&.name } }
-          WorksOrder.where(is_open: true).joins(customer_order: :customer).group("organizations.name").count
-          Part.where(customer: Organization.find_by(name: "Alutec")).where(enabled: true).pluck(:part_number, :description)
-      DESC
-      input_schema: {
-        type: "object",
-        properties: {
-          code: { type: "string", description: "Ruby/ActiveRecord expression to evaluate. Last value is returned." }
-        },
-        required: ["code"]
-      }
-    }
-  ].freeze
-
-  def perform(request_id)
-    request = AiAssistantRequest.find(request_id)
-    messages = request.messages
-
-    response_text = run_agentic_loop(messages)
-    request.mark_complete!(response_text)
-  rescue => e
-    Rails.logger.error "[AI Assistant Job] Error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
-    AiAssistantRequest.find_by(id: request_id)&.mark_error!(e.message)
-  end
-
-  private
-
-  def run_agentic_loop(messages)
-    loop_messages = messages.dup
-    iterations    = 0
-    @eval_binding = binding # shared binding persists local variables across all tool calls
-
-    loop do
-      iterations += 1
-      raise "Exceeded maximum tool iterations" if iterations > 20
-
-      response    = call_anthropic(loop_messages)
-      stop_reason = response["stop_reason"]
-      content     = response["content"] || []
-      text        = content.select { |b| b["type"] == "text" }.map { |b| b["text"] }.join("\n")
-
-      if stop_reason == "end_turn"
-        # Claude narrated instead of acting — push it back once, then give up
-        narrating = text.present? && text.match?(/let me|i need to|i will|i'll|now i|first i|my plan|per the|mandatory/i)
-        if narrating && iterations <= 3
-          loop_messages << { role: "assistant", content: content }
-          loop_messages << { role: "user", content: [{ type: "text", text: "Stop narrating. Call the tool now." }] }
-          next
-        end
-        return text.presence || "Done."
+      base_operations.map do |operation_data|
+        create_operation(operation_data, aerospace_defense)
       end
+    end
 
-      if stop_reason == "tool_use"
-        tool_uses = content.select { |b| b["type"] == "tool_use" }
-        loop_messages << { role: "assistant", content: content }
+    private
 
-        tool_results = tool_uses.map do |tu|
-          outcome = dispatch_tool(tu["name"], tu["input"] || {})
-          { type: "tool_result", tool_use_id: tu["id"], content: outcome.to_json }
-        end
+    def self.create_operation(data, aerospace_defense)
+      # The ending text is now dynamically generated based on aerospace/defense flag
+      base_text = data[:operation_text]
 
-        loop_messages << { role: "user", content: tool_results }
+      ending_text = if aerospace_defense
+        " -- check film thickness against specification, if out of range inform an A stampholder"
       else
-        return text.presence || "No response generated."
+        " -- check film thickness against specification, if out of range inform an A stampholder\n-- record film thickness ___ μm"
       end
+
+      operation_text = base_text + ending_text
+
+      # Append OCV monitoring for aerospace/defense (chromic has special checkpoints)
+      if aerospace_defense
+        ocv_text = build_chromic_voltage_monitoring_text(data[:id])
+        operation_text += "\n\n**OCV Monitoring:**\n#{ocv_text}"
+      end
+
+      Operation.new(
+        id: data[:id],
+        alloys: data[:alloys],
+        process_type: 'chromic_anodising',
+        anodic_classes: data[:anodic_classes] || [],
+        target_thickness: data[:target_thickness] || 0,
+        vat_numbers: data[:vat_numbers],
+        operation_text: operation_text
+      )
     end
-  end
 
-  def call_anthropic(messages)
-    uri  = URI(ANTHROPIC_API_URL)
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl      = true
-    http.read_timeout = 120  # Jobs aren't subject to Heroku's 30s HTTP timeout
+    def self.build_chromic_voltage_monitoring_text(operation_id)
+      checkpoints = case operation_id
+      when 'CAA_40_50V_40MIN'
+        # Check at key transition points: 10min (40V reached), 30min (before ramp), 35min (50V reached), 40min (end)
+        [
+          { time: 10, label: '10min (40V)' },
+          { time: 30, label: '30min (40V held)' },
+          { time: 35, label: '35min (50V)' },
+          { time: 40, label: '40min (end)' }
+        ]
+      when 'CAA_22V_37MIN'
+        # Check at: 7min (22V reached), 20min (mid-hold), 37min (end)
+        [
+          { time: 7, label: '7min (22V)' },
+          { time: 20, label: '20min (held)' },
+          { time: 37, label: '37min (end)' }
+        ]
+      else
+        # Fallback for unknown chromic processes
+        [
+          { time: 10, label: '10min' },
+          { time: 20, label: '20min' },
+          { time: 30, label: '30min' }
+        ]
+      end
 
-    req = Net::HTTP::Post.new(uri)
-    req["Content-Type"]      = "application/json"
-    req["x-api-key"]         = ENV["ANTHROPIC_API_KEY"]
-    req["anthropic-version"] = "2023-06-01"
-    req.body = {
-      model:      MODEL,
-      max_tokens: 4096,
-      system:     build_system_prompt,
-      tools:      TOOLS,
-      messages:   messages
-    }.to_json
-
-    res = http.request(req)
-    raise "Anthropic API error #{res.code}: #{res.body}" unless res.is_a?(Net::HTTPSuccess)
-
-    JSON.parse(res.body)
-  end
-
-  def build_system_prompt
-    schema = File.read(Rails.root.join("db", "schema.rb")) rescue "Schema unavailable."
-
-    <<~PROMPT
-      You are an internal assistant embedded in HAMS 2.0 — the management system for
-      Hard Anodising Surface Treatments Limited (HASTL).
-
-      YOUR CAPABILITY:
-      You have one tool — execute_query — which evaluates Ruby/ActiveRecord against the live
-      production database. Use it freely for both reads AND writes.
-      You can call it multiple times per response if needed.
-
-      READS: Query anything — counts, searches, associations, calculations.
-      WRITES: You CAN and SHOULD perform writes when asked — save!, update!, create!, etc.
-      Write operations are logged server-side for audit purposes but are fully permitted.
-      The only things blocked are bulk destructive operations (destroy_all, delete_all, truncate)
-      and shell access. Everything else is fair game.
-
-      Always query before answering questions about specific records. Do not guess at IDs or counts.
-      For writes, fetch the record first, then modify it — don't assume IDs.
-
-      BUSINESS CONTEXT:
-      - Core workflow: Customer PO → CustomerOrder → WorksOrders (one per line item) →
-        shop floor processing through VATs → ReleaseNotes on completion → Invoices raised
-      - Organizations: customers and suppliers synced from Xero
-      - Parts: master records for each customer's components — hold processing instructions
-      - WorksOrders: live jobs referencing a Part, carrying qty, pricing, open/closed status
-      - Process types: hard_anodising, standard_anodising, chromic_anodising,
-        chemical_conversion, electroless_nickel_plating
-      - VATs are the treatment tanks, numbered approximately 1–12
-      - ReleaseNotes record accepted/rejected quantities when work is completed
-      - Invoices sync to Xero via xero_id
-
-      CREATING PARTS:
-      Follow these steps exactly — 2 tool calls maximum.
-
-      STEP 1 (read) — Find the closest matching part and retrieve its full data:
-      Match on treatment combination and dye colour. Use this query as a starting point,
-      adapting the filter to match the new part's process types:
-
-        Part.joins(:customer)
-            .where("customisation_data->'operation_selection'->>'locked' = 'true'")
-            .select { |p|
-              t = JSON.parse(p.customisation_data.dig("operation_selection","treatments") || "[]") rescue []
-              types = t.map { |x| x["type"] }
-              types.include?("hard_anodising") && types.include?("chemical_conversion")
-            }
-            .map { |p| { id: p.id, part_number: p.part_number, customer: p.customer&.name,
-                         treatments: JSON.parse(p.customisation_data.dig("operation_selection","treatments") || "[]")
-                                       .map { |t| t.slice("type","operation_id","sealing_method","dye_color") } } }
-
-      Pick the closest match — same process types, same dye colour if applicable.
-      Then fetch the full part: Part.find("<id>").customisation_data
-
-      STEP 2 (write) — Clone and create in a single tool call:
-      Copy the entire customisation_data from the matched part. For each non-auto-inserted
-      operation that differs from the template (different spec, alloy, thickness, or chemical),
-      replace the operation_text and specifications fields by fetching them from the operation
-      library — never write process parameters (voltage, duration, vat, temperature, deposition
-      rate) from scratch:
-
-        op_text = Operation.all_operations.find { |o| o.id == "TARGET_OPERATION_ID" }&.operation_text
-
-      Then append the spec reference to the operation_text if not already present.
-      Do not change the structure, order, or auto-inserted operations.
-      Then create the part with the cloned customisation_data, setting locked: true.
-
-        template = Part.find("<matched_part_id>")
-        cdata = template.customisation_data.deep_dup
-        # update specific operation_text entries to match new spec...
-        ops = cdata.dig("operation_selection", "locked_operations")
-        ops.each do |op|
-          case op["id"]
-          when "IRIDITE_NCP_7_TO_10_MIN", "ALOCHROM_1200_CLASS_1A" # update to correct chemical
-            op["operation_text"] = "..." # match new spec
-            op["specifications"] = "..."
-          when /HARD/ # update hard anodise spec text if needed
-            op["operation_text"] = "..."
-          end
+      # Build monitoring text for 3 batches with chromic-specific checkpoints
+      text_lines = []
+      (1..3).each do |batch|
+        checkpoint_texts = checkpoints.map do |cp|
+          "#{cp[:label]}: ___V"
         end
-        customer = Organization.find_by!("name ILIKE ?", "%customer name%")
-        part = Part.create!(
-          customer_id: customer.id,
-          part_number: "...",
-          part_issue: "...",
-          description: "...",
-          material: "...",
-          specification: "...",
-          special_instructions: "...",
-          specified_thicknesses: "...",
-          process_type: template.process_type,
-          customisation_data: cdata
-        )
-        "Created \#{part.part_number} with \#{part.customisation_data.dig('operation_selection','locked_operations')&.length} operations"
-
-      TAPPED HOLES:
-      If the drawing contains tapped holes AND the hard anodise target thickness is 30μm or greater,
-      add a note to the masking operation_text that tapped holes must be masked before anodising.
-      If target thickness is less than 30μm, no masking of tapped holes is required.
-
-      MIL-PRF-8625 DEFAULT THICKNESS:
-      If a drawing does not specify a coating thickness, the MIL-PRF-8625 default is
-      0.002 inch = 50μm. Use 50 as target_thickness in this case. Only use a different
-      value if the drawing explicitly states a thickness or range.
-
-      CRITICAL — eval does not persist local variables between tool calls.
-      Step 2 must be a single tool call — fetch template, clone, adapt, and create together.
-      Always look up the Organization to get the correct customer_id — never guess it.
-
-      RESPONSE STYLE:
-      - Do not produce any text before or between tool calls. Only output text in your final response after all tool calls are complete. No narration, no plans, no commentary mid-task.
-      - Concise.
-      - Tables or lists for multiple records.
-      - Summarise large result sets and offer to drill in.
-      - If something looks wrong in the data, say so.
-      - Today is #{Date.current.strftime("%A, %d %B %Y")}.
-
-      CURRENT SCHEMA:
-      #{schema}
-    PROMPT
-  end
-
-  def dispatch_tool(name, input)
-    case name
-    when "execute_query" then run_query(input["code"].to_s.strip)
-    else { error: "Unknown tool: #{name}" }
-    end
-  end
-
-  def run_query(code)
-    return { error: "Empty query." } if code.blank?
-    return { error: "Code must be a Ruby expression, not a comment." } if code.match?(/\A\s*#/)
-
-    blocked = BLOCKED_PATTERNS.find { |p| code.match?(p) }
-    if blocked
-      Rails.logger.warn "[AI Assistant Job] BLOCKED | pattern: #{blocked.source} | code: #{code}"
-      return { blocked: true, reason: "Operation not permitted (matched: #{blocked.source})", code: code }
-    end
-
-    is_write = WRITE_PATTERNS.any? { |p| code.match?(p) }
-    if is_write
-      Rails.logger.warn "[AI Assistant Job] WRITE | code: #{code}"
-    else
-      Rails.logger.info  "[AI Assistant Job] READ  | code: #{code}"
-    end
-
-    b = @eval_binding || binding
-    result = if is_write
-      ActiveRecord::Base.transaction { b.eval(code) } # rubocop:disable Security/Eval
-    else
-      outcome = nil
-      ActiveRecord::Base.transaction do
-        outcome = b.eval(code) # rubocop:disable Security/Eval
-        raise ActiveRecord::Rollback
+        text_lines << "Batch ___: Temp ___°C [#{checkpoint_texts.join(' | ')}]"
       end
-      outcome
+
+      text_lines.join("\n")
     end
 
-    serialise(result)
-  rescue SyntaxError => e
-    { error: "Syntax error", detail: e.message }
-  rescue ActiveRecord::StatementInvalid => e
-    { error: "Database error", detail: e.message }
-  rescue => e
-    Rails.logger.error "[AI Assistant Job] Query error: #{e.class} — #{e.message} | Code: #{code}"
-    { error: e.class.to_s, detail: e.message }
-  end
+    def self.base_operations
+      [
+        # Chromic Acid Anodise Process 1 - High voltage variant (NOT available for 7075)
+        {
+          id: 'CAA_40_50V_40MIN',
+          alloys: ['general', 'aluminium', '6000_series', '2024'],
+          vat_numbers: [10],
+          operation_text: 'Chromic acid anodise in Vat 10 at 38-42°C. 0-40V (over 10 minutes), 40V (hold for 20 minutes), 40-50V (over 5 minutes), 50V (hold for 5 minutes)'
+        },
 
-  def serialise(value)
-    case value
-    when ActiveRecord::Relation  then value.as_json
-    when ActiveRecord::Base      then value.as_json
-    when Array                   then value.map { |v| v.respond_to?(:as_json) ? v.as_json : v }
-    when Hash, Numeric, String, TrueClass, FalseClass, NilClass then value
-    else value.respond_to?(:as_json) ? value.as_json : value.to_s
+        # Chromic Acid Anodise Process 2 - Standard voltage variant (available to all alloys, but ONLY option for 7075)
+        {
+          id: 'CAA_22V_37MIN',
+          alloys: ['general', 'aluminium', '6000_series', '7075', '2024'],
+          vat_numbers: [10],
+          operation_text: 'Chromic acid anodise in Vat 10 at 38-42°C. 0-22V (over 7 minutes), 22V (hold over 30 minutes)'
+        }
+      ]
     end
   end
 end
