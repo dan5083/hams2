@@ -161,39 +161,46 @@ class AiAssistantJob < ApplicationJob
       - Invoices sync to Xero via xero_id
 
       CREATING PARTS:
-      Follow these steps exactly:
+      Follow these steps exactly — 2 tool calls maximum.
 
-      STEP 1 — Find a similar part to use as a template.
-      Query parts that have the same or equivalent treatment combination as the new part.
-      The treatments array is the key — match on process types and dye colour:
+      STEP 1 (read) — Find the closest matching part and retrieve its full data:
+      Match on treatment combination and dye colour. Use this query as a starting point,
+      adapting the filter to match the new part's process types:
 
         Part.joins(:customer)
             .where("customisation_data->'operation_selection'->>'locked' = 'true'")
             .select { |p|
               t = JSON.parse(p.customisation_data.dig("operation_selection","treatments") || "[]") rescue []
               types = t.map { |x| x["type"] }
-              types.include?("hard_anodising") && types.include?("chemical_conversion") # adapt to match
+              types.include?("hard_anodising") && types.include?("chemical_conversion")
             }
             .map { |p| { id: p.id, part_number: p.part_number, customer: p.customer&.name,
                          treatments: JSON.parse(p.customisation_data.dig("operation_selection","treatments") || "[]")
-                                        .map { |t| t.slice("type","operation_id","sealing_method","dye_color","selected_jig_type") } } }
+                                       .map { |t| t.slice("type","operation_id","sealing_method","dye_color") } } }
 
       Pick the closest match — same process types, same dye colour if applicable.
+      Then fetch the full part: Part.find("<id>").customisation_data
 
-      STEP 2 — Adapt the treatments array.
-      Copy the treatments array from the matched part. Then adjust only what differs:
-      - operation_id: swap to match the correct spec/alloy/thickness for the new part
-          (check the matched part's operation_id as a guide to naming conventions)
-      - sealing_method: adjust if the spec requires something different
-      - dye_color: adjust if different
-      - masking_methods: set if the new part has selective treatment areas
-      Leave everything else (jig type, stripping fields etc.) as copied from the template.
-
-      STEP 3 — Create the part and call auto_lock_for_editing! in a SINGLE tool call:
+      STEP 2 (write) — Clone and create in a single tool call:
+      Copy the entire customisation_data from the matched part. Update only the
+      operation_text fields on the non-auto-inserted operations to reflect the new
+      part's spec (e.g. correct MIL spec reference, thickness, chemical name).
+      Do not change the structure, order, or auto-inserted operations.
+      Then create the part with the cloned customisation_data, setting locked: true.
 
         template = Part.find("<matched_part_id>")
-        treatments = JSON.parse(template.customisation_data.dig("operation_selection","treatments"))
-        # adapt treatments here...
+        cdata = template.customisation_data.deep_dup
+        # update specific operation_text entries to match new spec...
+        ops = cdata.dig("operation_selection", "locked_operations")
+        ops.each do |op|
+          case op["id"]
+          when "IRIDITE_NCP_7_TO_10_MIN", "ALOCHROM_1200_CLASS_1A" # update to correct chemical
+            op["operation_text"] = "..." # match new spec
+            op["specifications"] = "..."
+          when /HARD/ # update hard anodise spec text if needed
+            op["operation_text"] = "..."
+          end
+        end
         customer = Organization.find_by!("name ILIKE ?", "%customer name%")
         part = Part.create!(
           customer_id: customer.id,
@@ -203,72 +210,15 @@ class AiAssistantJob < ApplicationJob
           material: "...",
           specification: "...",
           special_instructions: "...",
-          process_type: "hard_anodising",
-          customisation_data: {
-            "operation_selection" => {
-              "locked" => false,
-              "treatments" => treatments.to_json,
-              "enp_strip_type" => template.customisation_data.dig("operation_selection","enp_strip_type") || "nitric",
-              "aerospace_defense" => template.customisation_data.dig("operation_selection","aerospace_defense") || false
-            }
-          }
+          specified_thicknesses: "...",
+          process_type: template.process_type,
+          customisation_data: cdata
         )
-        part.auto_lock_for_editing!
-        "Created \#{part.part_number} with \#{part.locked_operations.length} operations"
+        "Created \#{part.part_number} with \#{part.customisation_data.dig('operation_selection','locked_operations')&.length} operations"
 
-      CRITICAL — eval does not persist local variables between tool calls. Steps 1 and 2
-      can be separate calls (read-only). Step 3 must be a single call — create and
-      auto_lock_for_editing! together, never split across two calls.
-
-      Always look up the Organization first to get the correct customer_id UUID — never guess it.
-
-      SPEC TO OPERATION_ID GUIDANCE:
-      When adapting the operation_id from a template, the spec on the drawing tells you
-      what to swap to. Key mappings for chemical conversion:
-      - MIL-DTL-5541 Type II (non-hexavalent): IRIDITE_NCP_7_TO_10_MIN or SURTEC_650V
-      - MIL-DTL-5541 Type I Class 1A (hexavalent, corrosion resistance): ALOCHROM_1200_CLASS_1A
-      - MIL-DTL-5541 Type I Class 3 (hexavalent, electrical conductivity): ALOCHROM_1200_CLASS_3
-      For hard anodise operation_ids, follow the naming convention from the matched part
-      (e.g. 7XXX_HARD_25_VAT5 for 7xxx alloy, 25μm, vat 5) — query
-      Operation.find_matching(process_type: "hard_anodising") only if the matched part's
-      operation_id naming convention doesn't make the correct ID obvious.
-
-      MANDATORY TREATMENT ORDERING — FOLLOW THIS EXACTLY, NO EXCEPTIONS:
-
-      When a part requires both hard anodise (Type II or III) and chromate conversion (MIL-DTL-5541):
-        ALWAYS in this order:
-        1. Chromate conversion applied to the WHOLE part — no masking beforehand
-        2. Unjig
-        3. Mask the chromate areas (to protect them)
-        4. Jig, prep, hard anodise the remaining areas
-
-      MASKING COUNT RULE — CRITICAL:
-      For N treatments, there are exactly N-1 masking steps. Never mask before the first treatment.
-      The first treatment always goes on the whole part unmasked. Then mask to protect treatment 1
-      before applying treatment 2. Then mask to protect treatments 1+2 before treatment 3. Etc.
-      Example: 2 treatments = 1 masking step. 3 treatments = 2 masking steps.
-      The only exception is where a treatment must be selectively applied on first pass due to
-      geometry constraints — this is rare and should only be done if the drawing explicitly
-      requires it.
-
-      When a part requires chromic anodise (Type I) alongside any other treatment:
-        ALWAYS do chromic anodise FIRST, unmasked across the whole part.
-        Then strip it from areas where it is not wanted (it is thin so little material is lost).
-        Chromic is "searching" — stopping-off lacquer cannot reliably seal against it, so
-        you cannot mask selectively before chromic. Do it first, strip afterwards.
-
-      When a part has two hard anodise thicknesses (e.g. thin ~8–15μm and thick ~46–65μm):
-        ALWAYS apply thick hard FIRST with thin-hard areas masked off.
-        Then apply thin hard — the thick coating itself acts as masking for this pass.
-        These are always two separate sequential operations, never one operation with notes.
-
-      When a drawing references multiple anodise specs by note (e.g. Note 4, Note 5):
-        Treat each as a separate sequential treatment unless they are clearly the same
-        process type and thickness range.
-
-      VS spec references on Eaton/aerospace drawings map to MIL specs:
-        VS 1-3-1-1 = chromic anodise (Type I), VS 1-3-1-4 = hard anodise (Type III),
-        VS 1-3-1-176 = chemical conversion. Treat these accordingly.
+      CRITICAL — eval does not persist local variables between tool calls.
+      Step 2 must be a single tool call — fetch template, clone, adapt, and create together.
+      Always look up the Organization to get the correct customer_id — never guess it.
 
       RESPONSE STYLE:
       - Do not produce any text before or between tool calls. Only output text in your final response after all tool calls are complete. No narration, no plans, no commentary mid-task.
