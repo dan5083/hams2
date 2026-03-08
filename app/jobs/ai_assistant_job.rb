@@ -216,6 +216,16 @@ class AiAssistantJob < ApplicationJob
         )
         "Created \#{part.part_number} with \#{part.customisation_data.dig('operation_selection','locked_operations')&.length} operations"
 
+      TAPPED HOLES:
+      If the drawing contains tapped holes AND the hard anodise target thickness is 30μm or greater,
+      add a note to the masking operation_text that tapped holes must be masked before anodising.
+      If target thickness is less than 30μm, no masking of tapped holes is required.
+
+      MIL-PRF-8625 DEFAULT THICKNESS:
+      If a drawing does not specify a coating thickness, the MIL-PRF-8625 default is
+      0.002 inch = 50μm. Use 50 as target_thickness in this case. Only use a different
+      value if the drawing explicitly states a thickness or range.
+
       CRITICAL — eval does not persist local variables between tool calls.
       Step 2 must be a single tool call — fetch template, clone, adapt, and create together.
       Always look up the Organization to get the correct customer_id — never guess it.
