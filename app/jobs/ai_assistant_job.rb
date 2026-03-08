@@ -160,112 +160,78 @@ class AiAssistantJob < ApplicationJob
       - ReleaseNotes record accepted/rejected quantities when work is completed
       - Invoices sync to Xero via xero_id
 
-      CREATING PARTS — IMPORTANT:
-      Never construct locked_operations by hand or copy them from a template part.
-      The app generates the full operation scaffold automatically via auto_lock_for_editing!
-      This is the ONLY correct way to create a part. Follow these steps exactly:
+      CREATING PARTS:
+      Follow these steps exactly:
 
-      STEP 1 — Find the right operation_id(s) using the operation library:
-        Operation.find_matching(process_type: "hard_anodising")
-        Operation.find_matching(process_type: "chemical_conversion")
-        Operation.find_matching(process_type: "chromic_anodising")
-        etc.
-        Pick the operation whose id, alloys, and target_thickness best matches the drawing.
+      STEP 1 — Find a similar part to use as a template.
+      Query parts that have the same or equivalent treatment combination as the new part.
+      The treatments array is the key — match on process types and dye colour:
 
-      STEP 2 — Build a treatments array. Each treatment is a hash with these keys:
-        {
-          "id"                        => "treatment_1",   # unique per treatment
-          "type"                      => "hard_anodising", # must match process_type
-          "operation_id"              => "7XXX_HARD_50_VAT5", # from step 1
-          "selected_jig_type"         => "Double Strap Jig", # or whatever is appropriate
-          "masking_methods"           => {},               # hash of masking method => description, or {}
-          "sealing_method"            => "COLD_SEAL", # see sealing rules below
-          "dye_color"                 => "BLACK_DYE",      # or "none"
-          "stripping_enabled"         => false,
-          "stripping_type_secondary"  => "none",
-          "stripping_method_secondary"=> "none",
-          "ptfe_enabled"              => false,
-          "local_treatment_type"      => "none"
-        }
-      For multi-treatment parts, build one hash per treatment in the correct order (see below).
+        Part.joins(:customer)
+            .where("customisation_data->'operation_selection'->>'locked' = 'true'")
+            .select { |p|
+              t = JSON.parse(p.customisation_data.dig("operation_selection","treatments") || "[]") rescue []
+              types = t.map { |x| x["type"] }
+              types.include?("hard_anodising") && types.include?("chemical_conversion") # adapt to match
+            }
+            .map { |p| { id: p.id, part_number: p.part_number, customer: p.customer&.name,
+                         treatments: JSON.parse(p.customisation_data.dig("operation_selection","treatments") || "[]")
+                                        .map { |t| t.slice("type","operation_id","sealing_method","dye_color","selected_jig_type") } } }
 
-      STEP 3 — Create the part with locked: false and treatments as JSON:
+      Pick the closest match — same process types, same dye colour if applicable.
+
+      STEP 2 — Adapt the treatments array.
+      Copy the treatments array from the matched part. Then adjust only what differs:
+      - operation_id: swap to match the correct spec/alloy/thickness for the new part
+          (check the matched part's operation_id as a guide to naming conventions)
+      - sealing_method: adjust if the spec requires something different
+      - dye_color: adjust if different
+      - masking_methods: set if the new part has selective treatment areas
+      Leave everything else (jig type, stripping fields etc.) as copied from the template.
+
+      STEP 3 — Create the part and call auto_lock_for_editing! in a SINGLE tool call:
+
+        template = Part.find("<matched_part_id>")
+        treatments = JSON.parse(template.customisation_data.dig("operation_selection","treatments"))
+        # adapt treatments here...
+        customer = Organization.find_by!("name ILIKE ?", "%customer name%")
         part = Part.create!(
-          customer_id:         customer.id,
-          part_number:         "...",
-          part_issue:          "...",
-          description:         "...",
-          material:            "...",
-          specification:       "...",
-          special_instructions:"...",
-          process_type:        "hard_anodising",
-          customisation_data:  {
+          customer_id: customer.id,
+          part_number: "...",
+          part_issue: "...",
+          description: "...",
+          material: "...",
+          specification: "...",
+          special_instructions: "...",
+          process_type: "hard_anodising",
+          customisation_data: {
             "operation_selection" => {
-              "locked"           => false,
-              "treatments"       => treatments.to_json,
-              "enp_strip_type"   => "nitric",
-              "aerospace_defense"=> false
+              "locked" => false,
+              "treatments" => treatments.to_json,
+              "enp_strip_type" => template.customisation_data.dig("operation_selection","enp_strip_type") || "nitric",
+              "aerospace_defense" => template.customisation_data.dig("operation_selection","aerospace_defense") || false
             }
           }
         )
-
-      STEP 4 — Call auto_lock_for_editing! to generate all operations:
         part.auto_lock_for_editing!
+        "Created \#{part.part_number} with \#{part.locked_operations.length} operations"
 
-      This single call generates the complete locked_operations array including all
-      auto-inserted steps (jig, unjig, degrease, rinse, deox, masking inspection,
-      masking removal, OCV checks, foil verification, sealing, pack etc) in the correct order.
-
-      CRITICAL — customisation_data MUST include "locked" => false before calling
-      auto_lock_for_editing! — the method sets it to true itself. Do not set locked: true manually.
-
-      CRITICAL — eval does not persist local variables between tool calls. Each execute_query
-      call is a completely fresh context. Any multi-step operation (create then auto_lock,
-      find then update, etc.) MUST be done in a single execute_query call as a multi-line
-      Ruby block. For example, steps 3 and 4 must be one single tool call:
-
-        customer = Organization.find_by!("name ILIKE ?", "%24 Locks%")
-        treatments = [{ "id" => "treatment_1", ... }]
-        part = Part.create!(
-          customer_id: customer.id,
-          ...
-          customisation_data: { "operation_selection" => { "locked" => false, "treatments" => treatments.to_json, "enp_strip_type" => "nitric", "aerospace_defense" => false } }
-        )
-        part.auto_lock_for_editing!
-        "Created part \#{part.part_number} with \#{part.locked_operations.length} operations"
+      CRITICAL — eval does not persist local variables between tool calls. Steps 1 and 2
+      can be separate calls (read-only). Step 3 must be a single call — create and
+      auto_lock_for_editing! together, never split across two calls.
 
       Always look up the Organization first to get the correct customer_id UUID — never guess it.
 
-      SEALING SELECTION:
-      Sealing is NOT auto-inserted. You must always set sealing_method explicitly in the treatments
-      array — it will not appear unless you specify it. "none" means no seal at all.
-      Always check the drawing and spec for sealing requirements first. If stated, follow exactly.
-      - Hard anodise (Type III) default: COLD_SEAL
-      - Hard anodise with black dye default: COLD_SEAL
-      - Hard anodise, nickel acetate specified: NICKEL_ACETATE_SEAL
-      - Hard anodise, duplex seal specified (nickel acetate + dichromate): NICKEL_ACETATE_SEAL then SODIUM_DICHROMATE_SEAL as two separate sealing operations
-      - Standard anodise (Type II) default: SURTEC_650V_SEAL
-      - Chromic anodise default: HOT_SEAL
-      - SurTec 650V (SURTEC_650V_SEAL) is a chromate conversion post-treatment — only appropriate after standard or chromic anodise, never after hard anodise
-      - Chemical conversion (chromate): no sealing, set sealing_method to "none"
-
-      CHEMICAL CONVERSION TYPES — CRITICAL:
-      MIL-DTL-5541 has two types — they are chemically different and use different chemicals:
-      - Type I (Class 1A or Class 3): hexavalent chromium — Alochrom 1200, yellow/gold iridescent colour
-      - Type II (Class 1A or Class 3): non-hexavalent (RoHS compliant) — Iridite NCP, Surtec 650, clear/light colour
-      Always check the drawing spec carefully. "Type II" means non-hexavalent — do NOT use Alochrom 1200.
-      Use Operation.find_matching(process_type: "chemical_conversion") and check operation IDs/text
-      to confirm which chemical is used before selecting.
-
-      DEFAULT THICKNESSES BY SPECIFICATION:
-      If a drawing omits a thickness callout, the specification itself defines a default — do not leave thickness as 0 or null.
-      - MIL-PRF-8625 Type III Class 1 (hard anodise, natural): 25μm default
-      - MIL-PRF-8625 Type III Class 2 (hard anodise, black dye): 25μm default
-      - MIL-PRF-8625 Type II (standard anodise): 18μm default
-      - MIL-A-8625 references are equivalent to MIL-PRF-8625
-      - Chromic anodise (Type I): no significant thickness, use 0
-      - Chemical conversion (MIL-DTL-5541): no significant thickness, use 0
-      If a drawing gives an explicit thickness range, use the midpoint as target_thickness.
+      SPEC TO OPERATION_ID GUIDANCE:
+      When adapting the operation_id from a template, the spec on the drawing tells you
+      what to swap to. Key mappings for chemical conversion:
+      - MIL-DTL-5541 Type II (non-hexavalent): IRIDITE_NCP_7_TO_10_MIN or SURTEC_650V
+      - MIL-DTL-5541 Type I Class 1A (hexavalent, corrosion resistance): ALOCHROM_1200_CLASS_1A
+      - MIL-DTL-5541 Type I Class 3 (hexavalent, electrical conductivity): ALOCHROM_1200_CLASS_3
+      For hard anodise operation_ids, follow the naming convention from the matched part
+      (e.g. 7XXX_HARD_25_VAT5 for 7xxx alloy, 25μm, vat 5) — query
+      Operation.find_matching(process_type: "hard_anodising") only if the matched part's
+      operation_id naming convention doesn't make the correct ID obvious.
 
       MANDATORY TREATMENT ORDERING — FOLLOW THIS EXACTLY, NO EXCEPTIONS:
 
