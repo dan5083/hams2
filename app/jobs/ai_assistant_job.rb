@@ -160,25 +160,54 @@ class AiAssistantJob < ApplicationJob
       - ReleaseNotes record accepted/rejected quantities when work is completed
       - Invoices sync to Xero via xero_id
 
+    AEROSPACE / DEFENSE PRIMES:
+      If the work is ultimately for one of these primes, set aerospace_defense: true.
+      This flag significantly changes the locked operations (additional rinses, inspections, etc).
+      PRIMES: Flight Refuelling, Cobham, Ultra, Eaton.
+      The prime can usually be identified from the drawing — look for their name, logo,
+      or proprietary specification references (e.g. DS 26.00 = Cobham).
+      Match case-insensitively.
+
       CREATING PARTS:
       Follow these steps exactly — 2 tool calls maximum.
 
-      STEP 1 (read) — Find the closest matching part and retrieve its full data:
-      Match on treatment combination and dye colour. Use this query as a starting point,
-      adapting the filter to match the new part's process types:
+      STEP 1 (read) — Find the best template part across ALL customers:
+      Search the entire parts database for locked parts whose treatment array matches
+      the new part's requirements. Match on ALL of:
+        - Treatment types (e.g. hard_anodising, chemical_conversion)
+        - Sealing method (e.g. hot_water_seal, ptfe_seal, nickel_fluoride_seal, none)
+        - Dye colour (if applicable)
+        - aerospace_defense flag (must match — aerospace templates have different operations)
+
+      Use this query pattern, adapting the filters for the required treatments:
+
+        required_types = ["hard_anodising"]  # adapt to match drawing requirements
+        required_sealing = "hot_water_seal"  # adapt — derive from spec code if applicable
+        required_aero = true                 # true if customer is aerospace/defense
+        required_dye = nil                   # set if dye required
 
         Part.joins(:customer)
             .where("customisation_data->'operation_selection'->>'locked' = 'true'")
             .select { |p|
               t = JSON.parse(p.customisation_data.dig("operation_selection","treatments") || "[]") rescue []
               types = t.map { |x| x["type"] }
-              types.include?("hard_anodising") && types.include?("chemical_conversion")
+              sealing = t.map { |x| x["sealing_method"] }.compact.first
+              dye = t.map { |x| x["dye_color"] }.compact.first
+              aero = p.customisation_data.dig("operation_selection","aerospace_defense")
+              aero_flag = (aero == true || aero == "true")
+
+              required_types.all? { |rt| types.include?(rt) } &&
+                types.length == required_types.length &&
+                sealing == required_sealing &&
+                aero_flag == required_aero &&
+                (required_dye.nil? || dye == required_dye)
             }
             .map { |p| { id: p.id, part_number: p.part_number, customer: p.customer&.name,
+                         specification: p.specification,
                          treatments: JSON.parse(p.customisation_data.dig("operation_selection","treatments") || "[]")
                                        .map { |t| t.slice("type","operation_id","sealing_method","dye_color") } } }
 
-      Pick the closest match — same process types, same dye colour if applicable.
+      From the results, pick the template whose specification is closest to the new part's spec.
       Then fetch the full part: Part.find("<id>").customisation_data
 
       STEP 2 (write) — Clone and create in a single tool call:
@@ -192,10 +221,14 @@ class AiAssistantJob < ApplicationJob
 
       Then append the spec reference to the operation_text if not already present.
       Do not change the structure, order, or auto-inserted operations.
+      Do not change the sealing method — it was already matched in Step 1.
+      Ensure the aerospace_defense flag matches the customer (see list above).
       Then create the part with the cloned customisation_data, setting locked: true.
 
         template = Part.find("<matched_part_id>")
         cdata = template.customisation_data.deep_dup
+        # Set aerospace_defense flag based on customer
+        cdata["operation_selection"]["aerospace_defense"] = true  # or false
         # update specific operation_text entries to match new spec...
         ops = cdata.dig("operation_selection", "locked_operations")
         ops.each do |op|
