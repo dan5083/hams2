@@ -99,7 +99,7 @@
     <h3 class="text-lg font-medium text-gray-900 mb-4">Document Sections</h3>
 
     <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
-      <strong>Editor Tips:</strong> Use the toolbar to format text. Click the table icon to insert tables. Click inside a table to see table editing options.
+      <strong>Editor Tips:</strong> Use the toolbar to format text. Use the highlight button (paint bucket) to highlight text. Click the table icon to insert tables. Click inside a table to see table editing options.
     </div>
 
     <div id="sections" class="space-y-4">
@@ -113,9 +113,14 @@
               </span>
               <span class="text-sm font-medium text-gray-700">Section <%= index + 1 %></span>
             </div>
-            <button type="button" class="remove-section bg-red-500 hover:bg-red-700 text-white text-sm font-bold py-1 px-3 rounded">
-              Remove
-            </button>
+            <div class="flex gap-2">
+              <button type="button" class="insert-above bg-blue-500 hover:bg-blue-700 text-white text-sm font-bold py-1 px-3 rounded">
+                + Insert Above
+              </button>
+              <button type="button" class="remove-section bg-red-500 hover:bg-red-700 text-white text-sm font-bold py-1 px-3 rounded">
+                Remove
+              </button>
+            </div>
           </div>
 
           <div class="space-y-3">
@@ -229,7 +234,7 @@ const tinymceConfig = {
     'wordcount', 'code'
   ],
   toolbar: 'undo redo | formatselect | bold italic underline strikethrough | ' +
-           'bullist numlist | link | table | removeformat | code',
+           'backcolor forecolor | bullist numlist | link | table | removeformat | code',
   content_style: 'body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 14px; }',
 
   // Critical settings for HTML preservation
@@ -438,6 +443,70 @@ function initializePage() {
   const addSectionBtn = document.getElementById('add-section');
   const sectionsContainer = document.getElementById('sections');
 
+  function renumberSections() {
+    document.querySelectorAll('#sections .section-item').forEach((section, idx) => {
+      const numberBadge = section.querySelector('.section-number');
+      const label = section.querySelector('.text-sm.font-medium');
+      if (numberBadge) numberBadge.textContent = idx + 1;
+      if (label) label.textContent = `Section ${idx + 1}`;
+    });
+  }
+
+  function createSectionElement() {
+    const newSection = document.createElement('div');
+    newSection.className = 'bg-gray-50 border border-gray-200 rounded-lg p-4 section-item';
+    newSection.dataset.index = window.sectionIndex;
+
+    newSection.innerHTML = `
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-3">
+          <span class="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 text-white text-sm font-semibold section-number">
+            ?
+          </span>
+          <span class="text-sm font-medium text-gray-700">Section ?</span>
+        </div>
+        <div class="flex gap-2">
+          <button type="button" class="insert-above bg-blue-500 hover:bg-blue-700 text-white text-sm font-bold py-1 px-3 rounded">
+            + Insert Above
+          </button>
+          <button type="button" class="remove-section bg-red-500 hover:bg-red-700 text-white text-sm font-bold py-1 px-3 rounded">
+            Remove
+          </button>
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Section Heading</label>
+          <input type="text" name="sections[${window.sectionIndex}][heading]"
+                 class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
+                 required placeholder="e.g., Purpose, Scope, Procedure">
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Section Content</label>
+          <textarea name="sections[${window.sectionIndex}][content]"
+                    id="section_${window.sectionIndex}_content"
+                    class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm"></textarea>
+        </div>
+      </div>
+    `;
+
+    window.sectionIndex++;
+    return newSection;
+  }
+
+  function insertNewSection(beforeElement) {
+    const newSection = createSectionElement();
+    const sectionsDiv = document.getElementById('sections');
+    sectionsDiv.insertBefore(newSection, beforeElement);
+    renumberSections();
+
+    const textareaId = newSection.querySelector('textarea[id$="_content"]').id;
+    initializeTinyMCE(textareaId);
+    newSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
   if (addSectionBtn && sectionsContainer) {
     // Remove any existing listeners by cloning the button
     const newAddSectionBtn = addSectionBtn.cloneNode(true);
@@ -445,53 +514,16 @@ function initializePage() {
 
     newAddSectionBtn.addEventListener('click', function() {
       const sectionsDiv = document.getElementById('sections');
-      const newSection = document.createElement('div');
-      newSection.className = 'bg-gray-50 border border-gray-200 rounded-lg p-4 section-item';
-      newSection.dataset.index = window.sectionIndex;
-
-      const sectionNumber = document.querySelectorAll('#sections .section-item').length + 1;
-
-      newSection.innerHTML = `
-        <div class="flex items-center justify-between mb-3">
-          <div class="flex items-center gap-3">
-            <span class="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 text-white text-sm font-semibold section-number">
-              ${sectionNumber}
-            </span>
-            <span class="text-sm font-medium text-gray-700">Section ${sectionNumber}</span>
-          </div>
-          <button type="button" class="remove-section bg-red-500 hover:bg-red-700 text-white text-sm font-bold py-1 px-3 rounded">
-            Remove
-          </button>
-        </div>
-
-        <div class="space-y-3">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Section Heading</label>
-            <input type="text" name="sections[${window.sectionIndex}][heading]"
-                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm"
-                   required placeholder="e.g., Purpose, Scope, Procedure">
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Section Content</label>
-            <textarea name="sections[${window.sectionIndex}][content]"
-                      id="section_${window.sectionIndex}_content"
-                      class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm"></textarea>
-          </div>
-        </div>
-      `;
-
+      const newSection = createSectionElement();
       sectionsDiv.appendChild(newSection);
+      renumberSections();
 
-      // Initialize TinyMCE for new section
-      const textareaId = `section_${window.sectionIndex}_content`;
+      const textareaId = newSection.querySelector('textarea[id$="_content"]').id;
       initializeTinyMCE(textareaId);
-
-      window.sectionIndex++;
       newSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
 
-    // Use event delegation for remove buttons
+    // Use event delegation for remove and insert-above buttons
     sectionsContainer.addEventListener('click', function(e) {
       if (e.target.classList.contains('remove-section') || e.target.closest('.remove-section')) {
         const section = e.target.closest('.section-item');
@@ -505,14 +537,12 @@ function initializePage() {
         }
 
         section.remove();
+        renumberSections();
+      }
 
-        // Renumber remaining sections
-        document.querySelectorAll('#sections .section-item').forEach((section, index) => {
-          const numberBadge = section.querySelector('.section-number');
-          const label = section.querySelector('.text-sm.font-medium');
-          if (numberBadge) numberBadge.textContent = index + 1;
-          if (label) label.textContent = `Section ${index + 1}`;
-        });
+      if (e.target.classList.contains('insert-above') || e.target.closest('.insert-above')) {
+        const beforeSection = e.target.closest('.section-item');
+        insertNewSection(beforeSection);
       }
     });
   }
