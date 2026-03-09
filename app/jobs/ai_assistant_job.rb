@@ -7,7 +7,7 @@ class AiAssistantJob < ApplicationJob
   queue_as :default
 
   ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages".freeze
-  MODEL             = "claude-opus-4-6".freeze
+  MODEL             = "claude-sonnet-4-6".freeze
 
   BLOCKED_PATTERNS = [
     /destroy_all/, /delete_all/, /drop_table/, /truncate/i,
@@ -160,13 +160,11 @@ class AiAssistantJob < ApplicationJob
       - ReleaseNotes record accepted/rejected quantities when work is completed
       - Invoices sync to Xero via xero_id
 
-    AEROSPACE / DEFENSE PRIMES:
-      If the work is ultimately for one of these primes, set aerospace_defense: true.
+      AEROSPACE / DEFENSE CUSTOMERS:
+      The following customers require aerospace_defense: true in customisation_data.
       This flag significantly changes the locked operations (additional rinses, inspections, etc).
-      PRIMES: Flight Refuelling, Cobham, Ultra, Eaton.
-      The prime can usually be identified from the drawing — look for their name, logo,
-      or proprietary specification references (e.g. DS 26.00 = Cobham).
-      Match case-insensitively.
+      Customers: Flight Refuelling, Cobham, Ultra, Eaton.
+      Match case-insensitively — e.g. if the customer name contains "cobham", "flight refuelling", etc.
 
       CREATING PARTS:
       Follow these steps exactly — 2 tool calls maximum.
