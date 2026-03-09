@@ -524,27 +524,31 @@ function initializePage() {
     });
 
     // Use event delegation for remove and insert-above buttons
-    sectionsContainer.addEventListener('click', function(e) {
-      if (e.target.classList.contains('remove-section') || e.target.closest('.remove-section')) {
-        const section = e.target.closest('.section-item');
-        const index = section.dataset.index;
+    // Guard against double-registration from DOMContentLoaded + turbo:load
+    if (!sectionsContainer.dataset.listenerAttached) {
+      sectionsContainer.dataset.listenerAttached = 'true';
+      sectionsContainer.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-section') || e.target.closest('.remove-section')) {
+          const section = e.target.closest('.section-item');
+          const index = section.dataset.index;
 
-        // Remove TinyMCE instance if exists
-        const textareaId = `section_${index}_content`;
-        const editor = tinymce.get(textareaId);
-        if (editor) {
-          editor.remove();
+          // Remove TinyMCE instance if exists
+          const textareaId = `section_${index}_content`;
+          const editor = tinymce.get(textareaId);
+          if (editor) {
+            editor.remove();
+          }
+
+          section.remove();
+          renumberSections();
         }
 
-        section.remove();
-        renumberSections();
-      }
-
-      if (e.target.classList.contains('insert-above') || e.target.closest('.insert-above')) {
-        const beforeSection = e.target.closest('.section-item');
-        insertNewSection(beforeSection);
-      }
-    });
+        if (e.target.classList.contains('insert-above') || e.target.closest('.insert-above')) {
+          const beforeSection = e.target.closest('.section-item');
+          insertNewSection(beforeSection);
+        }
+      });
+    }
   }
 
   // Initialize TinyMCE
