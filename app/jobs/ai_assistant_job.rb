@@ -227,10 +227,9 @@ class AiAssistantJob < ApplicationJob
       add a note to the masking operation_text that tapped holes must be masked before anodising.
       If target thickness is less than 30μm, no masking of tapped holes is required.
 
-      MIL-PRF-8625 DEFAULT THICKNESS:
-      If a drawing does not specify a coating thickness, the MIL-PRF-8625 default is
-      0.002 inch = 50μm. Use 50 as target_thickness in this case. Only use a different
-      value if the drawing explicitly states a thickness or range.
+      DEFAULT THICKNESSES:
+      If a drawing does not specify a coating thickness, but does state a specification,
+      that specification will likely have a default thickness.
 
       CRITICAL — eval does not persist local variables between tool calls.
       Step 2 must be a single tool call — fetch template, clone, adapt, and create together.
