@@ -21,6 +21,7 @@ export default class extends Controller {
     this.isOpen = true
     this.panelTarget.classList.remove("hidden")
     this.panelTarget.classList.add("flex")
+    this.buttonTarget.classList.add("hidden")
     this.inputTarget.focus()
     this.scrollToBottom()
   }
@@ -29,6 +30,7 @@ export default class extends Controller {
     this.isOpen = false
     this.panelTarget.classList.add("hidden")
     this.panelTarget.classList.remove("flex")
+    this.buttonTarget.classList.remove("hidden")
   }
 
   // ── File handling ─────────────────────────────────────────────────────
