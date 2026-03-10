@@ -7,7 +7,7 @@ export default class extends Controller {
   connect() {
     this.messages = []
     this.isOpen = false
-    this.pendingFile = null
+    this.pendingFiles = []
     this.pollInterval = null
   }
 
@@ -36,32 +36,65 @@ export default class extends Controller {
   triggerFileUpload() { this.fileInputTarget.click() }
 
   async handleFileChange(event) {
-    const file = event.target.files[0]
-    if (!file) return
+    const files = Array.from(event.target.files)
+    if (!files.length) return
 
     const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"]
-    if (!allowed.includes(file.type)) {
-      this.addMessage("error", "Only images (JPEG, PNG, GIF, WEBP) and PDFs are supported.")
-      event.target.value = ""
-      return
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      this.addMessage("error", "File too large — maximum 10MB.")
-      event.target.value = ""
-      return
+
+    for (const file of files) {
+      if (!allowed.includes(file.type)) {
+        this.addMessage("error", `${file.name}: Only images (JPEG, PNG, GIF, WEBP) and PDFs are supported.`)
+        continue
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        this.addMessage("error", `${file.name}: File too large — maximum 10MB.`)
+        continue
+      }
+
+      const base64 = await this.readFileAsBase64(file)
+      this.pendingFiles.push({ base64, mediaType: file.type, name: file.name })
     }
 
-    const base64 = await this.readFileAsBase64(file)
-    this.pendingFile = { base64, mediaType: file.type, name: file.name }
-    this.filePreviewTarget.classList.remove("hidden")
-    this.filePreviewTarget.querySelector("[data-filename]").textContent = file.name
+    this.renderFilePreviews()
     event.target.value = ""
   }
 
+  removePendingFileAt(index) {
+    this.pendingFiles.splice(index, 1)
+    this.renderFilePreviews()
+  }
+
   removePendingFile() {
-    this.pendingFile = null
-    this.filePreviewTarget.classList.add("hidden")
-    this.filePreviewTarget.querySelector("[data-filename]").textContent = ""
+    this.pendingFiles = []
+    this.renderFilePreviews()
+  }
+
+  renderFilePreviews() {
+    const container = this.filePreviewTarget
+    container.innerHTML = ""
+
+    if (this.pendingFiles.length === 0) {
+      container.classList.add("hidden")
+      return
+    }
+
+    container.classList.remove("hidden")
+    this.pendingFiles.forEach((file, index) => {
+      const badge = document.createElement("div")
+      badge.classList.add("flex", "items-center", "gap-1.5", "bg-blue-50", "border", "border-blue-200", "rounded-lg", "px-2", "py-1", "text-xs", "text-blue-700")
+      badge.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+        </svg>
+        <span class="truncate max-w-[120px]">${file.name}</span>
+      `
+      const removeBtn = document.createElement("button")
+      removeBtn.classList.add("shrink-0", "hover:text-red-500", "transition-colors")
+      removeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`
+      removeBtn.addEventListener("click", () => this.removePendingFileAt(index))
+      badge.appendChild(removeBtn)
+      container.appendChild(badge)
+    })
   }
 
   readFileAsBase64(file) {
@@ -77,24 +110,29 @@ export default class extends Controller {
 
   async send() {
     const text = this.inputTarget.value.trim()
-    if ((!text && !this.pendingFile) || this.sending) return
+    if ((!text && !this.pendingFiles.length) || this.sending) return
 
     this.inputTarget.value = ""
 
     let userContent
-    let userDisplayText = text || "📎 File attached"
+    let userDisplayText = text || "📎 Files attached"
 
-    if (this.pendingFile) {
+    if (this.pendingFiles.length > 0) {
       const parts = []
-      if (this.pendingFile.mediaType === "application/pdf") {
-        parts.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: this.pendingFile.base64 } })
-      } else {
-        parts.push({ type: "image", source: { type: "base64", media_type: this.pendingFile.mediaType, data: this.pendingFile.base64 } })
+      const fileNames = []
+      for (const file of this.pendingFiles) {
+        if (file.mediaType === "application/pdf") {
+          parts.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: file.base64 } })
+        } else {
+          parts.push({ type: "image", source: { type: "base64", media_type: file.mediaType, data: file.base64 } })
+        }
+        fileNames.push(file.name)
       }
       if (text) parts.push({ type: "text", text })
       userContent    = parts
-      userDisplayText = (text ? text + " " : "") + `📎 ${this.pendingFile.name}`
-      this.removePendingFile()
+      userDisplayText = (text ? text + " " : "") + `📎 ${fileNames.join(", ")}`
+      this.pendingFiles = []
+      this.renderFilePreviews()
     } else {
       userContent = text
     }
@@ -172,8 +210,8 @@ export default class extends Controller {
   clearHistory() {
     this.stopPolling()
     this.messages = []
-    this.pendingFile = null
-    this.filePreviewTarget.classList.add("hidden")
+    this.pendingFiles = []
+    this.renderFilePreviews()
     this.messagesTarget.innerHTML = this.emptyStateHTML()
   }
 
