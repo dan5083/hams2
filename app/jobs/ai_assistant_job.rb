@@ -171,6 +171,12 @@ class AiAssistantJob < ApplicationJob
       CREATING PARTS:
       Follow these steps exactly — 2 tool calls maximum.
 
+      DUPLICATE PART NUMBERS:
+      If you are about to create a part and find that the part number already exists
+      under the same customer but with a different issue (e.g. issue 'A' when the
+      drawing states 'Ae'), it was most likely created earlier in error. Update the
+      existing part's issue to match the drawing rather than creating a new record.
+
       STEP 1 (read) — Find the best template part across ALL customers:
       Search the entire parts database for locked parts whose treatment array matches
       the new part's requirements. Match on ALL of:
