@@ -51,6 +51,7 @@ class AiAssistantJob < ApplicationJob
 
   def perform(request_id)
     request = AiAssistantRequest.find(request_id)
+    @request_user = request.user
     messages = request.messages
 
     response_text = run_agentic_loop(messages)
@@ -163,12 +164,12 @@ class AiAssistantJob < ApplicationJob
     AEROSPACE / DEFENSE PRIMES:
       If the work is ultimately for one of these primes, set aerospace_defense: true.
       This flag significantly changes the locked operations (additional rinses, inspections, etc).
-      PRIMES: Flight Refuelling, Cobham, Ultra, Eaton, Lufthansa.
+      PRIMES: Flight Refuelling, Cobham, Ultra, Eaton.
       The prime can usually be identified from the drawing — look for their name, logo,
       or proprietary specification references (e.g. DS 26.00 = Cobham).
       Match case-insensitively.
 
-      Lufthansa Technik Landing Gear Services UK:
+      LUFTHANSA TECHNIK:
       On Lufthansa POs, each line item may show a "Part-No." in the table header AND
       a "P/N:" reference in the notes below. If both are present, the P/N is the actual
       part number — use it instead of the Part-No. column value.
@@ -319,14 +320,32 @@ class AiAssistantJob < ApplicationJob
 
     is_write = WRITE_PATTERNS.any? { |p| code.match?(p) }
     if is_write
-      Rails.logger.warn "[AI Assistant Job] WRITE | code: #{code}"
+      Rails.logger.warn "[AI Assistant Job] WRITE | user: #{@request_user&.email_address} | code: #{code}"
     else
       Rails.logger.info  "[AI Assistant Job] READ  | code: #{code}"
     end
 
     b = @eval_binding || binding
     result = if is_write
-      ActiveRecord::Base.transaction { b.eval(code) } # rubocop:disable Security/Eval
+      ActiveRecord::Base.transaction do
+        write_count = 0
+        counter = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+          sql = payload[:sql].to_s.upcase.lstrip
+          write_count += 1 if sql.start_with?("INSERT") || sql.start_with?("UPDATE")
+        end
+        begin
+          outcome = b.eval(code) # rubocop:disable Security/Eval
+        ensure
+          ActiveSupport::Notifications.unsubscribe(counter)
+        end
+
+        if write_count > 3 && !unrestricted_user?
+          Rails.logger.warn "[AI Assistant Job] BULK WRITE BLOCKED | #{write_count} writes | user: #{@request_user&.email_address} | code: #{code}"
+          raise "Write blocked: this operation would modify #{write_count} records. Bulk writes are restricted to admin users. Ask Daniel to run this via the console."
+        end
+
+        outcome
+      end
     else
       outcome = nil
       ActiveRecord::Base.transaction do
@@ -354,5 +373,9 @@ class AiAssistantJob < ApplicationJob
     when Hash, Numeric, String, TrueClass, FalseClass, NilClass then value
     else value.respond_to?(:as_json) ? value.as_json : value.to_s
     end
+  end
+
+  def unrestricted_user?
+    @request_user&.email_address == "daniel@hardanodisingstl.com"
   end
 end

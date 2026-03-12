@@ -99,7 +99,9 @@ class User < ApplicationRecord
     email_address.in?([
       'daniel@hardanodisingstl.com',
       'tariq@hardanodisingstl.com',
-      'phil@hardanodisingstl.com'
+      'phil@hardanodisingstl.com',
+      'sophie@hardanodisingstl.com',
+      'julia@hardanodisingstl.com'
     ])
   end
 
