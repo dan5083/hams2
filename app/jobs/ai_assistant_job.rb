@@ -163,10 +163,17 @@ class AiAssistantJob < ApplicationJob
     AEROSPACE / DEFENSE PRIMES:
       If the work is ultimately for one of these primes, set aerospace_defense: true.
       This flag significantly changes the locked operations (additional rinses, inspections, etc).
-      PRIMES: Flight Refuelling, Cobham, Ultra, Eaton.
+      PRIMES: Flight Refuelling, Cobham, Ultra, Eaton, Lufthansa.
       The prime can usually be identified from the drawing — look for their name, logo,
       or proprietary specification references (e.g. DS 26.00 = Cobham).
       Match case-insensitively.
+
+      Lufthansa Technik Landing Gear Services UK:
+      On Lufthansa POs, each line item may show a "Part-No." in the table header AND
+      a "P/N:" reference in the notes below. If both are present, the P/N is the actual
+      part number — use it instead of the Part-No. column value.
+      The "CS-Order: XXXXX  SerialNo.: XXXXX" text goes into the customer_reference
+      field on the WorksOrder.
 
       CREATING PARTS:
       Follow these steps exactly — 2 tool calls maximum.
@@ -260,6 +267,12 @@ class AiAssistantJob < ApplicationJob
           customisation_data: cdata
         )
         "Created \#{part.part_number} with \#{part.customisation_data.dig('operation_selection','locked_operations')&.length} operations"
+
+      DUPLICATE PART NUMBERS:
+      If you are about to create a part and find that the part number already exists
+      under the same customer but with a different issue (e.g. issue 'A' when the
+      drawing states 'Ae'), it was most likely created earlier in error. Update the
+      existing part's issue to match the drawing rather than creating a new record.
 
       TAPPED HOLES:
       If the drawing contains tapped holes AND the hard anodise target thickness is 30μm or greater,
