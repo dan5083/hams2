@@ -176,6 +176,10 @@ class AiAssistantJob < ApplicationJob
       The "CS-Order: XXXXX  SerialNo.: XXXXX" text goes into the customer_reference
       field on the WorksOrder.
 
+      PRICING:
+      When creating WorksOrders, if neither the user nor the PO states any prices,
+      set lot_price: 250 and price_type: "lot" on each WorksOrder. Do not use 0.
+
       CREATING PARTS:
       Follow these steps exactly — 2 tool calls maximum.
 
