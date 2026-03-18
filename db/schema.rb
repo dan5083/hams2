@@ -1,393 +1,385 @@
-# This file is auto-generated from the current state of the database. Instead
-# of editing this file, please use the migrations feature of Active Record to
-# incrementally modify your database, and then regenerate this schema definition.
-#
-# This file is the source Rails uses to define your schema when running `bin/rails
-# db:schema:load`. When creating a new database, `bin/rails db:schema:load` tends to
-# be faster and is potentially less error prone than running all of your
-# migrations from scratch. Old migrations may fail to apply correctly if those
-# migrations use external dependencies or application code.
-#
-# It's strongly recommended that you check this file into your version control system.
+# app/jobs/ai_assistant_job.rb
+require "net/http"
+require "uri"
+require "json"
 
-ActiveRecord::Schema[8.0].define(version: 2026_03_06_121102) do
-  # These are extensions that must be enabled in order to support this database
-  enable_extension "pg_catalog.plpgsql"
-  enable_extension "pgcrypto"
+class AiAssistantJob < ApplicationJob
+  queue_as :default
 
-  create_table "active_storage_attachments", force: :cascade do |t|
-    t.string "name", null: false
-    t.string "record_type", null: false
-    t.bigint "record_id", null: false
-    t.bigint "blob_id", null: false
-    t.datetime "created_at", null: false
-    t.index ["blob_id"], name: "index_active_storage_attachments_on_blob_id"
-    t.index ["record_type", "record_id", "name", "blob_id"], name: "index_active_storage_attachments_uniqueness", unique: true
+  ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages".freeze
+  MODEL             = "claude-opus-4-6".freeze
+
+  BLOCKED_PATTERNS = [
+    /destroy_all/, /delete_all/, /drop_table/, /truncate/i,
+    /\.execute\s*\(/, /`[^`]+`/, /\bsystem\s*\(/, /\bexec\s*\(/,
+    /Kernel\.(system|exec)/,
+    /File\.(write|delete|unlink|rename)/, /FileUtils\./, /IO\.popen/, /Open3\./,
+  ].freeze
+
+  WRITE_PATTERNS = [
+    /\.save[!\s(]/, /\.update[!\s(]/, /\.create[!\s(]/,
+    /\.destroy(?!_all)/, /\.delete(?!_all)/,
+    /\.increment/, /\.decrement/, /\.toggle/,
+  ].freeze
+
+  TOOLS = [
+    {
+      name: "execute_query",
+      description: <<~DESC,
+        Execute Ruby / ActiveRecord against the live HAMS database.
+        All models are available: Organization, CustomerOrder, WorksOrder, Part,
+        ReleaseNote, Invoice, InvoiceItem, ExternalNcr, Specification,
+        QualityDocument, User, Buyer, and any other model in the app.
+        Use standard ActiveRecord — scopes, associations, calculations, anything.
+        Return a serialisable value (Array, Hash, ActiveRecord result, scalar).
+
+        Examples:
+          Organization.where(is_customer: true).count
+          CustomerOrder.includes(:customer).where(voided: false).order(date_received: :desc).limit(10).map { |o| { number: o.number, customer: o.customer&.name } }
+          WorksOrder.where(is_open: true).joins(customer_order: :customer).group("organizations.name").count
+          Part.where(customer: Organization.find_by(name: "Alutec")).where(enabled: true).pluck(:part_number, :description)
+      DESC
+      input_schema: {
+        type: "object",
+        properties: {
+          code: { type: "string", description: "Ruby/ActiveRecord expression to evaluate. Last value is returned." }
+        },
+        required: ["code"]
+      }
+    }
+  ].freeze
+
+  def perform(request_id)
+    request = AiAssistantRequest.find(request_id)
+    @request_user = request.user
+    messages = request.messages
+
+    response_text = run_agentic_loop(messages)
+    request.mark_complete!(response_text)
+  rescue => e
+    Rails.logger.error "[AI Assistant Job] Error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+    AiAssistantRequest.find_by(id: request_id)&.mark_error!(e.message)
   end
 
-  create_table "active_storage_blobs", force: :cascade do |t|
-    t.string "key", null: false
-    t.string "filename", null: false
-    t.string "content_type"
-    t.text "metadata"
-    t.string "service_name", null: false
-    t.bigint "byte_size", null: false
-    t.string "checksum"
-    t.datetime "created_at", null: false
-    t.index ["key"], name: "index_active_storage_blobs_on_key", unique: true
+  private
+
+  def run_agentic_loop(messages)
+    loop_messages = messages.dup
+    iterations    = 0
+    @eval_binding = binding # shared binding persists local variables across all tool calls
+
+    loop do
+      iterations += 1
+      raise "Exceeded maximum tool iterations" if iterations > 20
+
+      response    = call_anthropic(loop_messages)
+      stop_reason = response["stop_reason"]
+      content     = response["content"] || []
+      text        = content.select { |b| b["type"] == "text" }.map { |b| b["text"] }.join("\n")
+
+      if stop_reason == "end_turn"
+        # Claude narrated instead of acting — push it back once, then give up
+        narrating = text.present? && text.match?(/let me|i need to|i will|i'll|now i|first i|my plan|per the|mandatory/i)
+        if narrating && iterations <= 3
+          loop_messages << { role: "assistant", content: content }
+          loop_messages << { role: "user", content: [{ type: "text", text: "Stop narrating. Call the tool now." }] }
+          next
+        end
+        return text.presence || "Done."
+      end
+
+      if stop_reason == "tool_use"
+        tool_uses = content.select { |b| b["type"] == "tool_use" }
+        loop_messages << { role: "assistant", content: content }
+
+        tool_results = tool_uses.map do |tu|
+          outcome = dispatch_tool(tu["name"], tu["input"] || {})
+          { type: "tool_result", tool_use_id: tu["id"], content: outcome.to_json }
+        end
+
+        loop_messages << { role: "user", content: tool_results }
+      else
+        return text.presence || "No response generated."
+      end
+    end
   end
 
-  create_table "active_storage_variant_records", force: :cascade do |t|
-    t.bigint "blob_id", null: false
-    t.string "variation_digest", null: false
-    t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
+  def call_anthropic(messages)
+    uri  = URI(ANTHROPIC_API_URL)
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl      = true
+    http.read_timeout = 120  # Jobs aren't subject to Heroku's 30s HTTP timeout
+
+    req = Net::HTTP::Post.new(uri)
+    req["Content-Type"]      = "application/json"
+    req["x-api-key"]         = ENV["ANTHROPIC_API_KEY"]
+    req["anthropic-version"] = "2023-06-01"
+    req.body = {
+      model:      MODEL,
+      max_tokens: 4096,
+      system:     build_system_prompt,
+      tools:      TOOLS,
+      messages:   messages
+    }.to_json
+
+    res = http.request(req)
+    raise "Anthropic API error #{res.code}: #{res.body}" unless res.is_a?(Net::HTTPSuccess)
+
+    JSON.parse(res.body)
   end
 
-  create_table "additional_charge_presets", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.string "name", null: false
-    t.text "description"
-    t.decimal "amount", precision: 10, scale: 2
-    t.boolean "is_variable", default: false, null: false
-    t.string "calculation_type"
-    t.boolean "enabled", default: true, null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["enabled"], name: "index_additional_charge_presets_on_enabled"
-    t.index ["is_variable"], name: "index_additional_charge_presets_on_is_variable"
-    t.index ["name"], name: "index_additional_charge_presets_on_name", unique: true
+  def build_system_prompt
+    schema = File.read(Rails.root.join("db", "schema.rb")) rescue "Schema unavailable."
+
+    <<~PROMPT
+      You are an internal assistant embedded in HAMS 2.0 — the management system for
+      Hard Anodising Surface Treatments Limited (HASTL).
+
+      YOUR CAPABILITY:
+      You have one tool — execute_query — which evaluates Ruby/ActiveRecord against the live
+      production database. Use it freely for both reads AND writes.
+      You can call it multiple times per response if needed.
+
+      READS: Query anything — counts, searches, associations, calculations.
+      WRITES: You CAN and SHOULD perform writes when asked — save!, update!, create!, etc.
+      Write operations are logged server-side for audit purposes but are fully permitted.
+      The only things blocked are bulk destructive operations (destroy_all, delete_all, truncate)
+      and shell access. Everything else is fair game.
+
+      Always query before answering questions about specific records. Do not guess at IDs or counts.
+      For writes, fetch the record first, then modify it — don't assume IDs.
+
+      BUSINESS CONTEXT:
+      - Core workflow: Customer PO → CustomerOrder → WorksOrders (one per line item) →
+        shop floor processing through VATs → ReleaseNotes on completion → Invoices raised
+      - Organizations: customers and suppliers synced from Xero
+      - Parts: master records for each customer's components — hold processing instructions
+      - WorksOrders: live jobs referencing a Part, carrying qty, pricing, open/closed status
+      - Process types: hard_anodising, standard_anodising, chromic_anodising,
+        chemical_conversion, electroless_nickel_plating
+      - VATs are the treatment tanks, numbered approximately 1–12
+      - ReleaseNotes record accepted/rejected quantities when work is completed
+      - Invoices sync to Xero via xero_id
+
+    AEROSPACE / DEFENSE PRIMES:
+      If the work is ultimately for one of these primes, set aerospace_defense: true.
+      This flag significantly changes the locked operations (additional rinses, inspections, etc).
+      PRIMES: Flight Refuelling, Cobham, Ultra, Eaton.
+      The prime can usually be identified from the drawing — look for their name, logo,
+      or proprietary specification references (e.g. DS 26.00 = Cobham).
+      Match case-insensitively.
+
+      LUFTHANSA TECHNIK:
+      On Lufthansa POs, each line item may show a "Part-No." in the table header AND
+      a "P/N:" reference in the notes below. If both are present, the P/N is the actual
+      part number — use it instead of the Part-No. column value.
+      The "CS-Order: XXXXX  SerialNo.: XXXXX" text goes into the customer_reference
+      field on the WorksOrder.
+
+      PRICING:
+      When creating WorksOrders, if neither the user nor the PO states any prices,
+      set lot_price: 250 and price_type: "lot" on each WorksOrder. Do not use 0.
+
+      CREATING PARTS:
+      Follow these steps exactly — 2 tool calls maximum.
+
+      DUPLICATE PART NUMBERS:
+      If you are about to create a part and find that the part number already exists
+      under the same customer but with a different issue (e.g. issue 'A' when the
+      drawing states 'Ae'), it was most likely created earlier in error. Update the
+      existing part's issue to match the drawing rather than creating a new record.
+
+      STEP 1 (read) — Find the best template part across ALL customers:
+      Search the entire parts database for locked parts whose treatment array matches
+      the new part's requirements. Match on ALL of:
+        - Treatment types (e.g. hard_anodising, chemical_conversion)
+        - Sealing method (e.g. hot_water_seal, ptfe_seal, nickel_fluoride_seal, none)
+        - Dye colour (if applicable)
+        - aerospace_defense flag (must match — aerospace templates have different operations)
+
+      Use this query pattern, adapting the filters for the required treatments:
+
+        required_types = ["hard_anodising"]  # adapt to match drawing requirements
+        required_sealing = "hot_water_seal"  # adapt — derive from spec code if applicable
+        required_aero = true                 # true if customer is aerospace/defense
+        required_dye = nil                   # set if dye required
+
+        Part.joins(:customer)
+            .where("customisation_data->'operation_selection'->>'locked' = 'true'")
+            .select { |p|
+              t = JSON.parse(p.customisation_data.dig("operation_selection","treatments") || "[]") rescue []
+              types = t.map { |x| x["type"] }
+              sealing = t.map { |x| x["sealing_method"] }.compact.first
+              dye = t.map { |x| x["dye_color"] }.compact.first
+              aero = p.customisation_data.dig("operation_selection","aerospace_defense")
+              aero_flag = (aero == true || aero == "true")
+
+              required_types.all? { |rt| types.include?(rt) } &&
+                types.length == required_types.length &&
+                sealing == required_sealing &&
+                aero_flag == required_aero &&
+                (required_dye.nil? || dye == required_dye)
+            }
+            .map { |p| { id: p.id, part_number: p.part_number, customer: p.customer&.name,
+                         specification: p.specification,
+                         treatments: JSON.parse(p.customisation_data.dig("operation_selection","treatments") || "[]")
+                                       .map { |t| t.slice("type","operation_id","sealing_method","dye_color") } } }
+
+      From the results, pick the template whose specification is closest to the new part's spec.
+      Then fetch the full part: Part.find("<id>").customisation_data
+
+      STEP 2 (write) — Clone and create in a single tool call:
+      Copy the entire customisation_data from the matched part. For each non-auto-inserted
+      operation that differs from the template (different spec, alloy, thickness, or chemical),
+      replace the operation_text and specifications fields by fetching them from the operation
+      library — never write process parameters (voltage, duration, vat, temperature, deposition
+      rate) from scratch:
+
+        op_text = Operation.all_operations.find { |o| o.id == "TARGET_OPERATION_ID" }&.operation_text
+
+      Then append the spec reference to the operation_text if not already present.
+      Do not change the structure, order, or auto-inserted operations.
+      Do not change the sealing method — it was already matched in Step 1.
+      Ensure the aerospace_defense flag matches the customer (see list above).
+      Then create the part with the cloned customisation_data, setting locked: true.
+
+        template = Part.find("<matched_part_id>")
+        cdata = template.customisation_data.deep_dup
+        # Set aerospace_defense flag based on customer
+        cdata["operation_selection"]["aerospace_defense"] = true  # or false
+        # update specific operation_text entries to match new spec...
+        ops = cdata.dig("operation_selection", "locked_operations")
+        ops.each do |op|
+          case op["id"]
+          when "IRIDITE_NCP_7_TO_10_MIN", "ALOCHROM_1200_CLASS_1A" # update to correct chemical
+            op["operation_text"] = "..." # match new spec
+            op["specifications"] = "..."
+          when /HARD/ # update hard anodise spec text if needed
+            op["operation_text"] = "..."
+          end
+        end
+        customer = Organization.find_by!("name ILIKE ?", "%customer name%")
+        part = Part.create!(
+          customer_id: customer.id,
+          part_number: "...",
+          part_issue: "...",
+          description: "...",
+          material: "...",
+          specification: "...",
+          special_instructions: "...",
+          specified_thicknesses: "...",
+          process_type: template.process_type,
+          customisation_data: cdata
+        )
+        "Created \#{part.part_number} with \#{part.customisation_data.dig('operation_selection','locked_operations')&.length} operations"
+
+      DUPLICATE PART NUMBERS:
+      If you are about to create a part and find that the part number already exists
+      under the same customer but with a different issue (e.g. issue 'A' when the
+      drawing states 'Ae'), it was most likely created earlier in error. Update the
+      existing part's issue to match the drawing rather than creating a new record.
+
+      TAPPED HOLES:
+      If the drawing contains tapped holes AND the hard anodise target thickness is 30μm or greater,
+      add a note to the masking operation_text that tapped holes must be masked before anodising.
+      If target thickness is less than 30μm, no masking of tapped holes is required.
+
+      DEFAULT THICKNESSES:
+      If a drawing does not specify a coating thickness, but does state a specification,
+      that specification will likely have a default thickness.
+
+      CRITICAL — eval does not persist local variables between tool calls.
+      Step 2 must be a single tool call — fetch template, clone, adapt, and create together.
+      Always look up the Organization to get the correct customer_id — never guess it.
+
+      RESPONSE STYLE:
+      - Do not produce any text before or between tool calls. Only output text in your final response after all tool calls are complete. No narration, no plans, no commentary mid-task.
+      - Concise.
+      - Tables or lists for multiple records.
+      - Summarise large result sets and offer to drill in.
+      - If something looks wrong in the data, say so.
+      - Today is #{Date.current.strftime("%A, %d %B %Y")}.
+
+      CURRENT SCHEMA:
+      #{schema}
+    PROMPT
   end
 
-  create_table "ai_assistant_requests", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "user_id", null: false
-    t.string "status", default: "pending", null: false
-    t.jsonb "messages", default: [], null: false
-    t.text "response"
-    t.text "error"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["created_at"], name: "index_ai_assistant_requests_on_created_at"
-    t.index ["status"], name: "index_ai_assistant_requests_on_status"
-    t.index ["user_id"], name: "index_ai_assistant_requests_on_user_id"
+  def dispatch_tool(name, input)
+    case name
+    when "execute_query" then run_query(input["code"].to_s.strip)
+    else { error: "Unknown tool: #{name}" }
+    end
   end
 
-  create_table "buyers", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "organization_id", null: false
-    t.string "email", null: false
-    t.boolean "enabled", default: true, null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["enabled"], name: "index_buyers_on_enabled"
-    t.index ["organization_id", "email"], name: "index_buyers_on_organization_id_and_email", unique: true
-    t.index ["organization_id"], name: "index_buyers_on_organization_id"
+  def run_query(code)
+    return { error: "Empty query." } if code.blank?
+    return { error: "Code must be a Ruby expression, not a comment." } if code.match?(/\A\s*#/)
+
+    blocked = BLOCKED_PATTERNS.find { |p| code.match?(p) }
+    if blocked
+      Rails.logger.warn "[AI Assistant Job] BLOCKED | pattern: #{blocked.source} | code: #{code}"
+      return { blocked: true, reason: "Operation not permitted (matched: #{blocked.source})", code: code }
+    end
+
+    is_write = WRITE_PATTERNS.any? { |p| code.match?(p) }
+    if is_write
+      Rails.logger.warn "[AI Assistant Job] WRITE | user: #{@request_user&.email_address} | code: #{code}"
+    else
+      Rails.logger.info  "[AI Assistant Job] READ  | code: #{code}"
+    end
+
+    b = @eval_binding || binding
+    result = if is_write
+      ActiveRecord::Base.transaction do
+        write_count = 0
+        counter = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+          sql = payload[:sql].to_s.upcase.lstrip
+          write_count += 1 if sql.start_with?("INSERT") || sql.start_with?("UPDATE")
+        end
+        begin
+          outcome = b.eval(code) # rubocop:disable Security/Eval
+        ensure
+          ActiveSupport::Notifications.unsubscribe(counter)
+        end
+
+        if write_count > 3 && !unrestricted_user?
+          Rails.logger.warn "[AI Assistant Job] BULK WRITE BLOCKED | #{write_count} writes | user: #{@request_user&.email_address} | code: #{code}"
+          raise "Write blocked: this operation would modify #{write_count} records. Bulk writes are restricted to admin users. Ask Daniel to run this via the console."
+        end
+
+        outcome
+      end
+    else
+      outcome = nil
+      ActiveRecord::Base.transaction do
+        outcome = b.eval(code) # rubocop:disable Security/Eval
+        raise ActiveRecord::Rollback
+      end
+      outcome
+    end
+
+    serialise(result)
+  rescue SyntaxError => e
+    { error: "Syntax error", detail: e.message }
+  rescue ActiveRecord::StatementInvalid => e
+    { error: "Database error", detail: e.message }
+  rescue => e
+    Rails.logger.error "[AI Assistant Job] Query error: #{e.class} — #{e.message} | Code: #{code}"
+    { error: e.class.to_s, detail: e.message }
   end
 
-  create_table "customer_orders", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "customer_id", null: false
-    t.string "number", null: false
-    t.date "date_received", null: false
-    t.boolean "voided", default: false, null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.integer "open_works_orders_count", default: 0, null: false
-    t.integer "fully_released_works_orders_count", default: 0, null: false
-    t.integer "uninvoiced_accepted_quantity", default: 0, null: false
-    t.index ["customer_id"], name: "index_customer_orders_on_customer_id"
-    t.index ["date_received"], name: "index_customer_orders_on_date_received"
-    t.index ["number"], name: "index_customer_orders_on_number"
-    t.index ["open_works_orders_count", "fully_released_works_orders_count", "uninvoiced_accepted_quantity"], name: "index_customer_orders_on_cached_invoice_status"
-    t.index ["voided"], name: "index_customer_orders_on_voided"
+  def serialise(value)
+    case value
+    when ActiveRecord::Relation  then value.as_json
+    when ActiveRecord::Base      then value.as_json
+    when Array                   then value.map { |v| v.respond_to?(:as_json) ? v.as_json : v }
+    when Hash, Numeric, String, TrueClass, FalseClass, NilClass then value
+    else value.respond_to?(:as_json) ? value.as_json : value.to_s
+    end
   end
 
-  create_table "external_ncrs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.integer "hal_ncr_number", null: false
-    t.date "date", default: -> { "CURRENT_DATE" }, null: false
-    t.string "status", default: "draft", null: false
-    t.uuid "created_by_id", null: false
-    t.uuid "assigned_to_id"
-    t.jsonb "ncr_data", default: {}, null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.uuid "release_note_id", null: false
-    t.index ["assigned_to_id"], name: "index_external_ncrs_on_assigned_to_id"
-    t.index ["created_by_id"], name: "index_external_ncrs_on_created_by_id"
-    t.index ["date"], name: "index_external_ncrs_on_date"
-    t.index ["hal_ncr_number"], name: "index_external_ncrs_on_hal_ncr_number", unique: true
-    t.index ["ncr_data"], name: "index_external_ncrs_on_ncr_data", using: :gin
-    t.index ["release_note_id"], name: "index_external_ncrs_on_release_note_id"
-    t.index ["status"], name: "index_external_ncrs_on_status"
-    t.check_constraint "hal_ncr_number > 0", name: "check_positive_ncr_number"
-    t.check_constraint "status::text = ANY (ARRAY['draft'::character varying, 'in_progress'::character varying, 'completed'::character varying]::text[])", name: "check_valid_status"
+  def unrestricted_user?
+    @request_user&.email_address == "daniel@hardanodisingstl.com"
   end
-
-  create_table "invoice_items", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "invoice_id", null: false
-    t.uuid "release_note_id"
-    t.string "kind", null: false
-    t.integer "quantity", null: false
-    t.text "description", null: false
-    t.decimal "line_amount_ex_tax", precision: 10, scale: 2, null: false
-    t.decimal "line_amount_tax", precision: 10, scale: 2, null: false
-    t.decimal "line_amount_inc_tax", precision: 10, scale: 2, null: false
-    t.integer "position", default: 0, null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["invoice_id", "position"], name: "index_invoice_items_on_invoice_id_and_position"
-    t.index ["invoice_id"], name: "index_invoice_items_on_invoice_id"
-    t.index ["kind"], name: "index_invoice_items_on_kind"
-    t.index ["release_note_id"], name: "index_invoice_items_on_release_note_id"
-    t.check_constraint "line_amount_ex_tax >= 0::numeric AND line_amount_tax >= 0::numeric AND line_amount_inc_tax >= 0::numeric", name: "check_positive_amounts"
-    t.check_constraint "quantity > 0", name: "check_positive_quantity"
-  end
-
-  create_table "invoices", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "customer_id", null: false
-    t.date "date", default: -> { "CURRENT_DATE" }, null: false
-    t.decimal "total_ex_tax", precision: 10, scale: 2, default: "0.0", null: false
-    t.decimal "total_tax", precision: 10, scale: 2, default: "0.0", null: false
-    t.decimal "total_inc_tax", precision: 10, scale: 2, default: "0.0", null: false
-    t.string "xero_tax_type", null: false
-    t.decimal "tax_rate_pct", precision: 5, scale: 2, null: false
-    t.string "xero_id"
-    t.string "number"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["customer_id"], name: "index_invoices_on_customer_id"
-    t.index ["date"], name: "index_invoices_on_date"
-    t.index ["number"], name: "index_invoices_on_number", unique: true, where: "(number IS NOT NULL)"
-    t.index ["xero_id"], name: "index_invoices_on_xero_id", unique: true, where: "(xero_id IS NOT NULL)"
-  end
-
-  create_table "organizations", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.string "name"
-    t.boolean "enabled"
-    t.boolean "is_customer"
-    t.boolean "is_supplier"
-    t.uuid "xero_contact_id", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.jsonb "address_data", default: {}
-    t.index ["address_data"], name: "index_organizations_on_address_data", using: :gin
-    t.index ["is_customer"], name: "index_organizations_on_is_customer", where: "(is_customer = true)"
-    t.index ["xero_contact_id"], name: "index_organizations_on_xero_contact_id"
-  end
-
-  create_table "parts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "customer_id", null: false
-    t.string "part_number", null: false
-    t.string "part_issue", default: "A", null: false
-    t.string "description"
-    t.string "material"
-    t.text "specification"
-    t.text "notes"
-    t.boolean "enabled", default: true, null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.text "special_instructions"
-    t.string "process_type"
-    t.jsonb "customisation_data", default: {}
-    t.uuid "replaces_id"
-    t.text "specified_thicknesses"
-    t.decimal "each_price", precision: 10, scale: 2
-    t.string "file_cloudinary_ids", default: [], array: true
-    t.string "file_filenames", default: [], array: true
-    t.index ["customer_id", "enabled"], name: "index_parts_on_customer_id_and_enabled"
-    t.index ["customer_id", "part_number", "part_issue"], name: "index_parts_on_customer_and_part_number_and_issue", unique: true
-    t.index ["customer_id"], name: "index_parts_on_customer_id"
-    t.index ["customisation_data"], name: "index_parts_on_customisation_data", using: :gin
-    t.index ["enabled"], name: "index_parts_on_enabled"
-    t.index ["file_cloudinary_ids"], name: "index_parts_on_file_cloudinary_ids"
-    t.index ["part_number"], name: "index_parts_on_part_number"
-    t.index ["process_type"], name: "index_parts_on_process_type"
-    t.index ["replaces_id"], name: "index_parts_on_replaces_id"
-  end
-
-  create_table "quality_document_revisions", force: :cascade do |t|
-    t.bigint "quality_document_id", null: false
-    t.integer "issue_number", null: false
-    t.string "changed_by", null: false
-    t.text "change_description"
-    t.jsonb "previous_content"
-    t.datetime "changed_at", precision: nil, null: false
-    t.index ["quality_document_id", "issue_number"], name: "idx_on_quality_document_id_issue_number_08772926ba"
-    t.index ["quality_document_id"], name: "index_quality_document_revisions_on_quality_document_id"
-  end
-
-  create_table "quality_documents", force: :cascade do |t|
-    t.string "document_type", null: false
-    t.string "code", null: false
-    t.string "title", null: false
-    t.integer "current_issue_number", default: 1, null: false
-    t.string "approved_by"
-    t.jsonb "content", default: {}
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["content"], name: "index_quality_documents_on_content", using: :gin
-    t.index ["document_type", "code"], name: "index_quality_documents_on_document_type_and_code", unique: true
-  end
-
-  create_table "release_notes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.integer "number", null: false
-    t.uuid "works_order_id", null: false
-    t.uuid "issued_by_id", null: false
-    t.date "date", null: false
-    t.integer "quantity_accepted", default: 0, null: false
-    t.integer "quantity_rejected", default: 0, null: false
-    t.text "remarks"
-    t.boolean "no_invoice", default: false, null: false
-    t.boolean "voided", default: false, null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.jsonb "measured_thicknesses"
-    t.index ["date"], name: "index_release_notes_on_date"
-    t.index ["issued_by_id"], name: "index_release_notes_on_issued_by_id"
-    t.index ["no_invoice"], name: "index_release_notes_on_no_invoice"
-    t.index ["number"], name: "index_release_notes_on_number", unique: true
-    t.index ["voided"], name: "index_release_notes_on_voided"
-    t.index ["works_order_id"], name: "index_release_notes_on_works_order_id"
-    t.check_constraint "quantity_accepted > 0 OR quantity_rejected > 0", name: "check_has_quantity"
-    t.check_constraint "quantity_accepted >= 0 AND quantity_rejected >= 0", name: "check_positive_quantities"
-  end
-
-  create_table "sequences", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.string "key", null: false
-    t.integer "value", default: 1, null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["key"], name: "index_sequences_on_key", unique: true
-  end
-
-  create_table "sessions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "user_id", null: false
-    t.string "ip_address"
-    t.string "user_agent"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["user_id"], name: "index_sessions_on_user_id"
-  end
-
-  create_table "skipton_customer_mappings", force: :cascade do |t|
-    t.string "xero_name", null: false
-    t.string "skipton_id", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["skipton_id"], name: "index_skipton_customer_mappings_on_skipton_id"
-    t.index ["xero_name"], name: "index_skipton_customer_mappings_on_xero_name", unique: true
-  end
-
-  create_table "specification_presets", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.string "name", null: false
-    t.text "content", null: false
-    t.boolean "enabled", default: true, null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["enabled"], name: "index_specification_presets_on_enabled"
-    t.index ["name"], name: "index_specification_presets_on_name", unique: true
-  end
-
-  create_table "specifications", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.string "title", null: false
-    t.text "description"
-    t.string "version"
-    t.boolean "is_qs", default: false, null: false
-    t.boolean "archived", default: false, null: false
-    t.jsonb "document_data", default: {}, null: false
-    t.uuid "created_by_id", null: false
-    t.uuid "updated_by_id"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["archived"], name: "index_specifications_on_archived"
-    t.index ["created_by_id"], name: "index_specifications_on_created_by_id"
-    t.index ["document_data"], name: "index_specifications_on_document_data", using: :gin
-    t.index ["is_qs"], name: "index_specifications_on_is_qs"
-    t.index ["title"], name: "index_specifications_on_title"
-    t.index ["updated_by_id"], name: "index_specifications_on_updated_by_id"
-  end
-
-  create_table "users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.string "email_address", null: false
-    t.string "password_digest"
-    t.string "username"
-    t.string "full_name"
-    t.boolean "enabled"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.string "magic_link_token"
-    t.datetime "magic_link_expires_at"
-    t.index ["email_address"], name: "index_users_on_email_address", unique: true
-    t.index ["magic_link_expires_at"], name: "index_users_on_magic_link_expires_at"
-    t.index ["magic_link_token"], name: "index_users_on_magic_link_token", unique: true, where: "(magic_link_token IS NOT NULL)"
-  end
-
-  create_table "works_orders", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.integer "number", null: false
-    t.uuid "customer_order_id", null: false
-    t.uuid "part_id", null: false
-    t.string "customer_order_line"
-    t.string "part_number", null: false
-    t.string "part_issue", null: false
-    t.string "part_description", null: false
-    t.integer "quantity", null: false
-    t.integer "quantity_released", default: 0, null: false
-    t.boolean "is_open", default: true, null: false
-    t.boolean "voided", default: false, null: false
-    t.decimal "lot_price", precision: 10, scale: 2, null: false
-    t.string "price_type", null: false
-    t.decimal "each_price", precision: 10, scale: 2
-    t.string "material"
-    t.string "batch"
-    t.jsonb "customised_process_data", default: {}
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.jsonb "additional_charge_data", default: {}
-    t.string "customer_reference"
-    t.boolean "is_fully_released", default: false, null: false
-    t.index ["additional_charge_data"], name: "index_works_orders_on_additional_charge_data", using: :gin
-    t.index ["customer_order_id"], name: "index_works_orders_on_customer_order_id"
-    t.index ["customer_reference"], name: "index_works_orders_on_customer_reference"
-    t.index ["is_fully_released"], name: "index_works_orders_on_is_fully_released"
-    t.index ["is_open"], name: "index_works_orders_on_is_open"
-    t.index ["number"], name: "index_works_orders_on_number", unique: true
-    t.index ["part_id"], name: "index_works_orders_on_part_id"
-    t.index ["part_number", "part_issue"], name: "index_works_orders_on_part_number_and_part_issue"
-    t.index ["voided"], name: "index_works_orders_on_voided"
-    t.check_constraint "lot_price >= 0::numeric AND (each_price IS NULL OR each_price >= 0::numeric)", name: "check_positive_prices"
-    t.check_constraint "quantity > 0 AND quantity_released >= 0 AND quantity_released <= quantity", name: "check_positive_quantities"
-  end
-
-  create_table "xero_contacts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.string "name"
-    t.string "contact_status"
-    t.boolean "is_customer"
-    t.boolean "is_supplier"
-    t.string "merged_to_contact_id"
-    t.string "accounts_receivable_tax_type"
-    t.string "accounts_payable_tax_type"
-    t.string "xero_id"
-    t.jsonb "xero_data"
-    t.datetime "last_synced_at", precision: nil
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-  end
-
-  add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
-  add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
-  add_foreign_key "buyers", "organizations"
-  add_foreign_key "customer_orders", "organizations", column: "customer_id"
-  add_foreign_key "external_ncrs", "release_notes"
-  add_foreign_key "external_ncrs", "users", column: "assigned_to_id"
-  add_foreign_key "external_ncrs", "users", column: "created_by_id"
-  add_foreign_key "invoice_items", "invoices"
-  add_foreign_key "invoice_items", "release_notes"
-  add_foreign_key "invoices", "organizations", column: "customer_id"
-  add_foreign_key "organizations", "xero_contacts"
-  add_foreign_key "parts", "organizations", column: "customer_id"
-  add_foreign_key "parts", "parts", column: "replaces_id"
-  add_foreign_key "quality_document_revisions", "quality_documents"
-  add_foreign_key "release_notes", "users", column: "issued_by_id"
-  add_foreign_key "release_notes", "works_orders"
-  add_foreign_key "sessions", "users"
-  add_foreign_key "specifications", "users", column: "created_by_id"
-  add_foreign_key "specifications", "users", column: "updated_by_id"
-  add_foreign_key "works_orders", "customer_orders"
-  add_foreign_key "works_orders", "parts"
 end
