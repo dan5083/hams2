@@ -78,7 +78,6 @@ class AiAssistantJob < ApplicationJob
       text        = content.select { |b| b["type"] == "text" }.map { |b| b["text"] }.join("\n")
 
       if stop_reason == "end_turn"
-        # Claude narrated instead of acting — push it back once, then give up
         narrating = text.present? && text.match?(/let me|i need to|i will|i'll|now i|first i|my plan|per the|mandatory/i)
         if narrating && iterations <= 3
           loop_messages << { role: "assistant", content: content }
@@ -108,18 +107,19 @@ class AiAssistantJob < ApplicationJob
     uri  = URI(ANTHROPIC_API_URL)
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl      = true
-    http.read_timeout = 120  # Jobs aren't subject to Heroku's 30s HTTP timeout
+    http.read_timeout = 120
 
     req = Net::HTTP::Post.new(uri)
     req["Content-Type"]      = "application/json"
     req["x-api-key"]         = ENV["ANTHROPIC_API_KEY"]
     req["anthropic-version"] = "2023-06-01"
     req.body = {
-      model:      MODEL,
-      max_tokens: 4096,
-      system:     build_system_prompt,
-      tools:      TOOLS,
-      messages:   messages
+      model:         MODEL,
+      max_tokens:    4096,
+      cache_control: { type: "ephemeral" },
+      system:        build_system_prompt,
+      tools:         TOOLS,
+      messages:      messages
     }.to_json
 
     res = http.request(req)
@@ -128,9 +128,23 @@ class AiAssistantJob < ApplicationJob
     JSON.parse(res.body)
   end
 
-  def build_system_prompt
-    schema = File.read(Rails.root.join("db", "schema.rb")) rescue "Schema unavailable."
+  # ── System prompt (sectioned) ──────────────────────────────────────────
 
+  def build_system_prompt
+    [
+      core_identity,
+      business_context,
+      customer_rules,
+      pricing_rules,
+      part_creation,
+      order_creation,
+      quote_creation,
+      response_style,
+      schema_section
+    ].compact.join("\n\n")
+  end
+
+  def core_identity
     <<~PROMPT
       You are an internal assistant embedded in HAMS 2.0 — the management system for
       Hard Anodising Surface Treatments Limited (HASTL).
@@ -148,7 +162,11 @@ class AiAssistantJob < ApplicationJob
 
       Always query before answering questions about specific records. Do not guess at IDs or counts.
       For writes, fetch the record first, then modify it — don't assume IDs.
+    PROMPT
+  end
 
+  def business_context
+    <<~PROMPT
       BUSINESS CONTEXT:
       - Core workflow: Customer PO → CustomerOrder → WorksOrders (one per line item) →
         shop floor processing through VATs → ReleaseNotes on completion → Invoices raised
@@ -160,8 +178,12 @@ class AiAssistantJob < ApplicationJob
       - VATs are the treatment tanks, numbered approximately 1–12
       - ReleaseNotes record accepted/rejected quantities when work is completed
       - Invoices sync to Xero via xero_id
+    PROMPT
+  end
 
-    AEROSPACE / DEFENSE PRIMES:
+  def customer_rules
+    <<~PROMPT
+      AEROSPACE / DEFENSE PRIMES:
       If the work is ultimately for one of these primes, set aerospace_defense: true.
       This flag significantly changes the locked operations (additional rinses, inspections, etc).
       PRIMES: Flight Refuelling, Cobham, Ultra, Eaton.
@@ -175,11 +197,19 @@ class AiAssistantJob < ApplicationJob
       part number — use it instead of the Part-No. column value.
       The "CS-Order: XXXXX  SerialNo.: XXXXX" text goes into the customer_reference
       field on the WorksOrder.
+    PROMPT
+  end
 
+  def pricing_rules
+    <<~PROMPT
       PRICING:
       When creating WorksOrders, if neither the user nor the PO states any prices,
       set lot_price: 250 and price_type: "lot" on each WorksOrder. Do not use 0.
+    PROMPT
+  end
 
+  def part_creation
+    <<~PROMPT
       CREATING PARTS:
       Follow these steps exactly — 2 tool calls maximum.
 
@@ -273,12 +303,6 @@ class AiAssistantJob < ApplicationJob
         )
         "Created \#{part.part_number} with \#{part.customisation_data.dig('operation_selection','locked_operations')&.length} operations"
 
-      DUPLICATE PART NUMBERS:
-      If you are about to create a part and find that the part number already exists
-      under the same customer but with a different issue (e.g. issue 'A' when the
-      drawing states 'Ae'), it was most likely created earlier in error. Update the
-      existing part's issue to match the drawing rather than creating a new record.
-
       TAPPED HOLES:
       If the drawing contains tapped holes AND the hard anodise target thickness is 30μm or greater,
       add a note to the masking operation_text that tapped holes must be masked before anodising.
@@ -291,7 +315,21 @@ class AiAssistantJob < ApplicationJob
       CRITICAL — eval does not persist local variables between tool calls.
       Step 2 must be a single tool call — fetch template, clone, adapt, and create together.
       Always look up the Organization to get the correct customer_id — never guess it.
+    PROMPT
+  end
 
+  def order_creation
+    # TODO: CustomerOrder + WorksOrder creation from POs
+    nil
+  end
+
+  def quote_creation
+    # TODO: Xero quote generation from drawings/specs
+    nil
+  end
+
+  def response_style
+    <<~PROMPT
       RESPONSE STYLE:
       - Do not produce any text before or between tool calls. Only output text in your final response after all tool calls are complete. No narration, no plans, no commentary mid-task.
       - Concise.
@@ -299,11 +337,15 @@ class AiAssistantJob < ApplicationJob
       - Summarise large result sets and offer to drill in.
       - If something looks wrong in the data, say so.
       - Today is #{Date.current.strftime("%A, %d %B %Y")}.
-
-      CURRENT SCHEMA:
-      #{schema}
     PROMPT
   end
+
+  def schema_section
+    schema = File.read(Rails.root.join("db", "schema.rb")) rescue "Schema unavailable."
+    "CURRENT SCHEMA:\n#{schema}"
+  end
+
+  # ── Tool dispatch ──────────────────────────────────────────────────────
 
   def dispatch_tool(name, input)
     case name
