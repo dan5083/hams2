@@ -205,6 +205,67 @@ class AiAssistantJob < ApplicationJob
       PRICING:
       When creating WorksOrders, if neither the user nor the PO states any prices,
       set lot_price: 250 and price_type: "lot" on each WorksOrder. Do not use 0.
+
+      QUOTING — RATE CARD:
+      Use these constants when asked to quote a job. All prices are GBP ex-VAT.
+
+      SURFACE AREA ESTIMATION:
+      Approximate to the surface area of the smallest rectangular box the part could
+      fit into (L × W × H → 2(LW + LH + WH)). Convert to square feet (1 sqft = 0.0929 m²).
+      Use dimensions from the drawing. No need for high precision.
+
+      MINIMUM ORDER CHARGES (MOC):
+      All processes: £250 MOC, EXCEPT chemical conversion: £125 MOC.
+      If the calculated price is below MOC, use the MOC.
+
+      LARGE ITEMS:
+      A part is "large" if it weighs over 100 kg OR is longer than 2.5 m.
+      Large items use higher rates (see below).
+
+      HARD ANODISING:
+      - Generic (35–55 µm target): £20 / sqft
+      - Thin (5–35 µm target): £15 / sqft
+      - High copper alloy (2xxx series, 35–55 µm): £25 / sqft
+      - Large item: £35 / sqft
+
+      SOFT (STANDARD) ANODISING:
+      - Standard: £12.50 / sqft
+      - Large item: £25 / sqft
+
+      DYE:
+      Add 25% premium to the anodising price if dyeing is required.
+
+      CHROMIC ACID ANODISING:
+      - £12.50 / sqft, MOC £250
+
+      CHEMICAL CONVERSION COATINGS:
+      - Iridite NCP / Surtec 650: £5 / sqft
+      - Alochrom: £8 / sqft
+      - Iridite 15: £10 / sqft
+      - Small (factory 1) dichromate: £13 / sqft
+      - MOC £125 for all chemical conversion
+
+      ELECTROLESS NICKEL PLATING (ENP):
+      Priced per square foot per thou (0.001") of thickness:
+      - Low phosphorus: £35 / sqft / thou
+      - Medium phosphorus: £20 / sqft / thou
+      - High phosphorus: £35 / sqft / thou
+      - Nickel PTFE: £50 / sqft / thou
+
+      TIME-DEPENDENT ADD-ONS:
+      - Masking (lacquering + delacquering): £1.50 / minute
+      - Bunging: £0.30 per bung
+      - Taping: £1.00 / minute
+      - Heat treatment: £0.50 / kWh — assume the oven draws 24 kW regardless of temperature.
+        Cost = 24 × hours × £0.50. E.g. 2 hours = 24 × 2 × 0.50 = £24.
+
+      QUOTING WORKFLOW:
+      1. Identify the process(es) from the drawing/spec.
+      2. Estimate surface area from part dimensions (bounding box method).
+      3. Calculate base price = rate × sqft (× thou for ENP).
+      4. Add any add-ons (dye premium, masking, heat treatment).
+      5. Apply MOC if total is below minimum.
+      6. Present the quote breakdown clearly: process, sqft, rate, add-ons, total.
     PROMPT
   end
 
@@ -324,8 +385,41 @@ class AiAssistantJob < ApplicationJob
   end
 
   def quote_creation
-    # TODO: Xero quote generation from drawings/specs
-    nil
+    <<~PROMPT
+      CREATING QUOTES:
+      When asked to quote a job from a drawing, email, or description:
+      1. Identify the customer (look up or ask).
+      2. Read the drawing to determine: process type, material/alloy, dimensions,
+         thickness requirement, sealing, dye, masking, heat treatment.
+      3. Calculate the price using the rate card above.
+      4. Present a clear breakdown the user can copy into a quote.
+
+      If quantity breaks are requested, calculate each qty separately — the per-unit
+      price drops but MOC still applies to each line.
+
+      For multi-process parts (e.g. hard anodise + chemical conversion), price each
+      process separately and sum them.
+
+      PUSHING QUOTES TO XERO:
+      After presenting the price breakdown, ask if the user wants to create a draft
+      quote in Xero. If yes, call:
+
+        XeroQuoteService.create_draft_quote(
+          customer_name: "Customer Name",
+          line_items: [
+            { description: "Hard Anodising 50µm — PN123 (10 pcs)", quantity: 1, unit_amount: 250.00 },
+            { description: "Chemical Conversion Iridite NCP — PN123 (10 pcs)", quantity: 1, unit_amount: 125.00 }
+          ],
+          reference: "Quote for enquiry dated DD/MM/YYYY"
+        )
+
+      Each line_item should have a clear description including the process, spec,
+      part number, and quantity. The unit_amount is the total price for that line
+      (not per-piece — Xero shows it as a lot price with quantity 1).
+      The service returns the Xero quote number on success.
+      If it fails with a Xero connection error, tell the user to reconnect via
+      Settings > Xero and try again.
+    PROMPT
   end
 
   def response_style
@@ -385,7 +479,7 @@ class AiAssistantJob < ApplicationJob
           ActiveSupport::Notifications.unsubscribe(counter)
         end
 
-        if write_count > 3 && !unrestricted_user?
+        if write_count > 10 && !unrestricted_user?
           Rails.logger.warn "[AI Assistant Job] BULK WRITE BLOCKED | #{write_count} writes | user: #{@request_user&.email_address} | code: #{code}"
           raise "Write blocked: this operation would modify #{write_count} records. Bulk writes are restricted to admin users. Ask Daniel to run this via the console."
         end

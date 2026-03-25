@@ -50,7 +50,7 @@ class XeroAuthController < ApplicationController
         return
       end
 
-      # Store the token set first
+      # Store the token set in session (for web UI) and database (for background jobs)
       session[:xero_token_set] = token_set
 
       total_contacts = 0
@@ -69,6 +69,9 @@ class XeroAuthController < ApplicationController
           session[:xero_tenant_name] = tenant_name
           Rails.logger.info "Set primary organization: #{tenant_name}"
         end
+
+        # Persist token to database for background job access (AI assistant, etc.)
+        XeroToken.store_from_callback!(token_set, tenant_id, tenant_name)
 
         org_names << tenant_name
 
