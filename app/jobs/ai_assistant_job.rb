@@ -405,6 +405,14 @@ class AiAssistantJob < ApplicationJob
       higher applies. E.g. "Per unit: £4.50, MOC: £250. For quantities under ~56
       the MOC applies; above that the per-unit price takes over."
 
+      PRICE BREAKS:
+      When quoting multiple quantities, apply these standard discounts:
+      - Up to 249: list price (no discount)
+      - 250–499: 5% off
+      - 500–999: 10% off
+      - 1,000+: 15% off
+      Present each quantity as a separate line item in the quote.
+
       PUSHING QUOTES TO XERO:
       After presenting the price breakdown, ask if the user wants to create a draft
       quote in Xero. If yes, call:
@@ -415,7 +423,7 @@ class AiAssistantJob < ApplicationJob
           summary: "Hard Anodising 50µm, Hot Water Seal, DEF-STAN 03-25",
           reference: "enquirer@email.com",
           line_items: [
-            { description: "Hard Anodising 50µm — PN123, Part Desc (10 pcs)", quantity: 1, unit_amount: 250.00 }
+            { description: "Hard Anodising 50µm — PN123, Part Desc", quantity: 10, unit_amount: 4.50 }
           ]
         )
 
@@ -424,8 +432,10 @@ class AiAssistantJob < ApplicationJob
       - summary: Process type and spec (e.g. "Standard Anodising Type II DEF-STAN 03-25, 10–15µm")
       - reference: The enquirer's email address if provided, otherwise leave blank
       - customer_name: Use the EXACT name as it appears in HAMS, not an abbreviation
-      - line_items: Each line_item unit_amount is the lot total (not per-piece).
-        Use quantity 1 for lot pricing, or actual qty with per-unit price.
+      - line_items: Put the actual quantity in the quantity field and the per-unit
+        price in unit_amount. Do NOT put quantities in the description.
+        The description should be: process + spec + part number + part description.
+        For quantity breaks, create one line per qty tier.
 
       The service returns the Xero quote number and quote_id on success.
       If it fails with a Xero connection error, tell the user to reconnect via
