@@ -57,7 +57,7 @@ class XeroQuoteService
     req = Net::HTTP::Post.new(uri)
     req["Content-Type"] = "application/json"
     req["Accept"]       = "application/json"
-    req.merge!(token.bearer_header)
+    token.bearer_header.each { |k, v| req[k] = v }
     req.body = { "Quotes" => [payload] }.to_json
 
     res = http.request(req)
