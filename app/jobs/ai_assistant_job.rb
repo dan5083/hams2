@@ -214,8 +214,14 @@ class AiAssistantJob < ApplicationJob
   def pricing_rules
     <<~PROMPT
       PRICING:
-      When creating WorksOrders, if neither the user nor the PO states any prices,
-      set lot_price: 250 and price_type: "lot" on each WorksOrder. Do not use 0.
+      When creating WorksOrders and no prices are given on the PO or by the user:
+      1. Check if the Part record has an each_price saved (part.each_price > 0).
+         If yes, calculate: lot_price = each_price × quantity.
+         If that total is less than £250 (or £125 for chemical conversion), use
+         the MOC instead.
+         Set price_type: "each" and each_price: part.each_price on the WorksOrder.
+      2. If the Part has no each_price (nil or 0), set lot_price: 250 and
+         price_type: "lot". Do not use 0.
 
       QUOTING — RATE CARD:
       Use these constants when asked to quote a job. All prices are GBP ex-VAT.
@@ -331,33 +337,40 @@ class AiAssistantJob < ApplicationJob
       Then fetch the full part: Part.find("<id>").customisation_data
 
       STEP 2 (write) — Clone and create in a single tool call:
-      Copy the entire customisation_data from the matched part. For each non-auto-inserted
-      operation that differs from the template (different spec, alloy, thickness, or chemical),
-      replace the operation_text and specifications fields by fetching them from the operation
-      library — never write process parameters (voltage, duration, vat, temperature, deposition
-      rate) from scratch:
+      Copy the ENTIRE customisation_data from the matched part. The template already
+      has the correct operations in the correct order — your job is minimal tweaking,
+      not rebuilding.
 
-        op_text = Operation.all_operations.find { |o| o.id == "TARGET_OPERATION_ID" }&.operation_text
+      RULES — READ THESE CAREFULLY:
+      - Do NOT add new operations. The template has everything needed.
+      - Do NOT remove operations.
+      - Do NOT modify auto-inserted operations (auto_inserted: true).
+      - Do NOT put specification references into operation_text fields.
+        The operation_text contains process instructions (voltages, temperatures,
+        vat numbers, durations). Specifications go in the part's specification field.
+      - Do NOT invent operation text. If you need to change an operation, fetch the
+        correct text from the operation library:
+          Operation.all_operations.find { |o| o.id == "TARGET_OPERATION_ID" }&.operation_text
+      - Only modify the main treatment operation(s) if the template's operation_id
+        differs from what the new part needs (e.g. different thickness target or
+        different alloy recipe). In that case, swap the operation_id AND operation_text
+        together from the library.
+      - The sealing method was already matched in Step 1 — do not change it.
+      - Set the aerospace_defense flag to match the customer (see list above).
 
-      Then append the spec reference to the operation_text if not already present.
-      Do not change the structure, order, or auto-inserted operations.
-      Do not change the sealing method — it was already matched in Step 1.
-      Ensure the aerospace_defense flag matches the customer (see list above).
-      Then create the part with the cloned customisation_data, setting locked: true.
+      Example — ONLY change what's needed:
 
         template = Part.find("<matched_part_id>")
         cdata = template.customisation_data.deep_dup
-        # Set aerospace_defense flag based on customer
         cdata["operation_selection"]["aerospace_defense"] = true  # or false
-        # update specific operation_text entries to match new spec...
+        # ONLY swap the anodise operation if a different recipe is needed:
         ops = cdata.dig("operation_selection", "locked_operations")
+        target_op = Operation.all_operations.find { |o| o.id == "NEW_OPERATION_ID" }
         ops.each do |op|
-          case op["id"]
-          when "IRIDITE_NCP_7_TO_10_MIN", "ALOCHROM_1200_CLASS_1A" # update to correct chemical
-            op["operation_text"] = "..." # match new spec
-            op["specifications"] = "..."
-          when /HARD/ # update hard anodise spec text if needed
-            op["operation_text"] = "..."
+          if op["id"] =~ /HARD|ANOD/ && !op["auto_inserted"]
+            op["id"] = target_op.id
+            op["operation_text"] = target_op.operation_text
+            op["target_thickness"] = 50  # from drawing
           end
         end
         customer = Organization.find_by!("name ILIKE ?", "%customer name%")
