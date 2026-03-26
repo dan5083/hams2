@@ -400,23 +400,34 @@ class AiAssistantJob < ApplicationJob
       For multi-process parts (e.g. hard anodise + chemical conversion), price each
       process separately and sum them.
 
+      WHEN NO QUANTITY IS GIVEN:
+      Present two lines: a per-unit price AND the MOC. Explain that whichever is
+      higher applies. E.g. "Per unit: £4.50, MOC: £250. For quantities under ~56
+      the MOC applies; above that the per-unit price takes over."
+
       PUSHING QUOTES TO XERO:
       After presenting the price breakdown, ask if the user wants to create a draft
       quote in Xero. If yes, call:
 
         XeroQuoteService.create_draft_quote(
-          customer_name: "Customer Name",
+          customer_name: "Exact Customer Name",
+          title: "PART_NUMBER — Part Description",
+          summary: "Hard Anodising 50µm, Hot Water Seal, DEF-STAN 03-25",
+          reference: "enquirer@email.com",
           line_items: [
-            { description: "Hard Anodising 50µm — PN123 (10 pcs)", quantity: 1, unit_amount: 250.00 },
-            { description: "Chemical Conversion Iridite NCP — PN123 (10 pcs)", quantity: 1, unit_amount: 125.00 }
-          ],
-          reference: "Quote for enquiry dated DD/MM/YYYY"
+            { description: "Hard Anodising 50µm — PN123, Part Desc (10 pcs)", quantity: 1, unit_amount: 250.00 }
+          ]
         )
 
-      Each line_item should have a clear description including the process, spec,
-      part number, and quantity. The unit_amount is the total price for that line
-      (not per-piece — Xero shows it as a lot price with quantity 1).
-      The service returns the Xero quote number on success.
+      Field mapping:
+      - title: Part number + description (e.g. "PD67711-00 — Door Upper Hinge Insert")
+      - summary: Process type and spec (e.g. "Standard Anodising Type II DEF-STAN 03-25, 10–15µm")
+      - reference: The enquirer's email address if provided, otherwise leave blank
+      - customer_name: Use the EXACT name as it appears in HAMS, not an abbreviation
+      - line_items: Each line_item unit_amount is the lot total (not per-piece).
+        Use quantity 1 for lot pricing, or actual qty with per-unit price.
+
+      The service returns the Xero quote number and quote_id on success.
       If it fails with a Xero connection error, tell the user to reconnect via
       Settings > Xero and try again.
     PROMPT
