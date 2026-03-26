@@ -44,7 +44,8 @@ class XeroQuoteService
           "Description" => item[:description],
           "Quantity"    => item[:quantity] || 1,
           "UnitAmount"  => item[:unit_amount].to_f.round(2),
-          "AccountCode" => item[:account_code] || "200" # default sales account
+          "TaxType"     => "OUTPUT2",
+          "AccountCode" => item[:account_code] || "530514"
         }
       }
     }
