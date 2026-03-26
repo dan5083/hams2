@@ -74,6 +74,55 @@ class XeroQuoteService
     { success: false, error: e.message }
   end
 
+  # Attach files from the current AI assistant request to a Xero quote
+  #
+  # Usage from AI assistant:
+  #   XeroQuoteService.attach_from_request(
+  #     quote_id: "abc-123-...",
+  #     request_id: "def-456-..."
+  #   )
+  #
+  def self.attach_from_request(quote_id:, request_id:)
+    request = AiAssistantRequest.find(request_id)
+    results = []
+
+    request.messages.each do |msg|
+      content = msg["content"]
+      next unless content.is_a?(Array)
+
+      content.each do |block|
+        source = block["source"]
+        next unless source&.dig("type") == "base64" && source["data"].present?
+
+        media_type = source["media_type"] || "application/pdf"
+        ext = case media_type
+              when "application/pdf" then "pdf"
+              when /image\/jpeg/ then "jpg"
+              when /image\/png/ then "png"
+              else "dat"
+              end
+        file_name = "drawing_#{results.length + 1}.#{ext}"
+
+        result = attach_file(
+          quote_id:     quote_id,
+          file_data:    source["data"],
+          file_name:    file_name,
+          content_type: media_type
+        )
+        results << result
+      end
+    end
+
+    if results.empty?
+      { success: false, error: "No attachments found in the request messages." }
+    else
+      { success: true, attached: results.length, files: results.map { |r| r[:file_name] } }
+    end
+  rescue => e
+    Rails.logger.error "[XeroQuoteService] attach_from_request error: #{e.message}"
+    { success: false, error: e.message }
+  end
+
   # Attach a file (PDF/image) to an existing Xero quote
   #
   # Usage from AI assistant:

@@ -52,6 +52,7 @@ class AiAssistantJob < ApplicationJob
   def perform(request_id)
     request = AiAssistantRequest.find(request_id)
     @request_user = request.user
+    @request_id = request_id
     messages = request.messages
 
     response_text = run_agentic_loop(messages)
@@ -178,6 +179,16 @@ class AiAssistantJob < ApplicationJob
       - VATs are the treatment tanks, numbered approximately 1–12
       - ReleaseNotes record accepted/rejected quantities when work is completed
       - Invoices sync to Xero via xero_id
+
+      PROCESS TERMINOLOGY:
+      Drawings use various terms for the same processes. Be precise:
+      - "Sulphuric anodise" / "Type II" / "standard anodise" = standard_anodising
+      - "Hard anodise" / "Type III" / "hard coat" = hard_anodising
+      - "Chromic anodise" / "Type I" = chromic_anodising
+      - "Black sulphuric anodise" = standard_anodising WITH black dye (not hard anodise)
+      - "Clear anodise" / "natural anodise" = anodising without dye
+      "Sulphuric" alone does NOT mean hard anodise — it means standard.
+      Only use hard_anodising if the drawing explicitly says "hard" or "Type III".
     PROMPT
   end
 
@@ -440,6 +451,19 @@ class AiAssistantJob < ApplicationJob
       The service returns the Xero quote number and quote_id on success.
       If it fails with a Xero connection error, tell the user to reconnect via
       Settings > Xero and try again.
+
+      ATTACHING DRAWINGS TO QUOTES:
+      After creating a quote, if the user attached a drawing/PDF in this conversation,
+      attach it to the Xero quote:
+
+        XeroQuoteService.attach_from_request(
+          quote_id: "<quote_id from create result>",
+          request_id: @request_id
+        )
+
+      @request_id is available in the eval context. Always attempt this after creating
+      a quote if the user attached files. It pulls the original file data from the
+      request messages and uploads it to Xero as an attachment on the quote.
     PROMPT
   end
 
