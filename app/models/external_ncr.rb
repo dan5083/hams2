@@ -1,7 +1,7 @@
 # app/models/external_ncr.rb
 class ExternalNcr < ApplicationRecord
   # --- Associations ---
-  has_many :external_ncr_release_notes, dependent: :destroy
+  has_many :external_ncr_release_notes, dependent: :destroy, inverse_of: :external_ncr
   has_many :release_notes, through: :external_ncr_release_notes
 
   belongs_to :created_by, class_name: 'User'
@@ -61,10 +61,6 @@ class ExternalNcr < ApplicationRecord
   before_validation :set_defaults, if: :new_record?
   after_create :log_creation
   after_update :log_status_change, if: :saved_change_to_status?
-
-  # --- Accept nested release note IDs ---
-  # Allows: @external_ncr.release_note_ids = [1, 2, 3]
-  # This is handled natively by has_many :through
 
   # --- Display helpers ---
 
