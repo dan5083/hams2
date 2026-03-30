@@ -75,7 +75,6 @@
         height: auto;
       }
 
-      /* Company contact info styling */
       .company-contact {
         text-align: right;
         font-size: 8pt;
@@ -192,12 +191,10 @@
         line-height: 1.3;
       }
 
-      /* Compact spacing */
       .compact {
         margin-bottom: 0.5rem;
       }
 
-      /* Company footer styling */
       .company-footer {
         margin-top: 2rem;
         padding-top: 1rem;
@@ -289,7 +286,10 @@
             <h2>Customer</h2>
             <p>
               <%= @external_ncr.customer_name %><br/>
-              <%= simple_format(@external_ncr.customer.pdf_address) if @external_ncr.customer.respond_to?(:pdf_address) && @external_ncr.customer.pdf_address.present? %>
+              <% primary_customer = @external_ncr.customer %>
+              <% if primary_customer&.respond_to?(:pdf_address) && primary_customer&.pdf_address.present? %>
+                <%= simple_format(primary_customer.pdf_address) %>
+              <% end %>
             </p>
           </td>
           <td class="address">
@@ -303,9 +303,12 @@
     <div class="reference-info">
       <h3>Reference Information</h3>
       <p>
-        <strong>Release Note:</strong> <%= @external_ncr.release_note_number %><br/>
-        <strong>Works Order:</strong> <%= @external_ncr.works_order_number %><br/>
-        <strong>Customer Order:</strong> <%= @external_ncr.customer_po_number_from_works_order || "Not specified" %><br/>
+        <strong>Release Note<%= 's' if @external_ncr.release_notes.size > 1 %>:</strong>
+        <%= @external_ncr.release_note_numbers %><br/>
+        <strong>Works Order<%= 's' if @external_ncr.works_order_numbers.size > 1 %>:</strong>
+        <%= @external_ncr.works_order_number %><br/>
+        <strong>Customer Order<%= 's' if @external_ncr.customer_po_numbers_from_works_orders.size > 1 %>:</strong>
+        <%= @external_ncr.customer_po_number_from_works_order || "Not specified" %><br/>
         <% if @external_ncr.customer_ncr_number.present? %>
           <strong>Customer NCR Number:</strong> <%= @external_ncr.customer_ncr_number %><br/>
         <% end %>
@@ -318,17 +321,37 @@
     <!-- Part and Quantity Details -->
     <table class="detail-table compact">
       <tbody>
-        <tr>
-          <th>Part Number</th>
-          <td><%= @external_ncr.part_number || 'N/A' %>-<%= @external_ncr.part_issue || 'N/A' %></td>
-        </tr>
-        <tr>
-          <th>Part Description</th>
-          <td><%= @external_ncr.part_description %></td>
-        </tr>
+        <% if @external_ncr.release_notes.size == 1 %>
+          <tr>
+            <th>Part Number</th>
+            <td><%= @external_ncr.part_number || 'N/A' %>-<%= @external_ncr.part_issue || 'N/A' %></td>
+          </tr>
+          <tr>
+            <th>Part Description</th>
+            <td><%= @external_ncr.part_description %></td>
+          </tr>
+        <% else %>
+          <tr>
+            <th>Parts</th>
+            <td>
+              <% @external_ncr.release_notes.includes(works_order: :part).each do |rn| %>
+                RN<%= rn.number %>: <%= rn.works_order&.part_number || 'N/A' %>-<%= rn.works_order&.part_issue || 'N/A' %>
+                <% if rn.works_order&.part_description.present? %>
+                  (<%= rn.works_order.part_description %>)
+                <% end %>
+                <br/>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
         <tr>
           <th>Batch Quantity</th>
-          <td><%= @external_ncr.batch_quantity_from_release_note %></td>
+          <td>
+            <%= @external_ncr.batch_quantity_from_release_notes %>
+            <% if @external_ncr.release_notes.size > 1 %>
+              (across <%= @external_ncr.release_notes.size %> release notes)
+            <% end %>
+          </td>
         </tr>
         <% if @external_ncr.reject_quantity.present? %>
           <tr>
@@ -403,12 +426,10 @@
     </div>
 
     <script>
-      // Auto-focus for better UX when opening in new tab
       window.addEventListener('load', function() {
         document.body.focus();
       });
 
-      // Keyboard shortcut for printing
       document.addEventListener('keydown', function(e) {
         if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
           e.preventDefault();

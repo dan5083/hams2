@@ -141,31 +141,44 @@
                 <%= @external_ncr.customer_name %>
               </dd>
             </div>
+
+            <!-- Release Notes (multiple) -->
             <div>
-              <dt class="text-sm font-medium text-gray-500">Release Note</dt>
+              <dt class="text-sm font-medium text-gray-500">
+                Release Notes
+                <% if @external_ncr.release_notes.size > 1 %>
+                  <span class="text-xs text-gray-400">(<%= @external_ncr.release_notes.size %>)</span>
+                <% end %>
+              </dt>
               <dd class="mt-1 text-sm text-gray-900">
-                <%= link_to @external_ncr.release_note_number, @external_ncr.release_note,
-                    class: "text-blue-600 hover:text-blue-900 font-medium" %>
-              </dd>
-            </div>
-            <div>
-              <dt class="text-sm font-medium text-gray-500">Works Order</dt>
-              <dd class="mt-1 text-sm text-gray-900">
-                <%= link_to @external_ncr.works_order_number, @external_ncr.works_order,
-                    class: "text-blue-600 hover:text-blue-900 font-medium" %>
-              </dd>
-            </div>
-            <div>
-              <dt class="text-sm font-medium text-gray-500">Part</dt>
-              <dd class="mt-1 text-sm text-gray-900">
-                <%= @external_ncr.part_number || 'N/A' %>-<%= @external_ncr.part_issue || 'N/A' %>
-                <% if @external_ncr.part_description.present? %>
-                  <div class="text-xs text-gray-500 mt-1">
-                    <%= @external_ncr.part_description %>
+                <% @external_ncr.release_notes.includes(works_order: [:customer_order, :part]).each do |rn| %>
+                  <div class="<%= 'mb-2' unless rn == @external_ncr.release_notes.last %>">
+                    <%= link_to "RN#{rn.number}", rn,
+                        class: "text-blue-600 hover:text-blue-900 font-medium" %>
+                    <span class="text-xs text-gray-500">
+                      — <%= rn.works_order.customer_name %> — <%= rn.works_order.part_number %>-<%= rn.works_order.part_issue %>
+                      <% if rn.works_order.display_name.present? %>
+                        (<%= link_to rn.works_order.display_name, rn.works_order, class: "text-blue-600 hover:text-blue-900" %>)
+                      <% end %>
+                    </span>
                   </div>
                 <% end %>
               </dd>
             </div>
+
+            <% if @external_ncr.release_notes.size == 1 %>
+              <div>
+                <dt class="text-sm font-medium text-gray-500">Part</dt>
+                <dd class="mt-1 text-sm text-gray-900">
+                  <%= @external_ncr.part_number || 'N/A' %>-<%= @external_ncr.part_issue || 'N/A' %>
+                  <% if @external_ncr.part_description.present? %>
+                    <div class="text-xs text-gray-500 mt-1">
+                      <%= @external_ncr.part_description %>
+                    </div>
+                  <% end %>
+                </dd>
+              </div>
+            <% end %>
           </dl>
         </div>
       </div>
@@ -202,7 +215,7 @@
                   <dd class="mt-1 text-sm text-gray-900">
                     <%= @external_ncr.reject_quantity %>
                     <span class="text-xs text-gray-500">
-                      (of <%= @external_ncr.batch_quantity_from_release_note %> total)
+                      (of <%= @external_ncr.batch_quantity_from_release_notes %> total)
                     </span>
                   </dd>
                 </div>
@@ -212,14 +225,14 @@
                 <dt class="text-sm font-medium text-gray-500">Customer P/O No.</dt>
                 <dd class="mt-1 text-sm text-gray-900">
                   <%= @external_ncr.customer_po_number_from_works_order || "Not specified" %>
-                  <span class="text-xs text-gray-500">(from works order)</span>
+                  <span class="text-xs text-gray-500">(from works order<%= 's' if @external_ncr.release_notes.size > 1 %>)</span>
                 </dd>
               </div>
               <div>
                 <dt class="text-sm font-medium text-gray-500">Batch Qty.</dt>
                 <dd class="mt-1 text-sm text-gray-900">
-                  <%= @external_ncr.batch_quantity_from_release_note %>
-                  <span class="text-xs text-gray-500">(from release note)</span>
+                  <%= @external_ncr.batch_quantity_from_release_notes %>
+                  <span class="text-xs text-gray-500">(from <%= pluralize(@external_ncr.release_notes.size, 'release note') %>)</span>
                 </dd>
               </div>
             </dl>

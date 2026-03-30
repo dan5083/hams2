@@ -2,13 +2,11 @@
 class ExternalNcrsController < ApplicationController
   before_action :require_quality_access
   before_action :set_external_ncr, only: [:show, :edit, :update, :destroy, :advance_status, :download_document]
-  before_action :set_release_note, only: [:new, :create], if: -> { params[:release_note_id].present? }
 
   def index
-    @external_ncrs = ExternalNcr.includes(:release_note, :customer, :created_by, :respondent)
-                                .recent  # Removed .active scope
+    @external_ncrs = ExternalNcr.includes(:release_notes, :created_by, :respondent)
+                                .recent
 
-    # Search functionality (keep this)
     if params[:search].present?
       @external_ncrs = @external_ncrs.search(params[:search])
     end
@@ -17,42 +15,39 @@ class ExternalNcrsController < ApplicationController
   end
 
   def show
-    # @download_url = @external_ncr.generate_cloudinary_download_url if @external_ncr.has_document? # Remove this line
   end
 
   def new
+    @external_ncr = ExternalNcr.new
+
+    # If launched from a specific release note, pre-select it
     if params[:release_note_id].present?
-      @release_note = ReleaseNote.find(params[:release_note_id])
-      @external_ncr = @release_note.external_ncrs.build
-    else
-      @external_ncr = ExternalNcr.new
-      # Don't preload release notes - we'll use search instead
+      @preselected_release_note = ReleaseNote.find(params[:release_note_id])
     end
   end
 
   def create
-    if @release_note
-      @external_ncr = @release_note.external_ncrs.build(external_ncr_params)
-    else
-      @external_ncr = ExternalNcr.new(external_ncr_params)
-    end
+    @external_ncr = ExternalNcr.new(external_ncr_params)
 
     # Auto-assign creator as respondent
     @external_ncr.created_by = Current.user
     @external_ncr.respondent = Current.user
 
-    # Handle file upload first, then save the NCR
+    # Build release note associations from submitted IDs
+    release_note_ids = Array(params[:external_ncr][:release_note_ids]).reject(&:blank?).map(&:to_i)
+    release_note_ids.each do |rn_id|
+      @external_ncr.external_ncr_release_notes.build(release_note_id: rn_id)
+    end
+
+    # Handle file upload
     uploaded_file = params[:external_ncr][:temp_document]
 
     if uploaded_file.present?
       begin
-        # Upload to Cloudinary
         folder_path = "NCRs/#{@external_ncr.date.year}/#{@external_ncr.date.strftime('%m')}"
         filename_prefix = "NCR#{@external_ncr.hal_ncr_number || 'TEMP'}"
 
         upload_result = CloudinaryService.upload_file(uploaded_file, folder_path, filename_prefix: filename_prefix)
-
-        # Store document metadata
         @external_ncr.store_document_metadata(upload_result)
 
         Rails.logger.info "Successfully uploaded document for NCR: #{upload_result[:public_id]}"
@@ -65,7 +60,6 @@ class ExternalNcrsController < ApplicationController
         return
       end
     elsif @external_ncr.new_record?
-      # Require document for new NCRs
       @external_ncr.errors.add(:temp_document, "is required")
       prepare_form_data
       render :new, status: :unprocessable_entity
@@ -75,7 +69,7 @@ class ExternalNcrsController < ApplicationController
     if @external_ncr.save
       redirect_to @external_ncr, notice: "External NCR #{@external_ncr.display_name} was successfully created."
     else
-      # If save failed and we uploaded a file, clean up
+      # Clean up uploaded file on save failure
       if @external_ncr.cloudinary_public_id.present?
         begin
           CloudinaryService.delete_file(@external_ncr.cloudinary_public_id)
@@ -90,7 +84,6 @@ class ExternalNcrsController < ApplicationController
   end
 
   def edit
-    # Only allow editing of draft NCRs for document replacement
     if @external_ncr.status != 'draft' && params[:replace_document].blank?
       redirect_to @external_ncr, alert: 'Only draft NCRs can be fully edited.'
       return
@@ -103,13 +96,10 @@ class ExternalNcrsController < ApplicationController
 
     if uploaded_file.present? && @external_ncr.can_replace_document?
       begin
-        # Upload new file to Cloudinary
         folder_path = "NCRs/#{@external_ncr.date.year}/#{@external_ncr.date.strftime('%m')}"
         filename_prefix = "NCR#{@external_ncr.hal_ncr_number}"
 
         upload_result = CloudinaryService.upload_file(uploaded_file, folder_path, filename_prefix: filename_prefix)
-
-        # Replace the document
         @external_ncr.replace_document!(upload_result)
 
         Rails.logger.info "Successfully replaced document for NCR #{@external_ncr.hal_ncr_number}"
@@ -121,7 +111,12 @@ class ExternalNcrsController < ApplicationController
       end
     end
 
-    # Regular update
+    # Handle release note IDs update (only for draft NCRs)
+    if @external_ncr.status == 'draft' && params[:external_ncr][:release_note_ids].present?
+      new_ids = Array(params[:external_ncr][:release_note_ids]).reject(&:blank?).map(&:to_i)
+      @external_ncr.release_note_ids = new_ids
+    end
+
     if @external_ncr.update(external_ncr_params)
       redirect_to @external_ncr, notice: "External NCR #{@external_ncr.display_name} was successfully updated."
     else
@@ -131,13 +126,11 @@ class ExternalNcrsController < ApplicationController
 
   def destroy
     if @external_ncr.status == 'draft'
-      # Delete document from Cloudinary if it exists
       if @external_ncr.cloudinary_public_id.present?
         begin
           CloudinaryService.delete_file(@external_ncr.cloudinary_public_id)
         rescue => e
           Rails.logger.error "Failed to delete Cloudinary document for NCR #{@external_ncr.hal_ncr_number}: #{e.message}"
-          # Continue with NCR deletion even if Cloudinary deletion fails
         end
       end
 
@@ -177,13 +170,11 @@ class ExternalNcrsController < ApplicationController
     search_term = params[:q].to_s.strip
 
     if search_term.blank?
-      # Return recent release notes if no search term
       release_notes = ReleaseNote.includes(works_order: [:customer_order, :part])
                                  .where(voided: false)
                                  .order(number: :desc)
                                  .limit(20)
     else
-      # Search by release note number, works order number, customer name, or part number
       release_notes = ReleaseNote.includes(works_order: [:customer_order, :part])
                                  .joins(works_order: :customer_order)
                                  .joins('LEFT JOIN organizations ON customer_orders.customer_id = organizations.id')
@@ -232,40 +223,38 @@ class ExternalNcrsController < ApplicationController
     render json: { error: 'Release note not found' }, status: :not_found
   end
 
-def download_document
-  if @external_ncr.has_document?
-    begin
-      Rails.logger.info "Starting download for NCR #{@external_ncr.hal_ncr_number}"
+  def download_document
+    if @external_ncr.has_document?
+      begin
+        Rails.logger.info "Starting download for NCR #{@external_ncr.hal_ncr_number}"
 
-      # Generate a signed URL with attachment flag for download
-      download_url = CloudinaryService.generate_download_url(@external_ncr.cloudinary_public_id)
+        download_url = CloudinaryService.generate_download_url(@external_ncr.cloudinary_public_id)
 
-      if download_url
-        Rails.logger.info "Generated download URL, redirecting to Cloudinary"
-        redirect_to download_url, allow_other_host: true
-      else
-        Rails.logger.error "Failed to generate download URL"
-        redirect_to @external_ncr, alert: 'Unable to generate download link. Please try again.'
+        if download_url
+          Rails.logger.info "Generated download URL, redirecting to Cloudinary"
+          redirect_to download_url, allow_other_host: true
+        else
+          Rails.logger.error "Failed to generate download URL"
+          redirect_to @external_ncr, alert: 'Unable to generate download link. Please try again.'
+        end
+
+      rescue => e
+        Rails.logger.error "Download error: #{e.class} - #{e.message}"
+        redirect_to @external_ncr, alert: "Download failed: #{e.message}"
       end
-
-    rescue => e
-      Rails.logger.error "Download error: #{e.class} - #{e.message}"
-      redirect_to @external_ncr, alert: "Download failed: #{e.message}"
+    else
+      redirect_to @external_ncr, alert: 'No document available for download.'
     end
-  else
-    redirect_to @external_ncr, alert: 'No document available for download.'
   end
-end
 
-def response_pdf
-  @external_ncr = ExternalNcr.find(params[:id])
+  def response_pdf
+    @external_ncr = ExternalNcr.find(params[:id])
 
-  respond_to do |format|
-    format.html { render layout: false }  # Remove PDF format entirely
+    respond_to do |format|
+      format.html { render layout: false }
+    end
   end
-end
 
-  # Reassign respondent (for managers/admins)
   def reassign_respondent
     new_respondent = User.find(params[:respondent_id])
 
@@ -284,27 +273,21 @@ end
     @external_ncr = ExternalNcr.find(params[:id])
   end
 
-  def set_release_note
-    @release_note = ReleaseNote.find(params[:release_note_id])
-  end
-
   def external_ncr_params
     params.require(:external_ncr).permit(
-      :release_note_id, :date,
+      :date,
       :concession_number, :customer_ncr_number, :estimated_cost,
       :reject_quantity,
       :description_of_non_conformance, :containment_action,
       :root_cause_analysis, :corrective_action, :preventive_action
-      # Note: temp_document is handled separately
+      # Note: release_note_ids and temp_document are handled separately
     )
   end
 
   def prepare_form_data
-    if @release_note
-      # Release note is already set from nested route
-    elsif @external_ncr.release_note.present?
-      @release_note = @external_ncr.release_note
+    # Rebuild preselected release note for re-rendering the form on error
+    if params[:release_note_id].present?
+      @preselected_release_note = ReleaseNote.find_by(id: params[:release_note_id])
     end
-    # Don't preload release notes - we'll use search instead
   end
 end

@@ -1,14 +1,11 @@
 # app/models/external_ncr.rb
 class ExternalNcr < ApplicationRecord
-  belongs_to :release_note
+  # --- Associations ---
+  has_many :external_ncr_release_notes, dependent: :destroy
+  has_many :release_notes, through: :external_ncr_release_notes
+
   belongs_to :created_by, class_name: 'User'
   belongs_to :respondent, class_name: 'User', foreign_key: 'assigned_to_id'
-
-  # Delegate common fields to release_note -> works_order for easy access
-  has_one :works_order, through: :release_note
-  has_one :customer_order, through: :works_order
-  has_one :customer, through: :customer_order
-  has_one :part, through: :works_order
 
   # JSONB accessors for NCR-specific data
   store_accessor :ncr_data,
@@ -36,78 +33,156 @@ class ExternalNcr < ApplicationRecord
     :content_type,
     :document_uploaded_at
 
-  # Validations
+  # --- Validations ---
   validates :hal_ncr_number, presence: true, uniqueness: true, numericality: { greater_than: 0 }
-  validates :release_note_id, presence: true
   validates :date, presence: true
   validates :created_by_id, presence: true
   validates :status, inclusion: { in: %w[draft in_progress completed] }
+  validate :at_least_one_release_note
 
   # Validate quantities if provided
   validates :reject_quantity, numericality: { greater_than: 0 }, allow_blank: true
   validates :estimated_cost, numericality: { greater_than_or_equal_to: 0 }, allow_blank: true
 
-  # Scopes
+  # --- Scopes ---
   scope :active, -> { where.not(status: 'completed') }
   scope :by_status, ->(status) { where(status: status) }
-  scope :for_customer, ->(customer) { joins(:customer).where(customer: customer) }
+  scope :for_customer, ->(customer) {
+    joins(release_notes: { works_order: :customer_order })
+      .where(customer_orders: { customer_id: customer.id })
+      .distinct
+  }
   scope :recent, -> { order(created_at: :desc) }
   scope :with_documents, -> { where.not(ncr_data: { cloudinary_public_id: [nil, ''] }) }
   scope :missing_documents, -> { where(ncr_data: { cloudinary_public_id: [nil, ''] }) }
 
-  # Callbacks
+  # --- Callbacks ---
   before_validation :set_ncr_number, if: :new_record?
   before_validation :set_defaults, if: :new_record?
   after_create :log_creation
   after_update :log_status_change, if: :saved_change_to_status?
+
+  # --- Accept nested release note IDs ---
+  # Allows: @external_ncr.release_note_ids = [1, 2, 3]
+  # This is handled natively by has_many :through
+
+  # --- Display helpers ---
 
   def display_name
     "NCR#{hal_ncr_number}"
   end
 
   def display_title
-    "NCR#{hal_ncr_number} - #{customer_name} - #{part_display_name} - RN#{release_note.number}"
+    parts = ["NCR#{hal_ncr_number}"]
+    parts << customer_name if customer_name.present?
+    parts << part_display_name if part_display_name.present?
+    parts << release_note_numbers
+    parts.compact.join(" - ")
   end
 
-  # Auto-populated data from release note
-  def batch_quantity_from_release_note
-    return nil unless release_note
-    release_note.quantity_accepted + release_note.quantity_rejected
+  # --- Primary release note (first associated, for backward compat) ---
+
+  def primary_release_note
+    release_notes.order('external_ncr_release_notes.created_at ASC').first
+  end
+
+  # --- Data derived from release notes ---
+
+  def batch_quantity_from_release_notes
+    release_notes.sum { |rn| rn.quantity_accepted + rn.quantity_rejected }
+  end
+
+  # Backward compat alias
+  alias_method :batch_quantity_from_release_note, :batch_quantity_from_release_notes
+
+  def customer_po_numbers_from_works_orders
+    release_notes.includes(works_order: :customer_order).map { |rn|
+      rn.works_order&.customer_order&.number
+    }.compact.uniq
   end
 
   def customer_po_number_from_works_order
-    works_order&.customer_order&.number
+    customer_po_numbers_from_works_orders.join(", ").presence
+  end
+
+  def customer_names
+    release_notes.includes(works_order: :customer_order).map { |rn|
+      rn.works_order&.customer_order&.customer&.name
+    }.compact.uniq
   end
 
   def customer_name
-    customer&.name
+    customer_names.join(", ").presence
+  end
+
+  def customers
+    Organization.where(id:
+      release_notes.includes(works_order: :customer_order)
+                   .map { |rn| rn.works_order&.customer_order&.customer_id }
+                   .compact.uniq
+    )
+  end
+
+  # For the response PDF — use the first/primary customer
+  def customer
+    primary_release_note&.works_order&.customer_order&.customer
+  end
+
+  def part_display_names
+    release_notes.includes(works_order: :part).map { |rn|
+      rn.works_order&.part&.display_name
+    }.compact.uniq
   end
 
   def part_display_name
-    works_order&.part&.display_name
+    part_display_names.join(", ").presence
+  end
+
+  def part_numbers
+    release_notes.includes(:works_order).map { |rn|
+      "#{rn.works_order&.part_number}-#{rn.works_order&.part_issue}"
+    }.compact.uniq
   end
 
   def part_number
-    works_order&.part_number
+    primary_release_note&.works_order&.part_number
   end
 
   def part_issue
-    works_order&.part_issue
+    primary_release_note&.works_order&.part_issue
   end
 
   def part_description
-    works_order&.part_description
+    primary_release_note&.works_order&.part_description
+  end
+
+  def works_orders
+    WorksOrder.where(id: release_notes.pluck(:works_order_id).uniq)
+  end
+
+  def works_order_numbers
+    release_notes.includes(:works_order).map { |rn| rn.works_order&.display_name }.compact.uniq
   end
 
   def works_order_number
-    works_order&.display_name
+    works_order_numbers.join(", ").presence
+  end
+
+  # For backward compat (show page links etc.) — return first works order
+  def works_order
+    primary_release_note&.works_order
+  end
+
+  def release_note_numbers
+    release_notes.map { |rn| "RN#{rn.number}" }.join(", ")
   end
 
   def release_note_number
-    "RN#{release_note.number}"
+    release_note_numbers
   end
 
-  # Document management methods
+  # --- Document management methods ---
+
   def has_document?
     cloudinary_public_id.present?
   end
@@ -161,7 +236,8 @@ class ExternalNcr < ApplicationRecord
     self.document_uploaded_at = Time.current.iso8601
   end
 
-  # Status management
+  # --- Status management ---
+
   def next_status
     case status
     when 'draft' then 'in_progress'
@@ -208,7 +284,8 @@ class ExternalNcr < ApplicationRecord
     end
   end
 
-  # Search functionality
+  # --- Search functionality ---
+
   def self.search(term)
     return all if term.blank?
 
@@ -220,9 +297,9 @@ class ExternalNcr < ApplicationRecord
       return where(hal_ncr_number: ncr_number)
     end
 
-    # General search
-    joins(release_note: { works_order: :customer_order })
-      .joins(customer: [])
+    # General search across associated release notes
+    joins(release_notes: { works_order: :customer_order })
+      .joins("LEFT JOIN organizations ON customer_orders.customer_id = organizations.id")
       .where(
         "CAST(hal_ncr_number AS TEXT) ILIKE ? OR " \
         "organizations.name ILIKE ? OR " \
@@ -233,7 +310,8 @@ class ExternalNcr < ApplicationRecord
       .distinct
   end
 
-  # Replace document (for draft NCRs only)
+  # --- Replace document (for draft NCRs only) ---
+
   def replace_document!(new_upload_result)
     raise "Cannot replace document for non-draft NCR" unless can_replace_document?
 
@@ -243,7 +321,6 @@ class ExternalNcr < ApplicationRecord
         CloudinaryService.delete_file(cloudinary_public_id)
       rescue => e
         Rails.logger.error "Failed to delete old Cloudinary document: #{e.message}"
-        # Continue with replacement even if deletion fails
       end
     end
 
@@ -253,6 +330,13 @@ class ExternalNcr < ApplicationRecord
   end
 
   private
+
+  def at_least_one_release_note
+    # Check both the association and any pending IDs
+    if release_notes.empty? && external_ncr_release_notes.empty?
+      errors.add(:base, "At least one release note is required")
+    end
+  end
 
   def set_ncr_number
     sequence = Sequence.find_or_create_by(key: 'external_ncr_number')
@@ -269,7 +353,8 @@ class ExternalNcr < ApplicationRecord
   end
 
   def log_creation
-    Rails.logger.info "Created External NCR #{hal_ncr_number} for Release Note #{release_note.number}"
+    rn_numbers = release_notes.map(&:number).join(", ")
+    Rails.logger.info "Created External NCR #{hal_ncr_number} for Release Notes: #{rn_numbers}"
   end
 
   def log_status_change
