@@ -1,7 +1,7 @@
 # app/models/external_ncr.rb
 class ExternalNcr < ApplicationRecord
   # --- Associations ---
-  has_many :external_ncr_release_notes, dependent: :destroy, inverse_of: :external_ncr
+  has_many :external_ncr_release_notes, dependent: :destroy, inverse_of: :external_ncr, validate: false
   has_many :release_notes, through: :external_ncr_release_notes
 
   belongs_to :created_by, class_name: 'User'
@@ -328,7 +328,6 @@ class ExternalNcr < ApplicationRecord
   private
 
   def at_least_one_release_note
-    # Check both the association and any pending IDs
     if release_notes.empty? && external_ncr_release_notes.empty?
       errors.add(:base, "At least one release note is required")
     end
@@ -344,7 +343,6 @@ class ExternalNcr < ApplicationRecord
     self.date ||= Date.current
     self.status ||= 'draft'
     self.ncr_data ||= {}
-    # Auto-assign respondent to creator
     self.respondent = created_by if created_by.present?
   end
 

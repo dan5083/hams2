@@ -33,8 +33,8 @@ class ExternalNcrsController < ApplicationController
     @external_ncr.created_by = Current.user
     @external_ncr.respondent = Current.user
 
-    # Build release note associations from submitted IDs
-    release_note_ids = Array(params[:external_ncr][:release_note_ids]).reject(&:blank?).map(&:to_i)
+    # Build release note associations from submitted IDs (UUIDs — do NOT .to_i)
+    release_note_ids = Array(params[:external_ncr][:release_note_ids]).reject(&:blank?)
     release_note_ids.each do |rn_id|
       @external_ncr.external_ncr_release_notes.build(release_note_id: rn_id)
     end
@@ -113,7 +113,7 @@ class ExternalNcrsController < ApplicationController
 
     # Handle release note IDs update (only for draft NCRs)
     if @external_ncr.status == 'draft' && params[:external_ncr][:release_note_ids].present?
-      new_ids = Array(params[:external_ncr][:release_note_ids]).reject(&:blank?).map(&:to_i)
+      new_ids = Array(params[:external_ncr][:release_note_ids]).reject(&:blank?)
       @external_ncr.release_note_ids = new_ids
     end
 
@@ -285,7 +285,6 @@ class ExternalNcrsController < ApplicationController
   end
 
   def prepare_form_data
-    # Rebuild preselected release note for re-rendering the form on error
     if params[:release_note_id].present?
       @preselected_release_note = ReleaseNote.find_by(id: params[:release_note_id])
     end

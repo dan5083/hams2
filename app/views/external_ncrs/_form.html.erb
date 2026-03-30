@@ -375,7 +375,7 @@
   // Get currently selected release note IDs
   function getSelectedIds() {
     const items = container.querySelectorAll('.release-note-item');
-    return Array.from(items).map(item => parseInt(item.dataset.rnId));
+    return Array.from(items).map(item => item.dataset.rnId);
   }
 
   // Search for release notes
