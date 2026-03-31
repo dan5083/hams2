@@ -71,7 +71,7 @@ class AiAssistantJob < ApplicationJob
 
     loop do
       iterations += 1
-      raise "Exceeded maximum tool iterations" if iterations > 20
+      raise "Exceeded maximum tool iterations" if iterations > 30
 
       response    = call_anthropic(loop_messages)
       stop_reason = response["stop_reason"]
@@ -106,15 +106,7 @@ class AiAssistantJob < ApplicationJob
 
   def call_anthropic(messages)
     uri  = URI(ANTHROPIC_API_URL)
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl      = true
-    http.read_timeout = 120
-
-    req = Net::HTTP::Post.new(uri)
-    req["Content-Type"]      = "application/json"
-    req["x-api-key"]         = ENV["ANTHROPIC_API_KEY"]
-    req["anthropic-version"] = "2023-06-01"
-    req.body = {
+    body = {
       model:         MODEL,
       max_tokens:    4096,
       cache_control: { type: "ephemeral" },
@@ -123,10 +115,33 @@ class AiAssistantJob < ApplicationJob
       messages:      messages
     }.to_json
 
-    res = http.request(req)
-    raise "Anthropic API error #{res.code}: #{res.body}" unless res.is_a?(Net::HTTPSuccess)
+    retries = 0
+    max_retries = 4
 
-    JSON.parse(res.body)
+    loop do
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl      = true
+      http.read_timeout = 120
+
+      req = Net::HTTP::Post.new(uri)
+      req["Content-Type"]      = "application/json"
+      req["x-api-key"]         = ENV["ANTHROPIC_API_KEY"]
+      req["anthropic-version"] = "2023-06-01"
+      req.body = body
+
+      res = http.request(req)
+
+      if res.is_a?(Net::HTTPSuccess)
+        return JSON.parse(res.body)
+      elsif %w[429 529].include?(res.code.to_s) && retries < max_retries
+        retries += 1
+        wait = [5, 10, 20, 40][retries - 1] || 40
+        Rails.logger.warn "[AI Assistant Job] Anthropic #{res.code} — retry #{retries}/#{max_retries} in #{wait}s"
+        sleep(wait)
+      else
+        raise "Anthropic API error #{res.code}: #{res.body}"
+      end
+    end
   end
 
   # ── System prompt (sectioned) ──────────────────────────────────────────
