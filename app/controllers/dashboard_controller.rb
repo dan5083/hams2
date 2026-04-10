@@ -94,25 +94,10 @@ class DashboardController < ApplicationController
   end
 
   def load_ecard_metrics
-    # E-card specific metrics for shop floor users
     base_works_orders = WorksOrder.active.includes(:part, :customer_order)
 
-    # Apply user-specific filtering
-    filter_criteria = Current.user.ecard_filter_criteria
-
-    if filter_criteria.present? && !filter_criteria[:description]&.include?("sees all")
-      # Filter works orders based on user criteria
-      filtered_work_orders = base_works_orders.select do |wo|
-        user_can_see_work_order_for_dashboard?(wo)
-      end
-      @my_work_orders_count = filtered_work_orders.count
-      @my_pending_work_orders = filtered_work_orders.select { |wo| wo.unreleased_quantity > 0 }.count
-    else
-      # User sees all work orders
-      @my_work_orders_count = base_works_orders.count
-      @my_pending_work_orders = base_works_orders.with_unreleased_quantity.count
-    end
-
+    @my_work_orders_count = base_works_orders.count
+    @my_pending_work_orders = base_works_orders.with_unreleased_quantity.count
     @total_active_work_orders = base_works_orders.count
   end
 
@@ -149,42 +134,6 @@ class DashboardController < ApplicationController
     @recent_errors = get_recent_error_count
   end
 
-  # Helper method to check if user can see a work order (for dashboard metrics)
-  def user_can_see_work_order_for_dashboard?(work_order)
-    return true unless Current.user.sees_ecards?
-
-    filter_criteria = Current.user.ecard_filter_criteria
-    return true if filter_criteria.blank?
-
-    part = work_order.part
-    return true unless part
-
-    operations = part.get_operations_with_auto_ops
-
-    # Basic access only (maintenance) - no work orders
-    return false if filter_criteria[:basic_access_only]
-
-    # VAT number filtering
-    if filter_criteria[:vat_numbers].present?
-      operation_vats = operations.flat_map(&:vat_numbers).uniq
-      return false if operation_vats.any? && (operation_vats & filter_criteria[:vat_numbers]).empty?
-    end
-
-    # Process type filtering
-    if filter_criteria[:process_types].present?
-      operation_process_types = operations.map(&:process_type).uniq
-      return false if (operation_process_types & filter_criteria[:process_types]).empty?
-    end
-
-    # Process type exclusion
-    if filter_criteria[:exclude_process_types].present?
-      operation_process_types = operations.map(&:process_type).uniq
-      return false if (operation_process_types & filter_criteria[:exclude_process_types]).any?
-    end
-
-    true
-  end
-
   def calculate_completion_rate
     total_works_orders = WorksOrder.active.count
     return 0 if total_works_orders.zero?
@@ -202,17 +151,11 @@ class DashboardController < ApplicationController
   end
 
   def get_recent_error_count
-    # This would integrate with your logging system
-    # For now, return a placeholder
     0
   end
 
   def push_invoice_to_xero(invoice)
-    # Placeholder for Xero push logic
-    # This would integrate with your existing XeroService
     begin
-      # XeroInvoiceService.new.push_invoice(invoice)
-      # For now, just mark as success
       invoice.update(xero_id: "INV-#{invoice.number}-#{Time.current.to_i}")
       true
     rescue => e
