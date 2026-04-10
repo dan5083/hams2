@@ -1,4 +1,4 @@
-# app/controllers/works_orders_controller.rb - Fixed pricing parameter handling and route card operations with RBAC
+# app/controllers/works_orders_controller.rb
 class WorksOrdersController < ApplicationController
   before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :ecard, :sign_off_operation, :save_batches, :create_invoice, :void, :unvoid]
   before_action :require_ecard_access, only: [:ecard, :sign_off_operation, :save_batches, :save_operation_input]
@@ -260,6 +260,107 @@ class WorksOrdersController < ApplicationController
 
   private
 
+  def create_bulk
+    Rails.logger.info "Starting bulk works order creation"
+
+    # Extract works_orders from the request
+    works_orders_data = params[:works_orders]
+
+    unless works_orders_data.present?
+      render json: {
+        success: false,
+        error: "No works orders data provided"
+      }, status: :unprocessable_entity
+      return
+    end
+
+    created_works_orders = []
+    errors = []
+
+    # Wrap in a transaction so all-or-nothing
+    ActiveRecord::Base.transaction do
+      works_orders_data.each_with_index do |wo_data, index|
+        # Convert to ActionController::Parameters for safety
+        wo_params = ActionController::Parameters.new(wo_data.to_unsafe_h)
+
+        works_order = WorksOrder.new
+
+        # Manually assign attributes from params
+        works_order.customer_order_id = wo_params[:customer_order_id]
+        works_order.part_id = wo_params[:part_id]
+        works_order.customer_reference = wo_params[:customer_reference]
+        works_order.quantity = wo_params[:quantity]
+        works_order.price_type = wo_params[:price_type]
+
+        # Set pricing based on type
+        if wo_params[:price_type] == 'each'
+          works_order.each_price = wo_params[:each_price]
+          # lot_price will be calculated by before_validation callback
+        else
+          works_order.lot_price = wo_params[:lot_price]
+        end
+
+        # Set additional charges (stored in jsonb)
+        works_order.selected_charge_ids = wo_params[:selected_charge_ids] || []
+        works_order.custom_amounts = wo_params[:custom_amounts] || {}
+
+        # Validate part configuration
+        unless validate_part_configuration(works_order)
+          errors << { line: index + 1, errors: works_order.errors.full_messages }
+          raise ActiveRecord::Rollback
+        end
+
+        unless works_order.save
+          errors << { line: index + 1, errors: works_order.errors.full_messages }
+          raise ActiveRecord::Rollback
+        end
+
+        created_works_orders << works_order
+      end
+    end
+
+    # Check results and respond
+    if errors.empty? && created_works_orders.any?
+      # Send order acknowledgement email to buyers
+      customer_order = created_works_orders.first.customer_order
+
+      if customer_order && customer_order.customer.buyer_emails.any?
+        begin
+          OrderAcknowledgementMailer.order_confirmation(
+            customer_order,
+            created_works_orders
+          ).deliver_later
+
+          Rails.logger.info "Order acknowledgement email queued for #{customer_order.customer.name}"
+        rescue => e
+          # Log error but don't fail the request - email is secondary to order creation
+          Rails.logger.error "Failed to send order acknowledgement email: #{e.message}"
+        end
+      else
+        Rails.logger.info "No buyer emails configured for #{customer_order.customer.name} - skipping order acknowledgement"
+      end
+
+      redirect_url = if customer_order
+        customer_order_path(customer_order)
+      else
+        works_orders_path
+      end
+
+      render json: {
+        success: true,
+        message: "#{created_works_orders.count} works order(s) created successfully",
+        works_order_ids: created_works_orders.map(&:id),
+        redirect_url: redirect_url
+      }
+    else
+      render json: {
+        success: false,
+        error: "Failed to create works orders",
+        errors: errors
+      }, status: :unprocessable_entity
+    end
+  end
+
   def create_single
     @works_order = WorksOrder.new(works_order_params)
 
@@ -304,7 +405,6 @@ class WorksOrdersController < ApplicationController
     @works_order = WorksOrder.find(params[:id])
   end
 
-  # UPDATED: Removed part detail fields since they're handled by model callback
   def works_order_params
     # Always allow these core parameters
     permitted_params = [
@@ -371,15 +471,12 @@ class WorksOrdersController < ApplicationController
     load_reference_data
   end
 
-  # SIMPLIFIED: Just validate part configuration, don't manually set part details
   def validate_part_configuration(works_order)
     return false unless works_order.customer_order && works_order.part_id.present?
 
     begin
-      # Get the selected part
       part = Part.find(works_order.part_id)
 
-      # Check if part has processing instructions configured
       if part.customisation_data.blank? || part.customisation_data.dig("operation_selection", "treatments").blank?
         works_order.errors.add(:part_id, "Part #{part.display_name} does not have processing instructions configured. Please set up this part properly first.")
         return false
