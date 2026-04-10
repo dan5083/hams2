@@ -6,11 +6,6 @@ class WorksOrdersController < ApplicationController
  def index
     @works_orders = WorksOrder.includes(:customer_order, :part, customer: [])
 
-    # Apply user-specific e-card filtering if user sees e-cards
-    if Current.user.sees_ecards?
-      @works_orders = apply_ecard_filtering(@works_orders)
-    end
-
     # Search functionality - supports multiple search types
     if params[:search].present?
       search_term = params[:search].strip
@@ -219,246 +214,51 @@ class WorksOrdersController < ApplicationController
                   notice: "Invoice INV#{invoice.number} staged successfully! Go to dashboard to push to Xero."
 
     rescue StandardError => e
-      Rails.logger.error "Failed to create invoice: #{e.message}"
-      Rails.logger.error "Backtrace: #{e.backtrace.first(5).join("\n")}"
-
-      redirect_to @works_order,
-                  alert: "❌ Failed to stage invoice: #{e.message}. Please try again or contact support."
+      Rails.logger.error "Invoice creation error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+      redirect_to @works_order, alert: "Error creating invoice: #{e.message}"
     end
   end
 
+  # E-card display for shop floor
   def ecard
-    # Check user access (already handled by before_action, but add extra logging)
-    unless Current.user.sees_ecards?
-      Rails.logger.warn "Unauthorized e-card access attempt by #{Current.user.email_address}"
-      redirect_to @works_order, alert: "You don't have permission to access e-cards."
-      return
-    end
-
-    # Check if this specific work order matches user's filter criteria
-    unless user_can_see_work_order?(@works_order)
-      redirect_to works_orders_path, alert: "This work order is outside your assigned work area."
-      return
-    end
-
-    # Original demo customer restriction can be removed or kept as additional filter
-    demo_customers = ["24 Locks"]
-    unless demo_customers.include?(@works_order.customer.name)
-      redirect_to @works_order, alert: "E-Cards are currently in beta testing for select customers."
-      return
-    end
-  end
-
-  def save_batches
-    # Permission check handled by before_action
-    unless user_can_see_work_order?(@works_order)
-      render json: { success: false, error: "This work order is outside your assigned work area." }
-      return
-    end
-
-    batches_data = params[:batches] || []
-
-    # Validate batch data
-    unless batches_data.is_a?(Array)
-      render json: { success: false, error: "Invalid batch data format" }
-      return
-    end
-
-    # Initialize customised_process_data if blank
-    @works_order.customised_process_data ||= {}
-
-    # Store batches data
-    @works_order.customised_process_data["batches"] = batches_data.map do |batch|
-      {
-        "id" => batch["id"],
-        "number" => batch["number"].to_i,
-        "quantity" => batch["quantity"].to_i,
-        "status" => batch["status"],
-        "createdAt" => batch["createdAt"],
-        "currentOperation" => batch["currentOperation"].to_i
-      }
-    end
-
-    if @works_order.save
-      render json: {
-        success: true,
-        message: "Batches saved successfully",
-        batches: @works_order.customised_process_data["batches"]
-      }
-    else
-      render json: {
-        success: false,
-        error: "Failed to save batches: #{@works_order.errors.full_messages.join(', ')}"
-      }
-    end
-  end
-
-  def save_operation_input
-    # Permission check handled by before_action
-    unless user_can_see_work_order?(@works_order)
-      render json: { success: false, error: "This work order is outside your assigned work area." }
-      return
-    end
-
-    operation_position = params[:operation_position].to_s
-    input_index = params[:input_index].to_s
-    value = params[:value].to_s
-
-    # Initialize customised_process_data structure if needed
-    @works_order.customised_process_data ||= {}
-    @works_order.customised_process_data["operation_inputs"] ||= {}
-    @works_order.customised_process_data["operation_inputs"][operation_position] ||= {}
-
-    # Save the input value
-    @works_order.customised_process_data["operation_inputs"][operation_position][input_index] = value
-
-    if @works_order.save
-      render json: { success: true }
-    else
-      render json: { success: false, error: "Failed to save input" }
-    end
+    @operations = @works_order.operations_with_auto_ops || []
+    @batches = @works_order.batches.order(:batch_number)
   end
 
   def sign_off_operation
-    # Permission check handled by before_action
-    unless user_can_see_work_order?(@works_order)
-      redirect_to @works_order, alert: "This work order is outside your assigned work area."
-      return
-    end
-
-    position = params[:operation_position].to_i
+    operation_index = params[:operation_index].to_i
     batch_id = params[:batch_id]
 
-    # Initialize customised_process_data if blank
-    @works_order.customised_process_data ||= {}
+    batch = @works_order.batches.find(batch_id)
+    batch.sign_off_operation!(operation_index, Current.user)
 
-    if batch_id == "independent"
-      # Batch-independent operation (Contract Review, Final Inspection, Pack)
-      @works_order.customised_process_data["operations"] ||= {}
-      @works_order.customised_process_data["operations"][position.to_s] = {
-        "signed_off_by" => Current.user.id,
-        "signed_off_at" => Time.current.iso8601
-      }
-    else
-      # Batch-dependent operation
-      @works_order.customised_process_data["batch_operations"] ||= {}
-      @works_order.customised_process_data["batch_operations"][batch_id] ||= {}
-      @works_order.customised_process_data["batch_operations"][batch_id][position.to_s] = {
-        "signed_off_by" => Current.user.id,
-        "signed_off_at" => Time.current.iso8601,
-        "batch_id" => batch_id
-      }
-    end
+    redirect_to ecard_works_order_path(@works_order), notice: "Operation signed off successfully."
+  rescue => e
+    redirect_to ecard_works_order_path(@works_order), alert: "Error: #{e.message}"
+  end
 
-    if @works_order.save
-      redirect_to ecard_works_order_path(@works_order), notice: "Operation signed off"
-    else
-      redirect_to ecard_works_order_path(@works_order), alert: "Failed to sign off"
-    end
+  def save_batches
+    batches_params = params.require(:batches).permit!
+    @works_order.update_batches(batches_params)
+    redirect_to ecard_works_order_path(@works_order), notice: "Batches saved successfully."
+  rescue => e
+    redirect_to ecard_works_order_path(@works_order), alert: "Error saving batches: #{e.message}"
+  end
+
+  def save_operation_input
+    works_order = WorksOrder.find(params[:id])
+    operation_index = params[:operation_index].to_i
+    batch = works_order.batches.find(params[:batch_id])
+
+    input_data = params.permit(:temperature, :duration, :thickness, :notes).to_h
+    batch.save_operation_input!(operation_index, input_data, Current.user)
+
+    redirect_to ecard_works_order_path(works_order), notice: "Operation data saved."
+  rescue => e
+    redirect_to ecard_works_order_path(works_order), alert: "Error: #{e.message}"
   end
 
   private
-
- def create_bulk
-  Rails.logger.info "Starting bulk works order creation"
-
-  # Extract works_orders from the request
-  works_orders_data = params[:works_orders]
-
-  unless works_orders_data.present?
-    render json: {
-      success: false,
-      error: "No works orders data provided"
-    }, status: :unprocessable_entity
-    return
-  end
-
-  created_works_orders = []
-  errors = []
-
-  # Wrap in a transaction so all-or-nothing
-  ActiveRecord::Base.transaction do
-    works_orders_data.each_with_index do |wo_data, index|
-      # Convert to ActionController::Parameters for safety
-      wo_params = ActionController::Parameters.new(wo_data.to_unsafe_h)
-
-      works_order = WorksOrder.new
-
-      # Manually assign attributes from params
-      works_order.customer_order_id = wo_params[:customer_order_id]
-      works_order.part_id = wo_params[:part_id]
-      works_order.customer_reference = wo_params[:customer_reference]
-      works_order.quantity = wo_params[:quantity]
-      works_order.price_type = wo_params[:price_type]
-
-      # Set pricing based on type
-      if wo_params[:price_type] == 'each'
-        works_order.each_price = wo_params[:each_price]
-        # lot_price will be calculated by before_validation callback
-      else
-        works_order.lot_price = wo_params[:lot_price]
-      end
-
-      # Set additional charges (stored in jsonb)
-      works_order.selected_charge_ids = wo_params[:selected_charge_ids] || []
-      works_order.custom_amounts = wo_params[:custom_amounts] || {}
-
-      # Validate part configuration
-      unless validate_part_configuration(works_order)
-        errors << { line: index + 1, errors: works_order.errors.full_messages }
-        raise ActiveRecord::Rollback
-      end
-
-      unless works_order.save
-        errors << { line: index + 1, errors: works_order.errors.full_messages }
-        raise ActiveRecord::Rollback
-      end
-
-      created_works_orders << works_order
-    end
-  end
-
-  # Check results and respond
-  if errors.empty? && created_works_orders.any?
-    # Send order acknowledgement email to buyers
-    customer_order = created_works_orders.first.customer_order
-
-    if customer_order && customer_order.customer.buyer_emails.any?
-      begin
-        OrderAcknowledgementMailer.order_confirmation(
-          customer_order,
-          created_works_orders
-        ).deliver_later
-
-        Rails.logger.info "Order acknowledgement email queued for #{customer_order.customer.name}"
-      rescue => e
-        # Log error but don't fail the request - email is secondary to order creation
-        Rails.logger.error "Failed to send order acknowledgement email: #{e.message}"
-      end
-    else
-      Rails.logger.info "No buyer emails configured for #{customer_order.customer.name} - skipping order acknowledgement"
-    end
-
-    redirect_url = if customer_order
-      customer_order_path(customer_order)
-    else
-      works_orders_path
-    end
-
-    render json: {
-      success: true,
-      message: "#{created_works_orders.count} works order(s) created successfully",
-      works_order_ids: created_works_orders.map(&:id),
-      redirect_url: redirect_url
-    }
-  else
-    render json: {
-      success: false,
-      error: "Failed to create works orders",
-      errors: errors
-    }, status: :unprocessable_entity
-  end
-end
 
   def create_single
     @works_order = WorksOrder.new(works_order_params)
@@ -601,80 +401,5 @@ end
       Rails.logger.warn "Unauthorized e-card access attempt by #{Current.user&.email_address || 'unknown user'}"
       redirect_to root_path, alert: "You don't have permission to access e-cards."
     end
-  end
-
-  # Check if current user can see a specific work order based on their filter criteria
-  def user_can_see_work_order?(work_order)
-    return true unless Current.user.sees_ecards? # If they can't see e-cards, don't filter
-
-    filter_criteria = Current.user.ecard_filter_criteria
-    return true if filter_criteria.blank? # No filtering = see everything
-
-    part = work_order.part
-    return true unless part # If no part, allow access
-
-    operations = part.get_operations_with_auto_ops
-    customisation_data = part.customisation_data || {}
-
-    # Check basic access restriction (for maintenance staff)
-    if filter_criteria[:basic_access_only]
-      return false # Maintenance gets basic access only, no e-card filtering
-    end
-
-    # Aerospace priority filtering
-    if filter_criteria[:aerospace_priority] && part.aerospace_defense?
-      return true # Quality staff see aerospace work first
-    end
-
-    # VAT number filtering
-    if filter_criteria[:vat_numbers].present?
-      operation_vats = operations.flat_map(&:vat_numbers).uniq
-      return false if operation_vats.any? && (operation_vats & filter_criteria[:vat_numbers]).empty?
-    end
-
-    # Process type filtering (include specific types)
-    if filter_criteria[:process_types].present?
-      operation_process_types = operations.map(&:process_type).uniq
-      return false if (operation_process_types & filter_criteria[:process_types]).empty?
-    end
-
-    # Process type exclusion filtering
-    if filter_criteria[:exclude_process_types].present?
-      operation_process_types = operations.map(&:process_type).uniq
-      return false if (operation_process_types & filter_criteria[:exclude_process_types]).any?
-    end
-
-    # Priority process types (show these first, but don't exclude others)
-    if filter_criteria[:priority_process_types].present?
-      operation_process_types = operations.map(&:process_type).uniq
-      # This would be used for sorting, not filtering
-    end
-
-    true # Default to allowing access
-  end
-
-  # Apply user-specific filtering to the works orders collection
-  def apply_ecard_filtering(works_orders)
-    return works_orders unless Current.user.sees_ecards?
-
-    filter_criteria = Current.user.ecard_filter_criteria
-    return works_orders if filter_criteria.blank?
-
-    # For basic access only (maintenance), return empty collection
-    if filter_criteria[:basic_access_only]
-      return works_orders.none
-    end
-
-    # If user sees everything (management, quality inspectors, contract reviewers)
-    if filter_criteria[:description]&.include?("sees all")
-      return works_orders
-    end
-
-    # Apply filtering based on parts and operations
-    filtered_ids = works_orders.includes(:part).select do |work_order|
-      user_can_see_work_order?(work_order)
-    end.map(&:id)
-
-    works_orders.where(id: filtered_ids)
   end
 end
