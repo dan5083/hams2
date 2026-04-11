@@ -15,9 +15,8 @@ class WorksOrdersController < ApplicationController
                                   .where(
                                     "CAST(works_orders.number AS TEXT) ILIKE ? OR " \
                                     "works_orders.part_number ILIKE ? OR " \
-                                    "organizations.name ILIKE ? OR " \
-                                    "EXISTS(SELECT 1 FROM release_notes WHERE release_notes.works_order_id = works_orders.id AND CAST(release_notes.number AS TEXT) ILIKE ?)",
-                                    "%#{search_term}%", "%#{search_term}%", "%#{search_term}%", "%#{search_term}%"
+                                    "organizations.name ILIKE ?",
+                                    "%#{search_term}%", "%#{search_term}%", "%#{search_term}%"
                                   )
 
       @works_orders = @works_orders.distinct
