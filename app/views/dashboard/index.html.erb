@@ -73,13 +73,8 @@
         <p class="text-gray-600 mb-4">Your assigned manufacturing work.</p>
 
         <div class="space-y-2 text-sm">
-          <% if @my_work_orders_count %>
-            <div><strong>My Work Orders:</strong> <%= @my_work_orders_count %></div>
-            <div><strong>Pending Release:</strong> <%= @my_pending_work_orders %></div>
-          <% else %>
-            <div><strong>Total Active:</strong> <%= @total_active_work_orders %></div>
-          <% end %>
-          <div><strong>Filter:</strong> <%= Current.user.ecard_filter_criteria[:description] || "No filtering" %></div>
+          <div><strong>Total Active:</strong> <%= @total_active_work_orders %></div>
+          <div><strong>Pending Release:</strong> <%= @my_pending_work_orders %></div>
         </div>
       </div>
     <% else %>

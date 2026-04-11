@@ -94,11 +94,8 @@ class DashboardController < ApplicationController
   end
 
   def load_ecard_metrics
-    base_works_orders = WorksOrder.active.includes(:part, :customer_order)
-
-    @my_work_orders_count = base_works_orders.count
-    @my_pending_work_orders = base_works_orders.with_unreleased_quantity.count
-    @total_active_work_orders = base_works_orders.count
+    @total_active_work_orders = WorksOrder.active.count
+    @my_pending_work_orders = WorksOrder.active.with_unreleased_quantity.count
   end
 
   def load_quality_metrics
@@ -151,11 +148,17 @@ class DashboardController < ApplicationController
   end
 
   def get_recent_error_count
+    # This would integrate with your logging system
+    # For now, return a placeholder
     0
   end
 
   def push_invoice_to_xero(invoice)
+    # Placeholder for Xero push logic
+    # This would integrate with your existing XeroService
     begin
+      # XeroInvoiceService.new.push_invoice(invoice)
+      # For now, just mark as success
       invoice.update(xero_id: "INV-#{invoice.number}-#{Time.current.to_i}")
       true
     rescue => e
