@@ -29,6 +29,11 @@ class WorksOrdersController < ApplicationController
       @works_orders = @works_orders.for_customer(params[:customer_id])
     end
 
+    # Part filtering (from part show page "View all works orders" link)
+    if params[:part_id].present?
+      @works_orders = @works_orders.where(part_id: params[:part_id])
+    end
+
     # Status filtering
     if params[:status] == 'open'
       @works_orders = @works_orders.open

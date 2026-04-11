@@ -10,6 +10,8 @@
               data-mobile-table-target="toggleButton">
         Card View
       </button>
+      <%= link_to "New Works Order", new_works_order_path,
+          class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-center" %>
     </div>
   </div>
 
@@ -412,7 +414,7 @@
       <nav class="inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
         <!-- Previous Page -->
         <% if @works_orders.prev_page %>
-          <%= link_to works_orders_path(params.permit(:search, :status, :page).merge(page: @works_orders.prev_page)),
+          <%= link_to works_orders_path(params.permit(:search, :status, :page, :part_id).merge(page: @works_orders.prev_page)),
               class: "relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50" do %>
             <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
@@ -432,7 +434,7 @@
         <% page_range = [[@works_orders.current_page - 2, 1].max, [@works_orders.current_page + 2, @works_orders.total_pages].min] %>
 
         <% if page_range[0] > 1 %>
-          <%= link_to works_orders_path(params.permit(:search, :status, :page).merge(page: 1)),
+          <%= link_to works_orders_path(params.permit(:search, :status, :page, :part_id).merge(page: 1)),
               class: "relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50" do %>
             1
           <% end %>
@@ -449,7 +451,7 @@
               <%= page %>
             </span>
           <% else %>
-            <%= link_to works_orders_path(params.permit(:search, :status, :page).merge(page: page)),
+            <%= link_to works_orders_path(params.permit(:search, :status, :page, :part_id).merge(page: page)),
                 class: "relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50" do %>
               <%= page %>
             <% end %>
@@ -462,7 +464,7 @@
               ...
             </span>
           <% end %>
-          <%= link_to works_orders_path(params.permit(:search, :status, :page).merge(page: @works_orders.total_pages)),
+          <%= link_to works_orders_path(params.permit(:search, :status, :page, :part_id).merge(page: @works_orders.total_pages)),
               class: "relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50" do %>
             <%= @works_orders.total_pages %>
           <% end %>
@@ -470,7 +472,7 @@
 
         <!-- Next Page -->
         <% if @works_orders.next_page %>
-          <%= link_to works_orders_path(params.permit(:search, :status, :page).merge(page: @works_orders.next_page)),
+          <%= link_to works_orders_path(params.permit(:search, :status, :page, :part_id).merge(page: @works_orders.next_page)),
               class: "relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50" do %>
             <span class="sr-only">Next</span>
             <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
