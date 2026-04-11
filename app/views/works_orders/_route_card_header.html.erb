@@ -57,6 +57,7 @@
       </div>
     </div>
 
+    <% wo_count = works_order.part&.works_orders&.active&.count.to_i %>
     <div class="header-row">
       <div class="header-row-inner">
         <div class="header-row-inner2">
@@ -64,8 +65,20 @@
           <div class="header-field-label">Material</div>
           <div class="header-field-value"><%= works_order.part&.material.presence || "Not specified" %></div>
           <!-- Right column -->
+          <div class="header-field-label">Times Processed</div>
+          <div class="header-field-value" style="<%= 'background-color: #fff3cd; font-weight: bold;' if wo_count <= 1 %>">
+            <%= wo_count %><%= ' — NEW PART' if wo_count <= 1 %>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="header-row">
+      <div class="header-row-inner">
+        <div class="header-row-inner2">
+          <!-- Left column -->
           <div class="header-field-label">Specified Thickness(es)</div>
-          <div class="header-field-value"><%= works_order.part&.specified_thicknesses.presence || "Not specified" %></div>
+          <div class="header-field-value header-field-value-wide"><%= works_order.part&.specified_thicknesses.presence || "Not specified" %></div>
         </div>
       </div>
     </div>
