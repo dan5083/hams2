@@ -67,7 +67,7 @@
           <!-- Right column -->
           <div class="header-field-label">Times Processed</div>
           <div class="header-field-value" style="<%= 'background-color: #fff3cd; font-weight: bold;' if wo_count <= 1 %>">
-            <%= wo_count %><%= ' — NEW PART' if wo_count <= 1 %>
+            <%= wo_count <= 1 ? 'NEW PART' : wo_count %>
           </div>
         </div>
       </div>
