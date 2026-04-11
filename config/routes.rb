@@ -62,7 +62,7 @@ Rails.application.routes.draw do
   end
 
   # 3. Works Orders routes (main CRUD) - Updated to reference parts directly
-  resources :works_orders do
+  resources :works_orders, except: [:new, :create] do
     member do
       get :route_card
       get :ecard
