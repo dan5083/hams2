@@ -30,7 +30,6 @@ class PartsController < ApplicationController
   def new
     @part = Part.new
     @customers = Organization.enabled.order(:name)
-    @specification_presets = SpecificationPreset.enabled.ordered
 
     # Pre-select customer if coming from works order form
     if params[:customer_id].present?
@@ -156,7 +155,6 @@ end
 
   def edit
     @customers = [@part.customer] # Don't allow changing customer on existing part
-    @specification_presets = SpecificationPreset.enabled.ordered
 
     # Auto-lock existing parts that don't have the locked operations structure
     if @part.persisted? && !@part.has_locked_operations_data?
@@ -188,7 +186,6 @@ end
           return
         else
           @customers = [@part.customer]
-          @specification_presets = SpecificationPreset.enabled.ordered
           render :edit, status: :unprocessable_entity
           return
         end
@@ -208,12 +205,10 @@ end
           redirect_to @part, notice: 'Part and operations were successfully updated.'
         else
           @customers = [@part.customer]
-          @specification_presets = SpecificationPreset.enabled.ordered
           render :edit, status: :unprocessable_entity
         end
       else
         @customers = [@part.customer]
-        @specification_presets = SpecificationPreset.enabled.ordered
         render :edit, status: :unprocessable_entity
       end
       return
@@ -224,7 +219,6 @@ end
       redirect_to @part, notice: 'Part was successfully updated.'
     else
       @customers = [@part.customer]
-      @specification_presets = SpecificationPreset.enabled.ordered
       render :edit, status: :unprocessable_entity
     end
   end
@@ -765,7 +759,6 @@ end
 
   def load_form_data_for_errors
     @customers = Organization.enabled.order(:name)
-    @specification_presets = SpecificationPreset.enabled.ordered
   end
 
   def determine_process_type

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_03_25_122533) do
+ActiveRecord::Schema[8.0].define(version: 2026_04_12_121050) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -98,6 +98,16 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_25_122533) do
     t.index ["voided"], name: "index_customer_orders_on_voided"
   end
 
+  create_table "external_ncr_release_notes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "external_ncr_id", null: false
+    t.uuid "release_note_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["external_ncr_id", "release_note_id"], name: "idx_ncr_release_notes_unique", unique: true
+    t.index ["external_ncr_id"], name: "index_external_ncr_release_notes_on_external_ncr_id"
+    t.index ["release_note_id"], name: "index_external_ncr_release_notes_on_release_note_id"
+  end
+
   create_table "external_ncrs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.integer "hal_ncr_number", null: false
     t.date "date", default: -> { "CURRENT_DATE" }, null: false
@@ -107,7 +117,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_25_122533) do
     t.jsonb "ncr_data", default: {}, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.uuid "release_note_id", null: false
+    t.uuid "release_note_id"
     t.index ["assigned_to_id"], name: "index_external_ncrs_on_assigned_to_id"
     t.index ["created_by_id"], name: "index_external_ncrs_on_created_by_id"
     t.index ["date"], name: "index_external_ncrs_on_date"
@@ -274,16 +284,6 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_25_122533) do
     t.index ["xero_name"], name: "index_skipton_customer_mappings_on_xero_name", unique: true
   end
 
-  create_table "specification_presets", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.string "name", null: false
-    t.text "content", null: false
-    t.boolean "enabled", default: true, null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["enabled"], name: "index_specification_presets_on_enabled"
-    t.index ["name"], name: "index_specification_presets_on_name", unique: true
-  end
-
   create_table "specifications", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "title", null: false
     t.text "description"
@@ -385,6 +385,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_03_25_122533) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "buyers", "organizations"
   add_foreign_key "customer_orders", "organizations", column: "customer_id"
+  add_foreign_key "external_ncr_release_notes", "external_ncrs"
+  add_foreign_key "external_ncr_release_notes", "release_notes"
   add_foreign_key "external_ncrs", "release_notes"
   add_foreign_key "external_ncrs", "users", column: "assigned_to_id"
   add_foreign_key "external_ncrs", "users", column: "created_by_id"

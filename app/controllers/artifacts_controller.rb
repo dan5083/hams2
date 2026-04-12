@@ -2,8 +2,6 @@
 class ArtifactsController < ApplicationController
   def index
     # Load counts for all artifact types
-    @specification_presets_count = SpecificationPreset.count
-    @enabled_specification_presets_count = SpecificationPreset.enabled.count
 
     @additional_charge_presets_count = AdditionalChargePreset.count
     @enabled_additional_charge_presets_count = AdditionalChargePreset.enabled.count

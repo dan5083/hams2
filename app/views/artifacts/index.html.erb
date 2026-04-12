@@ -4,31 +4,6 @@
     <h1 class="text-3xl font-bold text-gray-900">Artifacts Management</h1>
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-    <!-- Specification Presets Card -->
-    <div class="bg-white rounded-lg shadow-md p-6">
-      <h2 class="text-xl font-semibold text-gray-800 mb-4">Specification Presets</h2>
-      <p class="text-gray-600 mb-4">Manage treatment specification templates.</p>
-
-      <div class="space-y-2 text-sm mb-4">
-        <div><strong>Total:</strong> <%= @specification_presets_count %></div>
-        <div><strong>Enabled:</strong> <%= @enabled_specification_presets_count %></div>
-        <div><strong>Disabled:</strong> <%= @specification_presets_count - @enabled_specification_presets_count %></div>
-      </div>
-
-      <div class="space-y-2">
-        <%= link_to specification_presets_path(t: Time.current.to_i),
-            class: "block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm text-center" do %>
-          📄 Manage Specifications
-        <% end %>
-
-        <%= link_to new_specification_preset_path(t: Time.current.to_i),
-            class: "block w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded text-sm text-center" do %>
-          ➕ Add New Specification
-        <% end %>
-      </div>
-    </div>
-
     <!-- Additional Charge Presets Card -->
     <div class="bg-white rounded-lg shadow-md p-6">
       <h2 class="text-xl font-semibold text-gray-800 mb-4">Additional Charges</h2>

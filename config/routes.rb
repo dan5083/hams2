@@ -199,12 +199,6 @@ Rails.application.routes.draw do
     end
   end
 
-  resources :specification_presets, except: [:show] do
-    member do
-      patch :toggle_enabled
-    end
-  end
-
   resources :additional_charge_presets, except: [:show] do
     member do
       patch :toggle_enabled
