@@ -293,7 +293,11 @@ class WorksOrdersController < ApplicationController
       end
     end
 
-    render json: { results: results }
+    customer_order_id = works_orders_params.first[:customer_order_id]
+    render json: {
+      results: results,
+      redirect_url: customer_order_path(customer_order_id)
+    }
   rescue => e
     render json: { error: e.message }, status: :unprocessable_entity
   end
