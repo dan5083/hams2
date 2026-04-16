@@ -255,9 +255,9 @@
               <dt class="text-sm font-medium text-gray-500 mb-2">Description of Non-Conformance</dt>
               <dd class="text-sm text-gray-900">
                 <% if @external_ncr.description_of_non_conformance.present? %>
-                  <div class="whitespace-pre-wrap bg-gray-50 p-3 rounded border">
-                    <%= @external_ncr.description_of_non_conformance %>
-                  </div>
+                  <p class="whitespace-pre-line leading-relaxed border-l-2 border-gray-200 pl-3">
+                    <%= @external_ncr.description_of_non_conformance.strip %>
+                  </p>
                 <% else %>
                   <span class="text-gray-400 italic">Not provided</span>
                   <% if @external_ncr.status == 'draft' %>
@@ -274,9 +274,9 @@
               <dt class="text-sm font-medium text-gray-500 mb-2">Containment (if required)</dt>
               <dd class="text-sm text-gray-900">
                 <% if @external_ncr.containment_action.present? %>
-                  <div class="whitespace-pre-wrap bg-gray-50 p-3 rounded border">
-                    <%= @external_ncr.containment_action %>
-                  </div>
+                  <p class="whitespace-pre-line leading-relaxed border-l-2 border-gray-200 pl-3">
+                    <%= @external_ncr.containment_action.strip %>
+                  </p>
                 <% else %>
                   <span class="text-gray-400 italic">Not provided</span>
                 <% end %>
@@ -288,9 +288,9 @@
               <dt class="text-sm font-medium text-gray-500 mb-2">Root Cause Analysis</dt>
               <dd class="text-sm text-gray-900">
                 <% if @external_ncr.root_cause_analysis.present? %>
-                  <div class="whitespace-pre-wrap bg-gray-50 p-3 rounded border">
-                    <%= @external_ncr.root_cause_analysis %>
-                  </div>
+                  <p class="whitespace-pre-line leading-relaxed border-l-2 border-gray-200 pl-3">
+                    <%= @external_ncr.root_cause_analysis.strip %>
+                  </p>
                 <% else %>
                   <span class="text-gray-400 italic">Not provided</span>
                 <% end %>
@@ -302,9 +302,9 @@
               <dt class="text-sm font-medium text-gray-500 mb-2">Corrective Actions</dt>
               <dd class="text-sm text-gray-900">
                 <% if @external_ncr.corrective_action.present? %>
-                  <div class="whitespace-pre-wrap bg-gray-50 p-3 rounded border">
-                    <%= @external_ncr.corrective_action %>
-                  </div>
+                  <p class="whitespace-pre-line leading-relaxed border-l-2 border-gray-200 pl-3">
+                    <%= @external_ncr.corrective_action.strip %>
+                  </p>
                 <% else %>
                   <span class="text-gray-400 italic">Not provided</span>
                   <% if @external_ncr.status == 'in_progress' %>
@@ -321,9 +321,9 @@
               <dt class="text-sm font-medium text-gray-500 mb-2">Preventive Action</dt>
               <dd class="text-sm text-gray-900">
                 <% if @external_ncr.preventive_action.present? %>
-                  <div class="whitespace-pre-wrap bg-gray-50 p-3 rounded border">
-                    <%= @external_ncr.preventive_action %>
-                  </div>
+                  <p class="whitespace-pre-line leading-relaxed border-l-2 border-gray-200 pl-3">
+                    <%= @external_ncr.preventive_action.strip %>
+                  </p>
                 <% else %>
                   <span class="text-gray-400 italic">Not provided</span>
                   <% if @external_ncr.status == 'in_progress' %>

@@ -84,10 +84,9 @@ class ExternalNcrsController < ApplicationController
   end
 
   def edit
-    if @external_ncr.status != 'draft' && params[:replace_document].blank?
-      redirect_to @external_ncr, alert: 'Only draft NCRs can be fully edited.'
-      return
-    end
+    # No status guard — the update action has granular status checks and the
+    # form conditionally hides the release note editor and document-replace
+    # input for non-draft NCRs. Content fields remain editable at any status.
   end
 
   def update
