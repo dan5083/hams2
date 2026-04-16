@@ -4,10 +4,17 @@
 
   <%# ── Chat Panel — full-width bottom dock ────────────────────────── %>
   <div data-ai-assistant-target="panel"
-       class="hidden flex-col
+       class="hidden flex-col relative
               fixed bottom-0 left-0 right-0 h-[360px] sm:h-[400px]
               bg-gray-50 shadow-[0_-4px_24px_rgba(0,0,0,0.12)] border-t border-gray-200 overflow-hidden
               transition-transform duration-200 ease-out">
+
+    <%# Resize handle — drag upward to grow the panel, downward to shrink %>
+    <div data-ai-assistant-target="resizeHandle"
+         data-action="pointerdown->ai-assistant#startResize"
+         class="absolute top-0 left-0 right-0 h-2 cursor-ns-resize flex items-center justify-center group touch-none z-10">
+      <div class="w-10 h-1 rounded-full bg-gray-300 group-hover:bg-gray-400 transition-colors"></div>
+    </div>
 
     <%# Header %>
     <div class="flex items-center justify-between px-5 py-2.5 bg-blue-600 text-white shrink-0">

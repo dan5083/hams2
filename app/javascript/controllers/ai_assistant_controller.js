@@ -2,17 +2,37 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["panel", "input", "messages", "button", "sendBtn", "spinner", "fileInput", "filePreview"]
+  static targets = ["panel", "input", "messages", "button", "sendBtn", "spinner", "fileInput", "filePreview", "resizeHandle"]
 
   connect() {
     this.messages = []
     this.isOpen = false
     this.pendingFiles = []
-    this.pollInterval = null
+    this.pollTimeout = null
+    this.polling = false
+    this.pollFailures = 0
+    this.currentRequestId = null
+
+    // Restore user's preferred panel height, if set
+    const saved = localStorage.getItem("aiAssistantHeight")
+    if (saved) this.panelTarget.style.height = `${saved}px`
+
+    // Bind once so we can add/remove the same reference
+    this._onResize     = this.onResize.bind(this)
+    this._endResize    = this.endResize.bind(this)
+    this._onVisibility = () => {
+      if (document.visibilityState === "visible" && this.polling && this.currentRequestId) {
+        // Tab came back — don't wait up to 2s for the next scheduled poll
+        if (this.pollTimeout) { clearTimeout(this.pollTimeout); this.pollTimeout = null }
+        this.checkStatus(this.currentRequestId)
+      }
+    }
+    document.addEventListener("visibilitychange", this._onVisibility)
   }
 
   disconnect() {
     this.stopPolling()
+    document.removeEventListener("visibilitychange", this._onVisibility)
   }
 
   toggle() { this.isOpen ? this.close() : this.open() }
@@ -31,6 +51,39 @@ export default class extends Controller {
     this.panelTarget.classList.add("hidden")
     this.panelTarget.classList.remove("flex")
     this.buttonTarget.classList.remove("hidden")
+  }
+
+  // ── Resize ────────────────────────────────────────────────────────────
+
+  startResize(event) {
+    event.preventDefault()
+    this.resizing = true
+    this.startY = event.clientY
+    this.startHeight = this.panelTarget.offsetHeight
+    document.addEventListener("pointermove", this._onResize)
+    document.addEventListener("pointerup",   this._endResize)
+    document.addEventListener("pointercancel", this._endResize)
+    document.body.style.userSelect = "none"
+  }
+
+  onResize(event) {
+    if (!this.resizing) return
+    const delta = this.startY - event.clientY           // drag up = grow
+    const max   = window.innerHeight - 16               // leave 16px gap at top
+    const min   = 240
+    const next  = Math.min(Math.max(this.startHeight + delta, min), max)
+    this.panelTarget.style.height = `${next}px`
+  }
+
+  endResize() {
+    if (!this.resizing) return
+    this.resizing = false
+    document.removeEventListener("pointermove", this._onResize)
+    document.removeEventListener("pointerup",   this._endResize)
+    document.removeEventListener("pointercancel", this._endResize)
+    document.body.style.userSelect = ""
+    localStorage.setItem("aiAssistantHeight", this.panelTarget.offsetHeight)
+    this.scrollToBottom()
   }
 
   // ── File handling ─────────────────────────────────────────────────────
@@ -114,6 +167,9 @@ export default class extends Controller {
     const text = this.inputTarget.value.trim()
     if ((!text && !this.pendingFiles.length) || this.sending) return
 
+    // Belt-and-braces: kill any orphaned poller from a previous send
+    this.stopPolling()
+
     this.inputTarget.value = ""
 
     let userContent
@@ -169,20 +225,39 @@ export default class extends Controller {
   // ── Polling ───────────────────────────────────────────────────────────
 
   startPolling(requestId) {
-    this.pollInterval = setInterval(() => this.checkStatus(requestId), 2000)
+    this.currentRequestId = requestId
+    this.polling = true
+    this.pollFailures = 0
+    this.scheduleNextPoll(requestId)
+  }
+
+  scheduleNextPoll(requestId) {
+    if (!this.polling || requestId !== this.currentRequestId) return
+    this.pollTimeout = setTimeout(() => this.checkStatus(requestId), 2000)
   }
 
   stopPolling() {
-    if (this.pollInterval) {
-      clearInterval(this.pollInterval)
-      this.pollInterval = null
+    this.polling = false
+    this.currentRequestId = null
+    if (this.pollTimeout) {
+      clearTimeout(this.pollTimeout)
+      this.pollTimeout = null
     }
   }
 
   async checkStatus(requestId) {
+    // Stale-poll guard: caller may have been superseded or cancelled
+    if (!this.polling || requestId !== this.currentRequestId) return
+
     try {
-      const res  = await fetch(`/ai_assistant/status/${requestId}`)
+      const res = await fetch(`/ai_assistant/status/${requestId}`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
+
+      // Re-check: state may have changed while the fetch was in flight
+      if (!this.polling || requestId !== this.currentRequestId) return
+
+      this.pollFailures = 0
 
       if (data.status === "complete") {
         this.stopPolling()
@@ -193,12 +268,21 @@ export default class extends Controller {
         this.stopPolling()
         this.addMessage("error", data.error || "Something went wrong.")
         this.setSending(false)
+      } else {
+        // still "pending" — schedule next poll only after this one returned
+        this.scheduleNextPoll(requestId)
       }
-      // if still "pending", just keep polling
     } catch (err) {
-      this.stopPolling()
-      this.addMessage("error", "Lost connection while waiting for response.")
-      this.setSending(false)
+      // Mobile networks blip. Tolerate ~30s of consecutive failures before
+      // giving up — the Sidekiq job is usually still running and will finish.
+      this.pollFailures += 1
+      if (this.pollFailures >= 15) {
+        this.stopPolling()
+        this.addMessage("error", "Lost connection — the job may still be running. Refresh in a moment to see the result.")
+        this.setSending(false)
+      } else {
+        this.scheduleNextPoll(requestId)
+      }
     }
   }
 
