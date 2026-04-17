@@ -120,6 +120,93 @@
   .prose tbody tr:hover {
     background-color: #f3f4f6;
   }
+
+  /* ── Matrix document styles ── */
+  .matrix-section {
+    margin-bottom: 1.5rem;
+    border: 1px solid #c9a96e;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+
+  .matrix-section-header {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    color: #fff;
+    padding: 0.625rem 1rem;
+    font-weight: 700;
+    font-size: 0.8125rem;
+    letter-spacing: 0.01em;
+  }
+
+  .matrix-section-header .not-active-note {
+    color: #f87171;
+    font-weight: 600;
+    font-style: italic;
+    font-size: 0.75rem;
+  }
+
+  .matrix-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.75rem;
+    line-height: 1.35;
+  }
+
+  .matrix-table thead th {
+    background: #d4a843;
+    color: #1e293b;
+    font-weight: 700;
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.5rem 0.5rem;
+    border: 1px solid #b8922e;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  .matrix-table tbody td {
+    padding: 0.375rem 0.5rem;
+    border: 1px solid #d6cbb2;
+    vertical-align: top;
+    color: #1e293b;
+  }
+
+  .matrix-table tbody tr {
+    background: #fffdf7;
+  }
+
+  .matrix-table tbody tr:nth-child(even) {
+    background: #faf6ed;
+  }
+
+  .matrix-table tbody tr:hover {
+    background: #f5edd8;
+  }
+
+  .matrix-table .col-method { min-width: 140px; font-weight: 600; }
+  .matrix-table .col-criteria { text-align: center; white-space: nowrap; }
+  .matrix-table .col-parts { text-align: center; }
+  .matrix-table .col-material { min-width: 110px; }
+  .matrix-table .col-frequency { text-align: center; white-space: nowrap; }
+  .matrix-table .col-location { text-align: center; white-space: nowrap; }
+  .matrix-table .col-details { min-width: 130px; }
+
+  .matrix-table .nadcap-note {
+    color: #dc2626;
+    font-weight: 600;
+    font-style: italic;
+    font-size: 0.6875rem;
+  }
+
+  .matrix-table .ref-row td {
+    background: #f1ead6;
+    font-style: italic;
+    font-weight: 600;
+    color: #78716c;
+    text-align: center;
+  }
 </style>
 
 <div class="container mx-auto px-4 py-6">
@@ -207,16 +294,91 @@
     <div class="bg-white shadow rounded-lg p-6 mb-6">
       <h2 class="text-xl font-semibold text-gray-900 mb-4 pb-2 border-b-2 border-gray-200">Document Content</h2>
 
-      <div class="space-y-6">
-        <% @document.content['sections'].each do |section| %>
-          <div class="border-l-4 border-purple-500 pl-4">
-            <h3 class="text-lg font-semibold text-gray-900 mb-2"><%= section['heading'] %></h3>
-            <div class="text-sm text-gray-700 leading-relaxed prose prose-sm max-w-none">
-              <%= raw section['content'] %>
+      <% if @document.document_type == 'M' %>
+        <%# ── Matrix rendering ── %>
+        <div class="space-y-4 overflow-x-auto">
+          <% @document.content['sections'].each do |section| %>
+            <div class="matrix-section">
+              <div class="matrix-section-header">
+                <% heading_text = section['heading'].to_s %>
+                <% if heading_text.include?('Not currently processed') %>
+                  <%= heading_text.sub(/\s*\(Not currently processed\)\s*/i, ' ') %>
+                  <span class="not-active-note">(Not currently processed)</span>
+                <% else %>
+                  <%= heading_text %>
+                <% end %>
+              </div>
+
+              <% if section['rows'].present? %>
+                <table class="matrix-table">
+                  <thead>
+                    <tr>
+                      <th>Method / Specification</th>
+                      <th>Test Criteria</th>
+                      <th>No. of Parts / Test Pieces</th>
+                      <th>Material / Dimensions</th>
+                      <th>Frequency</th>
+                      <th>Test Location</th>
+                      <th>Details</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% section['rows'].each do |row| %>
+                      <% if row.is_a?(Array) && row.length == 1 %>
+                        <%# Single-cell reference row %>
+                        <tr class="ref-row">
+                          <td colspan="7"><%= row[0] %></td>
+                        </tr>
+                      <% elsif row.is_a?(Array) %>
+                        <tr>
+                          <td class="col-method"><%= row[0] %></td>
+                          <td class="col-criteria"><%= row[1] %></td>
+                          <td class="col-parts"><%= row[2] %></td>
+                          <td class="col-material"><%= row[3] %></td>
+                          <td class="col-frequency"><%= row[4] %></td>
+                          <td class="col-location">
+                            <% loc = row[5].to_s %>
+                            <% if loc.include?('NADCAP') || loc.include?('Not approved') %>
+                              <span class="nadcap-note"><%= loc %></span>
+                            <% else %>
+                              <%= loc %>
+                            <% end %>
+                          </td>
+                          <td class="col-details">
+                            <% detail = row[6].to_s %>
+                            <% if detail.include?('NADCAP') || detail.include?('Not approved') || detail.include?('Not currently processed') %>
+                              <span class="nadcap-note"><%= detail %></span>
+                            <% else %>
+                              <%= detail %>
+                            <% end %>
+                          </td>
+                        </tr>
+                      <% end %>
+                    <% end %>
+                  </tbody>
+                </table>
+              <% elsif section['content'].present? %>
+                <%# Fallback for sections with old-style content %>
+                <div class="p-4 text-sm text-gray-700 prose prose-sm max-w-none">
+                  <%= raw section['content'] %>
+                </div>
+              <% end %>
             </div>
-          </div>
-        <% end %>
-      </div>
+          <% end %>
+        </div>
+      <% else %>
+        <%# ── Standard document rendering ── %>
+        <div class="space-y-6">
+          <% @document.content['sections'].each do |section| %>
+            <div class="border-l-4 border-purple-500 pl-4">
+              <h3 class="text-lg font-semibold text-gray-900 mb-2"><%= section['heading'] %></h3>
+              <div class="text-sm text-gray-700 leading-relaxed prose prose-sm max-w-none">
+                <%= raw section['content'] %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
     </div>
   <% end %>
 

@@ -187,14 +187,11 @@
       font-weight: bold;
     }
 
-    /* Handle tables that use inline bgcolor or style attributes */
     .content td[bgcolor],
     .content th[bgcolor] {
-      /* Let inline bgcolor show through, just ensure border */
       border: 1px solid #000;
     }
 
-    /* Nested tables (some migrated docs have these) */
     .content table table {
       margin: 0;
       width: 100%;
@@ -205,10 +202,83 @@
       border: 1px solid #666;
     }
 
-    /* Empty cells shouldn't collapse */
     .content td:empty::after,
     .content th:empty::after {
       content: '\00a0';
+    }
+
+    /* ── Matrix document styles ── */
+    .matrix-section {
+      margin-bottom: 18px;
+      page-break-inside: avoid;
+    }
+
+    .matrix-section-header {
+      background: #1e293b;
+      color: #fff;
+      padding: 5px 10px;
+      font-weight: bold;
+      font-size: 10pt;
+    }
+
+    .matrix-section-header .not-active-note {
+      color: #f87171;
+      font-style: italic;
+    }
+
+    .matrix-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 8.5pt;
+      line-height: 1.3;
+    }
+
+    .matrix-table thead th {
+      background: #d4a843;
+      color: #1e293b;
+      font-weight: bold;
+      font-size: 7.5pt;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      padding: 4px 5px;
+      border: 1px solid #b8922e;
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    .matrix-table tbody td {
+      padding: 3px 5px;
+      border: 1px solid #c9b88a;
+      vertical-align: top;
+    }
+
+    .matrix-table tbody tr {
+      background: #fffdf7;
+    }
+
+    .matrix-table tbody tr:nth-child(even) {
+      background: #faf6ed;
+    }
+
+    .matrix-table .col-method { font-weight: bold; }
+    .matrix-table .col-criteria,
+    .matrix-table .col-parts,
+    .matrix-table .col-frequency,
+    .matrix-table .col-location { text-align: center; }
+
+    .matrix-table .nadcap-note {
+      color: #dc2626;
+      font-weight: bold;
+      font-style: italic;
+      font-size: 7.5pt;
+    }
+
+    .matrix-table .ref-row td {
+      background: #f1ead6;
+      font-style: italic;
+      font-weight: bold;
+      color: #78716c;
+      text-align: center;
     }
 
     /* ── References ── */
@@ -259,17 +329,18 @@
         font-size: 11pt;
       }
 
-      /* Keep headings with their content */
       h2, h3, h4 {
         page-break-after: avoid;
       }
 
-      /* Only avoid breaks inside tables (not whole sections) */
+      .matrix-section {
+        page-break-inside: avoid;
+      }
+
       .content table {
         page-break-inside: avoid;
       }
 
-      /* Footer on last page only, not fixed */
       .document-footer {
         margin-top: 30px;
       }
@@ -304,13 +375,84 @@
       </div>
     </div>
 
-    <% (@document.content['sections'] || []).each do |section| %>
-      <div class="section">
-        <h2><%= section['heading'] %></h2>
-        <div class="content">
-          <%= raw section['content'] %>
+    <% if @document.document_type == 'M' %>
+      <%# ── Matrix rendering ── %>
+      <% (@document.content['sections'] || []).each do |section| %>
+        <div class="matrix-section">
+          <div class="matrix-section-header">
+            <% heading_text = section['heading'].to_s %>
+            <% if heading_text.include?('Not currently processed') %>
+              <%= heading_text.sub(/\s*\(Not currently processed\)\s*/i, ' ') %>
+              <span class="not-active-note">(Not currently processed)</span>
+            <% else %>
+              <%= heading_text %>
+            <% end %>
+          </div>
+
+          <% if section['rows'].present? %>
+            <table class="matrix-table">
+              <thead>
+                <tr>
+                  <th>Method / Specification</th>
+                  <th>Test Criteria</th>
+                  <th>No. of Parts / Test Pieces</th>
+                  <th>Material / Dimensions</th>
+                  <th>Frequency</th>
+                  <th>Test Location</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% section['rows'].each do |row| %>
+                  <% if row.is_a?(Array) && row.length == 1 %>
+                    <tr class="ref-row">
+                      <td colspan="7"><%= row[0] %></td>
+                    </tr>
+                  <% elsif row.is_a?(Array) %>
+                    <tr>
+                      <td class="col-method"><%= row[0] %></td>
+                      <td class="col-criteria"><%= row[1] %></td>
+                      <td class="col-parts"><%= row[2] %></td>
+                      <td class="col-material"><%= row[3] %></td>
+                      <td class="col-frequency"><%= row[4] %></td>
+                      <td class="col-location">
+                        <% loc = row[5].to_s %>
+                        <% if loc.include?('NADCAP') || loc.include?('Not approved') %>
+                          <span class="nadcap-note"><%= loc %></span>
+                        <% else %>
+                          <%= loc %>
+                        <% end %>
+                      </td>
+                      <td class="col-details">
+                        <% detail = row[6].to_s %>
+                        <% if detail.include?('NADCAP') || detail.include?('Not approved') || detail.include?('Not currently processed') %>
+                          <span class="nadcap-note"><%= detail %></span>
+                        <% else %>
+                          <%= detail %>
+                        <% end %>
+                      </td>
+                    </tr>
+                  <% end %>
+                <% end %>
+              </tbody>
+            </table>
+          <% elsif section['content'].present? %>
+            <div class="content" style="padding: 8px;">
+              <%= raw section['content'] %>
+            </div>
+          <% end %>
         </div>
-      </div>
+      <% end %>
+    <% else %>
+      <%# ── Standard document rendering ── %>
+      <% (@document.content['sections'] || []).each do |section| %>
+        <div class="section">
+          <h2><%= section['heading'] %></h2>
+          <div class="content">
+            <%= raw section['content'] %>
+          </div>
+        </div>
+      <% end %>
     <% end %>
 
     <% if @document.content['references'].present? && @document.content['references'].any? %>
