@@ -5,350 +5,74 @@
   <meta charset="utf-8">
   <title><%= @document.full_code %> - <%= @document.title %></title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 20px;
-      color: #000;
-      font-size: 12pt;
-      line-height: 1.5;
-    }
+    body { font-family: Arial, sans-serif; margin: 20px; color: #000; font-size: 12pt; line-height: 1.5; }
+    .print-bar { position: fixed; top: 0; left: 0; right: 0; background: #2d2d2d; padding: 10px 20px; display: flex; align-items: center; gap: 12px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+    .print-bar button { background: #7c3aed; color: #fff; border: none; padding: 8px 20px; font-size: 14px; font-weight: 600; border-radius: 4px; cursor: pointer; }
+    .print-bar button:hover { background: #6d28d9; }
+    .print-bar .back-link { color: #ccc; text-decoration: none; font-size: 13px; margin-left: auto; }
+    .print-bar .back-link:hover { color: #fff; }
+    .print-bar .doc-title { color: #aaa; font-size: 13px; }
+    .document-body { margin-top: 50px; }
+    .document-header { border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
+    .document-header h1 { margin: 0 0 10px 0; font-size: 22pt; }
+    .metadata { font-size: 10pt; }
+    .metadata p { margin: 4px 0; }
+    .metadata .issue-history { margin-top: 10px; padding-top: 10px; border-top: 1px solid #ccc; }
+    .section { margin-bottom: 24px; }
+    .section h2 { font-size: 14pt; font-weight: bold; border-bottom: 1px solid #999; padding-bottom: 4px; margin-bottom: 8px; page-break-after: avoid; }
+    .content { line-height: 1.6; font-size: 11pt; }
+    .content p { margin: 0.4em 0; }
+    .content ul, .content ol { margin: 0.5em 0 0.5em 24px; }
+    .content ul { list-style-type: disc; } .content ol { list-style-type: decimal; }
+    .content li { margin: 0.2em 0; }
+    .content strong, .content b { font-weight: bold; }
+    .content em, .content i { font-style: italic; }
+    .content u { text-decoration: underline; }
+    .content h1, .content h2, .content h3, .content h4 { font-weight: bold; margin: 0.8em 0 0.3em 0; }
+    .content h1 { font-size: 14pt; } .content h2 { font-size: 13pt; } .content h3 { font-size: 12pt; } .content h4 { font-size: 11pt; }
+    .content blockquote { border-left: 3px solid #999; padding-left: 12px; margin: 0.5em 0; color: #333; }
+    .content table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 10pt; page-break-inside: avoid; }
+    .content td, .content th { border: 1px solid #000; padding: 4px 6px; text-align: left; vertical-align: top; }
+    .content th { background-color: #e8e8e8; font-weight: bold; }
+    .content thead th, .content thead td { background-color: #e8e8e8; font-weight: bold; }
+    .content td[bgcolor], .content th[bgcolor] { border: 1px solid #000; }
+    .content table table { margin: 0; width: 100%; }
+    .content table table td, .content table table th { border: 1px solid #666; }
+    .content td:empty::after, .content th:empty::after { content: '\00a0'; }
 
-    /* ── Print button bar (hidden when printing) ── */
-    .print-bar {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      background: #2d2d2d;
-      padding: 10px 20px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      z-index: 1000;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    }
-
-    .print-bar button {
-      background: #7c3aed;
-      color: #fff;
-      border: none;
-      padding: 8px 20px;
-      font-size: 14px;
-      font-weight: 600;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
-    .print-bar button:hover {
-      background: #6d28d9;
-    }
-
-    .print-bar .back-link {
-      color: #ccc;
-      text-decoration: none;
-      font-size: 13px;
-      margin-left: auto;
-    }
-
-    .print-bar .back-link:hover {
-      color: #fff;
-    }
-
-    .print-bar .doc-title {
-      color: #aaa;
-      font-size: 13px;
-    }
-
-    /* Push body content below the fixed bar */
-    .document-body {
-      margin-top: 50px;
-    }
-
-    /* ── Document header ── */
-    .document-header {
-      border-bottom: 2px solid #000;
-      padding-bottom: 10px;
-      margin-bottom: 20px;
-    }
-
-    .document-header h1 {
-      margin: 0 0 10px 0;
-      font-size: 22pt;
-    }
-
-    .metadata {
-      font-size: 10pt;
-    }
-
-    .metadata p {
-      margin: 4px 0;
-    }
-
-    .metadata .issue-history {
-      margin-top: 10px;
-      padding-top: 10px;
-      border-top: 1px solid #ccc;
-    }
-
-    /* ── Sections ── */
-    .section {
-      margin-bottom: 24px;
-    }
-
-    .section h2 {
-      font-size: 14pt;
-      font-weight: bold;
-      border-bottom: 1px solid #999;
-      padding-bottom: 4px;
-      margin-bottom: 8px;
-      page-break-after: avoid;
-    }
-
-    /* ── Content prose ── */
-    .content {
-      line-height: 1.6;
-      font-size: 11pt;
-    }
-
-    .content p {
-      margin: 0.4em 0;
-    }
-
-    .content ul, .content ol {
-      margin: 0.5em 0 0.5em 24px;
-    }
-
-    .content ul {
-      list-style-type: disc;
-    }
-
-    .content ol {
-      list-style-type: decimal;
-    }
-
-    .content li {
-      margin: 0.2em 0;
-    }
-
-    .content strong, .content b {
-      font-weight: bold;
-    }
-
-    .content em, .content i {
-      font-style: italic;
-    }
-
-    .content u {
-      text-decoration: underline;
-    }
-
-    .content h1, .content h2, .content h3, .content h4 {
-      font-weight: bold;
-      margin: 0.8em 0 0.3em 0;
-    }
-
-    .content h1 { font-size: 14pt; }
-    .content h2 { font-size: 13pt; }
-    .content h3 { font-size: 12pt; }
-    .content h4 { font-size: 11pt; }
-
-    .content blockquote {
-      border-left: 3px solid #999;
-      padding-left: 12px;
-      margin: 0.5em 0;
-      color: #333;
-    }
-
-    /* ── Table styles (handles messy/migrated HTML tables) ── */
-    .content table {
-      border-collapse: collapse;
-      width: 100%;
-      margin: 10px 0;
-      font-size: 10pt;
-      page-break-inside: avoid;
-    }
-
-    .content td,
-    .content th {
-      border: 1px solid #000;
-      padding: 4px 6px;
-      text-align: left;
-      vertical-align: top;
-    }
-
-    .content th {
-      background-color: #e8e8e8;
-      font-weight: bold;
-    }
-
-    .content thead th,
-    .content thead td {
-      background-color: #e8e8e8;
-      font-weight: bold;
-    }
-
-    .content td[bgcolor],
-    .content th[bgcolor] {
-      border: 1px solid #000;
-    }
-
-    .content table table {
-      margin: 0;
-      width: 100%;
-    }
-
-    .content table table td,
-    .content table table th {
-      border: 1px solid #666;
-    }
-
-    .content td:empty::after,
-    .content th:empty::after {
-      content: '\00a0';
-    }
-
-    /* ── Matrix document styles ── */
-    .matrix-section {
-      margin-bottom: 18px;
-      page-break-inside: avoid;
-    }
-
-    .matrix-section-header {
-      background: #1e293b;
-      color: #fff;
-      padding: 5px 10px;
-      font-weight: bold;
-      font-size: 10pt;
-    }
-
-    .matrix-section-header .not-active-note {
-      color: #f87171;
-      font-style: italic;
-    }
-
-    .matrix-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 8.5pt;
-      line-height: 1.3;
-    }
-
-    .matrix-table thead th {
-      background: #d4a843;
-      color: #1e293b;
-      font-weight: bold;
-      font-size: 7.5pt;
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
-      padding: 4px 5px;
-      border: 1px solid #b8922e;
-      text-align: center;
-      vertical-align: middle;
-    }
-
-    .matrix-table tbody td {
-      padding: 3px 5px;
-      border: 1px solid #c9b88a;
-      vertical-align: top;
-    }
-
-    .matrix-table tbody tr {
-      background: #fffdf7;
-    }
-
-    .matrix-table tbody tr:nth-child(even) {
-      background: #faf6ed;
-    }
-
+    /* ── Matrix styles ── */
+    .matrix-section { margin-bottom: 18px; page-break-inside: avoid; }
+    .matrix-section-header { background: #1e293b; color: #fff; padding: 5px 10px; font-weight: bold; font-size: 10pt; }
+    .matrix-section-header .not-active-note { color: #f87171; font-style: italic; }
+    .matrix-table { width: 100%; border-collapse: collapse; font-size: 8.5pt; line-height: 1.3; }
+    .matrix-table thead th { background: #d4a843; color: #1e293b; font-weight: bold; font-size: 7.5pt; text-transform: uppercase; letter-spacing: 0.03em; padding: 4px 5px; border: 1px solid #b8922e; text-align: center; vertical-align: middle; }
+    .matrix-table tbody td { padding: 3px 5px; border: 1px solid #c9b88a; vertical-align: top; }
+    .matrix-table tbody tr { background: #fffdf7; }
+    .matrix-table tbody tr:nth-child(even) { background: #faf6ed; }
     .matrix-table .col-method { font-weight: bold; }
-    .matrix-table .col-criteria,
-    .matrix-table .col-parts,
-    .matrix-table .col-frequency,
-    .matrix-table .col-location { text-align: center; }
+    .matrix-table .col-criteria, .matrix-table .col-parts, .matrix-table .col-frequency, .matrix-table .col-location { text-align: center; }
+    .matrix-table .nadcap-note { color: #dc2626; font-weight: bold; font-style: italic; font-size: 7.5pt; }
+    .matrix-table .ref-row td { background: #f1ead6; font-style: italic; font-weight: bold; color: #78716c; text-align: center; }
+    .matrix-table .span-cell { text-align: center; font-weight: bold; color: #44403c; background: #faf5e8; }
 
-    .matrix-table .nadcap-note {
-      color: #dc2626;
-      font-weight: bold;
-      font-style: italic;
-      font-size: 7.5pt;
-    }
+    .references { margin-top: 24px; padding-top: 16px; border-top: 1px solid #999; }
+    .references h2 { font-size: 13pt; font-weight: bold; margin-bottom: 8px; }
+    .references ul { margin-left: 20px; list-style-type: disc; }
+    .references li { margin: 3px 0; font-size: 10pt; }
+    .document-footer { margin-top: 30px; padding-top: 10px; border-top: 1px solid #ccc; font-size: 9pt; color: #666; text-align: center; }
 
-    .matrix-table .ref-row td {
-      background: #f1ead6;
-      font-style: italic;
-      font-weight: bold;
-      color: #78716c;
-      text-align: center;
-    }
-
-    /* ── References ── */
-    .references {
-      margin-top: 24px;
-      padding-top: 16px;
-      border-top: 1px solid #999;
-    }
-
-    .references h2 {
-      font-size: 13pt;
-      font-weight: bold;
-      margin-bottom: 8px;
-    }
-
-    .references ul {
-      margin-left: 20px;
-      list-style-type: disc;
-    }
-
-    .references li {
-      margin: 3px 0;
-      font-size: 10pt;
-    }
-
-    /* ── Footer ── */
-    .document-footer {
-      margin-top: 30px;
-      padding-top: 10px;
-      border-top: 1px solid #ccc;
-      font-size: 9pt;
-      color: #666;
-      text-align: center;
-    }
-
-    /* ── Print styles ── */
     @media print {
-      .print-bar {
-        display: none !important;
-      }
-
-      .document-body {
-        margin-top: 0;
-      }
-
-      body {
-        margin: 0;
-        font-size: 11pt;
-      }
-
-      h2, h3, h4 {
-        page-break-after: avoid;
-      }
-
-      .matrix-section {
-        page-break-inside: avoid;
-      }
-
-      .content table {
-        page-break-inside: avoid;
-      }
-
-      .document-footer {
-        margin-top: 30px;
-      }
+      .print-bar { display: none !important; }
+      .document-body { margin-top: 0; }
+      body { margin: 0; font-size: 11pt; }
+      h2, h3, h4 { page-break-after: avoid; }
+      .matrix-section { page-break-inside: avoid; }
+      .content table { page-break-inside: avoid; }
+      .document-footer { margin-top: 30px; }
     }
   </style>
 </head>
 <body>
-  <!-- Print toolbar (hidden in print output) -->
   <div class="print-bar">
     <button onclick="window.print()">🖨️ Print / Save PDF</button>
     <span class="doc-title"><%= @document.full_code %> - <%= @document.title %></span>
@@ -363,7 +87,6 @@
         <p><strong>Issue:</strong> <%= @document.current_issue_number %></p>
         <p><strong>Approved by:</strong> <%= @document.approved_by %></p>
         <p><strong>Date:</strong> <%= @document.updated_at.strftime('%d/%m/%Y') %></p>
-
         <% if @document.content['issue_history'].present? %>
           <div class="issue-history">
             <strong>Issue History:</strong><br>
@@ -376,38 +99,36 @@
     </div>
 
     <% if @document.document_type == 'M' %>
-      <%# ── Matrix rendering ── %>
       <% (@document.content['sections'] || []).each do |section| %>
         <div class="matrix-section">
           <div class="matrix-section-header">
             <% heading_text = section['heading'].to_s %>
-            <% if heading_text.include?('Not currently processed') %>
+            <% if heading_text =~ /\(Not currently processed\)/i %>
               <%= heading_text.sub(/\s*\(Not currently processed\)\s*/i, ' ') %>
               <span class="not-active-note">(Not currently processed)</span>
-            <% else %>
-              <%= heading_text %>
-            <% end %>
+            <% else %><%= heading_text %><% end %>
           </div>
-
           <% if section['rows'].present? %>
             <table class="matrix-table">
-              <thead>
-                <tr>
-                  <th>Method / Specification</th>
-                  <th>Test Criteria</th>
-                  <th>No. of Parts / Test Pieces</th>
-                  <th>Material / Dimensions</th>
-                  <th>Frequency</th>
-                  <th>Test Location</th>
-                  <th>Details</th>
-                </tr>
-              </thead>
+              <thead><tr>
+                <th>Method / Specification</th><th>Test Criteria</th><th>No. of Parts / Test Pieces</th>
+                <th>Material / Dimensions</th><th>Frequency</th><th>Test Location</th><th>Details</th>
+              </tr></thead>
               <tbody>
                 <% section['rows'].each do |row| %>
-                  <% if row.is_a?(Array) && row.length == 1 %>
-                    <tr class="ref-row">
-                      <td colspan="7"><%= row[0] %></td>
+                  <% if row.is_a?(Hash) %>
+                    <% cols = row['cols'] || [] %>
+                    <% span_text = row['span'].to_s %>
+                    <% note = row['note'].to_s %>
+                    <% col_classes = ['col-method','col-criteria','col-parts','col-material','col-frequency','col-location','col-details'] %>
+                    <% remaining = 7 - cols.length - (note.present? ? 1 : 0) %>
+                    <tr>
+                      <% cols.each_with_index do |cell, i| %><td class="<%= col_classes[i] %>"><%= cell %></td><% end %>
+                      <td class="span-cell" colspan="<%= remaining %>"><%= span_text %></td>
+                      <% if note.present? %><td class="col-details"><span class="nadcap-note"><%= note %></span></td><% end %>
                     </tr>
+                  <% elsif row.is_a?(Array) && row.length == 1 %>
+                    <tr class="ref-row"><td colspan="7"><%= row[0] %></td></tr>
                   <% elsif row.is_a?(Array) %>
                     <tr>
                       <td class="col-method"><%= row[0] %></td>
@@ -415,42 +136,23 @@
                       <td class="col-parts"><%= row[2] %></td>
                       <td class="col-material"><%= row[3] %></td>
                       <td class="col-frequency"><%= row[4] %></td>
-                      <td class="col-location">
-                        <% loc = row[5].to_s %>
-                        <% if loc.include?('NADCAP') || loc.include?('Not approved') %>
-                          <span class="nadcap-note"><%= loc %></span>
-                        <% else %>
-                          <%= loc %>
-                        <% end %>
-                      </td>
-                      <td class="col-details">
-                        <% detail = row[6].to_s %>
-                        <% if detail.include?('NADCAP') || detail.include?('Not approved') || detail.include?('Not currently processed') %>
-                          <span class="nadcap-note"><%= detail %></span>
-                        <% else %>
-                          <%= detail %>
-                        <% end %>
-                      </td>
+                      <td class="col-location"><% loc = row[5].to_s %><% if loc.include?('NADCAP') || loc.include?('Not approved') %><span class="nadcap-note"><%= loc %></span><% else %><%= loc %><% end %></td>
+                      <td class="col-details"><% detail = row[6].to_s %><% if detail.include?('NADCAP') || detail.include?('Not approved') || detail.include?('Not currently processed') %><span class="nadcap-note"><%= detail %></span><% else %><%= detail %><% end %></td>
                     </tr>
                   <% end %>
                 <% end %>
               </tbody>
             </table>
           <% elsif section['content'].present? %>
-            <div class="content" style="padding: 8px;">
-              <%= raw section['content'] %>
-            </div>
+            <div class="content" style="padding: 8px;"><%= raw section['content'] %></div>
           <% end %>
         </div>
       <% end %>
     <% else %>
-      <%# ── Standard document rendering ── %>
       <% (@document.content['sections'] || []).each do |section| %>
         <div class="section">
           <h2><%= section['heading'] %></h2>
-          <div class="content">
-            <%= raw section['content'] %>
-          </div>
+          <div class="content"><%= raw section['content'] %></div>
         </div>
       <% end %>
     <% end %>
@@ -458,11 +160,7 @@
     <% if @document.content['references'].present? && @document.content['references'].any? %>
       <div class="references">
         <h2>References</h2>
-        <ul>
-          <% @document.content['references'].each do |ref| %>
-            <li><%= ref %></li>
-          <% end %>
-        </ul>
+        <ul><% @document.content['references'].each do |ref| %><li><%= ref %></li><% end %></ul>
       </div>
     <% end %>
 

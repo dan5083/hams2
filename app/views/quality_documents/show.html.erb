@@ -1,190 +1,37 @@
 <!-- app/views/quality_documents/show.html.erb -->
 <style>
-  /* Style for rendered HTML content */
-  .prose {
-    line-height: 1.6;
-  }
-
-  .prose p {
-    margin: 0.5rem 0;
-  }
-
-  .prose ul, .prose ol {
-    margin: 0.75rem 0;
-    padding-left: 1.5rem;
-  }
-
-  .prose ul {
-    list-style-type: disc;
-  }
-
-  .prose ol {
-    list-style-type: decimal;
-  }
-
-  .prose li {
-    margin: 0.25rem 0;
-  }
-
-  .prose strong {
-    font-weight: 600;
-    color: #1f2937;
-  }
-
-  .prose em {
-    font-style: italic;
-  }
-
-  .prose a {
-    color: #7c3aed;
-    text-decoration: underline;
-  }
-
-  .prose a:hover {
-    color: #6d28d9;
-  }
-
-  .prose h1, .prose h2, .prose h3 {
-    font-weight: 600;
-    margin: 1rem 0 0.5rem 0;
-    color: #1f2937;
-  }
-
-  .prose h1 {
-    font-size: 1.25rem;
-  }
-
-  .prose h2 {
-    font-size: 1.125rem;
-  }
-
-  .prose h3 {
-    font-size: 1rem;
-  }
-
-  .prose blockquote {
-    border-left: 4px solid #e5e7eb;
-    padding-left: 1rem;
-    margin: 1rem 0;
-    color: #6b7280;
-    font-style: italic;
-  }
-
-  .prose code {
-    background-color: #f3f4f6;
-    padding: 0.125rem 0.25rem;
-    border-radius: 0.25rem;
-    font-size: 0.875em;
-    font-family: monospace;
-  }
-
-  .prose pre {
-    background-color: #1f2937;
-    color: #f3f4f6;
-    padding: 1rem;
-    border-radius: 0.5rem;
-    overflow-x: auto;
-    margin: 1rem 0;
-  }
-
-  .prose pre code {
-    background: none;
-    padding: 0;
-  }
-
-  /* Table styles */
-  .prose table {
-    border-collapse: collapse;
-    width: 100%;
-    margin: 1rem 0;
-    font-size: 0.875rem;
-  }
-
-  .prose td,
-  .prose th {
-    border: 1px solid #d1d5db;
-    padding: 0.5rem 0.75rem;
-    text-align: left;
-  }
-
-  .prose th {
-    background-color: #f9fafb;
-    font-weight: 600;
-    color: #1f2937;
-  }
-
-  .prose tbody tr:nth-child(even) {
-    background-color: #f9fafb;
-  }
-
-  .prose tbody tr:hover {
-    background-color: #f3f4f6;
-  }
+  .prose { line-height: 1.6; }
+  .prose p { margin: 0.5rem 0; }
+  .prose ul, .prose ol { margin: 0.75rem 0; padding-left: 1.5rem; }
+  .prose ul { list-style-type: disc; }
+  .prose ol { list-style-type: decimal; }
+  .prose li { margin: 0.25rem 0; }
+  .prose strong { font-weight: 600; color: #1f2937; }
+  .prose em { font-style: italic; }
+  .prose a { color: #7c3aed; text-decoration: underline; }
+  .prose a:hover { color: #6d28d9; }
+  .prose h1, .prose h2, .prose h3 { font-weight: 600; margin: 1rem 0 0.5rem 0; color: #1f2937; }
+  .prose h1 { font-size: 1.25rem; } .prose h2 { font-size: 1.125rem; } .prose h3 { font-size: 1rem; }
+  .prose blockquote { border-left: 4px solid #e5e7eb; padding-left: 1rem; margin: 1rem 0; color: #6b7280; font-style: italic; }
+  .prose code { background-color: #f3f4f6; padding: 0.125rem 0.25rem; border-radius: 0.25rem; font-size: 0.875em; font-family: monospace; }
+  .prose pre { background-color: #1f2937; color: #f3f4f6; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; margin: 1rem 0; }
+  .prose pre code { background: none; padding: 0; }
+  .prose table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.875rem; }
+  .prose td, .prose th { border: 1px solid #d1d5db; padding: 0.5rem 0.75rem; text-align: left; }
+  .prose th { background-color: #f9fafb; font-weight: 600; color: #1f2937; }
+  .prose tbody tr:nth-child(even) { background-color: #f9fafb; }
+  .prose tbody tr:hover { background-color: #f3f4f6; }
 
   /* ── Matrix document styles ── */
-  .matrix-section {
-    margin-bottom: 1.5rem;
-    border: 1px solid #c9a96e;
-    border-radius: 0.5rem;
-    overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-  }
-
-  .matrix-section-header {
-    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-    color: #fff;
-    padding: 0.625rem 1rem;
-    font-weight: 700;
-    font-size: 0.8125rem;
-    letter-spacing: 0.01em;
-  }
-
-  .matrix-section-header .not-active-note {
-    color: #f87171;
-    font-weight: 600;
-    font-style: italic;
-    font-size: 0.75rem;
-  }
-
-  .matrix-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.75rem;
-    line-height: 1.35;
-  }
-
-  .matrix-table thead th {
-    background: #d4a843;
-    color: #1e293b;
-    font-weight: 700;
-    font-size: 0.6875rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    padding: 0.5rem 0.5rem;
-    border: 1px solid #b8922e;
-    text-align: center;
-    vertical-align: middle;
-  }
-
-  .matrix-table tbody td {
-    padding: 0.375rem 0.5rem;
-    border: 1px solid #d6cbb2;
-    vertical-align: top;
-    color: #1e293b;
-  }
-
-  .matrix-table tbody tr {
-    background: #fffdf7;
-  }
-
-  .matrix-table tbody tr:nth-child(even) {
-    background: #faf6ed;
-  }
-
-  .matrix-table tbody tr:hover {
-    background: #f5edd8;
-  }
-
+  .matrix-section { margin-bottom: 1.5rem; border: 1px solid #c9a96e; border-radius: 0.5rem; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .matrix-section-header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); color: #fff; padding: 0.625rem 1rem; font-weight: 700; font-size: 0.8125rem; letter-spacing: 0.01em; }
+  .matrix-section-header .not-active-note { color: #f87171; font-weight: 600; font-style: italic; font-size: 0.75rem; }
+  .matrix-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; line-height: 1.35; }
+  .matrix-table thead th { background: #d4a843; color: #1e293b; font-weight: 700; font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.5rem 0.5rem; border: 1px solid #b8922e; text-align: center; vertical-align: middle; }
+  .matrix-table tbody td { padding: 0.375rem 0.5rem; border: 1px solid #d6cbb2; vertical-align: top; color: #1e293b; }
+  .matrix-table tbody tr { background: #fffdf7; }
+  .matrix-table tbody tr:nth-child(even) { background: #faf6ed; }
+  .matrix-table tbody tr:hover { background: #f5edd8; }
   .matrix-table .col-method { min-width: 140px; font-weight: 600; }
   .matrix-table .col-criteria { text-align: center; white-space: nowrap; }
   .matrix-table .col-parts { text-align: center; }
@@ -192,93 +39,62 @@
   .matrix-table .col-frequency { text-align: center; white-space: nowrap; }
   .matrix-table .col-location { text-align: center; white-space: nowrap; }
   .matrix-table .col-details { min-width: 130px; }
-
-  .matrix-table .nadcap-note {
-    color: #dc2626;
-    font-weight: 600;
-    font-style: italic;
-    font-size: 0.6875rem;
-  }
-
-  .matrix-table .ref-row td {
-    background: #f1ead6;
-    font-style: italic;
-    font-weight: 600;
-    color: #78716c;
-    text-align: center;
-  }
+  .matrix-table .nadcap-note { color: #dc2626; font-weight: 600; font-style: italic; font-size: 0.6875rem; }
+  .matrix-table .ref-row td { background: #f1ead6; font-style: italic; font-weight: 600; color: #78716c; text-align: center; }
+  .matrix-table .span-cell { text-align: center; font-weight: 600; color: #44403c; background: #faf5e8; }
 </style>
 
 <div class="container mx-auto px-4 py-6">
-  <!-- Header Section -->
   <div class="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg shadow-lg p-6 mb-6">
     <h1 class="text-3xl font-bold text-white mb-4"><%= @document.full_code %> - <%= @document.title %></h1>
-
     <div class="flex flex-wrap gap-2">
-      <%= link_to 'Edit', edit_quality_document_path(@document),
-          class: "bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded" %>
-      <%= link_to 'View PDF', show_pdf_quality_document_path(@document),
-          class: "bg-gray-600 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded", target: '_blank' %>
-      <%= link_to 'Back to List', quality_documents_path,
-          class: "bg-white hover:bg-gray-100 text-purple-600 font-bold py-2 px-4 rounded border border-white" %>
-      <%= link_to 'Delete', quality_document_path(@document), method: :delete,
-          data: { confirm: 'Are you sure?' },
-          class: "bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded" %>
+      <%= link_to 'Edit', edit_quality_document_path(@document), class: "bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded" %>
+      <%= link_to 'View PDF', show_pdf_quality_document_path(@document), class: "bg-gray-600 hover:bg-gray-800 text-white font-bold py-2 px-4 rounded", target: '_blank' %>
+      <%= link_to 'Back to List', quality_documents_path, class: "bg-white hover:bg-gray-100 text-purple-600 font-bold py-2 px-4 rounded border border-white" %>
+      <%= link_to 'Delete', quality_document_path(@document), method: :delete, data: { confirm: 'Are you sure?' }, class: "bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded" %>
     </div>
   </div>
 
-  <!-- Document Information Card -->
   <div class="bg-white shadow rounded-lg p-6 mb-6">
     <h2 class="text-xl font-semibold text-gray-900 mb-4 pb-2 border-b-2 border-gray-200">Document Information</h2>
-
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <div>
         <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Document Type</dt>
         <dd class="text-sm text-gray-900 font-medium"><%= @document.type_description %></dd>
       </div>
-
       <div>
         <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Code</dt>
         <dd class="text-sm text-gray-900 font-medium font-mono"><%= @document.full_code %></dd>
       </div>
-
       <div>
         <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Current Issue</dt>
         <dd class="text-sm text-gray-900 font-medium">Issue <%= @document.current_issue_number %></dd>
       </div>
-
       <div>
         <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Approved By</dt>
         <dd class="text-sm text-gray-900 font-medium"><%= @document.approved_by %></dd>
       </div>
-
       <div>
         <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Last Updated</dt>
         <dd class="text-sm text-gray-900 font-medium"><%= @document.updated_at.strftime('%d/%m/%Y %H:%M') %></dd>
       </div>
-
       <% if @document.content['issue_history'].present? %>
         <div class="col-span-full">
           <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Issue History</dt>
           <dd class="space-y-1">
             <% @document.content['issue_history'].each do |history| %>
-              <div class="text-sm bg-gray-50 border-l-4 border-purple-500 py-2 px-3 rounded">
-                Issue <%= history['issue'] %>: <%= Date.parse(history['date']).strftime('%d/%m/%Y') rescue history['date'] %>
-              </div>
+              <div class="text-sm bg-gray-50 border-l-4 border-purple-500 py-2 px-3 rounded">Issue <%= history['issue'] %>: <%= Date.parse(history['date']).strftime('%d/%m/%Y') rescue history['date'] %></div>
             <% end %>
           </dd>
         </div>
       <% end %>
-
       <div class="col-span-full">
         <dt class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">References</dt>
         <dd>
           <% if @document.content['references'].present? && @document.content['references'].any? %>
             <div class="flex flex-wrap gap-2">
               <% @document.content['references'].each do |reference| %>
-                <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
-                  <%= reference %>
-                </span>
+                <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800"><%= reference %></span>
               <% end %>
             </div>
           <% else %>
@@ -289,46 +105,41 @@
     </div>
   </div>
 
-  <!-- Document Content Section -->
   <% if @document.content['sections'].present? && @document.content['sections'].any? %>
     <div class="bg-white shadow rounded-lg p-6 mb-6">
       <h2 class="text-xl font-semibold text-gray-900 mb-4 pb-2 border-b-2 border-gray-200">Document Content</h2>
-
       <% if @document.document_type == 'M' %>
-        <%# ── Matrix rendering ── %>
         <div class="space-y-4 overflow-x-auto">
           <% @document.content['sections'].each do |section| %>
             <div class="matrix-section">
               <div class="matrix-section-header">
                 <% heading_text = section['heading'].to_s %>
-                <% if heading_text.include?('Not currently processed') %>
+                <% if heading_text =~ /\(Not currently processed\)/i %>
                   <%= heading_text.sub(/\s*\(Not currently processed\)\s*/i, ' ') %>
                   <span class="not-active-note">(Not currently processed)</span>
-                <% else %>
-                  <%= heading_text %>
-                <% end %>
+                <% else %><%= heading_text %><% end %>
               </div>
-
               <% if section['rows'].present? %>
                 <table class="matrix-table">
-                  <thead>
-                    <tr>
-                      <th>Method / Specification</th>
-                      <th>Test Criteria</th>
-                      <th>No. of Parts / Test Pieces</th>
-                      <th>Material / Dimensions</th>
-                      <th>Frequency</th>
-                      <th>Test Location</th>
-                      <th>Details</th>
-                    </tr>
-                  </thead>
+                  <thead><tr>
+                    <th>Method / Specification</th><th>Test Criteria</th><th>No. of Parts / Test Pieces</th>
+                    <th>Material / Dimensions</th><th>Frequency</th><th>Test Location</th><th>Details</th>
+                  </tr></thead>
                   <tbody>
                     <% section['rows'].each do |row| %>
-                      <% if row.is_a?(Array) && row.length == 1 %>
-                        <%# Single-cell reference row %>
-                        <tr class="ref-row">
-                          <td colspan="7"><%= row[0] %></td>
+                      <% if row.is_a?(Hash) %>
+                        <% cols = row['cols'] || [] %>
+                        <% span_text = row['span'].to_s %>
+                        <% note = row['note'].to_s %>
+                        <% col_classes = ['col-method','col-criteria','col-parts','col-material','col-frequency','col-location','col-details'] %>
+                        <% remaining = 7 - cols.length - (note.present? ? 1 : 0) %>
+                        <tr>
+                          <% cols.each_with_index do |cell, i| %><td class="<%= col_classes[i] %>"><%= cell %></td><% end %>
+                          <td class="span-cell" colspan="<%= remaining %>"><%= span_text %></td>
+                          <% if note.present? %><td class="col-details"><span class="nadcap-note"><%= note %></span></td><% end %>
                         </tr>
+                      <% elsif row.is_a?(Array) && row.length == 1 %>
+                        <tr class="ref-row"><td colspan="7"><%= row[0] %></td></tr>
                       <% elsif row.is_a?(Array) %>
                         <tr>
                           <td class="col-method"><%= row[0] %></td>
@@ -336,45 +147,25 @@
                           <td class="col-parts"><%= row[2] %></td>
                           <td class="col-material"><%= row[3] %></td>
                           <td class="col-frequency"><%= row[4] %></td>
-                          <td class="col-location">
-                            <% loc = row[5].to_s %>
-                            <% if loc.include?('NADCAP') || loc.include?('Not approved') %>
-                              <span class="nadcap-note"><%= loc %></span>
-                            <% else %>
-                              <%= loc %>
-                            <% end %>
-                          </td>
-                          <td class="col-details">
-                            <% detail = row[6].to_s %>
-                            <% if detail.include?('NADCAP') || detail.include?('Not approved') || detail.include?('Not currently processed') %>
-                              <span class="nadcap-note"><%= detail %></span>
-                            <% else %>
-                              <%= detail %>
-                            <% end %>
-                          </td>
+                          <td class="col-location"><% loc = row[5].to_s %><% if loc.include?('NADCAP') || loc.include?('Not approved') %><span class="nadcap-note"><%= loc %></span><% else %><%= loc %><% end %></td>
+                          <td class="col-details"><% detail = row[6].to_s %><% if detail.include?('NADCAP') || detail.include?('Not approved') || detail.include?('Not currently processed') %><span class="nadcap-note"><%= detail %></span><% else %><%= detail %><% end %></td>
                         </tr>
                       <% end %>
                     <% end %>
                   </tbody>
                 </table>
               <% elsif section['content'].present? %>
-                <%# Fallback for sections with old-style content %>
-                <div class="p-4 text-sm text-gray-700 prose prose-sm max-w-none">
-                  <%= raw section['content'] %>
-                </div>
+                <div class="p-4 text-sm text-gray-700 prose prose-sm max-w-none"><%= raw section['content'] %></div>
               <% end %>
             </div>
           <% end %>
         </div>
       <% else %>
-        <%# ── Standard document rendering ── %>
         <div class="space-y-6">
           <% @document.content['sections'].each do |section| %>
             <div class="border-l-4 border-purple-500 pl-4">
               <h3 class="text-lg font-semibold text-gray-900 mb-2"><%= section['heading'] %></h3>
-              <div class="text-sm text-gray-700 leading-relaxed prose prose-sm max-w-none">
-                <%= raw section['content'] %>
-              </div>
+              <div class="text-sm text-gray-700 leading-relaxed prose prose-sm max-w-none"><%= raw section['content'] %></div>
             </div>
           <% end %>
         </div>
@@ -382,53 +173,31 @@
     </div>
   <% end %>
 
-  <!-- Revision History Section -->
   <div class="bg-white shadow rounded-lg p-6">
     <h2 class="text-xl font-semibold text-gray-900 mb-4 pb-2 border-b-2 border-gray-200">Revision History</h2>
-
     <% if @revisions.any? %>
       <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50">
-            <tr>
-              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Issue
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Changed By
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Date
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                Description
-              </th>
-            </tr>
-          </thead>
+          <thead class="bg-gray-50"><tr>
+            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Issue</th>
+            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Changed By</th>
+            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Description</th>
+          </tr></thead>
           <tbody class="bg-white divide-y divide-gray-200">
             <% @revisions.each do |revision| %>
               <tr class="hover:bg-gray-50">
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                  Issue <%= revision.issue_number %>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <%= revision.changed_by %>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <%= revision.changed_at.strftime('%d/%m/%Y %H:%M') %>
-                </td>
-                <td class="px-6 py-4 text-sm text-gray-900">
-                  <%= revision.change_description %>
-                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">Issue <%= revision.issue_number %></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><%= revision.changed_by %></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><%= revision.changed_at.strftime('%d/%m/%Y %H:%M') %></td>
+                <td class="px-6 py-4 text-sm text-gray-900"><%= revision.change_description %></td>
               </tr>
             <% end %>
           </tbody>
         </table>
       </div>
     <% else %>
-      <div class="text-center py-8">
-        <p class="text-gray-500 italic">No revisions yet.</p>
-      </div>
+      <div class="text-center py-8"><p class="text-gray-500 italic">No revisions yet.</p></div>
     <% end %>
   </div>
 </div>
