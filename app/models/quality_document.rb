@@ -14,6 +14,7 @@ class QualityDocument < ApplicationRecord
     'PCD' => 'Process Control',
     'F' => 'Form',
     'PM' => 'Process Mapping Process',
+    'M' => 'Matrix',
     'IM' => 'Integrated Manual'
   }.freeze
 
