@@ -5,7 +5,7 @@
   <meta charset="utf-8">
   <title><%= @document.full_code %> - <%= @document.title %></title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; color: #000; font-size: 12pt; line-height: 1.5; }
+    body { font-family: Arial, sans-serif; margin: 20px; color: #000; font-size: 12pt; line-height: 1.5; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
     .print-bar { position: fixed; top: 0; left: 0; right: 0; background: #2d2d2d; padding: 10px 20px; display: flex; align-items: center; gap: 12px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
     .print-bar button { background: #7c3aed; color: #fff; border: none; padding: 8px 20px; font-size: 14px; font-weight: 600; border-radius: 4px; cursor: pointer; }
     .print-bar button:hover { background: #6d28d9; }
@@ -83,18 +83,54 @@
     .references li { margin: 3px 0; font-size: 10pt; }
     .document-footer { margin-top: 30px; padding-top: 10px; border-top: 1px solid #ccc; font-size: 9pt; color: #666; text-align: center; }
 
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+
     @media print {
       .print-bar { display: none !important; }
       .document-body { margin-top: 0; }
       body { margin: 0; font-size: 11pt; }
       h2, h3, h4 { page-break-after: avoid; }
       .matrix-section { page-break-inside: avoid; }
-      .skills-grid { page-break-inside: auto; }
-      @page { size: landscape; margin: 10mm; }
+      .content table { page-break-inside: avoid; }
+      .document-footer { margin-top: 30px; }
     }
+
+    /* ── Skills matrix print: A3 landscape one-page ── */
+    body.skills-matrix-print { font-size: 7pt; margin: 5px; }
+    body.skills-matrix-print .document-header { border-bottom: 1px solid #000; padding-bottom: 3px; margin-bottom: 4px; }
+    body.skills-matrix-print .document-header h1 { font-size: 11pt; margin: 0; display: inline; }
+    body.skills-matrix-print .compact-meta { display: inline; font-size: 7pt; margin-left: 12px; color: #333; }
+    body.skills-matrix-print .compact-meta span { margin-right: 10px; }
+    body.skills-matrix-print .skills-legend { font-size: 6pt; margin-bottom: 2px; }
+    body.skills-matrix-print .skills-legend .swatch { width: 10px; height: 10px; font-size: 6pt; line-height: 10px; }
+    body.skills-matrix-print .skills-legend span { margin-right: 8px; }
+    body.skills-matrix-print .skills-legend-groups { font-size: 6pt; margin-bottom: 3px; }
+    body.skills-matrix-print .skills-legend-groups .swatch { width: 8px; height: 8px; }
+    body.skills-matrix-print .skills-legend-groups span { margin-right: 6px; }
+    body.skills-matrix-print .skills-grid { font-size: 6pt; }
+    body.skills-matrix-print .skills-grid th, body.skills-matrix-print .skills-grid td { border: 1px solid #aaa; padding: 1px; }
+    body.skills-matrix-print .skills-grid thead th.skill-header { height: 100px; width: 16px; min-width: 16px; max-width: 16px; }
+    body.skills-matrix-print .skills-grid thead th.skill-header .rotated { font-size: 5.5pt; padding: 2px 0; }
+    body.skills-matrix-print .skills-grid thead th.name-header { min-width: 75px; padding: 1px 3px; font-size: 6pt; }
+    body.skills-matrix-print .skills-grid thead th.title-header { min-width: 55px; padding: 1px 3px; font-size: 6pt; }
+    body.skills-matrix-print .skills-grid tbody td { width: 16px; min-width: 16px; max-width: 16px; height: 13px; font-size: 6pt; }
+    body.skills-matrix-print .skills-grid tbody td.staff-name { font-size: 6pt; min-width: 75px; padding: 1px 3px; }
+    body.skills-matrix-print .skills-grid tbody td.staff-title { font-size: 5.5pt; min-width: 55px; padding: 1px 3px; }
+    body.skills-matrix-print .skills-grid tfoot td { font-size: 4.5pt; padding: 1px; }
+    body.skills-matrix-print .document-footer { display: none; }
+
+    @media print {
+      body.skills-matrix-print {
+        margin: 0;
+      }
+      body.skills-matrix-print .document-body { margin-top: 0; }
+    }
+    <% if @document.content['skills_matrix'] %>
+      @media print { @page { size: A3 landscape; margin: 5mm; } }
+    <% end %>
   </style>
 </head>
-<body>
+<body class="<%= 'skills-matrix-print' if @document.content['skills_matrix'] %>">
   <div class="print-bar">
     <button onclick="window.print()">🖨️ Print / Save PDF</button>
     <span class="doc-title"><%= @document.full_code %> - <%= @document.title %></span>
@@ -103,29 +139,39 @@
 
   <div class="document-body">
     <div class="document-header">
-      <h1><%= @document.full_code %> - <%= @document.title %></h1>
-      <div class="metadata">
-        <p><strong>Document Type:</strong> <%= @document.type_description %></p>
-        <p><strong>Issue:</strong> <%= @document.current_issue_number %></p>
-        <p><strong>Approved by:</strong> <%= @document.approved_by %></p>
-        <p><strong>Date:</strong> <%= @document.updated_at.strftime('%d/%m/%Y') %></p>
-        <% if @document.content['issue_history'].present? %>
-          <div class="issue-history">
-            <strong>Issue History:</strong><br>
-            <% @document.content['issue_history'].each do |history| %>
-              Issue <%= history['issue'] %>: <%= Date.parse(history['date']).strftime('%d/%m/%Y') rescue history['date'] %><br>
-            <% end %>
-          </div>
-        <% end %>
-      </div>
+      <% if @document.content['skills_matrix'] %>
+        <h1><%= @document.full_code %> - <%= @document.title %></h1>
+        <span class="compact-meta">
+          <span>Issue: <%= @document.current_issue_number %></span>
+          <span>Approved: <%= @document.approved_by %></span>
+          <span>Date: <%= @document.updated_at.strftime('%d/%m/%Y') %></span>
+        </span>
+      <% else %>
+        <h1><%= @document.full_code %> - <%= @document.title %></h1>
+        <div class="metadata">
+          <p><strong>Document Type:</strong> <%= @document.type_description %></p>
+          <p><strong>Issue:</strong> <%= @document.current_issue_number %></p>
+          <p><strong>Approved by:</strong> <%= @document.approved_by %></p>
+          <p><strong>Date:</strong> <%= @document.updated_at.strftime('%d/%m/%Y') %></p>
+          <% if @document.content['issue_history'].present? %>
+            <div class="issue-history">
+              <strong>Issue History:</strong><br>
+              <% @document.content['issue_history'].each do |history| %>
+                Issue <%= history['issue'] %>: <%= Date.parse(history['date']).strftime('%d/%m/%Y') rescue history['date'] %><br>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
     </div>
 
     <% if @document.content['skills_matrix'] %>
       <%# ── Skills Matrix ── %>
       <% legend = @document.content['legend'] || {} %>
+      <% level_colors = { '1' => ['#fee2e2','#991b1b'], '2' => ['#fef3c7','#92400e'], '3' => ['#d1fae5','#065f46'], 'T' => ['#dbeafe','#1e40af'] } %>
       <div class="skills-legend">
-        <% { '1' => ['skill-l1','L1'], '2' => ['skill-l2','L2'], '3' => ['skill-l3','L3'], 'T' => ['skill-lt','T'] }.each do |code, (css, label)| %>
-          <span><span class="swatch <%= css %>"><%= code %></span> <%= legend[code] || code %></span>
+        <% level_colors.each do |code, (bg, fg)| %>
+          <span><span class="swatch" style="background-color: <%= bg %>; color: <%= fg %>; font-weight: bold;"><%= code %></span> <%= legend[code] || code %></span>
         <% end %>
       </div>
 
@@ -158,8 +204,8 @@
               <% skills.each_with_index do |skill, i| %>
                 <% level = person['levels']&.dig(i.to_s) %>
                 <% if level.present? %>
-                  <% css = case level; when '1' then 'skill-l1'; when '2' then 'skill-l2'; when '3' then 'skill-l3'; when 'T' then 'skill-lt'; else ''; end %>
-                  <td class="<%= css %>"><%= level %></td>
+                  <% bg, fg = case level; when '1' then ['#fee2e2','#991b1b']; when '2' then ['#fef3c7','#92400e']; when '3' then ['#d1fae5','#065f46']; when 'T' then ['#dbeafe','#1e40af']; else ['',''] end %>
+                  <td style="background-color: <%= bg %>; color: <%= fg %>; font-weight: bold; text-align: center;"><%= level %></td>
                 <% else %>
                   <td></td>
                 <% end %>
