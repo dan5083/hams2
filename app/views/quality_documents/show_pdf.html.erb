@@ -51,11 +51,20 @@
     .skills-legend .swatch { display: inline-block; width: 14px; height: 14px; vertical-align: middle; margin-right: 3px; border: 1px solid #999; text-align: center; font-weight: bold; font-size: 8pt; line-height: 14px; }
     .skills-grid { border-collapse: collapse; font-size: 7pt; line-height: 1.2; }
     .skills-grid th, .skills-grid td { border: 1px solid #999; padding: 2px; }
-    .skills-grid thead th { background: #d4a843; font-weight: bold; text-align: center; vertical-align: bottom; }
+    .skills-grid thead th { font-weight: bold; text-align: center; vertical-align: bottom; }
     .skills-grid thead th.skill-header { height: 120px; width: 20px; white-space: nowrap; overflow: hidden; }
     .skills-grid thead th.skill-header .rotated { writing-mode: vertical-rl; transform: rotate(180deg); text-align: left; font-size: 6.5pt; padding: 2px 1px; }
-    .skills-grid thead th.name-header { text-align: left; padding: 3px 4px; min-width: 90px; }
-    .skills-grid thead th.title-header { text-align: left; padding: 3px 4px; min-width: 70px; }
+    .skills-grid thead th.name-header { text-align: left; padding: 3px 4px; min-width: 90px; background: #e5e7eb; }
+    .skills-grid thead th.title-header { text-align: left; padding: 3px 4px; min-width: 70px; background: #e5e7eb; }
+    .sg-lab { background: #4ade80 !important; }
+    .sg-process { background: #facc15 !important; }
+    .sg-manual { background: #60a5fa !important; }
+    .sg-ops { background: #93c5fd !important; }
+    .sg-admin { background: #fb923c !important; }
+    .sg-quality { background: #f87171 !important; }
+    .sg-hse { background: #fbbf24 !important; }
+    .sg-systems { background: #c084fc !important; }
+    .sg-support { background: #d1d5db !important; }
     .skills-grid tbody td { text-align: center; vertical-align: middle; width: 20px; height: 16px; font-weight: bold; font-size: 7pt; }
     .skills-grid tbody td.staff-name { text-align: left; font-weight: bold; white-space: nowrap; padding: 2px 4px; min-width: 90px; }
     .skills-grid tbody td.staff-title { text-align: left; font-size: 6.5pt; color: #555; white-space: nowrap; padding: 2px 4px; }
@@ -64,6 +73,11 @@
     .skill-l2 { background: #fef3c7 !important; color: #92400e; }
     .skill-l3 { background: #d1fae5 !important; color: #065f46; }
     .skill-lt { background: #dbeafe !important; color: #1e40af; }
+    .skills-grid tfoot td { font-size: 5.5pt; text-align: center; vertical-align: top; padding: 2px 1px; color: #44403c; font-weight: bold; background: #f5f5f0; }
+    .skills-grid tfoot td.training-label { text-align: left; padding: 2px 4px; font-size: 6pt; }
+    .skills-legend-groups { margin-bottom: 6px; font-size: 8pt; }
+    .skills-legend-groups .swatch { display: inline-block; width: 10px; height: 10px; vertical-align: middle; margin-right: 2px; border: 1px solid #999; }
+    .skills-legend-groups span { margin-right: 10px; }
 
     .references { margin-top: 24px; padding-top: 16px; border-top: 1px solid #999; }
     .references h2 { font-size: 13pt; font-weight: bold; margin-bottom: 8px; }
@@ -117,6 +131,14 @@
         <% end %>
       </div>
 
+      <% skill_groups = @document.content['skill_groups'] || {} %>
+      <% group_css = { 'lab' => 'sg-lab', 'process' => 'sg-process', 'manual' => 'sg-manual', 'ops' => 'sg-ops', 'admin' => 'sg-admin', 'quality' => 'sg-quality', 'hse' => 'sg-hse', 'systems' => 'sg-systems', 'support' => 'sg-support' } %>
+      <div class="skills-legend-groups">
+        <% skill_groups.each do |key, label| %>
+          <span><span class="swatch <%= group_css[key] %>"></span> <%= label %></span>
+        <% end %>
+      </div>
+
       <% skills = @document.content['skills'] || [] %>
       <% staff = @document.content['staff'] || [] %>
 
@@ -126,7 +148,7 @@
             <th class="name-header">Name</th>
             <th class="title-header">Job Title</th>
             <% skills.each do |skill| %>
-              <th class="skill-header"><div class="rotated"><%= skill['name'] %></div></th>
+              <th class="skill-header <%= group_css[skill['group']] %>"><div class="rotated"><%= skill['name'] %></div></th>
             <% end %>
           </tr>
         </thead>
@@ -147,6 +169,16 @@
             </tr>
           <% end %>
         </tbody>
+        <% if skills.any? { |s| s['training_ref'].present? } %>
+          <tfoot>
+            <tr>
+              <td class="training-label" colspan="2">Training / Evaluation Method</td>
+              <% skills.each do |skill| %>
+                <td><%= skill['training_ref'] %></td>
+              <% end %>
+            </tr>
+          </tfoot>
+        <% end %>
       </table>
 
     <% elsif @document.document_type == 'M' %>
