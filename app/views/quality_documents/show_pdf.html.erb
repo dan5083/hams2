@@ -15,8 +15,7 @@
     .document-body { margin-top: 50px; }
     .document-header { border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }
     .document-header h1 { margin: 0 0 10px 0; font-size: 22pt; }
-    .metadata { font-size: 10pt; }
-    .metadata p { margin: 4px 0; }
+    .metadata { font-size: 10pt; } .metadata p { margin: 4px 0; }
     .metadata .issue-history { margin-top: 10px; padding-top: 10px; border-top: 1px solid #ccc; }
     .section { margin-bottom: 24px; }
     .section h2 { font-size: 14pt; font-weight: bold; border-bottom: 1px solid #999; padding-bottom: 4px; margin-bottom: 8px; page-break-after: avoid; }
@@ -27,20 +26,11 @@
     .content li { margin: 0.2em 0; }
     .content strong, .content b { font-weight: bold; }
     .content em, .content i { font-style: italic; }
-    .content u { text-decoration: underline; }
-    .content h1, .content h2, .content h3, .content h4 { font-weight: bold; margin: 0.8em 0 0.3em 0; }
-    .content h1 { font-size: 14pt; } .content h2 { font-size: 13pt; } .content h3 { font-size: 12pt; } .content h4 { font-size: 11pt; }
-    .content blockquote { border-left: 3px solid #999; padding-left: 12px; margin: 0.5em 0; color: #333; }
     .content table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 10pt; page-break-inside: avoid; }
     .content td, .content th { border: 1px solid #000; padding: 4px 6px; text-align: left; vertical-align: top; }
     .content th { background-color: #e8e8e8; font-weight: bold; }
-    .content thead th, .content thead td { background-color: #e8e8e8; font-weight: bold; }
-    .content td[bgcolor], .content th[bgcolor] { border: 1px solid #000; }
-    .content table table { margin: 0; width: 100%; }
-    .content table table td, .content table table th { border: 1px solid #666; }
-    .content td:empty::after, .content th:empty::after { content: '\00a0'; }
 
-    /* ── Matrix styles ── */
+    /* ── Testing Matrix styles ── */
     .matrix-section { margin-bottom: 18px; page-break-inside: avoid; }
     .matrix-section-header { background: #1e293b; color: #fff; padding: 5px 10px; font-weight: bold; font-size: 10pt; }
     .matrix-section-header .not-active-note { color: #f87171; font-style: italic; }
@@ -55,6 +45,26 @@
     .matrix-table .ref-row td { background: #f1ead6; font-style: italic; font-weight: bold; color: #78716c; text-align: center; }
     .matrix-table .span-cell { text-align: center; font-weight: bold; color: #44403c; background: #faf5e8; }
 
+    /* ── Skills Matrix styles ── */
+    .skills-legend { margin-bottom: 10px; font-size: 9pt; }
+    .skills-legend span { margin-right: 16px; }
+    .skills-legend .swatch { display: inline-block; width: 14px; height: 14px; vertical-align: middle; margin-right: 3px; border: 1px solid #999; text-align: center; font-weight: bold; font-size: 8pt; line-height: 14px; }
+    .skills-grid { border-collapse: collapse; font-size: 7pt; line-height: 1.2; }
+    .skills-grid th, .skills-grid td { border: 1px solid #999; padding: 2px; }
+    .skills-grid thead th { background: #d4a843; font-weight: bold; text-align: center; vertical-align: bottom; }
+    .skills-grid thead th.skill-header { height: 120px; width: 20px; white-space: nowrap; overflow: hidden; }
+    .skills-grid thead th.skill-header .rotated { writing-mode: vertical-rl; transform: rotate(180deg); text-align: left; font-size: 6.5pt; padding: 2px 1px; }
+    .skills-grid thead th.name-header { text-align: left; padding: 3px 4px; min-width: 90px; }
+    .skills-grid thead th.title-header { text-align: left; padding: 3px 4px; min-width: 70px; }
+    .skills-grid tbody td { text-align: center; vertical-align: middle; width: 20px; height: 16px; font-weight: bold; font-size: 7pt; }
+    .skills-grid tbody td.staff-name { text-align: left; font-weight: bold; white-space: nowrap; padding: 2px 4px; min-width: 90px; }
+    .skills-grid tbody td.staff-title { text-align: left; font-size: 6.5pt; color: #555; white-space: nowrap; padding: 2px 4px; }
+    .skills-grid tbody tr:nth-child(even) { background: #f5f5f0; }
+    .skill-l1 { background: #fee2e2 !important; color: #991b1b; }
+    .skill-l2 { background: #fef3c7 !important; color: #92400e; }
+    .skill-l3 { background: #d1fae5 !important; color: #065f46; }
+    .skill-lt { background: #dbeafe !important; color: #1e40af; }
+
     .references { margin-top: 24px; padding-top: 16px; border-top: 1px solid #999; }
     .references h2 { font-size: 13pt; font-weight: bold; margin-bottom: 8px; }
     .references ul { margin-left: 20px; list-style-type: disc; }
@@ -67,8 +77,8 @@
       body { margin: 0; font-size: 11pt; }
       h2, h3, h4 { page-break-after: avoid; }
       .matrix-section { page-break-inside: avoid; }
-      .content table { page-break-inside: avoid; }
-      .document-footer { margin-top: 30px; }
+      .skills-grid { page-break-inside: auto; }
+      @page { size: landscape; margin: 10mm; }
     }
   </style>
 </head>
@@ -98,7 +108,49 @@
       </div>
     </div>
 
-    <% if @document.document_type == 'M' %>
+    <% if @document.content['skills_matrix'] %>
+      <%# ── Skills Matrix ── %>
+      <% legend = @document.content['legend'] || {} %>
+      <div class="skills-legend">
+        <% { '1' => ['skill-l1','L1'], '2' => ['skill-l2','L2'], '3' => ['skill-l3','L3'], 'T' => ['skill-lt','T'] }.each do |code, (css, label)| %>
+          <span><span class="swatch <%= css %>"><%= code %></span> <%= legend[code] || code %></span>
+        <% end %>
+      </div>
+
+      <% skills = @document.content['skills'] || [] %>
+      <% staff = @document.content['staff'] || [] %>
+
+      <table class="skills-grid">
+        <thead>
+          <tr>
+            <th class="name-header">Name</th>
+            <th class="title-header">Job Title</th>
+            <% skills.each do |skill| %>
+              <th class="skill-header"><div class="rotated"><%= skill['name'] %></div></th>
+            <% end %>
+          </tr>
+        </thead>
+        <tbody>
+          <% staff.each do |person| %>
+            <tr>
+              <td class="staff-name"><%= person['name'] %></td>
+              <td class="staff-title"><%= person['job_title'] %></td>
+              <% skills.each_with_index do |skill, i| %>
+                <% level = person['levels']&.dig(i.to_s) %>
+                <% if level.present? %>
+                  <% css = case level; when '1' then 'skill-l1'; when '2' then 'skill-l2'; when '3' then 'skill-l3'; when 'T' then 'skill-lt'; else ''; end %>
+                  <td class="<%= css %>"><%= level %></td>
+                <% else %>
+                  <td></td>
+                <% end %>
+              <% end %>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+
+    <% elsif @document.document_type == 'M' %>
+      <%# ── Testing Matrix ── %>
       <% (@document.content['sections'] || []).each do |section| %>
         <div class="matrix-section">
           <div class="matrix-section-header">
@@ -149,6 +201,7 @@
         </div>
       <% end %>
     <% else %>
+      <%# ── Standard documents ── %>
       <% (@document.content['sections'] || []).each do |section| %>
         <div class="section">
           <h2><%= section['heading'] %></h2>

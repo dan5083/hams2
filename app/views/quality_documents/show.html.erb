@@ -22,7 +22,7 @@
   .prose tbody tr:nth-child(even) { background-color: #f9fafb; }
   .prose tbody tr:hover { background-color: #f3f4f6; }
 
-  /* ── Matrix document styles ── */
+  /* ── Matrix document styles (testing matrix) ── */
   .matrix-section { margin-bottom: 1.5rem; border: 1px solid #c9a96e; border-radius: 0.5rem; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
   .matrix-section-header { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); color: #fff; padding: 0.625rem 1rem; font-weight: 700; font-size: 0.8125rem; letter-spacing: 0.01em; }
   .matrix-section-header .not-active-note { color: #f87171; font-weight: 600; font-style: italic; font-size: 0.75rem; }
@@ -42,6 +42,37 @@
   .matrix-table .nadcap-note { color: #dc2626; font-weight: 600; font-style: italic; font-size: 0.6875rem; }
   .matrix-table .ref-row td { background: #f1ead6; font-style: italic; font-weight: 600; color: #78716c; text-align: center; }
   .matrix-table .span-cell { text-align: center; font-weight: 600; color: #44403c; background: #faf5e8; }
+
+  /* ── Skills Matrix styles ── */
+  .skills-legend { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .skills-legend-item { display: flex; align-items: center; gap: 0.375rem; font-size: 0.75rem; font-weight: 600; color: #1e293b; }
+  .skills-legend-swatch { width: 1.5rem; height: 1.5rem; border-radius: 0.25rem; border: 1px solid rgba(0,0,0,0.15); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.6875rem; }
+
+  .skills-grid-wrap { overflow-x: auto; border: 1px solid #c9a96e; border-radius: 0.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .skills-grid { border-collapse: collapse; font-size: 0.6875rem; line-height: 1.2; }
+  .skills-grid th, .skills-grid td { border: 1px solid #d6cbb2; padding: 0; }
+
+  .skills-grid thead th { background: #d4a843; color: #1e293b; font-weight: 700; text-align: center; vertical-align: bottom; padding: 0.25rem; }
+  .skills-grid thead th.skill-header { height: 160px; width: 28px; min-width: 28px; max-width: 28px; white-space: nowrap; overflow: hidden; }
+  .skills-grid thead th.skill-header .rotated { writing-mode: vertical-rl; transform: rotate(180deg); text-align: left; font-size: 0.625rem; letter-spacing: 0.01em; padding: 4px 2px; }
+  .skills-grid thead th.name-header { text-align: left; padding: 0.375rem 0.5rem; min-width: 120px; position: sticky; left: 0; z-index: 2; background: #d4a843; }
+  .skills-grid thead th.title-header { text-align: left; padding: 0.375rem 0.5rem; min-width: 90px; position: sticky; left: 120px; z-index: 2; background: #d4a843; }
+
+  .skills-grid tbody td.staff-name { font-weight: 700; white-space: nowrap; padding: 0.25rem 0.5rem; background: #fffdf7; position: sticky; left: 0; z-index: 1; min-width: 120px; }
+  .skills-grid tbody td.staff-title { font-size: 0.625rem; color: #78716c; white-space: nowrap; padding: 0.25rem 0.5rem; background: #fffdf7; position: sticky; left: 120px; z-index: 1; min-width: 90px; }
+  .skills-grid tbody tr:nth-child(even) td.staff-name,
+  .skills-grid tbody tr:nth-child(even) td.staff-title { background: #faf6ed; }
+  .skills-grid tbody tr:hover td { background: #f5edd8 !important; }
+
+  .skills-grid tbody td { text-align: center; vertical-align: middle; width: 28px; min-width: 28px; max-width: 28px; height: 24px; }
+  .skills-grid tbody tr { background: #fffdf7; }
+  .skills-grid tbody tr:nth-child(even) { background: #faf6ed; }
+
+  .skill-cell { font-weight: 800; font-size: 0.6875rem; }
+  .skill-l1 { background: #fee2e2 !important; color: #991b1b; }
+  .skill-l2 { background: #fef3c7 !important; color: #92400e; }
+  .skill-l3 { background: #d1fae5 !important; color: #065f46; }
+  .skill-lt { background: #dbeafe !important; color: #1e40af; }
 </style>
 
 <div class="container mx-auto px-4 py-6">
@@ -105,7 +136,57 @@
     </div>
   </div>
 
-  <% if @document.content['sections'].present? && @document.content['sections'].any? %>
+  <% if @document.document_type == 'M' && @document.content['skills_matrix'] %>
+    <%# ── Skills Matrix rendering ── %>
+    <div class="bg-white shadow rounded-lg p-6 mb-6">
+      <h2 class="text-xl font-semibold text-gray-900 mb-4 pb-2 border-b-2 border-gray-200">Skills Matrix</h2>
+
+      <% legend = @document.content['legend'] || {} %>
+      <div class="skills-legend">
+        <% { '1' => 'skill-l1', '2' => 'skill-l2', '3' => 'skill-l3', 'T' => 'skill-lt' }.each do |code, css| %>
+          <div class="skills-legend-item">
+            <div class="skills-legend-swatch <%= css %>"><%= code %></div>
+            <span><%= legend[code] || code %></span>
+          </div>
+        <% end %>
+      </div>
+
+      <% skills = @document.content['skills'] || [] %>
+      <% staff = @document.content['staff'] || [] %>
+
+      <div class="skills-grid-wrap">
+        <table class="skills-grid">
+          <thead>
+            <tr>
+              <th class="name-header">Name</th>
+              <th class="title-header">Job Title</th>
+              <% skills.each do |skill| %>
+                <th class="skill-header"><div class="rotated"><%= skill['name'] %></div></th>
+              <% end %>
+            </tr>
+          </thead>
+          <tbody>
+            <% staff.each do |person| %>
+              <tr>
+                <td class="staff-name"><%= person['name'] %></td>
+                <td class="staff-title"><%= person['job_title'] %></td>
+                <% skills.each_with_index do |skill, i| %>
+                  <% level = person['levels']&.dig(i.to_s) %>
+                  <% if level.present? %>
+                    <% css = case level; when '1' then 'skill-l1'; when '2' then 'skill-l2'; when '3' then 'skill-l3'; when 'T' then 'skill-lt'; else ''; end %>
+                    <td class="skill-cell <%= css %>"><%= level %></td>
+                  <% else %>
+                    <td></td>
+                  <% end %>
+                <% end %>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  <% elsif @document.content['sections'].present? && @document.content['sections'].any? %>
     <div class="bg-white shadow rounded-lg p-6 mb-6">
       <h2 class="text-xl font-semibold text-gray-900 mb-4 pb-2 border-b-2 border-gray-200">Document Content</h2>
       <% if @document.document_type == 'M' %>
