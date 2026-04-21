@@ -63,15 +63,13 @@
   .skills-grid thead th.title-header { text-align: left; padding: 0.375rem 0.5rem; min-width: 90px; position: sticky; left: 120px; z-index: 2; background: #e5e7eb; }
 
   /* Group header colours */
-  .sg-lab { background: #4ade80 !important; }
-  .sg-process { background: #facc15 !important; }
-  .sg-manual { background: #60a5fa !important; }
-  .sg-ops { background: #93c5fd !important; }
-  .sg-admin { background: #fb923c !important; }
-  .sg-quality { background: #f87171 !important; }
-  .sg-hse { background: #fbbf24 !important; }
-  .sg-systems { background: #c084fc !important; }
-  .sg-support { background: #d1d5db !important; }
+  .sg-green { background: #4ade80 !important; }
+  .sg-yellow { background: #facc15 !important; }
+  .sg-blue { background: #60a5fa !important; }
+  .sg-violet { background: #c084fc !important; }
+  .sg-red { background: #f87171 !important; }
+  .sg-salmon { background: #fda4af !important; }
+  .sg-orange { background: #fb923c !important; }
 
   .skills-grid tbody td.staff-name { font-weight: 700; white-space: nowrap; padding: 0.25rem 0.5rem; background: #fffdf7; position: sticky; left: 0; z-index: 1; min-width: 120px; }
   .skills-grid tbody td.staff-title { font-size: 0.625rem; color: #78716c; white-space: nowrap; padding: 0.25rem 0.5rem; background: #fffdf7; position: sticky; left: 120px; z-index: 1; min-width: 90px; }
@@ -171,11 +169,11 @@
       </div>
 
       <% skill_groups = @document.content['skill_groups'] || {} %>
-      <% group_css = { 'lab' => 'sg-lab', 'process' => 'sg-process', 'manual' => 'sg-manual', 'ops' => 'sg-ops', 'admin' => 'sg-admin', 'quality' => 'sg-quality', 'hse' => 'sg-hse', 'systems' => 'sg-systems', 'support' => 'sg-support' } %>
+      <% group_colors = { 'green' => '#4ade80', 'yellow' => '#facc15', 'blue' => '#60a5fa', 'violet' => '#c084fc', 'red' => '#f87171', 'salmon' => '#fda4af', 'orange' => '#fb923c' } %>
       <div class="skills-group-legend">
         <% skill_groups.each do |key, label| %>
           <div class="skills-group-legend-item">
-            <div class="skills-group-legend-swatch <%= group_css[key] %>"></div>
+            <div class="skills-group-legend-swatch" style="background-color: <%= group_colors[key] %>;"></div>
             <span><%= label %></span>
           </div>
         <% end %>
@@ -191,7 +189,7 @@
               <th class="name-header">Name</th>
               <th class="title-header">Job Title</th>
               <% skills.each do |skill| %>
-                <th class="skill-header <%= group_css[skill['group']] %>"><div class="rotated"><%= skill['name'] %></div></th>
+                <th class="skill-header" style="background-color: <%= group_colors[skill['group']] %>;"><div class="rotated"><%= skill['name'] %></div></th>
               <% end %>
             </tr>
           </thead>
