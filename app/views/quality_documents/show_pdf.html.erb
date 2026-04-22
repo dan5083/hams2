@@ -52,8 +52,8 @@
     .skills-grid { border-collapse: collapse; font-size: 7pt; line-height: 1.2; }
     .skills-grid th, .skills-grid td { border: 1px solid #999; padding: 2px; }
     .skills-grid thead th { font-weight: bold; text-align: center; vertical-align: bottom; }
-    .skills-grid thead th.skill-header { height: 120px; width: 20px; white-space: nowrap; overflow: hidden; }
-    .skills-grid thead th.skill-header .rotated { writing-mode: vertical-rl; transform: rotate(180deg); text-align: left; font-size: 6.5pt; padding: 2px 1px; }
+    .skills-grid thead th.skill-header { height: 120px; width: 22px; min-width: 22px; max-width: 22px; white-space: nowrap; overflow: hidden; vertical-align: bottom; padding: 0 0 3px 0; position: relative; }
+    .skills-grid thead th.skill-header .rotated { position: absolute; bottom: 6px; left: 50%; transform: rotate(-55deg); transform-origin: 0% 100%; white-space: nowrap; font-size: 7pt; font-family: Arial, Helvetica, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
     .skills-grid thead th.name-header { text-align: left; padding: 3px 4px; min-width: 90px; background: #e5e7eb; }
     .skills-grid thead th.title-header { text-align: left; padding: 3px 4px; min-width: 70px; background: #e5e7eb; }
     .sg-green { background: #4ade80 !important; }
@@ -63,7 +63,7 @@
     .sg-red { background: #f87171 !important; }
     .sg-salmon { background: #fda4af !important; }
     .sg-orange { background: #fb923c !important; }
-    .skills-grid tbody td { text-align: center; vertical-align: middle; width: 20px; height: 16px; font-weight: bold; font-size: 7pt; }
+    .skills-grid tbody td { text-align: center; vertical-align: middle; width: 22px; min-width: 22px; max-width: 22px; height: 16px; font-weight: bold; font-size: 7pt; }
     .skills-grid tbody td.staff-name { text-align: left; font-weight: bold; white-space: nowrap; padding: 2px 4px; min-width: 90px; }
     .skills-grid tbody td.staff-title { text-align: left; font-size: 6.5pt; color: #555; white-space: nowrap; padding: 2px 4px; }
     .skills-grid tbody tr:nth-child(even) { background: #f5f5f0; }
@@ -109,11 +109,11 @@
     body.skills-matrix-print .skills-legend-groups span { margin-right: 6px; }
     body.skills-matrix-print .skills-grid { font-size: 6pt; }
     body.skills-matrix-print .skills-grid th, body.skills-matrix-print .skills-grid td { border: 1px solid #aaa; padding: 1px; }
-    body.skills-matrix-print .skills-grid thead th.skill-header { height: 100px; width: 16px; min-width: 16px; max-width: 16px; }
-    body.skills-matrix-print .skills-grid thead th.skill-header .rotated { font-size: 5.5pt; padding: 2px 0; }
+    body.skills-matrix-print .skills-grid thead th.skill-header { height: 100px; width: 18px; min-width: 18px; max-width: 18px; }
+    body.skills-matrix-print .skills-grid thead th.skill-header .rotated { font-size: 5.5pt; bottom: 4px; }
     body.skills-matrix-print .skills-grid thead th.name-header { min-width: 75px; padding: 1px 3px; font-size: 6pt; }
     body.skills-matrix-print .skills-grid thead th.title-header { min-width: 55px; padding: 1px 3px; font-size: 6pt; }
-    body.skills-matrix-print .skills-grid tbody td { width: 16px; min-width: 16px; max-width: 16px; height: 13px; font-size: 6pt; }
+    body.skills-matrix-print .skills-grid tbody td { width: 18px; min-width: 18px; max-width: 18px; height: 13px; font-size: 6pt; }
     body.skills-matrix-print .skills-grid tbody td.staff-name { font-size: 6pt; min-width: 75px; padding: 1px 3px; }
     body.skills-matrix-print .skills-grid tbody td.staff-title { font-size: 5.5pt; min-width: 55px; padding: 1px 3px; }
     body.skills-matrix-print .skills-grid tfoot td { font-size: 4.5pt; padding: 1px; }

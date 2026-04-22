@@ -57,8 +57,8 @@
   .skills-grid th, .skills-grid td { border: 1px solid #d6cbb2; padding: 0; }
 
   .skills-grid thead th { color: #1e293b; font-weight: 700; text-align: center; vertical-align: bottom; padding: 0.25rem; }
-  .skills-grid thead th.skill-header { height: 160px; width: 28px; min-width: 28px; max-width: 28px; white-space: nowrap; overflow: hidden; }
-  .skills-grid thead th.skill-header .rotated { writing-mode: vertical-rl; transform: rotate(180deg); text-align: left; font-size: 0.625rem; letter-spacing: 0.01em; padding: 4px 2px; }
+  .skills-grid thead th.skill-header { height: 160px; width: 32px; min-width: 32px; max-width: 32px; white-space: nowrap; overflow: hidden; vertical-align: bottom; padding: 0 0 4px 0; position: relative; }
+  .skills-grid thead th.skill-header .rotated { position: absolute; bottom: 8px; left: 50%; transform: rotate(-55deg); transform-origin: 0% 100%; white-space: nowrap; font-size: 0.6875rem; font-family: Arial, Helvetica, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; letter-spacing: 0; }
   .skills-grid thead th.name-header { text-align: left; padding: 0.375rem 0.5rem; min-width: 120px; position: sticky; left: 0; z-index: 2; background: #e5e7eb; }
   .skills-grid thead th.title-header { text-align: left; padding: 0.375rem 0.5rem; min-width: 90px; position: sticky; left: 120px; z-index: 2; background: #e5e7eb; }
 
@@ -77,7 +77,7 @@
   .skills-grid tbody tr:nth-child(even) td.staff-title { background: #faf6ed; }
   .skills-grid tbody tr:hover td { background: #f5edd8 !important; }
 
-  .skills-grid tbody td { text-align: center; vertical-align: middle; width: 28px; min-width: 28px; max-width: 28px; height: 24px; }
+  .skills-grid tbody td { text-align: center; vertical-align: middle; width: 32px; min-width: 32px; max-width: 32px; height: 24px; }
   .skills-grid tbody tr { background: #fffdf7; }
   .skills-grid tbody tr:nth-child(even) { background: #faf6ed; }
 
