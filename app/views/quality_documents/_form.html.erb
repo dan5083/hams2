@@ -95,6 +95,139 @@
   </div>
 
   <!-- Document Sections -->
+  <% is_matrix = @document.document_type == 'M' && !@document.content&.dig('skills_matrix') %>
+
+  <% if is_matrix %>
+  <%# ── Testing Matrix structured editor ── %>
+  <div class="bg-white shadow rounded-lg p-6">
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Testing Matrix Sections</h3>
+
+    <% col_grid = '2fr 1fr 1fr 2fr 1fr 1fr 2fr 60px' %>
+    <% col_names = ['Method / Specification', 'Test Criteria', 'No. of Parts', 'Material / Dimensions', 'Frequency', 'Test Location', 'Details'] %>
+
+    <div id="matrix-editor" class="space-y-4">
+
+      <% (@document.content['sections'] || []).each_with_index do |section, si| %>
+        <div class="matrix-section-block border border-gray-300 rounded-lg overflow-hidden" data-section-index="<%= si %>">
+
+          <div class="bg-slate-800 px-4 py-3 flex items-center gap-3">
+            <label class="text-white text-sm font-semibold whitespace-nowrap">Section Heading</label>
+            <input type="text"
+                   name="matrix_sections[<%= si %>][heading]"
+                   value="<%= section['heading'] %>"
+                   class="flex-1 bg-slate-700 text-white border border-slate-500 rounded px-2 py-1 text-sm focus:outline-none focus:border-purple-400"
+                   placeholder="e.g. Hard Anodising — MIL-PRF-8625 F Type III">
+            <button type="button" onclick="matrixRemoveSection(this)"
+                    class="text-red-400 hover:text-red-300 text-sm font-semibold ml-2 whitespace-nowrap">✕ Remove Section</button>
+          </div>
+
+          <div class="bg-amber-600 grid text-white text-xs font-bold uppercase tracking-wide px-3 py-2"
+               style="grid-template-columns: <%= col_grid %>;">
+            <% col_names.each do |col| %><span><%= col %></span><% end %>
+            <span></span>
+          </div>
+
+          <div class="matrix-rows-container divide-y divide-gray-200" data-section-idx="<%= si %>">
+
+            <% (section['rows'] || []).each_with_index do |row, ri| %>
+
+              <% if row.is_a?(Array) && row.length == 1 %>
+                <div class="matrix-row flex items-center gap-2 px-3 py-2 bg-amber-50" data-row-type="ref">
+                  <input type="hidden" name="matrix_sections[<%= si %>][rows][<%= ri %>][type]" value="ref">
+                  <span class="text-xs font-bold text-amber-700 uppercase bg-amber-200 px-2 py-0.5 rounded whitespace-nowrap">Ref</span>
+                  <input type="text"
+                         name="matrix_sections[<%= si %>][rows][<%= ri %>][ref_text]"
+                         value="<%= row[0] %>"
+                         class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:border-purple-400"
+                         placeholder="Reference text...">
+                  <div class="flex gap-1">
+                    <button type="button" onclick="matrixMoveRow(this,-1)" class="text-gray-400 hover:text-gray-600 text-base px-1 leading-none" title="Move up">↑</button>
+                    <button type="button" onclick="matrixMoveRow(this,1)"  class="text-gray-400 hover:text-gray-600 text-base px-1 leading-none" title="Move down">↓</button>
+                    <button type="button" onclick="matrixRemoveRow(this)"  class="text-red-400 hover:text-red-600 text-base px-1 leading-none" title="Remove">✕</button>
+                  </div>
+                </div>
+
+              <% elsif row.is_a?(Hash) %>
+                <% cols = row['cols'] || [] %>
+                <div class="matrix-row px-3 py-2 bg-stone-50" data-row-type="span">
+                  <input type="hidden" name="matrix_sections[<%= si %>][rows][<%= ri %>][type]" value="span">
+                  <div class="grid gap-1 items-center mb-2" style="grid-template-columns: <%= col_grid %>;">
+                    <% 7.times do |ci| %>
+                      <% if ci < cols.length %>
+                        <input type="text"
+                               name="matrix_sections[<%= si %>][rows][<%= ri %>][cols][<%= ci %>]"
+                               value="<%= cols[ci] %>"
+                               class="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-purple-400">
+                      <% else %>
+                        <input type="hidden" name="matrix_sections[<%= si %>][rows][<%= ri %>][cols][<%= ci %>]" value="">
+                        <div class="border border-dashed border-gray-200 rounded px-2 py-1 text-xs text-gray-300 text-center">span</div>
+                      <% end %>
+                    <% end %>
+                    <div class="flex gap-1 justify-end">
+                      <button type="button" onclick="matrixMoveRow(this,-1)" class="text-gray-400 hover:text-gray-600 text-base px-1 leading-none" title="Move up">↑</button>
+                      <button type="button" onclick="matrixMoveRow(this,1)"  class="text-gray-400 hover:text-gray-600 text-base px-1 leading-none" title="Move down">↓</button>
+                      <button type="button" onclick="matrixRemoveRow(this)"  class="text-red-400 hover:text-red-600 text-base px-1 leading-none" title="Remove">✕</button>
+                    </div>
+                  </div>
+                  <div class="flex gap-2 items-center">
+                    <span class="text-xs font-bold text-stone-600 uppercase whitespace-nowrap">Span text</span>
+                    <input type="text"
+                           name="matrix_sections[<%= si %>][rows][<%= ri %>][span]"
+                           value="<%= row['span'] %>"
+                           class="flex-1 border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-purple-400">
+                    <span class="text-xs font-bold text-stone-600 uppercase whitespace-nowrap">NADCAP note</span>
+                    <input type="text"
+                           name="matrix_sections[<%= si %>][rows][<%= ri %>][note]"
+                           value="<%= row['note'] %>"
+                           class="w-56 border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-purple-400">
+                  </div>
+                </div>
+
+              <% else %>
+                <% cells = row.is_a?(Array) ? row : [] %>
+                <div class="matrix-row grid gap-1 items-center px-3 py-2 hover:bg-gray-50"
+                     data-row-type="standard"
+                     style="grid-template-columns: <%= col_grid %>;">
+                  <input type="hidden" name="matrix_sections[<%= si %>][rows][<%= ri %>][type]" value="standard">
+                  <% 7.times do |ci| %>
+                    <input type="text"
+                           name="matrix_sections[<%= si %>][rows][<%= ri %>][cells][<%= ci %>]"
+                           value="<%= cells[ci] %>"
+                           class="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-purple-400">
+                  <% end %>
+                  <div class="flex gap-1 justify-end">
+                    <button type="button" onclick="matrixMoveRow(this,-1)" class="text-gray-400 hover:text-gray-600 text-base px-1 leading-none" title="Move up">↑</button>
+                    <button type="button" onclick="matrixMoveRow(this,1)"  class="text-gray-400 hover:text-gray-600 text-base px-1 leading-none" title="Move down">↓</button>
+                    <button type="button" onclick="matrixRemoveRow(this)"  class="text-red-400 hover:text-red-600 text-base px-1 leading-none" title="Remove">✕</button>
+                  </div>
+                </div>
+              <% end %>
+
+            <% end %>
+          </div><%# /.matrix-rows-container %>
+
+          <div class="bg-gray-50 border-t border-gray-200 px-3 py-2 flex gap-2 flex-wrap">
+            <button type="button" onclick="matrixAddRow(this,'standard')"
+                    class="text-xs bg-purple-600 hover:bg-purple-700 text-white font-semibold py-1 px-3 rounded">+ Standard Row</button>
+            <button type="button" onclick="matrixAddRow(this,'ref')"
+                    class="text-xs bg-amber-600 hover:bg-amber-700 text-white font-semibold py-1 px-3 rounded">+ Reference Row</button>
+            <button type="button" onclick="matrixAddRow(this,'span')"
+                    class="text-xs bg-stone-500 hover:bg-stone-600 text-white font-semibold py-1 px-3 rounded">+ Span Row</button>
+          </div>
+
+        </div><%# /.matrix-section-block %>
+      <% end %>
+
+      <button type="button" onclick="matrixAddSection()"
+              class="w-full bg-slate-700 hover:bg-slate-800 text-white font-semibold py-2 px-4 rounded-lg text-sm">
+        + Add Section
+      </button>
+
+    </div><%# /#matrix-editor %>
+  </div>
+
+  <% else %>
+  <%# ── Standard TinyMCE sections ── %>
   <div class="bg-white shadow rounded-lg p-6">
     <h3 class="text-lg font-medium text-gray-900 mb-4">Document Sections</h3>
 
@@ -147,6 +280,7 @@
       + Add Section
     </button>
   </div>
+  <% end %>
 
   <!-- Hidden fields for reissue data (populated by modal) -->
   <input type="hidden" name="reissue_change_description" id="reissue_change_description_hidden">
@@ -619,6 +753,158 @@ function initializePage() {
 
   console.log('Form script loaded successfully');
 }
+
+<% if is_matrix %>
+// ── Testing Matrix editor JS ─────────────────────────────────────────────────
+(function() {
+  const COL_GRID  = '2fr 1fr 1fr 2fr 1fr 1fr 2fr 60px';
+  const COL_NAMES = ['Method / Specification','Test Criteria','No. of Parts','Material / Dimensions','Frequency','Test Location','Details'];
+  const ROW_BTNS  = `
+    <div class="flex gap-1 justify-end">
+      <button type="button" onclick="matrixMoveRow(this,-1)" class="text-gray-400 hover:text-gray-600 text-base px-1 leading-none" title="Move up">↑</button>
+      <button type="button" onclick="matrixMoveRow(this,1)"  class="text-gray-400 hover:text-gray-600 text-base px-1 leading-none" title="Move down">↓</button>
+      <button type="button" onclick="matrixRemoveRow(this)"  class="text-red-400 hover:text-red-600 text-base px-1 leading-none" title="Remove">✕</button>
+    </div>`;
+
+  function uid() { return Date.now() + '_' + Math.floor(Math.random() * 9999); }
+
+  function renumberRows(container) {
+    container.querySelectorAll(':scope > .matrix-row').forEach((row, ri) => {
+      row.querySelectorAll('[name]').forEach(el => {
+        el.name = el.name.replace(/\[rows\]\[[\w]+\]/, `[rows][${ri}]`);
+      });
+    });
+  }
+
+  function renumberSections() {
+    document.querySelectorAll('#matrix-editor .matrix-section-block').forEach((block, si) => {
+      block.dataset.sectionIndex = si;
+      const container = block.querySelector('.matrix-rows-container');
+      if (container) container.dataset.sectionIdx = si;
+      block.querySelectorAll('[name]').forEach(el => {
+        el.name = el.name.replace(/^matrix_sections\[[\w]+\]/, `matrix_sections[${si}]`);
+      });
+    });
+  }
+
+  window.matrixRemoveSection = function(btn) {
+    if (!confirm('Remove this section and all its rows?')) return;
+    btn.closest('.matrix-section-block').remove();
+    renumberSections();
+  };
+
+  window.matrixAddSection = function() {
+    const si    = uid();
+    const block = document.createElement('div');
+    block.className = 'matrix-section-block border border-gray-300 rounded-lg overflow-hidden';
+    block.dataset.sectionIndex = si;
+    block.innerHTML = `
+      <div class="bg-slate-800 px-4 py-3 flex items-center gap-3">
+        <label class="text-white text-sm font-semibold whitespace-nowrap">Section Heading</label>
+        <input type="text" name="matrix_sections[${si}][heading]" value=""
+               class="flex-1 bg-slate-700 text-white border border-slate-500 rounded px-2 py-1 text-sm focus:outline-none focus:border-purple-400"
+               placeholder="e.g. Hard Anodising — MIL-PRF-8625 F Type III">
+        <button type="button" onclick="matrixRemoveSection(this)"
+                class="text-red-400 hover:text-red-300 text-sm font-semibold ml-2 whitespace-nowrap">✕ Remove Section</button>
+      </div>
+      <div class="bg-amber-600 grid text-white text-xs font-bold uppercase tracking-wide px-3 py-2"
+           style="grid-template-columns: ${COL_GRID};">
+        ${COL_NAMES.map(c => `<span>${c}</span>`).join('')}<span></span>
+      </div>
+      <div class="matrix-rows-container divide-y divide-gray-200" data-section-idx="${si}"></div>
+      <div class="bg-gray-50 border-t border-gray-200 px-3 py-2 flex gap-2 flex-wrap">
+        <button type="button" onclick="matrixAddRow(this,'standard')"
+                class="text-xs bg-purple-600 hover:bg-purple-700 text-white font-semibold py-1 px-3 rounded">+ Standard Row</button>
+        <button type="button" onclick="matrixAddRow(this,'ref')"
+                class="text-xs bg-amber-600 hover:bg-amber-700 text-white font-semibold py-1 px-3 rounded">+ Reference Row</button>
+        <button type="button" onclick="matrixAddRow(this,'span')"
+                class="text-xs bg-stone-500 hover:bg-stone-600 text-white font-semibold py-1 px-3 rounded">+ Span Row</button>
+      </div>`;
+    const editor = document.getElementById('matrix-editor');
+    editor.insertBefore(block, editor.lastElementChild);
+    renumberSections();
+  };
+
+  window.matrixAddRow = function(btn, type) {
+    const container = btn.closest('.matrix-section-block').querySelector('.matrix-rows-container');
+    const si = container.dataset.sectionIdx;
+    const ri = uid();
+    const row = document.createElement('div');
+    row.classList.add('matrix-row');
+
+    if (type === 'ref') {
+      row.classList.add('flex','items-center','gap-2','px-3','py-2','bg-amber-50');
+      row.dataset.rowType = 'ref';
+      row.innerHTML = `
+        <input type="hidden" name="matrix_sections[${si}][rows][${ri}][type]" value="ref">
+        <span class="text-xs font-bold text-amber-700 uppercase bg-amber-200 px-2 py-0.5 rounded whitespace-nowrap">Ref</span>
+        <input type="text" name="matrix_sections[${si}][rows][${ri}][ref_text]" value=""
+               class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:border-purple-400"
+               placeholder="Reference text...">
+        ${ROW_BTNS}`;
+
+    } else if (type === 'span') {
+      row.classList.add('px-3','py-2','bg-stone-50');
+      row.dataset.rowType = 'span';
+      const cellHtml = Array.from({length: 7}, (_, ci) =>
+        ci === 0
+          ? `<input type="text" name="matrix_sections[${si}][rows][${ri}][cols][${ci}]" value=""
+                    class="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-purple-400">`
+          : `<input type="hidden" name="matrix_sections[${si}][rows][${ri}][cols][${ci}]" value="">
+             <div class="border border-dashed border-gray-200 rounded px-2 py-1 text-xs text-gray-300 text-center">span</div>`
+      ).join('');
+      row.innerHTML = `
+        <input type="hidden" name="matrix_sections[${si}][rows][${ri}][type]" value="span">
+        <div class="grid gap-1 items-center mb-2" style="grid-template-columns: ${COL_GRID};">
+          ${cellHtml}${ROW_BTNS}
+        </div>
+        <div class="flex gap-2 items-center">
+          <span class="text-xs font-bold text-stone-600 uppercase whitespace-nowrap">Span text</span>
+          <input type="text" name="matrix_sections[${si}][rows][${ri}][span]" value=""
+                 class="flex-1 border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-purple-400"
+                 placeholder="Text shown in merged cells...">
+          <span class="text-xs font-bold text-stone-600 uppercase whitespace-nowrap">NADCAP note</span>
+          <input type="text" name="matrix_sections[${si}][rows][${ri}][note]" value=""
+                 class="w-56 border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-purple-400">
+        </div>`;
+
+    } else {
+      row.classList.add('grid','gap-1','items-center','px-3','py-2','hover:bg-gray-50');
+      row.style.gridTemplateColumns = COL_GRID;
+      row.dataset.rowType = 'standard';
+      const cellHtml = Array.from({length: 7}, (_, ci) =>
+        `<input type="text" name="matrix_sections[${si}][rows][${ri}][cells][${ci}]" value=""
+                class="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-purple-400">`
+      ).join('');
+      row.innerHTML = `
+        <input type="hidden" name="matrix_sections[${si}][rows][${ri}][type]" value="standard">
+        ${cellHtml}${ROW_BTNS}`;
+    }
+
+    container.appendChild(row);
+    renumberRows(container);
+  };
+
+  window.matrixRemoveRow = function(btn) {
+    const row       = btn.closest('.matrix-row');
+    const container = row.closest('.matrix-rows-container');
+    row.remove();
+    renumberRows(container);
+  };
+
+  window.matrixMoveRow = function(btn, dir) {
+    const row       = btn.closest('.matrix-row');
+    const container = row.closest('.matrix-rows-container');
+    const rows      = [...container.querySelectorAll(':scope > .matrix-row')];
+    const idx       = rows.indexOf(row);
+    const neighbour = rows[idx + dir];
+    if (!neighbour) return;
+    if (dir === -1) container.insertBefore(row, neighbour);
+    else            container.insertBefore(neighbour, row);
+    renumberRows(container);
+  };
+})();
+<% end %>
 
 // FIX 2: Tear down all TinyMCE editors before Turbo swaps the body.
 // Registered once via a flag so it doesn't stack up across navigations.

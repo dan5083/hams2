@@ -129,26 +129,61 @@ class QualityDocumentsController < ApplicationController
 
   def build_content_from_params
     content = {
-      'sections' => [],
+      'sections'   => [],
       'references' => []
     }
 
-    # Build sections from form params
-    if params[:sections].present?
-      params[:sections].each do |index, section_data|
-        section = {
-          'heading' => section_data[:heading],
-          'content' => section_data[:content]
-        }
-        # Add flowchart if present
-        if section_data[:flowchart].present?
-          section['flowchart'] = section_data[:flowchart]
+    if @document.document_type == 'M' && !@document.content.dig('skills_matrix')
+      # ── Testing Matrix: structured rows editor ──────────────────────────────
+      if params[:matrix_sections].present?
+        params[:matrix_sections].each do |_idx, section_data|
+          section = {
+            'heading' => section_data[:heading].to_s,
+            'rows'    => []
+          }
+
+          (section_data[:rows] || {}).sort_by { |k, _| k.to_s }.each do |_ridx, row_data|
+            case row_data[:type]
+            when 'ref'
+              # Single-cell reference row — stored as 1-element array
+              section['rows'] << [row_data[:ref_text].to_s]
+
+            when 'span'
+              # Partial row: explicit cols + a spanning cell + optional NADCAP note
+              cols = (row_data[:cols] || {})
+                       .sort_by { |k, _| k.to_i }
+                       .map { |_, v| v.to_s }
+                       .reject(&:blank?)
+              row_hash = { 'cols' => cols, 'span' => row_data[:span].to_s }
+              row_hash['note'] = row_data[:note].to_s if row_data[:note].present?
+              section['rows'] << row_hash
+
+            else
+              # Standard 7-cell array row
+              cells = (0..6).map { |i| row_data[:cells]&.dig(i.to_s).to_s }
+              section['rows'] << cells
+            end
+          end
+
+          content['sections'] << section
         end
-        content['sections'] << section
+      end
+
+    else
+      # ── Standard / Skills Matrix: TinyMCE sections ─────────────────────────
+      if params[:sections].present?
+        params[:sections].each do |_index, section_data|
+          section = {
+            'heading' => section_data[:heading],
+            'content' => section_data[:content]
+          }
+          section['flowchart'] = section_data[:flowchart] if section_data[:flowchart].present?
+          content['sections'] << section
+        end
       end
     end
 
-    # Build references from form params
+    # References — common to all document types
     if params[:document].present? && params[:document][:references].present?
       content['references'] = params[:document][:references].reject(&:blank?)
     end
