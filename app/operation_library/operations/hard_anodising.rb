@@ -215,6 +215,15 @@ module OperationLibrary
           operation_text: "Hard anodise 25V↗️32V over 30 minutes in vat 5"
         },
 
+                {
+          id: '6000_HARD_40_MULTI',
+          alloys: ['6000_series'],
+          anodic_classes: ['class_1', 'class_2'],
+          target_thickness: 40,
+          vat_numbers: [1, 3, 9, 12],
+          operation_text: "Hard anodise 25V↗️40V over 20 minutes in any of vats 1, 3, 9, 12"
+        },
+
         # 6000 Series (excluding 6063) - 40/42.5μm
         {
           id: '6000_HARD_42_5',
