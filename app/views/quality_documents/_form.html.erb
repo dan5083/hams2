@@ -1,4 +1,5 @@
 <% is_matrix = @document.document_type == 'M' && !@document.content&.dig('skills_matrix') %>
+<% is_skills_matrix = @document.document_type == 'M' && !!@document.content&.dig('skills_matrix') %>
 <!-- app/views/quality_documents/_form.html.erb -->
 <%= form_with model: @document, local: true, class: "space-y-6" do |f| %>
   <% if @document.errors.any? %>
@@ -223,6 +224,16 @@
       </button>
 
     </div><%# /#matrix-editor %>
+  </div>
+
+  <% elsif is_skills_matrix %>
+  <%# ── Skills Matrix: content not editable here ── %>
+  <div class="bg-white shadow rounded-lg p-6">
+    <h3 class="text-lg font-medium text-gray-900 mb-4">Document Sections</h3>
+    <div class="p-4 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
+      <strong>Skills Matrix</strong> — content is managed directly and cannot be edited here.
+      Use the fields above to update the issue number or approved by.
+    </div>
   </div>
 
   <% else %>
