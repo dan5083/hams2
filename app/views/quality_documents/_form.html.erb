@@ -1,3 +1,4 @@
+<% is_matrix = @document.document_type == 'M' && !@document.content&.dig('skills_matrix') %>
 <!-- app/views/quality_documents/_form.html.erb -->
 <%= form_with model: @document, local: true, class: "space-y-6" do |f| %>
   <% if @document.errors.any? %>
@@ -95,8 +96,6 @@
   </div>
 
   <!-- Document Sections -->
-  <% is_matrix = @document.document_type == 'M' && !@document.content&.dig('skills_matrix') %>
-
   <% if is_matrix %>
   <%# ── Testing Matrix structured editor ── %>
   <div class="bg-white shadow rounded-lg p-6">
