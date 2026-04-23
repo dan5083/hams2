@@ -135,32 +135,31 @@ class QualityDocumentsController < ApplicationController
 
     if @document.document_type == 'M' && !@document.content.dig('skills_matrix')
       # ── Testing Matrix: structured rows editor ──────────────────────────────
+      # Use to_unsafe_h so we get a plain Ruby hash with string keys and can
+      # call sort_by / dig without ActionController::Parameters restrictions.
       if params[:matrix_sections].present?
-        params[:matrix_sections].each do |_idx, section_data|
+        params[:matrix_sections].to_unsafe_h.each do |_idx, section_data|
           section = {
-            'heading' => section_data[:heading].to_s,
+            'heading' => section_data['heading'].to_s,
             'rows'    => []
           }
 
-          (section_data[:rows] || {}).sort_by { |k, _| k.to_s }.each do |_ridx, row_data|
-            case row_data[:type]
+          (section_data['rows'] || {}).sort_by { |k, _| k.to_s }.each do |_ridx, row_data|
+            case row_data['type']
             when 'ref'
-              # Single-cell reference row — stored as 1-element array
-              section['rows'] << [row_data[:ref_text].to_s]
+              section['rows'] << [row_data['ref_text'].to_s]
 
             when 'span'
-              # Partial row: explicit cols + a spanning cell + optional NADCAP note
-              cols = (row_data[:cols] || {})
+              cols = (row_data['cols'] || {})
                        .sort_by { |k, _| k.to_i }
                        .map { |_, v| v.to_s }
                        .reject(&:blank?)
-              row_hash = { 'cols' => cols, 'span' => row_data[:span].to_s }
-              row_hash['note'] = row_data[:note].to_s if row_data[:note].present?
+              row_hash = { 'cols' => cols, 'span' => row_data['span'].to_s }
+              row_hash['note'] = row_data['note'].to_s if row_data['note'].present?
               section['rows'] << row_hash
 
             else
-              # Standard 7-cell array row
-              cells = (0..6).map { |i| row_data[:cells]&.dig(i.to_s).to_s }
+              cells = (0..6).map { |i| row_data.dig('cells', i.to_s).to_s }
               section['rows'] << cells
             end
           end
