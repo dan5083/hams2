@@ -112,6 +112,15 @@ class User < ApplicationRecord
     ])
   end
 
+  def can_edit_quality_documents?
+    email_address.in?([
+      'quality@hardanodisingstl.com',    # Jim Ledger
+      'chris@hardanodisingstl.com',      # Chris Connon
+      'daniel@hardanodisingstl.com',     # Daniel Bayliss
+      'phil@hardanodisingstl.com'        # Phil Bayliss
+    ])
+  end
+
   private
 
   def set_defaults
