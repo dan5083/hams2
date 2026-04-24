@@ -134,21 +134,15 @@ class QualityDocumentsController < ApplicationController
     }
 
     if @document.document_type == 'M' && !@document.content.dig('skills_matrix')
-      # ── Testing Matrix: structured rows editor ──────────────────────────────
-      # Use to_unsafe_h so we get a plain Ruby hash with string keys and can
-      # call sort_by / dig without ActionController::Parameters restrictions.
+      # ── Testing Matrix ───────────────────────────────────────────────────────
       if params[:matrix_sections].present?
         params[:matrix_sections].to_unsafe_h.each do |_idx, section_data|
-          section = {
-            'heading' => section_data['heading'].to_s,
-            'rows'    => []
-          }
+          section = { 'heading' => section_data['heading'].to_s, 'rows' => [] }
 
           (section_data['rows'] || {}).sort_by { |k, _| k.to_s }.each do |_ridx, row_data|
             case row_data['type']
             when 'ref'
               section['rows'] << [row_data['ref_text'].to_s]
-
             when 'span'
               cols = (row_data['cols'] || {})
                        .sort_by { |k, _| k.to_i }
@@ -157,7 +151,6 @@ class QualityDocumentsController < ApplicationController
               row_hash = { 'cols' => cols, 'span' => row_data['span'].to_s }
               row_hash['note'] = row_data['note'].to_s if row_data['note'].present?
               section['rows'] << row_hash
-
             else
               cells = (0..6).map { |i| row_data.dig('cells', i.to_s).to_s }
               section['rows'] << cells
@@ -168,21 +161,44 @@ class QualityDocumentsController < ApplicationController
         end
       end
 
+    elsif @document.content.dig('skills_matrix')
+      # ── Skills Matrix ────────────────────────────────────────────────────────
+      sm = params[:skills_matrix].to_unsafe_h
+
+      skills = (sm['skills'] || {}).sort_by { |k, _| k.to_i }.map do |_, s|
+        skill = { 'name' => s['name'].to_s, 'group' => s['group'].to_s }
+        skill['training_ref'] = s['training_ref'].to_s if s['training_ref'].present?
+        skill
+      end
+
+      staff = (sm['staff'] || {}).sort_by { |k, _| k.to_i }.map do |_, p|
+        levels = {}
+        (p['levels'] || {}).each { |idx, val| levels[idx.to_s] = val.to_s if val.present? }
+        { 'name' => p['name'].to_s, 'job_title' => p['job_title'].to_s, 'levels' => levels }
+      end
+
+      content.merge!(
+        'skills_matrix' => true,
+        'skills'        => skills,
+        'staff'         => staff,
+        'legend'        => sm['legend'] || {},
+        'skill_groups'  => sm['skill_groups'] || {},
+        'sections'      => [],
+        'references'    => []
+      )
+
     else
-      # ── Standard / Skills Matrix: TinyMCE sections ─────────────────────────
+      # ── Standard TinyMCE sections ────────────────────────────────────────────
       if params[:sections].present?
         params[:sections].each do |_index, section_data|
-          section = {
-            'heading' => section_data[:heading],
-            'content' => section_data[:content]
-          }
+          section = { 'heading' => section_data[:heading], 'content' => section_data[:content] }
           section['flowchart'] = section_data[:flowchart] if section_data[:flowchart].present?
           content['sections'] << section
         end
       end
     end
 
-    # References — common to all document types
+    # References — common to all non-skills-matrix types
     if params[:document].present? && params[:document][:references].present?
       content['references'] = params[:document][:references].reject(&:blank?)
     end

@@ -227,12 +227,139 @@
   </div>
 
   <% elsif is_skills_matrix %>
-  <%# ── Skills Matrix: content not editable here ── %>
+  <%# ── Skills Matrix structured editor ── %>
+  <% sm_skills = @document.content['skills'] || [] %>
+  <% sm_staff  = @document.content['staff']  || [] %>
+  <% sm_legend = @document.content['legend'] || {} %>
+  <% sm_groups = @document.content['skill_groups'] || {} %>
+  <% sm_gc = {'green'=>'#4ade80','yellow'=>'#facc15','blue'=>'#60a5fa','violet'=>'#c084fc','red'=>'#f87171','salmon'=>'#fda4af','orange'=>'#fb923c'} %>
+
   <div class="bg-white shadow rounded-lg p-6">
-    <h3 class="text-lg font-medium text-gray-900 mb-4">Document Sections</h3>
-    <div class="p-4 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
-      <strong>Skills Matrix</strong> — content is managed directly and cannot be edited here.
-      Use the fields above to update the issue number or approved by.
+    <h3 class="text-lg font-medium text-gray-900 mb-6">Skills Matrix</h3>
+
+    <%# Legend & Groups side by side %>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+      <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+        <h4 class="text-sm font-semibold text-gray-700 mb-3">Proficiency Legend</h4>
+        <% [['1','#fee2e2','#991b1b'],['2','#fef3c7','#92400e'],['3','#d1fae5','#065f46'],['T','#dbeafe','#1e40af']].each do |code, bg, fg| %>
+          <div class="flex items-center gap-2 mb-2">
+            <span class="w-8 h-8 rounded flex items-center justify-center font-bold text-sm flex-shrink-0"
+                  style="background:<%= bg %>;color:<%= fg %>"><%= code %></span>
+            <input type="text" name="skills_matrix[legend][<%= code %>]" value="<%= sm_legend[code] %>"
+                   class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500">
+          </div>
+        <% end %>
+      </div>
+      <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+        <h4 class="text-sm font-semibold text-gray-700 mb-3">Skill Groups</h4>
+        <% sm_gc.each do |key, color| %>
+          <div class="flex items-center gap-2 mb-2">
+            <span class="w-4 h-4 rounded flex-shrink-0" style="background:<%= color %>"></span>
+            <span class="text-xs text-gray-500 w-14 flex-shrink-0"><%= key %></span>
+            <input type="text" name="skills_matrix[skill_groups][<%= key %>]" value="<%= sm_groups[key] %>"
+                   class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500">
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <%# Skills list %>
+    <div class="mb-6">
+      <h4 class="text-sm font-semibold text-gray-700 mb-2">Skills</h4>
+      <div class="grid text-xs font-semibold text-gray-500 uppercase px-2 mb-1"
+           style="grid-template-columns: 2fr 120px 180px 36px;">
+        <span>Skill Name</span><span>Group</span><span>Training Ref</span><span></span>
+      </div>
+      <div id="sm-skills-list" class="space-y-1">
+        <% sm_skills.each_with_index do |skill, si| %>
+          <div class="sm-skill-row grid gap-2 items-center" data-skill-idx="<%= si %>"
+               style="grid-template-columns: 2fr 120px 180px 36px;">
+            <input type="text" name="skills_matrix[skills][<%= si %>][name]" value="<%= skill['name'] %>"
+                   class="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-purple-400"
+                   oninput="smSyncSkillHeader(<%= si %>, this.value)"
+                   placeholder="Skill name">
+            <select name="skills_matrix[skills][<%= si %>][group]"
+                    class="border border-gray-300 rounded px-1 py-1 text-xs focus:outline-none focus:border-purple-400">
+              <% sm_gc.each_key do |key| %>
+                <option value="<%= key %>" <%= 'selected' if skill['group'] == key %>><%= key %></option>
+              <% end %>
+            </select>
+            <input type="text" name="skills_matrix[skills][<%= si %>][training_ref]" value="<%= skill['training_ref'] %>"
+                   class="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-purple-400"
+                   placeholder="e.g. WI 3206 &amp; 2015/8">
+            <button type="button" onclick="smRemoveSkill(this)"
+                    class="text-red-400 hover:text-red-600 text-sm font-bold leading-none">✕</button>
+          </div>
+        <% end %>
+      </div>
+      <button type="button" onclick="smAddSkill()"
+              class="mt-2 text-xs bg-purple-600 hover:bg-purple-700 text-white font-semibold py-1 px-3 rounded">
+        + Add Skill
+      </button>
+    </div>
+
+    <%# Staff + Levels grid %>
+    <div>
+      <h4 class="text-sm font-semibold text-gray-700 mb-2">Staff &amp; Competency Levels</h4>
+      <p class="text-xs text-gray-500 mb-2">Column numbers correspond to the skill list above. Hover a column header to see the skill name.</p>
+      <div class="overflow-x-auto border border-gray-200 rounded-lg">
+        <table id="sm-staff-table" class="border-collapse text-xs">
+          <thead>
+            <tr id="sm-skills-header">
+              <th class="sticky left-0 z-20 bg-gray-100 border border-gray-300 px-2 py-1 text-left font-semibold text-gray-700 whitespace-nowrap" style="min-width:130px;">Name</th>
+              <th class="sticky z-20 bg-gray-100 border border-gray-300 px-2 py-1 text-left font-semibold text-gray-700 whitespace-nowrap" style="min-width:110px;left:130px;">Job Title</th>
+              <% sm_skills.each_with_index do |skill, si| %>
+                <th class="bg-gray-100 border border-gray-300 px-1 py-1 text-center font-bold"
+                    data-skill-col="<%= si %>"
+                    style="min-width:34px;max-width:34px;width:34px;color:<%= sm_gc[skill['group']] || '#999' %>;"
+                    title="<%= skill['name'] %>">
+                  <%= si + 1 %>
+                </th>
+              <% end %>
+              <th class="bg-gray-100 border border-gray-300 px-1 py-1 w-8"></th>
+            </tr>
+          </thead>
+          <tbody id="sm-staff-tbody">
+            <% sm_staff.each_with_index do |person, pi| %>
+              <tr data-staff-idx="<%= pi %>">
+                <td class="sticky left-0 z-10 bg-white border border-gray-200 p-0">
+                  <input type="text" name="skills_matrix[staff][<%= pi %>][name]" value="<%= person['name'] %>"
+                         class="w-full px-2 py-1 text-xs border-0 focus:outline-none focus:ring-1 focus:ring-inset focus:ring-purple-400"
+                         style="min-width:130px;">
+                </td>
+                <td class="sticky z-10 bg-white border border-gray-200 p-0" style="left:130px;">
+                  <input type="text" name="skills_matrix[staff][<%= pi %>][job_title]" value="<%= person['job_title'] %>"
+                         class="w-full px-2 py-1 text-xs border-0 focus:outline-none focus:ring-1 focus:ring-inset focus:ring-purple-400"
+                         style="min-width:110px;">
+                </td>
+                <% sm_skills.each_with_index do |_, si| %>
+                  <% lv = person['levels']&.dig(si.to_s) %>
+                  <% lv_style = case lv; when '1' then 'background:#fee2e2;color:#991b1b'; when '2' then 'background:#fef3c7;color:#92400e'; when '3' then 'background:#d1fae5;color:#065f46'; when 'T' then 'background:#dbeafe;color:#1e40af'; else ''; end %>
+                  <td class="border border-gray-200 p-0 text-center" data-skill-col="<%= si %>">
+                    <select name="skills_matrix[staff][<%= pi %>][levels][<%= si %>]"
+                            class="w-full border-0 text-xs font-bold text-center focus:outline-none cursor-pointer"
+                            style="<%= lv_style %>width:34px;"
+                            onchange="smLevelChanged(this)">
+                      <option value=""></option>
+                      <% ['1','2','3','T'].each do |l| %>
+                        <option value="<%= l %>" <%= 'selected' if lv == l %>><%= l %></option>
+                      <% end %>
+                    </select>
+                  </td>
+                <% end %>
+                <td class="border border-gray-200 p-1 text-center">
+                  <button type="button" onclick="smRemoveStaff(this)"
+                          class="text-red-400 hover:text-red-600 text-sm font-bold leading-none">✕</button>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+      <button type="button" onclick="smAddStaff()"
+              class="mt-2 text-xs bg-purple-600 hover:bg-purple-700 text-white font-semibold py-1 px-3 rounded">
+        + Add Staff Member
+      </button>
     </div>
   </div>
 
@@ -852,7 +979,6 @@ function initializePage() {
                class="flex-1 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:border-purple-400"
                placeholder="Reference text...">
         ${ROW_BTNS}`;
-
     } else if (type === 'span') {
       row.classList.add('px-3','py-2','bg-stone-50');
       row.dataset.rowType = 'span';
@@ -877,7 +1003,6 @@ function initializePage() {
           <input type="text" name="matrix_sections[${si}][rows][${ri}][note]" value=""
                  class="w-56 border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-purple-400">
         </div>`;
-
     } else {
       row.classList.add('grid','gap-1','items-center','px-3','py-2','hover:bg-gray-50');
       row.style.gridTemplateColumns = COL_GRID;
@@ -912,6 +1037,157 @@ function initializePage() {
     if (dir === -1) container.insertBefore(row, neighbour);
     else            container.insertBefore(neighbour, row);
     renumberRows(container);
+  };
+})();
+<% end %>
+
+<% if is_skills_matrix %>
+// ── Skills Matrix editor JS ──────────────────────────────────────────────────
+(function() {
+  const GC = {green:'#4ade80',yellow:'#facc15',blue:'#60a5fa',violet:'#c084fc',red:'#f87171',salmon:'#fda4af',orange:'#fb923c'};
+  const GROUPS = Object.keys(GC);
+  const LV_STYLES = {'1':'background:#fee2e2;color:#991b1b;','2':'background:#fef3c7;color:#92400e;','3':'background:#d1fae5;color:#065f46;','T':'background:#dbeafe;color:#1e40af;'};
+
+  window.smLevelChanged = function(sel) {
+    sel.style.cssText = (LV_STYLES[sel.value] || '') + 'width:34px;border:none;font-size:0.75rem;font-weight:700;text-align:center;cursor:pointer;';
+  };
+
+  window.smSyncSkillHeader = function(si, name) {
+    const th = document.querySelector(`#sm-skills-header [data-skill-col="${si}"]`);
+    if (th) th.title = name;
+  };
+
+  function skillCount() {
+    return document.querySelectorAll('#sm-skills-list .sm-skill-row').length;
+  }
+
+  function renumberSkills() {
+    document.querySelectorAll('#sm-skills-list .sm-skill-row').forEach((row, si) => {
+      row.dataset.skillIdx = si;
+      row.querySelectorAll('[name]').forEach(el => {
+        el.name = el.name.replace(/\[skills\]\[\d+\]/, `[skills][${si}]`);
+      });
+      const inp = row.querySelector('input[type="text"]');
+      if (inp) inp.setAttribute('oninput', `smSyncSkillHeader(${si}, this.value)`);
+    });
+    document.querySelectorAll('#sm-skills-header [data-skill-col]').forEach((th, si) => {
+      th.dataset.skillCol = si;
+      th.textContent = si + 1;
+    });
+    document.querySelectorAll('#sm-staff-tbody tr').forEach((tr, pi) => {
+      tr.querySelectorAll('[data-skill-col]').forEach((td, si) => {
+        td.dataset.skillCol = si;
+        const sel = td.querySelector('select');
+        if (sel) sel.name = `skills_matrix[staff][${pi}][levels][${si}]`;
+      });
+    });
+  }
+
+  function renumberStaff() {
+    document.querySelectorAll('#sm-staff-tbody tr').forEach((tr, pi) => {
+      tr.dataset.staffIdx = pi;
+      tr.querySelectorAll('[name]').forEach(el => {
+        el.name = el.name.replace(/\[staff\]\[\d+\]/, `[staff][${pi}]`);
+      });
+    });
+  }
+
+  function levelSelect(pi, si, val) {
+    const style = (LV_STYLES[val] || '') + 'width:34px;border:none;font-size:0.75rem;font-weight:700;text-align:center;cursor:pointer;';
+    return `<select name="skills_matrix[staff][${pi}][levels][${si}]"
+                    class="w-full border-0 text-xs font-bold text-center focus:outline-none cursor-pointer"
+                    style="${style}"
+                    onchange="smLevelChanged(this)">
+      <option value=""></option>
+      <option value="1"${val==='1'?' selected':''}>1</option>
+      <option value="2"${val==='2'?' selected':''}>2</option>
+      <option value="3"${val==='3'?' selected':''}>3</option>
+      <option value="T"${val==='T'?' selected':''}>T</option>
+    </select>`;
+  }
+
+  window.smAddSkill = function() {
+    const si = skillCount();
+    const groupOpts = GROUPS.map(k => `<option value="${k}">${k}</option>`).join('');
+    const row = document.createElement('div');
+    row.className = 'sm-skill-row grid gap-2 items-center';
+    row.style.gridTemplateColumns = '2fr 120px 180px 36px';
+    row.dataset.skillIdx = si;
+    row.innerHTML = `
+      <input type="text" name="skills_matrix[skills][${si}][name]" value=""
+             class="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-purple-400"
+             oninput="smSyncSkillHeader(${si}, this.value)" placeholder="Skill name">
+      <select name="skills_matrix[skills][${si}][group]"
+              class="border border-gray-300 rounded px-1 py-1 text-xs focus:outline-none focus:border-purple-400">
+        ${groupOpts}
+      </select>
+      <input type="text" name="skills_matrix[skills][${si}][training_ref]" value=""
+             class="border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:border-purple-400"
+             placeholder="Training ref (optional)">
+      <button type="button" onclick="smRemoveSkill(this)"
+              class="text-red-400 hover:text-red-600 text-sm font-bold leading-none">✕</button>`;
+    document.getElementById('sm-skills-list').appendChild(row);
+
+    // Add header th
+    const headerRow = document.getElementById('sm-skills-header');
+    const th = document.createElement('th');
+    th.className = 'bg-gray-100 border border-gray-300 px-1 py-1 text-center font-bold';
+    th.dataset.skillCol = si;
+    th.style.cssText = 'min-width:34px;max-width:34px;width:34px;color:#999;';
+    th.title = '';
+    th.textContent = si + 1;
+    headerRow.insertBefore(th, headerRow.lastElementChild);
+
+    // Add level cell to every staff row
+    document.querySelectorAll('#sm-staff-tbody tr').forEach((tr, pi) => {
+      const td = document.createElement('td');
+      td.className = 'border border-gray-200 p-0 text-center';
+      td.dataset.skillCol = si;
+      td.innerHTML = levelSelect(pi, si, '');
+      tr.insertBefore(td, tr.lastElementChild);
+    });
+  };
+
+  window.smRemoveSkill = function(btn) {
+    const row = btn.closest('.sm-skill-row');
+    const si  = parseInt(row.dataset.skillIdx);
+    row.remove();
+    document.querySelector(`#sm-skills-header [data-skill-col="${si}"]`)?.remove();
+    document.querySelectorAll(`#sm-staff-tbody [data-skill-col="${si}"]`).forEach(td => td.remove());
+    renumberSkills();
+  };
+
+  window.smAddStaff = function() {
+    const pi = document.querySelectorAll('#sm-staff-tbody tr').length;
+    const sc = skillCount();
+    let cells = '';
+    for (let si = 0; si < sc; si++) {
+      cells += `<td class="border border-gray-200 p-0 text-center" data-skill-col="${si}">${levelSelect(pi, si, '')}</td>`;
+    }
+    const tr = document.createElement('tr');
+    tr.dataset.staffIdx = pi;
+    tr.innerHTML = `
+      <td class="sticky left-0 z-10 bg-white border border-gray-200 p-0">
+        <input type="text" name="skills_matrix[staff][${pi}][name]" value=""
+               class="w-full px-2 py-1 text-xs border-0 focus:outline-none focus:ring-1 focus:ring-inset focus:ring-purple-400"
+               style="min-width:130px;" placeholder="Name">
+      </td>
+      <td class="sticky z-10 bg-white border border-gray-200 p-0" style="left:130px;">
+        <input type="text" name="skills_matrix[staff][${pi}][job_title]" value=""
+               class="w-full px-2 py-1 text-xs border-0 focus:outline-none focus:ring-1 focus:ring-inset focus:ring-purple-400"
+               style="min-width:110px;" placeholder="Job title">
+      </td>
+      ${cells}
+      <td class="border border-gray-200 p-1 text-center">
+        <button type="button" onclick="smRemoveStaff(this)"
+                class="text-red-400 hover:text-red-600 text-sm font-bold leading-none">✕</button>
+      </td>`;
+    document.getElementById('sm-staff-tbody').appendChild(tr);
+  };
+
+  window.smRemoveStaff = function(btn) {
+    btn.closest('tr').remove();
+    renumberStaff();
   };
 })();
 <% end %>
