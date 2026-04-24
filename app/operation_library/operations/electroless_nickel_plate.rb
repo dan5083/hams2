@@ -1,6 +1,18 @@
 # app/operation_library/operations/electroless_nickel_plate.rb
 module OperationLibrary
   class ElectrolessNickelPlate
+    # Alloys that require a test piece and adhesion bend test
+    ADHESION_BEND_MATERIALS = %w[
+      steel
+      stainless_steel
+      stainless_steel_with_oxides
+      316_stainless_steel
+      aluminium
+      2000_series_alloys
+      cope_rolled_aluminium
+      mclaren_sta142_procedure_d
+    ].freeze
+
     def self.operations(target_thickness_um = nil, aerospace_defense: false)
       base_operations = [
         # High Phosphorous - Vandalloy 4100
@@ -128,6 +140,58 @@ module OperationLibrary
         text_lines << "Batch ___: Time ___    Temp ___°C"
       end
       text_lines.join("\n")
+    end
+
+    # Test piece operation - inserted after INCOMING_INSPECT for qualifying alloys
+    def self.test_piece_operation
+      Operation.new(
+        id: 'TEST_PIECE',
+        process_type: 'test_piece',
+        operation_text: 'Include a test sample (25mm x 100mm 0.6mm thick minimum) with batch'
+      )
+    end
+
+    # Adhesion bend test operation - inserted before pack for qualifying alloys
+    def self.adhesion_bend_operation
+      Operation.new(
+        id: 'ADHESION_BEND',
+        process_type: 'adhesion_bend',
+        operation_text: <<~TEXT.strip
+          Bend test piece through an angle of 180°, or until fracture, over a mandrel having a radius equal to four times the thickness of the sample (minimum radius 1.5 mm)
+
+          The portion of the specimen that is bent shall not show any separation or peeling of the plate when examined at low magnification, such as 4X. Except at the very edges of the test specimens at the point of bending, the plate shall not detach from the base metal using a sharp instrument.
+
+          **Result:** PASS / FAIL
+
+          **Operator stamp:** ___________
+
+          *PASS: apply stamp only. FAIL: circle 'FAIL' and apply stamp.*
+        TEXT
+      )
+    end
+
+    # Check if adhesion bend test is required for the given alloy
+    def self.adhesion_bend_required?(alloy)
+      ADHESION_BEND_MATERIALS.include?(alloy.to_s.downcase)
+    end
+
+    # Insert test piece (after INCOMING_INSPECT) and adhesion bend (before pack)
+    def self.insert_enp_quality_ops(sequence, alloy)
+      return sequence unless adhesion_bend_required?(alloy)
+
+      # Insert test piece immediately after INCOMING_INSPECT
+      incoming_idx = sequence.find_index { |op| op.id == 'INCOMING_INSPECT' }
+      if incoming_idx
+        sequence.insert(incoming_idx + 1, test_piece_operation)
+      end
+
+      # Insert adhesion bend immediately before pack
+      pack_idx = sequence.find_index { |op| op.process_type == 'pack' }
+      if pack_idx
+        sequence.insert(pack_idx, adhesion_bend_operation)
+      end
+
+      sequence
     end
 
     private

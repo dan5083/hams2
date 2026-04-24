@@ -417,6 +417,15 @@ class Part < ApplicationRecord
       )
     end
 
+    # 6. Insert ENP quality ops (test piece + adhesion bend) if required
+    if has_enp && defined?(OperationLibrary::ElectrolessNickelPlate)
+      enp_treatment = treatments.find { |t| t[:operation].process_type == 'electroless_nickel_plating' }
+      if enp_treatment
+        alloy = enp_treatment[:treatment_data]["selected_alloy"]
+        sequence = OperationLibrary::ElectrolessNickelPlate.insert_enp_quality_ops(sequence, alloy)
+      end
+    end
+
     # Remove any nil entries that might have been added
     sequence.compact
   end
