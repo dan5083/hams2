@@ -163,9 +163,7 @@ module OperationLibrary
 
           **Result:** PASS / FAIL
 
-          **Operator stamp:** ___________
-
-          *PASS: apply stamp only. FAIL: circle 'FAIL' and apply stamp.*
+          *PASS: apply stamp only. FAIL: circle 'FAIL'.*
         TEXT
       )
     end
