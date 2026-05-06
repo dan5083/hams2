@@ -7,8 +7,14 @@ class ExternalNcr < ApplicationRecord
   belongs_to :created_by, class_name: 'User'
   belongs_to :respondent, class_name: 'User', foreign_key: 'assigned_to_id'
 
+  # Virtual attribute — not persisted, set by controller to bypass release note validation
+  attr_accessor :simple_upload
+
   # JSONB accessors for NCR-specific data
   store_accessor :ncr_data,
+    # For simple uploads where no release note is linked yet
+    :manual_customer_name,
+
     # Identification numbers
     :concession_number,
     :customer_ncr_number,
@@ -34,7 +40,7 @@ class ExternalNcr < ApplicationRecord
     :document_uploaded_at
 
   # --- Validations ---
-  validates :hal_ncr_number, uniqueness: true, numericality: { greater_than: 0 }, allow_nil: true
+  validates :hal_ncr_number, presence: true, uniqueness: true, numericality: { greater_than: 0 }
   validates :date, presence: true
   validates :created_by_id, presence: true
   validates :status, inclusion: { in: %w[draft in_progress completed] }
@@ -57,6 +63,7 @@ class ExternalNcr < ApplicationRecord
   scope :missing_documents, -> { where(ncr_data: { cloudinary_public_id: [nil, ''] }) }
 
   # --- Callbacks ---
+  before_validation :set_ncr_number, if: :new_record?
   before_validation :set_defaults, if: :new_record?
   after_create :log_creation
   after_update :log_status_change, if: :saved_change_to_status?
@@ -64,11 +71,11 @@ class ExternalNcr < ApplicationRecord
   # --- Display helpers ---
 
   def display_name
-    hal_ncr_number.present? ? "NCR#{hal_ncr_number}" : "Draft (unconfirmed)"
+    "NCR#{hal_ncr_number}"
   end
 
   def display_title
-    parts = [hal_ncr_number.present? ? "NCR#{hal_ncr_number}" : "Draft (unconfirmed)"]
+    parts = ["NCR#{hal_ncr_number}"]
     parts << customer_name if customer_name.present?
     parts << part_display_name if part_display_name.present?
     parts << release_note_numbers
@@ -107,7 +114,8 @@ class ExternalNcr < ApplicationRecord
   end
 
   def customer_name
-    customer_names.join(", ").presence
+    derived = customer_names.join(", ").presence
+    derived || manual_customer_name
   end
 
   def customers
@@ -258,10 +266,6 @@ class ExternalNcr < ApplicationRecord
     new_status = next_status
     return false unless new_status
 
-    if status == 'draft'
-      assign_ncr_number
-    end
-
     if new_status == 'completed'
       self.completed_by_user_id = Current.user&.id
     end
@@ -331,13 +335,13 @@ class ExternalNcr < ApplicationRecord
   private
 
   def at_least_one_release_note
+    return if simple_upload
     if release_notes.empty? && external_ncr_release_notes.empty?
       errors.add(:base, "At least one release note is required")
     end
   end
 
-  def assign_ncr_number
-    return if hal_ncr_number.present?
+  def set_ncr_number
     sequence = Sequence.find_or_create_by(key: 'external_ncr_number')
     self.hal_ncr_number = sequence.value
     sequence.increment!(:value)
@@ -352,10 +356,10 @@ class ExternalNcr < ApplicationRecord
 
   def log_creation
     rn_numbers = release_notes.map(&:number).join(", ")
-    Rails.logger.info "Created draft External NCR (unconfirmed) for Release Notes: #{rn_numbers}"
+    Rails.logger.info "Created External NCR #{hal_ncr_number} for Release Notes: #{rn_numbers}"
   end
 
   def log_status_change
-    Rails.logger.info "External NCR #{hal_ncr_number || '(unconfirmed)'} status changed from #{status_before_last_save} to #{status}"
+    Rails.logger.info "External NCR #{hal_ncr_number} status changed from #{status_before_last_save} to #{status}"
   end
 end

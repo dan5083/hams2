@@ -1,7 +1,7 @@
 # app/controllers/external_ncrs_controller.rb
 class ExternalNcrsController < ApplicationController
-  before_action :require_quality_access
-  before_action :set_external_ncr, only: [:show, :edit, :update, :destroy, :advance_status, :download_document]
+  before_action :require_ncr_manage_access, only: [:edit, :update, :destroy, :advance_status, :reassign_respondent]
+  before_action :set_external_ncr, only: [:show, :edit, :update, :destroy, :advance_status, :download_document, :reassign_respondent, :response_pdf]
 
   def index
     @external_ncrs = ExternalNcr.includes(:release_notes, :created_by, :respondent)
@@ -19,6 +19,7 @@ class ExternalNcrsController < ApplicationController
 
   def new
     @external_ncr = ExternalNcr.new
+    @simple_mode = !Current.user.can_manage_ncrs? || params[:simple].present?
 
     # If launched from a specific release note, pre-select it
     if params[:release_note_id].present?
@@ -27,25 +28,30 @@ class ExternalNcrsController < ApplicationController
   end
 
   def create
+    @simple_mode = params[:simple_upload] == 'true' || !Current.user.can_manage_ncrs?
     @external_ncr = ExternalNcr.new(external_ncr_params)
 
     # Auto-assign creator as respondent
     @external_ncr.created_by = Current.user
     @external_ncr.respondent = Current.user
+    @external_ncr.simple_upload = @simple_mode
 
-    # Build release note associations from submitted IDs (UUIDs — do NOT .to_i)
-    release_note_ids = Array(params[:external_ncr][:release_note_ids]).reject(&:blank?)
-    release_note_ids.each do |rn_id|
-      @external_ncr.external_ncr_release_notes.build(release_note_id: rn_id)
+    unless @simple_mode
+      # Build release note associations from submitted IDs (UUIDs — do NOT .to_i)
+      release_note_ids = Array(params[:external_ncr][:release_note_ids]).reject(&:blank?)
+      release_note_ids.each do |rn_id|
+        @external_ncr.external_ncr_release_notes.build(release_note_id: rn_id)
+      end
     end
 
-    # Handle file upload
+    # Handle file upload — resolve date early to avoid nil.year
     uploaded_file = params[:external_ncr][:temp_document]
+    date_for_path = @external_ncr.date.presence || Date.current
 
     if uploaded_file.present?
       begin
-        folder_path = "NCRs/#{@external_ncr.date.year}/#{@external_ncr.date.strftime('%m')}"
-        filename_prefix = "NCR#{@external_ncr.hal_ncr_number || 'TEMP'}"
+        folder_path = "NCRs/#{date_for_path.year}/#{date_for_path.strftime('%m')}"
+        filename_prefix = @simple_mode ? "NCR_upload" : "NCR#{@external_ncr.hal_ncr_number || 'TEMP'}"
 
         upload_result = CloudinaryService.upload_file(uploaded_file, folder_path, filename_prefix: filename_prefix)
         @external_ncr.store_document_metadata(upload_result)
@@ -67,6 +73,7 @@ class ExternalNcrsController < ApplicationController
     end
 
     if @external_ncr.save
+      NcrMailer.draft_created(@external_ncr).deliver_later
       redirect_to @external_ncr, notice: "External NCR #{@external_ncr.display_name} was successfully created."
     else
       # Clean up uploaded file on save failure
@@ -247,8 +254,6 @@ class ExternalNcrsController < ApplicationController
   end
 
   def response_pdf
-    @external_ncr = ExternalNcr.find(params[:id])
-
     respond_to do |format|
       format.html { render layout: false }
     end
@@ -275,11 +280,12 @@ class ExternalNcrsController < ApplicationController
   def external_ncr_params
     params.require(:external_ncr).permit(
       :date,
+      :manual_customer_name,
       :concession_number, :customer_ncr_number, :estimated_cost,
       :reject_quantity,
       :description_of_non_conformance, :containment_action,
       :root_cause_analysis, :corrective_action, :preventive_action
-      # Note: release_note_ids and temp_document are handled separately
+      # Note: release_note_ids, temp_document, and simple_upload are handled separately
     )
   end
 
