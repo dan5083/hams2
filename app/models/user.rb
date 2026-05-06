@@ -112,6 +112,20 @@ class User < ApplicationRecord
     ])
   end
 
+  def sees_ncrs?
+    email_address != 'judy@hardanodisingstl.com'
+  end
+
+  def can_manage_ncrs?
+    email_address.in?([
+      'quality@hardanodisingstl.com',  # Jim Ledger
+      'chris@hardanodisingstl.com',    # Chris Connon
+      'phil@hardanodisingstl.com',     # Phil Bayliss
+      'tariq@hardanodisingstl.com',    # Tariq Anwar
+      'daniel@hardanodisingstl.com'    # Daniel Bayliss
+    ])
+  end
+
   def can_edit_quality_documents?
     email_address.in?([
       'quality@hardanodisingstl.com',    # Jim Ledger
