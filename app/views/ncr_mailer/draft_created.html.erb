@@ -1,0 +1,60 @@
+<%# app/views/ncr_mailer/draft_created.html.erb %>
+<p>Hi,</p>
+
+<p>
+  A new external NCR has been logged and is awaiting review.
+</p>
+
+<table style="border-collapse: collapse; width: 100%; margin: 16px 0;">
+  <tr>
+    <td style="padding: 8px; font-weight: bold; width: 160px;">NCR Number</td>
+    <td style="padding: 8px;"><%= @external_ncr.display_name %></td>
+  </tr>
+  <tr style="background: #f9f9f9;">
+    <td style="padding: 8px; font-weight: bold;">Date</td>
+    <td style="padding: 8px;"><%= @external_ncr.date.strftime("%d %B %Y") %></td>
+  </tr>
+  <tr>
+    <td style="padding: 8px; font-weight: bold;">Customer</td>
+    <td style="padding: 8px;"><%= @external_ncr.customer_name.presence || "—" %></td>
+  </tr>
+  <tr style="background: #f9f9f9;">
+    <td style="padding: 8px; font-weight: bold;">Release Note(s)</td>
+    <td style="padding: 8px;"><%= @external_ncr.release_note_numbers.presence || "—" %></td>
+  </tr>
+  <% if @external_ncr.customer_ncr_number.present? %>
+  <tr>
+    <td style="padding: 8px; font-weight: bold;">Customer NCR Ref</td>
+    <td style="padding: 8px;"><%= @external_ncr.customer_ncr_number %></td>
+  </tr>
+  <% end %>
+  <% if @external_ncr.reject_quantity.present? %>
+  <tr style="background: #f9f9f9;">
+    <td style="padding: 8px; font-weight: bold;">Reject Quantity</td>
+    <td style="padding: 8px;"><%= @external_ncr.reject_quantity %></td>
+  </tr>
+  <% end %>
+  <tr>
+    <td style="padding: 8px; font-weight: bold;">Logged by</td>
+    <td style="padding: 8px;"><%= @creator&.full_name %></td>
+  </tr>
+  <tr style="background: #f9f9f9;">
+    <td style="padding: 8px; font-weight: bold;">Document</td>
+    <td style="padding: 8px;">
+      <% if @external_ncr.has_document? %>
+        ✅ Attached (<%= @external_ncr.document_filename %>)
+      <% else %>
+        ⚠️ No document uploaded
+      <% end %>
+    </td>
+  </tr>
+</table>
+
+<p>
+  <%= link_to "View NCR in HAMS →", @ncr_url, style: "background: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; display: inline-block;" %>
+</p>
+
+<p style="color: #6b7280; font-size: 13px; margin-top: 24px;">
+  This NCR is currently in <strong>Draft</strong> status. It will need to be reviewed and advanced
+  before a corrective action response is required.
+</p>

@@ -132,6 +132,16 @@ class ApplicationController < ActionController::Base
     true
   end
 
+  # NCR-specific guards (split read vs manage)
+  def require_ncr_manage_access
+    unless Current.user&.can_manage_ncrs?
+      Rails.logger.warn "Unauthorized NCR manage attempt by #{Current.user&.email_address || 'unknown user'} on #{request.path}"
+      redirect_to root_path, alert: "You don't have permission to manage NCRs."
+      return false
+    end
+    true
+  end
+
   def require_artifacts_access
     artifacts_users = [
       'daniel@hardanodisingstl.com',
