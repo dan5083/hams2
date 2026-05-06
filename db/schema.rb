@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_04_12_121050) do
+ActiveRecord::Schema[8.0].define(version: 2026_05_06_090005) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -109,7 +109,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_04_12_121050) do
   end
 
   create_table "external_ncrs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.integer "hal_ncr_number", null: false
+    t.integer "hal_ncr_number"
     t.date "date", default: -> { "CURRENT_DATE" }, null: false
     t.string "status", default: "draft", null: false
     t.uuid "created_by_id", null: false

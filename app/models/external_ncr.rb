@@ -34,7 +34,7 @@ class ExternalNcr < ApplicationRecord
     :document_uploaded_at
 
   # --- Validations ---
-  validates :hal_ncr_number, presence: true, uniqueness: true, numericality: { greater_than: 0 }
+  validates :hal_ncr_number, uniqueness: true, numericality: { greater_than: 0 }, allow_nil: true
   validates :date, presence: true
   validates :created_by_id, presence: true
   validates :status, inclusion: { in: %w[draft in_progress completed] }
@@ -57,7 +57,6 @@ class ExternalNcr < ApplicationRecord
   scope :missing_documents, -> { where(ncr_data: { cloudinary_public_id: [nil, ''] }) }
 
   # --- Callbacks ---
-  before_validation :set_ncr_number, if: :new_record?
   before_validation :set_defaults, if: :new_record?
   after_create :log_creation
   after_update :log_status_change, if: :saved_change_to_status?
@@ -65,11 +64,11 @@ class ExternalNcr < ApplicationRecord
   # --- Display helpers ---
 
   def display_name
-    "NCR#{hal_ncr_number}"
+    hal_ncr_number.present? ? "NCR#{hal_ncr_number}" : "Draft (unconfirmed)"
   end
 
   def display_title
-    parts = ["NCR#{hal_ncr_number}"]
+    parts = [hal_ncr_number.present? ? "NCR#{hal_ncr_number}" : "Draft (unconfirmed)"]
     parts << customer_name if customer_name.present?
     parts << part_display_name if part_display_name.present?
     parts << release_note_numbers
@@ -259,6 +258,10 @@ class ExternalNcr < ApplicationRecord
     new_status = next_status
     return false unless new_status
 
+    if status == 'draft'
+      assign_ncr_number
+    end
+
     if new_status == 'completed'
       self.completed_by_user_id = Current.user&.id
     end
@@ -333,7 +336,8 @@ class ExternalNcr < ApplicationRecord
     end
   end
 
-  def set_ncr_number
+  def assign_ncr_number
+    return if hal_ncr_number.present?
     sequence = Sequence.find_or_create_by(key: 'external_ncr_number')
     self.hal_ncr_number = sequence.value
     sequence.increment!(:value)
@@ -348,10 +352,10 @@ class ExternalNcr < ApplicationRecord
 
   def log_creation
     rn_numbers = release_notes.map(&:number).join(", ")
-    Rails.logger.info "Created External NCR #{hal_ncr_number} for Release Notes: #{rn_numbers}"
+    Rails.logger.info "Created draft External NCR (unconfirmed) for Release Notes: #{rn_numbers}"
   end
 
   def log_status_change
-    Rails.logger.info "External NCR #{hal_ncr_number} status changed from #{status_before_last_save} to #{status}"
+    Rails.logger.info "External NCR #{hal_ncr_number || '(unconfirmed)'} status changed from #{status_before_last_save} to #{status}"
   end
 end
