@@ -32,8 +32,8 @@
         <%= link_to "Parts", parts_path,
             class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(parts_path)}" %>
 
-        <!-- NCRs - Quality staff and management -->
-        <% if Current.user&.email_address&.in?(['chris@hardanodisingstl.com', 'quality@hardanodisingstl.com', 'phil@hardanodisingstl.com', 'tariq@hardanodisingstl.com', 'daniel@hardanodisingstl.com']) %>
+        <!-- NCRs - visible to all except Judy -->
+        <% if Current.user&.sees_ncrs? %>
           <%= link_to "NCRs", external_ncrs_path,
               class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(external_ncrs_path)}" %>
         <% end %>
@@ -99,7 +99,7 @@
       <!-- Quality submenu (mobile) -->
       <div class="border-t border-blue-600 mt-2 pt-2">
         <div class="text-white text-xs font-semibold px-3 py-1">QUALITY</div>
-        <% if Current.user&.email_address&.in?(['chris@hardanodisingstl.com', 'quality@hardanodisingstl.com', 'phil@hardanodisingstl.com', 'tariq@hardanodisingstl.com', 'daniel@hardanodisingstl.com']) %>
+        <% if Current.user&.sees_ncrs? %>
           <%= link_to "NCRs", external_ncrs_path,
               class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(external_ncrs_path)}" %>
         <% end %>
