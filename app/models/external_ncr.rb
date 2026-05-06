@@ -5,7 +5,7 @@ class ExternalNcr < ApplicationRecord
   has_many :release_notes, through: :external_ncr_release_notes
 
   belongs_to :created_by, class_name: 'User'
-  belongs_to :respondent, class_name: 'User', foreign_key: 'assigned_to_id'
+  belongs_to :respondent, class_name: 'User', foreign_key: 'assigned_to_id', optional: true
 
   # Virtual attribute — not persisted, set by controller to bypass release note validation
   attr_accessor :simple_upload
@@ -266,6 +266,7 @@ class ExternalNcr < ApplicationRecord
     return false unless new_status
 
     assign_ncr_number if status == 'draft'
+    self.respondent = Current.user if Current.user.present?
 
     if new_status == 'completed'
       self.completed_by_user_id = Current.user&.id
@@ -353,7 +354,7 @@ class ExternalNcr < ApplicationRecord
     self.date ||= Date.current
     self.status ||= 'draft'
     self.ncr_data ||= {}
-    self.respondent = created_by if created_by.present?
+    self.respondent = created_by if created_by.present? && !simple_upload
   end
 
   def log_creation
