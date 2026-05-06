@@ -47,30 +47,6 @@
           <p class="mt-1 text-xs text-gray-500">PDF, JPG, PNG, TIFF, DOC or DOCX — max 10MB</p>
         </div>
 
-        <!-- Customer Name -->
-        <div>
-          <%= f.label :manual_customer_name, "Customer Name", class: "block text-sm font-medium text-gray-700" %>
-          <%= f.text_field :manual_customer_name,
-              placeholder: "e.g. Eaton Aerospace",
-              class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
-        </div>
-
-        <!-- Date -->
-        <div>
-          <%= f.label :date, "Date Received", class: "block text-sm font-medium text-gray-700" %>
-          <%= f.date_field :date,
-              value: Date.current,
-              class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
-        </div>
-
-        <!-- Customer NCR Reference (optional) -->
-        <div>
-          <%= f.label :customer_ncr_number, "Customer's Reference No. (optional)", class: "block text-sm font-medium text-gray-700" %>
-          <%= f.text_field :customer_ncr_number,
-              placeholder: "e.g. NCR-2026-0042",
-              class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
-        </div>
-
       </div>
     </div>
 
