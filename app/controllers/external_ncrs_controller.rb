@@ -21,7 +21,6 @@ class ExternalNcrsController < ApplicationController
     @external_ncr = ExternalNcr.new
     @simple_mode = !Current.user.can_manage_ncrs? || params[:simple].present?
 
-    # If launched from a specific release note, pre-select it
     if params[:release_note_id].present?
       @preselected_release_note = ReleaseNote.find(params[:release_note_id])
     end
@@ -31,20 +30,17 @@ class ExternalNcrsController < ApplicationController
     @simple_mode = params[:simple_upload] == 'true' || !Current.user.can_manage_ncrs?
     @external_ncr = ExternalNcr.new(external_ncr_params)
 
-    # Auto-assign creator as respondent
-    @external_ncr.created_by = Current.user
-    @external_ncr.respondent = Current.user
+    @external_ncr.created_by  = Current.user
+    @external_ncr.respondent  = Current.user unless @simple_mode
     @external_ncr.simple_upload = @simple_mode
 
     unless @simple_mode
-      # Build release note associations from submitted IDs (UUIDs — do NOT .to_i)
       release_note_ids = Array(params[:external_ncr][:release_note_ids]).reject(&:blank?)
       release_note_ids.each do |rn_id|
         @external_ncr.external_ncr_release_notes.build(release_note_id: rn_id)
       end
     end
 
-    # Handle file upload — resolve date early to avoid nil.year
     uploaded_file = params[:external_ncr][:temp_document]
     date_for_path = @external_ncr.date.presence || Date.current
 
@@ -76,7 +72,6 @@ class ExternalNcrsController < ApplicationController
       NcrMailer.draft_created(@external_ncr).deliver_later
       redirect_to @external_ncr, notice: "External NCR #{@external_ncr.display_name} was successfully created."
     else
-      # Clean up uploaded file on save failure
       if @external_ncr.cloudinary_public_id.present?
         begin
           CloudinaryService.delete_file(@external_ncr.cloudinary_public_id)
@@ -285,7 +280,6 @@ class ExternalNcrsController < ApplicationController
       :reject_quantity,
       :description_of_non_conformance, :containment_action,
       :root_cause_analysis, :corrective_action, :preventive_action
-      # Note: release_note_ids, temp_document, and simple_upload are handled separately
     )
   end
 
