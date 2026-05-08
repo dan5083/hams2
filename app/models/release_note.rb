@@ -665,6 +665,10 @@ class ReleaseNote < ApplicationRecord
           if readings.blank? || readings.empty?
             errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} thickness measurement is required for aerospace/defense parts")
           else
+            unless readings.count % 8 == 0
+              errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} requires a multiple of 8 readings (#{readings.count} provided)")
+            end
+
             readings.each_with_index do |reading, index|
               if reading <= 0
                 errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} reading #{index + 1} must be greater than 0")
