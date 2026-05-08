@@ -559,7 +559,7 @@
       <div class="cert-footer">
         <h2>Statement</h2>
         <div class="statement">
-          <p>Certificate of conformity &ndash; We certify that the above work has been processed and inspected according to the terms of your order.<% if @release_note.remarks.present? %> <%= @release_note.remarks %><% end %></p>
+          <p><%= @release_note.remarks.present? ? @release_note.remarks : 'Certificate of conformity &ndash; We certify that the above work has been processed and inspected according to the terms of your order.' %></p>
         </div>
         <div class="signature-block">
           <span class="signature-name"><%= @release_note.issued_by.display_name %></span><br/>
