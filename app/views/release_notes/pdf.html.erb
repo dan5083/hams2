@@ -16,7 +16,7 @@
 
       @page {
         size: A4 portrait;
-        margin: 1.2cm 1cm 1cm 1cm;
+        margin: 1.8cm 1.5cm 1.5cm 1.5cm;
       }
 
       /* ----------------------------------------------------------------
@@ -29,11 +29,13 @@
       }
 
       /* ----------------------------------------------------------------
-         Certificate — starts on next sheet, pads to match @page margin
+         Certificate — starts on next sheet.
+         Small padding-top gives the logo breathing room since body
+         padding does not re-apply after a page break.
          ---------------------------------------------------------------- */
       .certificate-page {
         page-break-before: always;
-        padding: 0;
+        padding: 0.3rem 0 0 0;
       }
 
       /* ----------------------------------------------------------------
@@ -418,7 +420,9 @@
 
               <% if is_enp %>
                 <%# ============================================================
-                    ENP: one compact A-F table per batch.
+                    ENP: single transposed table — points as rows, batches as
+                    column groups (Before / After / Growth per batch).
+                    Works for 1–5 batches; all fit horizontally at 8pt on A4.
                     ============================================================ %>
                 <%
                   enp_batches = if has_batches
@@ -432,6 +436,7 @@
                   all_growths = enp_batches.flat_map { |b|
                     (b['enp_measurements'] || []).map { |m| m['growth_um'] }.compact.select { |g| g >= 0 }
                   }
+                  all_points = enp_batches.flat_map { |b| (b['enp_measurements'] || []).map { |m| m['point'] } }.uniq.sort
                 %>
 
                 <% if multi_batch && all_growths.any? %>
@@ -443,38 +448,39 @@
                   </div>
                 <% end %>
 
-                <% enp_batches.each do |batch| %>
-                  <%
-                    enp_measurements = batch['enp_measurements'] || []
-                    batch_number     = batch['batch_number']
-                    next if enp_measurements.empty?
-                  %>
-                  <% if multi_batch %>
-                    <div class="enp-batch-label">Batch <%= batch_number %></div>
-                  <% end %>
-                  <table class="enp-table">
-                    <thead>
-                      <tr>
-                        <th style="width:10%;">Point</th>
-                        <th style="width:30%;">Before (mm)</th>
-                        <th style="width:30%;">After (mm)</th>
-                        <th style="width:30%;">Growth (µm)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <% enp_measurements.each do |m| %>
-                        <tr>
-                          <td style="font-weight:bold;"><%= m['point'] %></td>
-                          <td><%= m['start_mm']  ? sprintf('%.3f', m['start_mm'])  : '—' %></td>
-                          <td><%= m['finish_mm'] ? sprintf('%.3f', m['finish_mm']) : '—' %></td>
-                          <td class="<%= m['growth_um'] && m['growth_um'] < 0 ? 'enp-growth-negative' : 'enp-growth-positive' %>">
-                            <%= m['growth_um'] ? sprintf('%.1f', m['growth_um']) : '—' %>
-                          </td>
-                        </tr>
+                <table class="enp-table">
+                  <thead>
+                    <tr>
+                      <th rowspan="2" style="width:6%; vertical-align:middle;">Point</th>
+                      <% enp_batches.each do |batch| %>
+                        <% label = multi_batch ? "Batch #{batch['batch_number']}" : "Measurements" %>
+                        <th colspan="3" style="text-align:center; background-color:#dbeafe; color:#1d4ed8;"><%= label %></th>
                       <% end %>
-                    </tbody>
-                  </table>
-                <% end %><!-- /enp_batches.each -->
+                    </tr>
+                    <tr>
+                      <% enp_batches.each do %>
+                        <th style="width:<%=  multi_batch ? '10' : '28' %>%;">Before (mm)</th>
+                        <th style="width:<%=  multi_batch ? '10' : '28' %>%;">After (mm)</th>
+                        <th style="width:<%=  multi_batch ? '8'  : '28' %>%;">Growth (µm)</th>
+                      <% end %>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% all_points.each do |point| %>
+                      <tr>
+                        <td style="font-weight:bold; text-align:center;"><%= point %></td>
+                        <% enp_batches.each do |batch| %>
+                          <% m = (batch['enp_measurements'] || []).find { |x| x['point'] == point } %>
+                          <td><%= m && m['start_mm']  ? sprintf('%.3f', m['start_mm'])  : '—' %></td>
+                          <td><%= m && m['finish_mm'] ? sprintf('%.3f', m['finish_mm']) : '—' %></td>
+                          <td class="<%= m && m['growth_um'] && m['growth_um'] < 0 ? 'enp-growth-negative' : 'enp-growth-positive' %>">
+                            <%= m && m['growth_um'] ? sprintf('%.1f', m['growth_um']) : '—' %>
+                          </td>
+                        <% end %>
+                      </tr>
+                    <% end %>
+                  </tbody>
+                </table>
 
               <% else %>
                 <%# ============================================================
