@@ -35,6 +35,7 @@
       .certificate-content {
         max-height: none;
         overflow: visible;
+        padding-bottom: 4.5cm; /* keep readings clear of the fixed footer */
       }
 
       /* Compressed mode for ENP / Aerospace jobs */
@@ -195,6 +196,41 @@
         padding-top: 0.5rem;
       }
       .company-footer a { color: #555; text-decoration: none; }
+
+      /*
+       * Fixed footer — repeats on every page of the CofC section.
+       * wkhtmltopdf renders position:fixed elements on every page within the
+       * @page content area, so the statement/signature/accreditation text
+       * will appear at the bottom of every sheet.
+       *
+       * padding-bottom on .certificate-content must exceed the footer height
+       * so batch readings never underlap it (~4.5cm covers statement +
+       * signature + NADCAP line with comfortable clearance).
+       */
+      .cofc-fixed-footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background-color: #ffffff;
+        padding-top: 0.4rem;
+        border-top: 2pt solid #ddd;
+      }
+      .cofc-fixed-footer .statement {
+        margin: 0 0 0.4rem 0;
+        padding: 0.5rem 0.75rem;
+      }
+      .cofc-fixed-footer .signature-block {
+        margin-top: 0.4rem;
+        margin-bottom: 0.3rem;
+      }
+      .cofc-fixed-footer .company-footer {
+        margin-top: 0.3rem;
+        border-top: 1pt solid #ddd;
+        padding-top: 0.3rem;
+      }
+
+      /* Push certificate content clear of the fixed footer — defined above on .certificate-content */
 
       .customer-reference-row {
         padding: 0.5rem;
@@ -609,25 +645,29 @@
           <% end %><!-- /measurements_by_type.each -->
         <% end %><!-- /has_thickness_measurements? -->
 
-        <!-- Statement -->
-        <h2>Statement</h2>
-        <div class="statement">
-          <p><%= simple_format(@release_note.remarks) if @release_note.remarks.present? %></p>
-        </div>
+      </div>
+    </div>
 
-        <!-- Signature Block -->
-        <div class="signature-block">
-          <p>
-            <span class="signature-name"><%= @release_note.issued_by.display_name %></span><br/>
-            For and on behalf of Hard Anodising Surface Treatments Ltd
-          </p>
-        </div>
-
-        <!-- Company Footer -->
-        <div class="company-footer">
-          <strong>HARD ANODISING SURFACE TREATMENTS LTD</strong> has been assessed and registered by NQA against the provisions of: AS9100D &amp; BS EN ISO 9001:2015. Certificate No: 22732<br/>
-          Hard Anodising Surface Treatments Limited has NADCAP accreditation for Chemical Processing Certificate Number 7426237911
-        </div>
+    <!--
+      Fixed footer — rendered by wkhtmltopdf at the bottom of every page of
+      the CofC section.  Keeping statement + signature + accreditation here
+      ensures every sheet of a multi-page certificate is fully self-certifying
+      for NADCAP audit purposes.
+    -->
+    <div class="cofc-fixed-footer">
+      <h2 style="margin: 0 0 0.3rem 0; font-size: 0.9em;">Statement</h2>
+      <div class="statement">
+        <p style="margin:0;">Certificate of conformity &ndash; We certify that the above work has been processed and inspected according to the terms of your order.<% if @release_note.remarks.present? %> <%= @release_note.remarks %><% end %></p>
+      </div>
+      <div class="signature-block">
+        <p style="margin:0;">
+          <span class="signature-name"><%= @release_note.issued_by.display_name %></span><br/>
+          For and on behalf of Hard Anodising Surface Treatments Ltd
+        </p>
+      </div>
+      <div class="company-footer">
+        <strong>HARD ANODISING SURFACE TREATMENTS LTD</strong> has been assessed and registered by NQA against the provisions of: AS9100D &amp; BS EN ISO 9001:2015. Certificate No: 22732<br/>
+        Hard Anodising Surface Treatments Limited has NADCAP accreditation for Chemical Processing Certificate Number 7426237911
       </div>
     </div>
   </body>
