@@ -7,7 +7,7 @@
         font-family: sans-serif;
         font-size: 9pt;
         margin: 0;
-        padding: 0;
+        padding: 1cm;
         --standard-border-width: 1pt;
         --standard-border-color: black;
         --standard-border-style: solid;
@@ -16,7 +16,7 @@
 
       @page {
         size: A4 portrait;
-        margin: 1.8cm 1.5cm 1.5cm 1.5cm;
+        margin: 1cm;
       }
 
       /* ----------------------------------------------------------------
@@ -30,12 +30,13 @@
 
       /* ----------------------------------------------------------------
          Certificate — starts on next sheet.
-         Small padding-top gives the logo breathing room since body
-         padding does not re-apply after a page break.
+         body padding does not re-apply after a page break, so we add
+         padding-top here to stop the logo sitting flush against the
+         @page top margin.
          ---------------------------------------------------------------- */
       .certificate-page {
         page-break-before: always;
-        padding: 0.3rem 0 0 0;
+        padding: 0.8cm 0 0 0;
       }
 
       /* ----------------------------------------------------------------
