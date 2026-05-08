@@ -1,4 +1,4 @@
-# app/controllers/release_notes_controller.rb - Updated to handle Elcometer readings arrays
+# app/controllers/release_notes_controller.rb - Updated to handle multi-batch measurements
 class ReleaseNotesController < ApplicationController
   before_action :set_release_note, only: [:show, :edit, :update, :destroy, :void, :pdf]
   before_action :set_works_order, only: [:new, :create]
@@ -7,7 +7,6 @@ class ReleaseNotesController < ApplicationController
     @release_notes = ReleaseNote.includes(:works_order, :issued_by, :invoice_item)
                                 .order(number: :desc)
 
-    # Filter by status
     case params[:status]
     when 'active'
       @release_notes = @release_notes.active
@@ -19,21 +18,16 @@ class ReleaseNotesController < ApplicationController
       @release_notes = @release_notes.joins(:invoice_item)
     end
 
-    # Filter by customer
     if params[:customer_id].present?
       @release_notes = @release_notes.joins(works_order: { customer_order: :customer })
-                                    .where(customer_orders: { customer_id: params[:customer_id] })
+                                     .where(customer_orders: { customer_id: params[:customer_id] })
     end
 
-    # Search by release note number
     if params[:search].present?
       @release_notes = @release_notes.where("number::text ILIKE ?", "%#{params[:search]}%")
     end
 
-    # For the filter dropdown
     @customers = Organization.customers.enabled.order(:name)
-
-    # Add pagination - 20 items per page to match customer orders
     @release_notes = @release_notes.page(params[:page]).per(20)
   end
 
@@ -50,7 +44,6 @@ class ReleaseNotesController < ApplicationController
     @release_note = @works_order.release_notes.build(release_note_params)
     @release_note.issued_by = Current.user
 
-    # Handle thickness measurements if present
     if thickness_measurements_provided?
       process_thickness_measurements
     end
@@ -68,7 +61,6 @@ class ReleaseNotesController < ApplicationController
       return
     end
 
-    # Store original quantities for comparison (used in form warnings)
     @original_quantity_accepted = @release_note.quantity_accepted
     @original_quantity_rejected = @release_note.quantity_rejected
   end
@@ -79,25 +71,21 @@ class ReleaseNotesController < ApplicationController
       return
     end
 
-    # Handle thickness measurements if present
     if thickness_measurements_provided?
       process_thickness_measurements
     end
 
-    # Store whether this release note was invoiced before update for messaging
     was_invoiced = @release_note.invoiced?
 
     if @release_note.update(release_note_params)
       success_message = 'Release note was successfully updated.'
 
-      # Add warning if quantities were changed on an invoiced release note
       if was_invoiced && (@release_note.quantity_accepted_previously_changed? || @release_note.quantity_rejected_previously_changed?)
         success_message += ' Note: This release note has already been invoiced - the invoice amounts will not be affected by quantity changes.'
       end
 
       redirect_to @release_note, notice: success_message
     else
-      # Store original quantities again for form warnings on re-render
       @original_quantity_accepted = @release_note.quantity_accepted_was
       @original_quantity_rejected = @release_note.quantity_rejected_was
       render :edit, status: :unprocessable_entity
@@ -123,8 +111,7 @@ class ReleaseNotesController < ApplicationController
   end
 
   def pdf
-    # Set up data for the PDF template - customer delivery documentation
-    @company_name = "Hard Anodising Surface Treatments Ltd"
+    @company_name    = "Hard Anodising Surface Treatments Ltd"
     @trading_address = "Firs Industrial Estate, Rickets Close\nKidderminster, DY11 7QN"
 
     respond_to do |format|
@@ -134,7 +121,11 @@ class ReleaseNotesController < ApplicationController
           render_to_string(
             template: 'release_notes/pdf',
             layout: false,
-            locals: { release_note: @release_note, company_name: @company_name, trading_address: @trading_address }
+            locals: {
+              release_note: @release_note,
+              company_name: @company_name,
+              trading_address: @trading_address
+            }
           ),
           format: 'A4',
           margin: { top: '1cm', bottom: '1cm', left: '1cm', right: '1cm' },
@@ -154,7 +145,6 @@ class ReleaseNotesController < ApplicationController
     @release_notes = ReleaseNote.requires_invoicing
                                 .includes(:works_order, :issued_by)
                                 .order(number: :desc)
-
     render :index
   end
 
@@ -180,113 +170,171 @@ class ReleaseNotesController < ApplicationController
   end
 
   def thickness_measurements_provided?
-    # Check if measurements were provided via JSON (from Elcometer or form submission)
-    params[:release_note][:measured_thicknesses].present? ||
-    # Check if individual thickness readings fields were provided (anodic)
-    params.keys.any? { |key| key.to_s.start_with?('thickness_readings_') } ||
-    # Check if ENP measurement fields were provided
-    params.keys.any? { |key| key.to_s.start_with?('enp_measurements_') } ||
-    # Check if legacy individual thickness fields were provided (backward compatibility)
-    params.keys.any? { |key| key.to_s.start_with?('thickness_measurement_') }
+    # Primary JSON payload (from submit handler)
+    return true if params[:release_note][:measured_thicknesses].present?
+
+    # Per-batch anodic fields: thickness_readings_<id>_b<n>  OR legacy thickness_readings_<id>
+    return true if params.keys.any? { |k|
+      k.to_s.start_with?('thickness_readings_') || k.to_s.start_with?('thickness_measurement_')
+    }
+
+    # Per-batch ENP fields: enp_measurements_<id>_b<n>  OR legacy enp_measurements_<id>
+    return true if params.keys.any? { |k| k.to_s.start_with?('enp_measurements_') }
+
+    false
   end
 
-def process_thickness_measurements
-  Rails.logger.info "Processing thickness measurements for release note"
+  # ---------------------------------------------------------------------------
+  # Primary path: the form's submit handler packs everything into a single JSON
+  # blob at release_note[measured_thicknesses].  The blob now uses the batches
+  # structure:
+  #
+  #   { "measurements": [
+  #       { "treatment_id": "abc123",
+  #         "process_type": "hard_anodising",
+  #         "display_name": "Hard Anodising",
+  #         "target_thickness": 25,
+  #         "batches": [
+  #           { "batch_number": 1, "readings": [70.5, 70.7, ...] },
+  #           { "batch_number": 2, "readings": [71.0, 70.8, ...] }
+  #         ]
+  #       },
+  #       { "treatment_id": "def456",
+  #         "process_type": "electroless_nickel_plating",
+  #         "batches": [
+  #           { "batch_number": 1, "enp_measurements": [{...}, ...] },
+  #           { "batch_number": 2, "enp_measurements": [{...}, ...] }
+  #         ]
+  #       }
+  #     ]
+  #   }
+  #
+  # Fallback path: individual per-batch fields (legacy or if JS failed).
+  #   Anodic field names: thickness_readings_<treatment_id>_b<n>
+  #   ENP field names:    enp_measurements_<treatment_id>_b<n>
+  # ---------------------------------------------------------------------------
+  def process_thickness_measurements
+    Rails.logger.info "Processing thickness measurements (batch-aware)"
 
-  # Try to process JSON data from form submission first
-  if release_note_params[:measured_thicknesses].present?
-    begin
-      json_data = JSON.parse(release_note_params[:measured_thicknesses])
-      if json_data.is_a?(Hash) && json_data['measurements'].is_a?(Array)
-        Rails.logger.info "Found JSON thickness data with #{json_data['measurements'].length} measurements"
-        @release_note.measured_thicknesses = json_data
-        return
+    # --- Primary path: JSON blob ---
+    if release_note_params[:measured_thicknesses].present?
+      begin
+        json_data = JSON.parse(release_note_params[:measured_thicknesses])
+        if json_data.is_a?(Hash) && json_data['measurements'].is_a?(Array)
+          Rails.logger.info "Processing JSON payload with #{json_data['measurements'].length} measurements"
+          @release_note.measured_thicknesses = json_data
+          return
+        end
+      rescue JSON::ParserError => e
+        Rails.logger.warn "Failed to parse JSON thickness data: #{e.message}"
       end
-    rescue JSON::ParserError => e
-      Rails.logger.warn "Failed to parse JSON thickness data: #{e.message}"
     end
-  end
 
-  # Process individual measurement fields
-  required_treatments = @release_note.get_required_treatments
-  @release_note.measured_thicknesses = { 'measurements' => [] }
+    # --- Fallback path: individual fields ---
+    required_treatments = @release_note.get_required_treatments
+    @release_note.measured_thicknesses = { 'measurements' => [] }
 
-  # Process anodic thickness readings fields (Elcometer and manual entry)
-  readings_fields = params.select { |key, _|
-    key.to_s.start_with?('thickness_readings_') || key.to_s.start_with?('thickness_measurement_')
-  }
+    # Collect anodic per-batch fields
+    # Field name patterns:
+    #   thickness_readings_<treatment_id>_b<n>    (new batch format)
+    #   thickness_readings_<treatment_id>          (legacy single batch)
+    #   thickness_measurement_<treatment_id>       (older legacy)
+    anodic_fields = params.select { |k, _|
+      k.to_s.start_with?('thickness_readings_') || k.to_s.start_with?('thickness_measurement_')
+    }
 
-  readings_fields.each do |field_name, field_value|
-    # Extract treatment_id (works for both field name formats)
-    treatment_id = field_name.to_s.sub(/^thickness_(readings|measurement)_/, '')
+    # Group by treatment_id → { treatment_id => { batch_number => field_value } }
+    anodic_by_treatment = {}
+    anodic_fields.each do |field_name, field_value|
+      base = field_name.to_s.sub(/^thickness_(readings|measurement)_/, '')
 
-    treatment_info = required_treatments.find { |t| t[:treatment_id] == treatment_id }
-    next unless treatment_info
-
-    begin
-      # Parse readings - handle both JSON arrays and single values
-      readings = if field_value.is_a?(String) && field_value.strip.start_with?('[')
-        JSON.parse(field_value) # Elcometer: "[70.5, 70.7, 69.9]"
-      elsif field_value.present?
-        [field_value] # Manual entry: "25.4" -> [25.4]
+      treatment_id, batch_number = if base =~ /^(.+)_b(\d+)$/
+        [$1, $2.to_i]
       else
-        []
+        [base, 1]
       end
 
-      if readings.any?
-        Rails.logger.info "Processing #{readings.count} anodic reading(s) for treatment #{treatment_id}"
-        success = @release_note.set_thickness_measurement(treatment_id, readings, treatment_info)
+      anodic_by_treatment[treatment_id] ||= {}
+      anodic_by_treatment[treatment_id][batch_number] = field_value
+    end
 
+    anodic_by_treatment.each do |treatment_id, batches_hash|
+      treatment_info = required_treatments.find { |t| t[:treatment_id] == treatment_id }
+      next unless treatment_info
+
+      batches = batches_hash
+        .map { |batch_number, field_value| { 'batch_number' => batch_number, 'readings' => parse_readings_field(field_value) } }
+        .sort_by { |b| b['batch_number'] }
+
+      if batches.any? { |b| b['readings'].any? }
+        Rails.logger.info "Processing #{batches.count} anodic batch(es) for treatment #{treatment_id}"
+        success = @release_note.set_thickness_measurement(treatment_id, batches, treatment_info)
         unless success
-          @release_note.errors.add(:measured_thicknesses,
-            "Invalid readings for #{treatment_info[:display_name]}")
+          @release_note.errors.add(:measured_thicknesses, "Invalid readings for #{treatment_info[:display_name]}")
         end
       end
-    rescue JSON::ParserError => e
-      Rails.logger.error "Failed to parse readings for #{treatment_id}: #{e.message}"
-      @release_note.errors.add(:measured_thicknesses,
-        "Invalid data format for #{treatment_info[:display_name]}")
     end
-  end
 
-  # Process ENP measurement fields
-  enp_fields = params.select { |key, _| key.to_s.start_with?('enp_measurements_') }
+    # Collect ENP per-batch fields
+    # Field name patterns:
+    #   enp_measurements_<treatment_id>_b<n>    (new batch format)
+    #   enp_measurements_<treatment_id>          (legacy single batch)
+    enp_fields = params.select { |k, _| k.to_s.start_with?('enp_measurements_') }
 
-  enp_fields.each do |field_name, field_value|
-    # Extract treatment_id: enp_measurements_abc123
-    treatment_id = field_name.to_s.sub(/^enp_measurements_/, '')
+    enp_by_treatment = {}
+    enp_fields.each do |field_name, field_value|
+      base = field_name.to_s.sub(/^enp_measurements_/, '')
 
-    treatment_info = required_treatments.find { |t| t[:treatment_id] == treatment_id }
-    next unless treatment_info
-
-    begin
-      # Parse ENP measurements JSON
-      enp_data = if field_value.is_a?(String) && field_value.strip.present?
-        JSON.parse(field_value)
+      treatment_id, batch_number = if base =~ /^(.+)_b(\d+)$/
+        [$1, $2.to_i]
       else
-        []
+        [base, 1]
       end
 
-      if enp_data.any?
-        Rails.logger.info "Processing #{enp_data.count} ENP measurement(s) for treatment #{treatment_id}"
+      enp_by_treatment[treatment_id] ||= {}
+      enp_by_treatment[treatment_id][batch_number] = field_value
+    end
 
-        # Add enp_type to treatment_info if available
+    enp_by_treatment.each do |treatment_id, batches_hash|
+      treatment_info = required_treatments.find { |t| t[:treatment_id] == treatment_id }
+      next unless treatment_info
+
+      batches = batches_hash.map do |batch_number, field_value|
+        enp_data = begin
+          field_value.present? ? JSON.parse(field_value) : []
+        rescue JSON::ParserError => e
+          Rails.logger.error "Failed to parse ENP batch #{batch_number} for #{treatment_id}: #{e.message}"
+          @release_note.errors.add(:measured_thicknesses, "Invalid ENP data format for #{treatment_info[:display_name]} batch #{batch_number}")
+          []
+        end
+        { 'batch_number' => batch_number, 'enp_measurements' => enp_data }
+      end.sort_by { |b| b['batch_number'] }
+
+      if batches.any? { |b| b['enp_measurements'].any? }
+        Rails.logger.info "Processing #{batches.count} ENP batch(es) for treatment #{treatment_id}"
         treatment_info[:enp_type] = treatment_info[:process_type]
-
-        success = @release_note.set_enp_measurements(treatment_id, enp_data, treatment_info)
-
+        success = @release_note.set_enp_measurements(treatment_id, batches, treatment_info)
         unless success
-          @release_note.errors.add(:measured_thicknesses,
-            "Invalid ENP measurements for #{treatment_info[:display_name]}")
+          @release_note.errors.add(:measured_thicknesses, "Invalid ENP measurements for #{treatment_info[:display_name]}")
         end
       end
-    rescue JSON::ParserError => e
-      Rails.logger.error "Failed to parse ENP measurements for #{treatment_id}: #{e.message}"
-      @release_note.errors.add(:measured_thicknesses,
-        "Invalid ENP data format for #{treatment_info[:display_name]}")
     end
   end
-end
+
+  # Parses a readings field value which may be a JSON array ("[]") or a single value.
+  def parse_readings_field(field_value)
+    return [] if field_value.blank?
+
+    if field_value.is_a?(String) && field_value.strip.start_with?('[')
+      begin
+        JSON.parse(field_value)
+      rescue JSON::ParserError
+        []
+      end
+    else
+      [field_value]
+    end
+  end
 end
 
 # =============================================================================
@@ -310,7 +358,6 @@ end
 # parts.each do |part|
 #   treatments = part.get_treatments
 #   if part.aerospace_defense? && treatments.empty? && part.locked_for_editing?
-#     # Check if they have anodising in locked operations
 #     has_anodising = part.locked_operations.any? do |op|
 #       op_text = op["operation_text"]&.downcase || ""
 #       op_name = op["display_name"]&.downcase || ""
@@ -324,79 +371,28 @@ end
 # 2. FIX A PART - Add Thickness Measurement Requirement
 # -----------------------------------------------------------------------------
 #
-# CHROMIC ANODISING:
-# ------------------
-# part = Part.find_by(part_number: 'PART-NUMBER-HERE')
-# part.customisation_data["operation_selection"]["treatments"] = [
-#   {
-#     "type" => "chromic_anodising",
-#     "operation_id" => "CHROMIC_22V",
-#     "selected_jig_type" => "titanium_wire",
-#     "target_thickness" => 5
-#   }
-# ].to_json
-# part.save!
-#
 # HARD ANODISING:
-# ---------------
 # part = Part.find_by(part_number: 'PART-NUMBER-HERE')
 # part.customisation_data["operation_selection"]["treatments"] = [
-#   {
-#     "type" => "hard_anodising",
-#     "operation_id" => "HARD_ANODISING",
-#     "selected_jig_type" => "titanium_wire",
-#     "target_thickness" => 25
-#   }
+#   { "type" => "hard_anodising", "operation_id" => "HARD_ANODISING",
+#     "selected_jig_type" => "titanium_wire", "target_thickness" => 25 }
 # ].to_json
 # part.save!
 #
-# STANDARD ANODISING:
-# -------------------
-# part = Part.find_by(part_number: 'PART-NUMBER-HERE')
+# CHROMIC ANODISING:
 # part.customisation_data["operation_selection"]["treatments"] = [
-#   {
-#     "type" => "standard_anodising",
-#     "operation_id" => "STANDARD_ANODISING",
-#     "selected_jig_type" => "titanium_wire",
-#     "target_thickness" => 15
-#   }
+#   { "type" => "chromic_anodising", "operation_id" => "CHROMIC_22V",
+#     "selected_jig_type" => "titanium_wire", "target_thickness" => 5 }
 # ].to_json
 # part.save!
 #
-# MULTIPLE TREATMENTS (e.g., Chromic + Hard):
-# --------------------------------------------
-# part = Part.find_by(part_number: 'PART-NUMBER-HERE')
+# MULTIPLE TREATMENTS:
 # part.customisation_data["operation_selection"]["treatments"] = [
-#   {
-#     "type" => "chromic_anodising",
-#     "operation_id" => "CHROMIC_22V",
-#     "selected_jig_type" => "titanium_wire",
-#     "target_thickness" => 5
-#   },
-#   {
-#     "type" => "hard_anodising",
-#     "operation_id" => "HARD_ANODISING",
-#     "selected_jig_type" => "titanium_wire",
-#     "target_thickness" => 25
-#   }
+#   { "type" => "chromic_anodising", ... },
+#   { "type" => "hard_anodising", ... }
 # ].to_json
 # part.save!
 #
-# -----------------------------------------------------------------------------
-# 3. VERIFY THE FIX
-# -----------------------------------------------------------------------------
-#
-# wo = part.works_orders.last
-# if wo
-#   rn = wo.release_notes.build
-#   puts "✅ Requires thickness: #{rn.requires_thickness_measurements?}"
-#   puts "Required treatments: #{rn.get_required_treatments.inspect}"
-# end
-#
-# -----------------------------------------------------------------------------
-# NOTES:
-# - Adjust target_thickness to match your specification
-# - Common jig types: "titanium_wire", "titanium_bar", "aluminium_bar"
-# - Valid types: "chromic_anodising", "hard_anodising", "standard_anodising"
-# - For multiple treatments, just add more hashes to the array
+# Valid types: "chromic_anodising", "hard_anodising", "standard_anodising"
+# Common jig types: "titanium_wire", "titanium_bar", "aluminium_bar"
 # =============================================================================

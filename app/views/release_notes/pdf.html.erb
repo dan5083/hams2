@@ -19,7 +19,7 @@
         margin: 1cm;
       }
 
-      /* Force Advice Note to print on right side (odd page) and single sided */
+      /* Advice Note always on right side / odd page, single sided */
       .advice-note {
         page-break-before: right;
         page-break-after: always;
@@ -27,145 +27,47 @@
         overflow: hidden;
       }
 
-      /* Certificate starts on next sheet, can use both sides */
+      /* Certificate starts on next sheet, can use multiple sides */
       .certificate-page {
         page-break-before: right;
       }
 
-      /* Allow certificate content to flow across pages */
       .certificate-content {
         max-height: none;
         overflow: visible;
       }
 
-      /* Compressed mode for ENP/Aerospace jobs */
-      .certificate-page.compressed .logo-header {
-        margin-bottom: 0.5rem;
-      }
-
-      .certificate-page.compressed h1 {
-        margin: 0.4rem 0;
-        font-size: 1.2em;
-      }
-
-      .certificate-page.compressed h2 {
-        font-size: 0.9em;
-        margin: 0.5rem 0 0.3rem 0;
-      }
-
-      .certificate-page.compressed table {
-        margin-bottom: 0.5rem;
-      }
-
-      .certificate-page.compressed .header-table {
-        margin-bottom: 0.5rem;
-      }
-
-      .certificate-page.compressed .addresses {
-        margin-bottom: 0.5rem;
-      }
-
-      .certificate-page.compressed .detail-table {
-        margin-top: 0.5rem;
-        margin-bottom: 0.5rem;
-      }
-
+      /* Compressed mode for ENP / Aerospace jobs */
+      .certificate-page.compressed .logo-header  { margin-bottom: 0.5rem; }
+      .certificate-page.compressed h1            { margin: 0.4rem 0; font-size: 1.2em; }
+      .certificate-page.compressed h2            { font-size: 0.9em; margin: 0.5rem 0 0.3rem 0; }
+      .certificate-page.compressed table         { margin-bottom: 0.5rem; }
+      .certificate-page.compressed .header-table { margin-bottom: 0.5rem; }
+      .certificate-page.compressed .addresses    { margin-bottom: 0.5rem; }
+      .certificate-page.compressed .detail-table { margin-top: 0.5rem; margin-bottom: 0.5rem; }
       .certificate-page.compressed th,
-      .certificate-page.compressed td {
-        padding: 0.25rem;
-      }
-
-      .certificate-page.compressed .thickness-group {
-        margin-bottom: 0.4rem;
-      }
-
-      .certificate-page.compressed .thickness-stats {
-        padding: 0.2rem 0.3rem;
-        margin-bottom: 0.2rem;
-        font-size: 8pt;
-      }
-
-      .certificate-page.compressed .thickness-table {
-        margin-top: 0.3rem;
-        margin-bottom: 0.4rem;
-      }
-
+      .certificate-page.compressed td            { padding: 0.25rem; }
+      .certificate-page.compressed .thickness-group   { margin-bottom: 0.4rem; }
+      .certificate-page.compressed .thickness-stats   { padding: 0.2rem 0.3rem; margin-bottom: 0.2rem; font-size: 8pt; }
+      .certificate-page.compressed .thickness-table   { margin-top: 0.3rem; margin-bottom: 0.4rem; }
       .certificate-page.compressed .thickness-table th,
-      .certificate-page.compressed .thickness-table td {
-        padding: 0.2rem;
-        font-size: 8pt;
-      }
+      .certificate-page.compressed .thickness-table td { padding: 0.2rem; font-size: 8pt; }
+      .certificate-page.compressed .statement         { margin: 0.5rem 0; padding: 0.4rem; }
+      .certificate-page.compressed .signature-block   { margin-top: 0.75rem; }
+      .certificate-page.compressed .company-footer    { margin-top: 0.5rem; font-size: 8pt; line-height: 1.3; }
+      .certificate-page.compressed .readings-grid     { gap: 0.15rem; padding: 0.2rem; font-size: 7.5pt; }
+      .certificate-page.compressed .reading-value     { padding: 0.15rem; }
 
-      .certificate-page.compressed .statement {
-        margin: 0.5rem 0;
-        padding: 0.4rem;
-      }
+      .logo-header         { text-align: left; margin-bottom: 1rem; }
+      .logo-header img     { max-width: 250px; height: auto; }
 
-      .certificate-page.compressed .signature-block {
-        margin-top: 0.75rem;
-      }
+      .company-contact     { text-align: right; font-size: 8pt; color: #555; margin-top: 0.5rem; line-height: 1.2; }
+      .company-contact a   { color: #555; text-decoration: none; }
 
-      .certificate-page.compressed .company-footer {
-        margin-top: 0.5rem;
-        font-size: 8pt;
-        line-height: 1.3;
-      }
+      h1 { text-align: center; margin: 0.75rem 0; font-size: 1.3em; }
+      h2 { font-size: 0.95em; margin: 0.75rem 0 0.4rem 0; }
 
-      .certificate-page.compressed .readings-grid {
-        gap: 0.15rem;
-        padding: 0.2rem;
-        font-size: 7.5pt;
-      }
-
-      .certificate-page.compressed .reading-value {
-        padding: 0.15rem;
-      }
-
-      .logo-header {
-        text-align: left;
-        margin-bottom: 1rem;
-      }
-
-      .logo-header img {
-        max-width: 250px;
-        height: auto;
-      }
-
-      /* Company contact info styling */
-      .company-contact {
-        text-align: right;
-        font-size: 8pt;
-        color: #555;
-        margin-top: 0.5rem;
-        line-height: 1.2;
-      }
-
-      .company-contact a {
-        color: #555;
-        text-decoration: none;
-      }
-
-      .company-contact a:hover {
-        text-decoration: underline;
-      }
-
-      h1 {
-        text-align: center;
-        margin: 0.75rem 0;
-        font-size: 1.3em;
-      }
-
-      h2 {
-        font-size: 0.95em;
-        margin: 0.75rem 0 0.4rem 0;
-      }
-
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 0.75rem;
-      }
-
+      table { width: 100%; border-collapse: collapse; margin-bottom: 0.75rem; }
       th, td {
         border-color: var(--standard-border-color);
         border-style: var(--standard-border-style);
@@ -173,57 +75,19 @@
         padding: 0.4rem;
         vertical-align: top;
       }
+      th { background-color: #f8f9fa; font-weight: bold; text-align: left; width: 30%; }
 
-      th {
-        background-color: #f8f9fa;
-        font-weight: bold;
-        text-align: left;
-        width: 30%;
-      }
+      .addresses          { table-layout: fixed; margin-bottom: 1rem; }
+      .address            { width: 50%; vertical-align: top; padding: 0.4rem; }
+      .address h2         { font-size: 0.9em; margin: 0 0 0.4rem 0; text-decoration: underline; }
+      .address p          { margin: 0; line-height: 1.3; }
 
-      .addresses {
-        table-layout: fixed;
-        margin-bottom: 1rem;
-      }
+      .header-table       { margin-bottom: 1rem; }
+      .detail-table       { margin-top: 0.75rem; margin-bottom: 1rem; }
 
-      .address {
-        width: 50%;
-        vertical-align: top;
-        padding: 0.4rem;
-      }
-
-      .address h2 {
-        font-size: 0.9em;
-        margin: 0 0 0.4rem 0;
-        text-decoration: underline;
-      }
-
-      .address p {
-        margin: 0;
-        line-height: 1.3;
-      }
-
-      .header-table {
-        margin-bottom: 1rem;
-      }
-
-      .detail-table {
-        margin-top: 0.75rem;
-        margin-bottom: 1rem;
-      }
-
-      .signature-table {
-        table-layout: fixed;
-        margin-top: 1rem;
-      }
-
-      .signature-table th {
-        width: 25%;
-      }
-
-      .signature-table td {
-        height: 2.5rem;
-      }
+      .signature-table    { table-layout: fixed; margin-top: 1rem; }
+      .signature-table th { width: 25%; }
+      .signature-table td { height: 2.5rem; }
 
       .signature-name {
         font-family: 'Times New Roman', serif;
@@ -239,24 +103,13 @@
         background-color: #f8f9fa;
       }
 
-      .signature-block {
-        margin-top: 1.5rem;
-        text-align: center;
-      }
+      .signature-block { margin-top: 1.5rem; text-align: center; }
 
-      .thickness-table {
-        margin-top: 0.5rem;
-        margin-bottom: 0.75rem;
-      }
+      /* ---- Thickness / anodic readings ---- */
+      .thickness-table              { margin-top: 0.5rem; margin-bottom: 0.75rem; }
+      .thickness-table th           { width: auto; }
 
-      .thickness-table th {
-        width: auto;
-      }
-
-      .thickness-group {
-        margin-bottom: 0.75rem;
-      }
-
+      .thickness-group              { margin-bottom: 0.75rem; }
       .thickness-group-header {
         background-color: #e9ecef;
         font-weight: bold;
@@ -264,6 +117,7 @@
         border-bottom: 2pt solid #ccc;
       }
 
+      /* Overall (combined) stats bar */
       .thickness-stats {
         background-color: #f8f9fa;
         padding: 0.3rem 0.4rem;
@@ -271,24 +125,28 @@
         border: 1pt solid #ddd;
         font-size: 8.5pt;
       }
+      .thickness-stats strong { color: #2563eb; }
 
-      .thickness-stats strong {
-        color: #2563eb;
+      /* Per-batch section */
+      .batch-section         { margin-bottom: 0.5rem; }
+      .batch-header {
+        background-color: #eff6ff;
+        border: 1pt solid #bfdbfe;
+        padding: 0.2rem 0.4rem;
+        font-size: 8pt;
+        font-weight: bold;
+        color: #1d4ed8;
+        margin-bottom: 0.2rem;
+      }
+      .batch-stats {
+        background-color: #f8f9fa;
+        padding: 0.2rem 0.4rem;
+        margin-bottom: 0.2rem;
+        border: 1pt solid #e2e8f0;
+        font-size: 8pt;
       }
 
-      .gauge-info {
-        background-color: #fffbeb;
-        border: 1pt solid #fbbf24;
-        padding: 0.4rem;
-        margin-bottom: 0.5rem;
-        font-size: 8.5pt;
-        line-height: 1.4;
-      }
-
-      .gauge-info strong {
-        color: #92400e;
-      }
-
+      /* Anodic readings grid */
       .readings-grid {
         display: grid;
         grid-template-columns: repeat(8, 1fr);
@@ -298,7 +156,6 @@
         border: 1pt solid #ddd;
         font-size: 8pt;
       }
-
       .reading-value {
         text-align: center;
         padding: 0.2rem;
@@ -307,53 +164,27 @@
         border-radius: 2pt;
       }
 
-      /* ENP measurements table styling */
-      .enp-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 0.5rem;
-        margin-bottom: 0.75rem;
+      /* Gauge info box */
+      .gauge-info {
+        background-color: #fffbeb;
+        border: 1pt solid #fbbf24;
+        padding: 0.4rem;
+        margin-bottom: 0.5rem;
         font-size: 8.5pt;
+        line-height: 1.4;
       }
+      .gauge-info strong { color: #92400e; }
 
-      .enp-table thead th {
-        background-color: #e9ecef;
-        font-weight: bold;
-        text-align: center;
-        padding: 0.3rem;
-        border: 1pt solid #adb5bd;
-      }
+      /* ENP measurements */
+      .enp-table                    { width: 100%; border-collapse: collapse; margin-top: 0.4rem; margin-bottom: 0.5rem; font-size: 8.5pt; }
+      .enp-table thead th           { background-color: #e9ecef; font-weight: bold; text-align: center; padding: 0.3rem; border: 1pt solid #adb5bd; }
+      .enp-table tbody td           { text-align: center; padding: 0.3rem; border: 1pt solid #dee2e6; }
+      .enp-table tbody tr:nth-child(even) { background-color: #f8f9fa; }
+      .enp-point                    { font-weight: bold; background-color: #e9ecef; }
+      .enp-growth-positive          { color: #16a34a; font-weight: bold; }
+      .enp-growth-negative          { color: #dc2626; font-weight: bold; }
 
-      .enp-table tbody td {
-        text-align: center;
-        padding: 0.3rem;
-        border: 1pt solid #dee2e6;
-      }
-
-      .enp-table tbody tr:nth-child(even) {
-        background-color: #f8f9fa;
-      }
-
-      .enp-point {
-        font-weight: bold;
-        background-color: #e9ecef;
-      }
-
-      .enp-growth-positive {
-        color: #16a34a;
-        font-weight: bold;
-      }
-
-      .enp-growth-negative {
-        color: #dc2626;
-        font-weight: bold;
-      }
-
-      .compact {
-        /* Can be applied to any table to reduce spacing */
-      }
-
-      /* Company footer styling */
+      /* Company footer */
       .company-footer {
         margin-top: 1rem;
         text-align: center;
@@ -363,15 +194,7 @@
         border-top: 1pt solid #ddd;
         padding-top: 0.5rem;
       }
-
-      .company-footer a {
-        color: #555;
-        text-decoration: none;
-      }
-
-      .company-footer a:hover {
-        text-decoration: underline;
-      }
+      .company-footer a { color: #555; text-decoration: none; }
 
       .customer-reference-row {
         padding: 0.5rem;
@@ -381,20 +204,19 @@
         font-weight: bold;
         text-align: center;
       }
+
+      .compact { /* table density helper */ }
     </style>
   </head>
   <body>
     <%
-      # Determine if we need compressed mode (ENP or Aerospace)
       is_special_customer = @release_note.works_order.customer_order.customer.name.include?('Lufthansa')
 
-      # Check if any measurements are ENP type
       has_enp = false
       if @release_note.has_thickness_measurements?
-        measurements_by_type = @release_note.thickness_measurements_by_type
-        measurements_by_type.each do |process_type, measurements|
-          measurements.each do |measurement|
-            if @release_note.treatment_is_enp?(measurement['process_type'])
+        @release_note.thickness_measurements_by_type.each do |_, measurements|
+          measurements.each do |m|
+            if @release_note.treatment_is_enp?(m['process_type'])
               has_enp = true
               break
             end
@@ -403,28 +225,27 @@
         end
       end
 
-      # Aerospace is typically indicated by specification or customer type
       is_aerospace = @release_note.specification.to_s.match?(/AMS|BAC|DTD|DEF STAN|AEROSPACE/i) ||
                      @release_note.works_order.customer_order.customer.name.match?(/AEROSPACE|AIRCRAFT|AVIATION/i)
 
       use_compressed_mode = has_enp || is_aerospace
 
-      # Extract CS-Order and Serial Number if present in customer reference
-      cs_order = nil
+      # Extract CS-Order and Serial Number from customer reference
+      cs_order  = nil
       serial_no = nil
       if @release_note.works_order.customer_reference.present?
-        ref = @release_note.works_order.customer_reference
-        cs_order = ref.match(/CS-?Order[:\s]+([^\s\/]+)/i)&.captures&.first
+        ref       = @release_note.works_order.customer_reference
+        cs_order  = ref.match(/CS-?Order[:\s]+([^\s\/]+)/i)&.captures&.first
         serial_no = ref.match(/(?:S\/N|SerialNo\.)[:\s]+(.+)/i)&.captures&.first&.strip
       end
     %>
 
-    <!-- Page 1: Advice Note (Always right side/odd page, single sided) -->
+    <!-- ================================================================
+         Page 1: Advice Note (always right / odd page, single sided)
+         ================================================================ -->
     <div class="advice-note">
-      <!-- Logo Header -->
       <div class="logo-header">
         <%= image_tag("logo-with-company-name.png", alt: "Hard Anodising Surface Treatments Ltd") %>
-        <!-- Company contact info in header -->
         <div class="company-contact">
           Firs Industrial Estate, Rickets Close, Kidderminster DY11 7QN<br/>
           Tel: 01562 747100 | <a href="https://www.hard-anodising.co.uk/">www.hard-anodising.co.uk</a>
@@ -433,21 +254,13 @@
 
       <h1>Advice Note</h1>
 
-      <!-- Header Information -->
       <table class="header-table">
         <tbody>
-          <tr>
-            <th>Release Note Number</th>
-            <td>RN<%= @release_note.number %></td>
-          </tr>
-          <tr>
-            <th>Date</th>
-            <td><%= @release_note.date.strftime("%d/%m/%Y") %></td>
-          </tr>
+          <tr><th>Release Note Number</th><td>RN<%= @release_note.number %></td></tr>
+          <tr><th>Date</th><td><%= @release_note.date.strftime("%d/%m/%Y") %></td></tr>
         </tbody>
       </table>
 
-      <!-- Customer Details -->
       <table class="addresses">
         <tbody>
           <tr>
@@ -469,7 +282,6 @@
         </tbody>
       </table>
 
-      <!-- Release Note Details -->
       <table class="detail-table">
         <tbody>
           <tr>
@@ -482,68 +294,34 @@
             </td>
           </tr>
           <% if @release_note.works_order.customer_reference.present? %>
-            <tr>
-              <th>Customer Reference</th>
-              <td><%= @release_note.works_order.customer_reference %></td>
-            </tr>
+            <tr><th>Customer Reference</th><td><%= @release_note.works_order.customer_reference %></td></tr>
           <% end %>
-          <tr>
-            <th>Part Number</th>
-            <td><%= @release_note.works_order.part_number %></td>
-          </tr>
-          <tr>
-            <th>Issue</th>
-            <td><%= @release_note.works_order.part_issue %></td>
-          </tr>
-          <tr>
-            <th>Description</th>
-            <td><%= @release_note.works_order.part_description %></td>
-          </tr>
-          <tr>
-            <th>Specification</th>
-            <td><%= @release_note.specification %></td>
-          </tr>
-          <tr>
-            <th>Quantity Accepted</th>
-            <td><%= @release_note.quantity_accepted %></td>
-          </tr>
-          <tr>
-            <th>Quantity Rejected</th>
-            <td><%= @release_note.quantity_rejected %></td>
-          </tr>
-          <tr>
-            <th>Our Works Order Number</th>
-            <td>WO<%= @release_note.works_order.number %></td>
-          </tr>
+          <tr><th>Part Number</th><td><%= @release_note.works_order.part_number %></td></tr>
+          <tr><th>Issue</th><td><%= @release_note.works_order.part_issue %></td></tr>
+          <tr><th>Description</th><td><%= @release_note.works_order.part_description %></td></tr>
+          <tr><th>Specification</th><td><%= @release_note.specification %></td></tr>
+          <tr><th>Quantity Accepted</th><td><%= @release_note.quantity_accepted %></td></tr>
+          <tr><th>Quantity Rejected</th><td><%= @release_note.quantity_rejected %></td></tr>
+          <tr><th>Our Works Order Number</th><td>WO<%= @release_note.works_order.number %></td></tr>
         </tbody>
       </table>
 
-      <!-- Signature Table -->
       <table class="signature-table">
         <tbody>
-          <tr>
-            <th>Name</th>
-            <td></td>
-          </tr>
-          <tr>
-            <th>Signature</th>
-            <td></td>
-          </tr>
-          <tr>
-            <th>Date</th>
-            <td></td>
-          </tr>
+          <tr><th>Name</th><td></td></tr>
+          <tr><th>Signature</th><td></td></tr>
+          <tr><th>Date</th><td></td></tr>
         </tbody>
       </table>
     </div>
 
-    <!-- Page 2+: Certificate of Conformity (Can use multiple sides) -->
+    <!-- ================================================================
+         Page 2+: Certificate of Conformity
+         ================================================================ -->
     <div class="certificate-page <%= 'compressed' if use_compressed_mode %>">
       <div class="certificate-content">
-        <!-- Logo Header -->
         <div class="logo-header">
           <%= image_tag("logo-with-company-name.png", alt: "Hard Anodising Surface Treatments Ltd") %>
-          <!-- Company contact info in header -->
           <div class="company-contact">
             Firs Industrial Estate, Rickets Close, Kidderminster DY11 7QN<br/>
             Tel: 01562 747100 | <a href="https://www.hard-anodising.co.uk/">www.hard-anodising.co.uk</a>
@@ -551,26 +329,18 @@
         </div>
 
         <% if @release_note.works_order.part.aerospace_defense? %>
-        <h1>Certificate of Conformity - NADCAP Accredited</h1>
+          <h1>Certificate of Conformity - NADCAP Accredited</h1>
         <% else %>
-        <h1>Certificate of Conformity</h1>
+          <h1>Certificate of Conformity</h1>
         <% end %>
 
-        <!-- Header Information -->
         <table class="header-table compact">
           <tbody>
-            <tr>
-              <th>Release Note Number</th>
-              <td>RN<%= @release_note.number %></td>
-            </tr>
-            <tr>
-              <th>Date</th>
-              <td><%= @release_note.date.strftime("%d/%m/%Y") %></td>
-            </tr>
+            <tr><th>Release Note Number</th><td>RN<%= @release_note.number %></td></tr>
+            <tr><th>Date</th><td><%= @release_note.date.strftime("%d/%m/%Y") %></td></tr>
           </tbody>
         </table>
 
-        <!-- Invoice Address Only (removed deliver to) -->
         <table class="addresses compact">
           <tbody>
             <tr>
@@ -593,14 +363,12 @@
           </tbody>
         </table>
 
-        <!-- Customer Reference (if present AND not special customer) - Full width row, no label -->
         <% if @release_note.works_order.customer_reference.present? && !is_special_customer %>
           <div class="customer-reference-row">
             <%= @release_note.works_order.customer_reference %>
           </div>
         <% end %>
 
-        <!-- Release Note Details -->
         <table class="detail-table compact">
           <tbody>
             <tr>
@@ -625,39 +393,24 @@
               </td>
             </tr>
             <% unless is_special_customer %>
-              <tr>
-                <th>Issue</th>
-                <td><%= @release_note.works_order.part_issue %></td>
-              </tr>
+              <tr><th>Issue</th><td><%= @release_note.works_order.part_issue %></td></tr>
             <% end %>
-            <tr>
-              <th>Description</th>
-              <td><%= @release_note.works_order.part_description %></td>
-            </tr>
-            <tr>
-              <th>Specification</th>
-              <td><%= @release_note.specification %></td>
-            </tr>
-            <tr>
-              <th>Quantity Accepted</th>
-              <td><%= @release_note.quantity_accepted %></td>
-            </tr>
-            <tr>
-              <th>Quantity Rejected</th>
-              <td><%= @release_note.quantity_rejected %></td>
-            </tr>
-            <tr>
-              <th>Our Works Order Number</th>
-              <td>WO<%= @release_note.works_order.number %></td>
-            </tr>
+            <tr><th>Description</th><td><%= @release_note.works_order.part_description %></td></tr>
+            <tr><th>Specification</th><td><%= @release_note.specification %></td></tr>
+            <tr><th>Quantity Accepted</th><td><%= @release_note.quantity_accepted %></td></tr>
+            <tr><th>Quantity Rejected</th><td><%= @release_note.quantity_rejected %></td></tr>
+            <tr><th>Our Works Order Number</th><td>WO<%= @release_note.works_order.number %></td></tr>
           </tbody>
         </table>
 
-        <!-- Calibrated Thickness Measurements - UPDATED FOR ENP -->
+        <!-- ============================================================
+             Calibrated Thickness Measurements
+             Renders per-batch sections when multiple batches are present.
+             Falls back cleanly to single-batch / legacy format.
+             ============================================================ -->
         <% if @release_note.has_thickness_measurements? %>
           <h2>Calibrated Thickness Measurements</h2>
 
-          <!-- Elcometer Gauge Information for Special Customers (anodic only) -->
           <% if is_special_customer %>
             <div class="gauge-info">
               <strong>Gauge Type:</strong> Elcometer 456/4, Serial # BD10146<br/>
@@ -671,108 +424,190 @@
               <div class="thickness-group-header">
                 <%= process_type.humanize.gsub('_', ' ').titleize %>
               </div>
+
               <% measurements.each do |measurement| %>
                 <%
-                  display_name = measurement['display_name'] || measurement['process_type'].humanize.titleize
-                  treatment_id = measurement['treatment_id']
+                  treatment_id  = measurement['treatment_id']
+                  display_name  = measurement['display_name'] || measurement['process_type'].humanize.titleize
+                  is_enp        = @release_note.treatment_is_enp?(measurement['process_type'])
+                  group_header  = process_type.humanize.gsub('_', ' ').titleize
+                  show_name     = display_name != group_header
 
-                  # Check if this is ENP or anodic
-                  is_enp = @release_note.treatment_is_enp?(measurement['process_type'])
-
-                  # Only show display name if it differs from the group header
-                  group_header_text = process_type.humanize.gsub('_', ' ').titleize
-                  show_display_name = display_name != group_header_text
+                  # Resolve batches – support both new format (batches key) and legacy flat format
+                  raw_batches   = measurement['batches']
+                  has_batches   = raw_batches.is_a?(Array) && raw_batches.any?
                 %>
 
                 <div style="margin-bottom: 0.5rem;">
-                  <% if show_display_name %>
-                    <div style="font-weight: bold; margin-bottom: 0.2rem; font-size: 9pt;">
+                  <% if show_name %>
+                    <div style="font-weight: bold; margin-bottom: 0.3rem; font-size: 9pt;">
                       <%= display_name %>
                     </div>
                   <% end %>
 
                   <% if is_enp %>
-                    <!-- ENP Measurements Table -->
+                    <%# ======================================================
+                        ENP: show one A-F table per batch.
+                        If single batch (legacy or new), no batch label shown.
+                        ====================================================== %>
                     <%
-                      enp_measurements = measurement['enp_measurements'] || []
-                      next if enp_measurements.empty?
-
-                      # Calculate statistics
-                      valid_growths = enp_measurements.map { |m| m['growth_um'] }.compact.select { |g| g >= 0 }
-                      if valid_growths.any?
-                        mean = (valid_growths.sum / valid_growths.count.to_f).round(1)
-                        min_val = valid_growths.min
-                        max_val = valid_growths.max
-                        count = valid_growths.count
+                      # Build a unified list of { batch_number, enp_measurements } hashes
+                      enp_batches = if has_batches
+                        raw_batches.select { |b| b.key?('enp_measurements') }
+                      else
+                        # Legacy flat format
+                        legacy_enp = measurement['enp_measurements'] || []
+                        legacy_enp.any? ? [{ 'batch_number' => 1, 'enp_measurements' => legacy_enp }] : []
                       end
+
+                      # Overall combined stats across all batches
+                      all_growths = enp_batches.flat_map { |b|
+                        (b['enp_measurements'] || []).map { |m| m['growth_um'] }.compact.select { |g| g >= 0 }
+                      }
+                      multi_batch = enp_batches.count > 1
                     %>
 
-                    <!-- Statistics -->
-                    <% if valid_growths.any? %>
-                      <div class="thickness-stats">
-                        <strong>Mean Growth: <%= mean %> µm</strong> |
-                        Min: <%= min_val %> µm |
-                        Max: <%= max_val %> µm |
-                        Points: <%= count %>/6
+                    <% next if enp_batches.empty? %>
+
+                    <% if multi_batch && all_growths.any? %>
+                      <%
+                        combined_mean = (all_growths.sum / all_growths.count.to_f).round(1)
+                        combined_min  = all_growths.min
+                        combined_max  = all_growths.max
+                      %>
+                      <div class="thickness-stats" style="margin-bottom: 0.4rem;">
+                        <strong>Overall (<%= enp_batches.count %> batches):</strong>
+                        Mean Growth: <strong><%= combined_mean %> µm</strong> |
+                        Min: <%= combined_min %> µm |
+                        Max: <%= combined_max %> µm |
+                        Total points: <%= all_growths.count %>
                       </div>
                     <% end %>
 
-                    <!-- ENP Measurements Table -->
-                    <table class="thickness-table" style="margin-top: 0.5rem;">
-                      <thead>
-                        <tr>
-                          <th style="width: 12%; text-align: center;">Point</th>
-                          <th style="width: 29%; text-align: center;">Before (mm)</th>
-                          <th style="width: 29%; text-align: center;">After (mm)</th>
-                          <th style="width: 30%; text-align: center;">Growth (µm)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <% enp_measurements.each do |measurement| %>
-                          <tr>
-                            <td style="text-align: center; font-weight: bold;"><%= measurement['point'] %></td>
-                            <td style="text-align: center;"><%= measurement['start_mm'] ? sprintf('%.3f', measurement['start_mm']) : '—' %></td>
-                            <td style="text-align: center;"><%= measurement['finish_mm'] ? sprintf('%.3f', measurement['finish_mm']) : '—' %></td>
-                            <td style="text-align: center; <%= measurement['growth_um'] && measurement['growth_um'] < 0 ? 'color: #dc2626; font-weight: bold;' : 'color: #16a34a; font-weight: bold;' %>">
-                              <%= measurement['growth_um'] ? sprintf('%.1f', measurement['growth_um']) : '—' %>
-                            </td>
-                          </tr>
+                    <% enp_batches.each do |batch| %>
+                      <%
+                        enp_measurements = batch['enp_measurements'] || []
+                        batch_number     = batch['batch_number']
+                        valid_growths    = enp_measurements.map { |m| m['growth_um'] }.compact.select { |g| g >= 0 }
+                        next if enp_measurements.empty?
+
+                        batch_mean  = valid_growths.any? ? (valid_growths.sum / valid_growths.count.to_f).round(1) : nil
+                        batch_min   = valid_growths.min
+                        batch_max   = valid_growths.max
+                      %>
+
+                      <div class="batch-section">
+                        <% if multi_batch %>
+                          <div class="batch-header">Batch <%= batch_number %></div>
                         <% end %>
-                      </tbody>
-                    </table>
+
+                        <% if valid_growths.any? %>
+                          <div class="<%= multi_batch ? 'batch-stats' : 'thickness-stats' %>">
+                            <strong>Mean Growth: <%= batch_mean %> µm</strong> |
+                            Min: <%= batch_min %> µm |
+                            Max: <%= batch_max %> µm |
+                            Points: <%= valid_growths.count %>/6
+                          </div>
+                        <% end %>
+
+                        <table class="enp-table" style="margin-top: 0.3rem;">
+                          <thead>
+                            <tr>
+                              <th style="width: 12%; text-align: center;">Point</th>
+                              <th style="width: 29%; text-align: center;">Before (mm)</th>
+                              <th style="width: 29%; text-align: center;">After (mm)</th>
+                              <th style="width: 30%; text-align: center;">Growth (µm)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <% enp_measurements.each do |m| %>
+                              <tr>
+                                <td style="text-align: center; font-weight: bold;"><%= m['point'] %></td>
+                                <td style="text-align: center;"><%= m['start_mm']  ? sprintf('%.3f', m['start_mm'])  : '—' %></td>
+                                <td style="text-align: center;"><%= m['finish_mm'] ? sprintf('%.3f', m['finish_mm']) : '—' %></td>
+                                <td style="text-align: center; <%= m['growth_um'] && m['growth_um'] < 0 ? 'color: #dc2626; font-weight: bold;' : 'color: #16a34a; font-weight: bold;' %>">
+                                  <%= m['growth_um'] ? sprintf('%.1f', m['growth_um']) : '—' %>
+                                </td>
+                              </tr>
+                            <% end %>
+                          </tbody>
+                        </table>
+                      </div>
+                    <% end %><!-- /enp_batches.each -->
 
                   <% else %>
-                    <!-- Anodic Measurements (existing format) -->
+                    <%# ======================================================
+                        Anodic: show a readings grid per batch.
+                        Single batch → plain grid (existing layout).
+                        Multiple batches → labelled sections + combined summary.
+                        ====================================================== %>
                     <%
-                      readings = measurement['readings'] || []
-                      next if readings.empty?
+                      anodic_batches = if has_batches
+                        raw_batches.select { |b| b.key?('readings') }
+                      else
+                        # Legacy flat format
+                        legacy_readings = measurement['readings'] || []
+                        legacy_readings.any? ? [{ 'batch_number' => 1, 'readings' => legacy_readings }] : []
+                      end
 
-                      mean = (readings.sum / readings.count.to_f).round(1)
-                      min_val = readings.min
-                      max_val = readings.max
-                      count = readings.count
+                      all_readings = anodic_batches.flat_map { |b| b['readings'] || [] }
+                      multi_batch  = anodic_batches.count > 1
                     %>
 
-                    <!-- Statistics -->
-                    <div class="thickness-stats">
-                      <strong>Mean: <%= mean %> µm</strong> |
-                      Min: <%= min_val %> µm |
-                      Max: <%= max_val %> µm |
-                      Count: <%= count %> readings
-                    </div>
+                    <% next if all_readings.empty? %>
 
-                    <!-- All Individual Readings -->
-                    <div class="readings-grid">
-                      <% readings.each do |reading| %>
-                        <div class="reading-value"><%= reading %> µm</div>
-                      <% end %>
-                    </div>
-                  <% end %>
+                    <% if multi_batch %>
+                      <%
+                        combined_mean  = (all_readings.sum / all_readings.count.to_f).round(1)
+                        combined_min   = all_readings.min
+                        combined_max   = all_readings.max
+                      %>
+                      <div class="thickness-stats" style="margin-bottom: 0.4rem;">
+                        <strong>Overall (<%= anodic_batches.count %> batches):</strong>
+                        Mean: <strong><%= combined_mean %> µm</strong> |
+                        Min: <%= combined_min %> µm |
+                        Max: <%= combined_max %> µm |
+                        Total readings: <%= all_readings.count %>
+                      </div>
+                    <% end %>
+
+                    <% anodic_batches.each do |batch| %>
+                      <%
+                        readings     = batch['readings'] || []
+                        batch_number = batch['batch_number']
+                        next if readings.empty?
+
+                        batch_mean = (readings.sum / readings.count.to_f).round(1)
+                        batch_min  = readings.min
+                        batch_max  = readings.max
+                      %>
+
+                      <div class="batch-section">
+                        <% if multi_batch %>
+                          <div class="batch-header">Batch <%= batch_number %></div>
+                        <% end %>
+
+                        <div class="<%= multi_batch ? 'batch-stats' : 'thickness-stats' %>">
+                          <strong>Mean: <%= batch_mean %> µm</strong> |
+                          Min: <%= batch_min %> µm |
+                          Max: <%= batch_max %> µm |
+                          Count: <%= readings.count %> readings
+                        </div>
+
+                        <div class="readings-grid">
+                          <% readings.each do |reading| %>
+                            <div class="reading-value"><%= reading %> µm</div>
+                          <% end %>
+                        </div>
+                      </div>
+                    <% end %><!-- /anodic_batches.each -->
+
+                  <% end %><!-- /is_enp else -->
                 </div>
-              <% end %>
+              <% end %><!-- /measurements.each -->
             </div>
-          <% end %>
-        <% end %>
+          <% end %><!-- /measurements_by_type.each -->
+        <% end %><!-- /has_thickness_measurements? -->
 
         <!-- Statement -->
         <h2>Statement</h2>
@@ -790,7 +625,7 @@
 
         <!-- Company Footer -->
         <div class="company-footer">
-          <strong>HARD ANODISING SURFACE TREATMENTS LTD</strong> has been assessed and registered by NQA against the provisions of: AS9100D & BS EN ISO 9001:2015. Certificate No: 22732<br/>
+          <strong>HARD ANODISING SURFACE TREATMENTS LTD</strong> has been assessed and registered by NQA against the provisions of: AS9100D &amp; BS EN ISO 9001:2015. Certificate No: 22732<br/>
           Hard Anodising Surface Treatments Limited has NADCAP accreditation for Chemical Processing Certificate Number 7426237911
         </div>
       </div>

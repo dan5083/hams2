@@ -33,9 +33,7 @@
           </svg>
         </div>
         <div class="ml-3">
-          <h3 class="text-sm font-medium text-amber-800">
-            Invoiced Release Note
-          </h3>
+          <h3 class="text-sm font-medium text-amber-800">Invoiced Release Note</h3>
           <div class="mt-2 text-sm text-amber-700">
             <p><strong>Important:</strong> This release note has been invoiced
               (<%= link_to @release_note.invoice_item.invoice.display_name, @release_note.invoice_item.invoice,
@@ -112,7 +110,6 @@
               <p class="text-xs">If the customer is collecting or no charges apply, just tick the confirmation box below.</p>
             <% end %>
 
-            <!-- Required Acknowledgement Checkbox -->
             <div class="mt-4 pt-4 border-t <%= has_charges ? 'border-blue-200' : 'border-amber-200' %>">
               <label class="flex items-start">
                 <input type="checkbox"
@@ -190,245 +187,298 @@
           <% end %>
         </div>
 
-        <!-- Thickness Measurements Section (Conditional) - UPDATED FOR ELCOMETER -->
+        <!-- ================================================================
+             Thickness Measurements Section
+             Supports multiple batches per treatment.
+             Audit requirement: 8 readings per batch for anodic films.
+             ENP: A-F (6 points) per batch, before/after unchanged.
+             ================================================================ -->
         <% if @release_note.requires_thickness_measurements? %>
           <div class="sm:col-span-6">
             <div class="border-t border-gray-200 pt-6">
-              <h3 class="text-lg font-medium text-gray-900 mb-4">
+              <h3 class="text-lg font-medium text-gray-900 mb-1">
                 Thickness Measurements
                 <span class="text-sm font-normal text-gray-500">(Required for Aerospace/Defense)</span>
               </h3>
+              <p class="text-xs text-gray-500 mb-4">
+                Audit requirement: <strong>8 readings per batch</strong> for anodic films.
+                Use "Number of Batches" to record measurements from multiple production batches on a single release.
+              </p>
 
-              <div class="space-y-6">
+              <div class="space-y-8">
                 <% @release_note.get_required_treatments.each do |treatment| %>
                   <%
-                    treatment_id = treatment[:treatment_id]
-                    display_name = treatment[:display_name]
-                    process_type = treatment[:process_type]
-                    is_enp = @release_note.treatment_is_enp?(process_type)
+                    treatment_id  = treatment[:treatment_id]
+                    display_name  = treatment[:display_name]
+                    process_type  = treatment[:process_type]
+                    is_enp        = @release_note.treatment_is_enp?(process_type)
+                    target_thickness = treatment[:target_thickness]
+                    max_batches   = 5
+                    saved_batch_count = @release_note.persisted? ? @release_note.get_batch_count(treatment_id) : 1
                   %>
 
-                  <% if is_enp %>
-                    <!-- ENP Measurement UI -->
-                    <%
-                      existing_enp_measurements = @release_note.get_enp_measurements(treatment_id)
-                    %>
+                  <!-- Treatment outer card -->
+                  <div class="border border-gray-300 rounded-lg overflow-hidden"
+                       data-treatment-section="<%= treatment_id %>">
 
-                    <div data-enp-section="<%= treatment_id %>"
-                         class="border border-gray-200 rounded-lg p-4 bg-gray-50">
-
-                      <!-- ENP Header -->
-                      <div class="flex items-center justify-between mb-4">
-                        <div>
-                          <label class="block text-sm font-medium text-gray-700">
-                            <%= display_name %>
-                            <span class="text-red-500">*</span>
-                          </label>
-                          <p class="mt-1 text-xs text-gray-500">6 measurement points (A-F)</p>
-                        </div>
-                        <div class="flex gap-2">
-                          <!-- Progress Counter -->
-                          <span class="enp-progress text-sm text-gray-500">0/6 complete</span>
-
-                          <!-- Clear Button -->
-                          <button type="button"
-                                  onclick="clearENPMeasurements('<%= treatment_id %>')"
-                                  class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                            </svg>
-                            Clear
-                          </button>
-                        </div>
+                    <!-- Treatment title bar -->
+                    <div class="bg-gray-100 border-b border-gray-300 px-4 py-3 flex items-center justify-between">
+                      <div>
+                        <span class="text-sm font-semibold text-gray-800"><%= display_name %></span>
+                        <% unless is_enp %>
+                          <span class="ml-2 text-xs text-gray-500">Target: <%= target_thickness %> µm</span>
+                        <% end %>
+                        <span class="text-red-500 ml-1">*</span>
                       </div>
 
-                      <!-- Statistics Display -->
-                      <div class="enp-statistics mb-4"></div>
-
-                      <!-- ENP Measurement Table -->
-                      <div class="mb-4">
-                        <div class="overflow-hidden border border-gray-200 rounded-md">
-                          <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-100">
-                              <tr>
-                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase">Point</th>
-                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase">Before (mm)</th>
-                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase">After (mm)</th>
-                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase">Film Thickness (µm)</th>
-                              </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                              <% ['A', 'B', 'C', 'D', 'E', 'F'].each_with_index do |point, index| %>
-                                <%
-                                  existing_point = existing_enp_measurements.find { |m| m['point'] == point }
-                                  start_value = existing_point ? existing_point['start_mm'] : nil
-                                  finish_value = existing_point ? existing_point['finish_mm'] : nil
-                                %>
-                                <tr>
-                                  <td class="px-3 py-2 text-sm font-medium text-gray-900"><%= point %></td>
-                                  <td class="px-3 py-2">
-                                    <input type="number"
-                                           class="enp-start block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                                           data-treatment="<%= treatment_id %>"
-                                           data-index="<%= index %>"
-                                           step="0.001"
-                                           min="0"
-                                           value="<%= start_value %>"
-                                           onblur="updateENPMeasurement(this)"
-                                           placeholder="10.500" />
-                                  </td>
-                                  <td class="px-3 py-2">
-                                    <input type="number"
-                                           class="enp-finish block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                                           data-treatment="<%= treatment_id %>"
-                                           data-index="<%= index %>"
-                                           step="0.001"
-                                           min="0"
-                                           value="<%= finish_value %>"
-                                           onblur="updateENPMeasurement(this)"
-                                           placeholder="10.525" />
-                                  </td>
-                                  <td class="px-3 py-2">
-                                    <span class="enp-growth text-sm text-gray-500" data-index="<%= index %>">—</span>
-                                  </td>
-                                </tr>
-                              <% end %>
-                            </tbody>
-                          </table>
-                        </div>
-                        <p class="mt-2 text-xs text-gray-500">
-                          <strong>Auto-fill:</strong> Enter "Before" value for point A and press TAB - all other points will be filled automatically.<br>
-                          <strong>Calculation:</strong> Film thickness (µm) = (After - Before) × 1000 ÷ 2 (plated on both sides).
-                        </p>
-                      </div>
-
-                      <!-- Hidden field to store ENP measurements for form submission -->
-                      <%= hidden_field_tag "enp_measurements_#{treatment_id}",
-                                          existing_enp_measurements.to_json,
-                                          class: "enp-data" %>
-                    </div>
-
-                  <% else %>
-                    <!-- Anodic Treatment - Elcometer Controller Wrapper -->
-                    <%
-                      target_thickness = treatment[:target_thickness]
-                      existing_readings = @release_note.get_thickness_readings(treatment_id)
-                      field_name = "thickness_measurement_#{treatment_id}"
-                    %>
-
-                    <div data-controller="elcometer"
-                         data-elcometer-treatment-id-value="<%= treatment_id %>"
-                         data-elcometer-process-type-value="<%= process_type %>"
-                         data-elcometer-target-thickness-value="<%= target_thickness %>"
-                         data-elcometer-display-name-value="<%= display_name %>"
-                         class="border border-gray-200 rounded-lg p-4 bg-gray-50">
-
-                      <!-- Treatment Header -->
-                      <div class="flex items-center justify-between mb-4">
-                        <div>
-                          <label class="block text-sm font-medium text-gray-700">
-                            <%= display_name %>
-                            <span class="text-red-500">*</span>
-                          </label>
-                        </div>
-                        <div class="flex gap-2">
-                          <!-- Connect Button -->
-                          <button type="button"
-                                  data-elcometer-target="connectButton"
-                                  data-action="click->elcometer#connectElcometer"
-                                  class="inline-flex items-center px-3 py-2 border border-blue-600 rounded-md shadow-sm text-sm font-medium text-blue-600 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                            </svg>
-                            Connect Elcometer
-                          </button>
-
-                          <!-- Stop Button (hidden initially) -->
-                          <button type="button"
-                                  data-elcometer-target="stopButton"
-                                  data-action="click->elcometer#stopReading"
-                                  class="hidden inline-flex items-center px-3 py-2 border border-red-600 rounded-md shadow-sm text-sm font-medium text-red-600 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
-                            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                            </svg>
-                            Stop
-                          </button>
-
-                          <!-- Clear Button -->
-                          <button type="button"
-                                  data-action="click->elcometer#clearReadings"
-                                  class="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                            <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                            </svg>
-                            Clear
-                          </button>
-                        </div>
-                      </div>
-
-                      <!-- Statistics Display -->
-                      <div data-elcometer-target="statistics" class="mb-4"></div>
-
-                      <!-- Readings Display -->
-                      <div class="mb-4">
-                        <label class="block text-xs font-medium text-gray-500 mb-2">Readings:</label>
-                        <div data-elcometer-target="readingsList" class="min-h-[3rem] p-3 bg-white border border-gray-200 rounded-md">
-                          <% if existing_readings.any? %>
-                            <% existing_readings.each do |reading| %>
-                              <span class="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm mr-2 mb-2">
-                                <%= reading %> µm
-                              </span>
-                            <% end %>
-                          <% else %>
-                            <span class="text-gray-400 text-sm">No readings yet...</span>
+                      <!-- Batch count selector -->
+                      <div class="flex items-center gap-2">
+                        <label for="batch_count_<%= treatment_id %>"
+                               class="text-xs font-medium text-gray-600 whitespace-nowrap">
+                          Number of Batches:
+                        </label>
+                        <select id="batch_count_<%= treatment_id %>"
+                                class="text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 py-1"
+                                onchange="setBatchCount('<%= treatment_id %>', this.value, '<%= is_enp ? 'enp' : 'anodic' %>')">
+                          <% (1..max_batches).each do |n| %>
+                            <option value="<%= n %>" <%= 'selected' if n == saved_batch_count %>><%= n %></option>
                           <% end %>
-                        </div>
+                        </select>
                       </div>
-
-                      <!-- Manual Entry - 8 Individual Fields -->
-                      <div class="space-y-3">
-                        <div>
-                          <label class="block text-xs font-medium text-gray-500 mb-2">
-                            Manual Entry (µm):
-                          </label>
-                          <div class="grid grid-cols-4 gap-2">
-                            <% 8.times do |i| %>
-                              <input type="number"
-                                     data-elcometer-target="manualReadingInput"
-                                     data-action="blur->elcometer#addManualReading"
-                                     data-index="<%= i %>"
-                                     step="0.1"
-                                     min="0"
-                                     class="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                                     placeholder="<%= i + 1 %>" />
-                            <% end %>
-                          </div>
-                          <p class="mt-2 text-xs text-gray-500">
-                            Enter readings and press TAB. Values are added automatically.
-                          </p>
-                        </div>
-                      </div>
-
-                      <!-- Hidden field to store readings array for form submission -->
-                      <%= hidden_field_tag "thickness_readings_#{treatment_id}",
-                                          existing_readings.to_json,
-                                          data: { elcometer_target: "readingsData" } %>
                     </div>
-                  <% end %>
-                <% end %>
+
+                    <!-- Batch containers -->
+                    <div class="divide-y divide-gray-200">
+                      <% max_batches.times do |batch_idx| %>
+                        <% batch_number     = batch_idx + 1 %>
+                        <% batch_tid        = "#{treatment_id}_b#{batch_number}" %>
+
+                        <div id="batch_container_<%= treatment_id %>_<%= batch_number %>"
+                             class="p-4"
+                             style="<%= 'display:none;' if batch_number > saved_batch_count %>">
+
+                          <!-- Batch label (visible only when >1 batch selected) -->
+                          <div id="batch_label_<%= treatment_id %>_<%= batch_number %>"
+                               class="flex items-center gap-3 mb-3"
+                               style="<%= 'display:none;' if saved_batch_count == 1 %>">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                              Batch <%= batch_number %>
+                            </span>
+                            <div class="flex-1 h-px bg-blue-100"></div>
+                          </div>
+
+                          <% if is_enp %>
+                            <%#
+                              ---- ENP batch container ----
+                              Each batch gets its own data-enp-section keyed as treatment_id_b{n}.
+                              The ENP JS functions all route through that key so they work independently.
+                            %>
+                            <%
+                              existing_enp = @release_note.get_enp_measurements_for_batch(treatment_id, batch_number)
+                            %>
+
+                            <div data-enp-section="<%= batch_tid %>"
+                                 class="bg-gray-50 rounded-md">
+
+                              <!-- ENP header row -->
+                              <div class="flex items-center justify-between mb-3">
+                                <p class="text-xs text-gray-500">6 measurement points (A–F) · before &amp; after</p>
+                                <div class="flex gap-2">
+                                  <span class="enp-progress text-sm text-gray-500">0/6 complete</span>
+                                  <button type="button"
+                                          onclick="clearENPMeasurements('<%= batch_tid %>')"
+                                          class="inline-flex items-center px-2 py-1 border border-gray-300 rounded text-xs font-medium text-gray-600 bg-white hover:bg-gray-50">
+                                    <svg class="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                    Clear
+                                  </button>
+                                </div>
+                              </div>
+
+                              <!-- Statistics display -->
+                              <div class="enp-statistics mb-3"></div>
+
+                              <!-- A-F table -->
+                              <div class="overflow-hidden border border-gray-200 rounded-md mb-3">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                  <thead class="bg-gray-100">
+                                    <tr>
+                                      <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase">Point</th>
+                                      <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase">Before (mm)</th>
+                                      <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase">After (mm)</th>
+                                      <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase">Film Thickness (µm)</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody class="bg-white divide-y divide-gray-200">
+                                    <% ['A', 'B', 'C', 'D', 'E', 'F'].each_with_index do |point, index| %>
+                                      <%
+                                        existing_point = existing_enp.find { |m| m['point'] == point }
+                                        start_value    = existing_point ? existing_point['start_mm'] : nil
+                                        finish_value   = existing_point ? existing_point['finish_mm'] : nil
+                                      %>
+                                      <tr>
+                                        <td class="px-3 py-2 text-sm font-medium text-gray-900"><%= point %></td>
+                                        <td class="px-3 py-2">
+                                          <input type="number"
+                                                 class="enp-start block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                                 data-treatment="<%= batch_tid %>"
+                                                 data-index="<%= index %>"
+                                                 step="0.001" min="0"
+                                                 value="<%= start_value %>"
+                                                 onblur="updateENPMeasurement(this)"
+                                                 placeholder="10.500" />
+                                        </td>
+                                        <td class="px-3 py-2">
+                                          <input type="number"
+                                                 class="enp-finish block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                                 data-treatment="<%= batch_tid %>"
+                                                 data-index="<%= index %>"
+                                                 step="0.001" min="0"
+                                                 value="<%= finish_value %>"
+                                                 onblur="updateENPMeasurement(this)"
+                                                 placeholder="10.525" />
+                                        </td>
+                                        <td class="px-3 py-2">
+                                          <span class="enp-growth text-sm text-gray-500" data-index="<%= index %>">—</span>
+                                        </td>
+                                      </tr>
+                                    <% end %>
+                                  </tbody>
+                                </table>
+                              </div>
+                              <p class="text-xs text-gray-500">
+                                <strong>Auto-fill:</strong> Enter "Before" for point A and press TAB – all points copy automatically.<br>
+                                <strong>Calculation:</strong> Film thickness (µm) = (After − Before) × 1000 ÷ 2 (plated both sides).
+                              </p>
+
+                              <!-- Hidden field stores ENP data for this batch -->
+                              <%= hidden_field_tag "enp_measurements_#{batch_tid}",
+                                                  existing_enp.to_json,
+                                                  class: "enp-data" %>
+                            </div>
+
+                          <% else %>
+                            <%#
+                              ---- Anodic / Elcometer batch container ----
+                              Each batch gets its own data-controller="elcometer" so Stimulus
+                              manages it independently. The treatment-id value is batch_tid
+                              (e.g. "abc123_b1") so the hidden field becomes
+                              thickness_readings_abc123_b1, which the submit handler groups back
+                              into the batches payload.
+                            %>
+                            <%
+                              batch_readings = @release_note.get_thickness_readings_for_batch(treatment_id, batch_number)
+                            %>
+
+                            <div data-controller="elcometer"
+                                 data-elcometer-treatment-id-value="<%= batch_tid %>"
+                                 data-elcometer-process-type-value="<%= process_type %>"
+                                 data-elcometer-target-thickness-value="<%= target_thickness %>"
+                                 data-elcometer-display-name-value="<%= display_name %>"
+                                 class="bg-gray-50 rounded-md">
+
+                              <!-- Elcometer controls row -->
+                              <div class="flex items-center justify-between mb-3">
+                                <div class="text-xs text-gray-500">
+                                  Elcometer or manual entry · 8 readings required per batch
+                                </div>
+                                <div class="flex gap-2">
+                                  <!-- Connect Button -->
+                                  <button type="button"
+                                          data-elcometer-target="connectButton"
+                                          data-action="click->elcometer#connectElcometer"
+                                          class="inline-flex items-center px-3 py-1.5 border border-blue-600 rounded text-xs font-medium text-blue-600 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500">
+                                    <svg class="h-3.5 w-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                    </svg>
+                                    Connect Elcometer
+                                  </button>
+
+                                  <!-- Stop Button (hidden initially) -->
+                                  <button type="button"
+                                          data-elcometer-target="stopButton"
+                                          data-action="click->elcometer#stopReading"
+                                          class="hidden inline-flex items-center px-3 py-1.5 border border-red-600 rounded text-xs font-medium text-red-600 bg-white hover:bg-red-50">
+                                    <svg class="h-3.5 w-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                    Stop
+                                  </button>
+
+                                  <!-- Clear Button -->
+                                  <button type="button"
+                                          data-action="click->elcometer#clearReadings"
+                                          class="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded text-xs font-medium text-gray-700 bg-white hover:bg-gray-50">
+                                    <svg class="h-3.5 w-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                    Clear
+                                  </button>
+                                </div>
+                              </div>
+
+                              <!-- Statistics Display -->
+                              <div data-elcometer-target="statistics" class="mb-3"></div>
+
+                              <!-- Readings Display -->
+                              <div class="mb-3">
+                                <label class="block text-xs font-medium text-gray-500 mb-1">Readings:</label>
+                                <div data-elcometer-target="readingsList"
+                                     class="min-h-[2.5rem] p-3 bg-white border border-gray-200 rounded-md">
+                                  <% if batch_readings.any? %>
+                                    <% batch_readings.each do |reading| %>
+                                      <span class="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm mr-2 mb-1">
+                                        <%= reading %> µm
+                                      </span>
+                                    <% end %>
+                                  <% else %>
+                                    <span class="text-gray-400 text-sm">No readings yet...</span>
+                                  <% end %>
+                                </div>
+                              </div>
+
+                              <!-- Manual Entry - 8 fields -->
+                              <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">Manual Entry (µm):</label>
+                                <div class="grid grid-cols-4 gap-2">
+                                  <% 8.times do |i| %>
+                                    <input type="number"
+                                           data-elcometer-target="manualReadingInput"
+                                           data-action="blur->elcometer#addManualReading"
+                                           data-index="<%= i %>"
+                                           step="0.1" min="0"
+                                           class="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                                           placeholder="<%= i + 1 %>" />
+                                  <% end %>
+                                </div>
+                                <p class="mt-1 text-xs text-gray-500">
+                                  Enter readings and press TAB. Values are added automatically.
+                                </p>
+                              </div>
+
+                              <!-- Hidden field for this batch's readings -->
+                              <%= hidden_field_tag "thickness_readings_#{batch_tid}",
+                                                  batch_readings.to_json,
+                                                  data: { elcometer_target: "readingsData" } %>
+                            </div>
+                          <% end %>
+                        </div><!-- /batch container -->
+                      <% end %><!-- /max_batches.times -->
+                    </div><!-- /divide-y -->
+                  </div><!-- /treatment outer card -->
+                <% end %><!-- /get_required_treatments.each -->
               </div>
             </div>
           </div>
         <% end %>
+        <!-- /Thickness Measurements Section -->
 
         <!-- Statement (using remarks field) -->
         <div class="sm:col-span-6">
           <%= form.label :remarks, "Statement", class: "block text-sm font-medium text-gray-700" %>
           <%
-            # Default statement for new release notes
             default_statement = "Certificate of conformity - We certify that the above work has been processed and inspected according to the terms of your order."
-
-            # Use existing remarks if present, otherwise use default
             field_value = @release_note.remarks.present? ? @release_note.remarks : default_statement
           %>
           <%= form.text_area :remarks, rows: 4,
@@ -443,7 +493,7 @@
           </p>
         </div>
 
-        <!-- No Invoice Checkbox - Disabled if already invoiced -->
+        <!-- No Invoice Checkbox -->
         <div class="sm:col-span-6">
           <div class="flex items-start">
             <div class="flex items-center h-5">
@@ -478,34 +528,21 @@
   <!-- JavaScript for auto-populating quantity accepted -->
   <% unless @release_note.invoiced? %>
     <script>
-      // Run immediately, not waiting for DOMContentLoaded
       (function() {
         function autoPopulateQuantity() {
           const quantityField = document.getElementById('release_note_quantity_accepted');
-
-          if (!quantityField) {
-            // If field not ready, try again in 100ms
-            setTimeout(autoPopulateQuantity, 100);
-            return;
-          }
+          if (!quantityField) { setTimeout(autoPopulateQuantity, 100); return; }
 
           const currentValue = parseInt(quantityField.value) || 0;
-          const maxQuantity = parseInt(quantityField.getAttribute('max')) || 0;
+          const maxQuantity  = parseInt(quantityField.getAttribute('max')) || 0;
 
-          // Only auto-populate if the field is empty/zero and we have unreleased quantity
           if (currentValue === 0 && maxQuantity > 0) {
-            // Set the field value
             quantityField.value = maxQuantity;
-
-            // Flash the field to draw attention
             quantityField.classList.add('ring-2', 'ring-amber-400', 'bg-amber-50');
-            setTimeout(() => {
-              quantityField.classList.remove('ring-2', 'ring-amber-400', 'bg-amber-50');
-            }, 2000);
+            setTimeout(() => quantityField.classList.remove('ring-2', 'ring-amber-400', 'bg-amber-50'), 2000);
 
-            // Show warning notification
             const notification = document.createElement('div');
-            notification.className = 'fixed top-4 right-4 z-50 bg-amber-50 border border-amber-200 text-amber-800 rounded-md p-4 shadow-lg max-w-md animate-fade-in';
+            notification.className = 'fixed top-4 right-4 z-50 bg-amber-50 border border-amber-200 text-amber-800 rounded-md p-4 shadow-lg max-w-md';
             notification.innerHTML = `
               <div class="flex items-start">
                 <div class="flex-shrink-0">
@@ -525,18 +562,10 @@
               </div>
             `;
             document.body.appendChild(notification);
-
-            // Auto-remove after 8 seconds (longer since it's important)
-            setTimeout(() => {
-              notification.remove();
-            }, 8000);
+            setTimeout(() => notification.remove(), 8000);
           }
         }
-
-        // Try immediately
         autoPopulateQuantity();
-
-        // Also try on DOMContentLoaded in case we're early
         if (document.readyState === 'loading') {
           document.addEventListener('DOMContentLoaded', autoPopulateQuantity);
         }
@@ -544,69 +573,163 @@
     </script>
   <% end %>
 
-  <!-- JavaScript for handling thickness measurements submission -->
+  <!-- ========================================================================
+       JavaScript for thickness measurements - batch-aware submit handler
+       and batch count switcher.
+       ======================================================================== -->
   <% if @release_note.requires_thickness_measurements? %>
     <script>
+      // --------------------------------------------------------------------
+      // setBatchCount – show/hide batch containers and their labels
+      // Called by the "Number of Batches" dropdown for each treatment.
+      // --------------------------------------------------------------------
+      function setBatchCount(treatmentId, newCountStr, type) {
+        const newCount  = parseInt(newCountStr);
+        const maxBatches = 5;
+
+        for (let batch = 1; batch <= maxBatches; batch++) {
+          const container = document.getElementById(`batch_container_${treatmentId}_${batch}`);
+          const label     = document.getElementById(`batch_label_${treatmentId}_${batch}`);
+
+          if (container) {
+            container.style.display = (batch <= newCount) ? '' : 'none';
+          }
+          if (label) {
+            // Show batch labels only when there's more than one batch
+            label.style.display = (newCount > 1) ? '' : 'none';
+          }
+        }
+      }
+
+      // --------------------------------------------------------------------
+      // Submit handler – collects per-batch readings and ENP measurements,
+      // groups them by treatment_id (stripping the _b{n} suffix), and
+      // builds the batches JSON payload for release_note[measured_thicknesses].
+      // --------------------------------------------------------------------
       document.addEventListener('DOMContentLoaded', function() {
         const form = document.querySelector('form');
+        if (!form) return;
 
-        form.addEventListener('submit', function(e) {
-          // Collect all thickness measurements from Elcometer controllers
-          const measurements = [];
+        form.addEventListener('submit', function() {
+          // --- Anodic readings ---
+          // Field names: thickness_readings_<treatment_id>_b<n>
+          const treatmentBatches = {};  // pure_treatment_id -> { batch_number -> readings[] }
+          const treatmentMeta    = {};  // pure_treatment_id -> { process_type, target_thickness, display_name }
 
-          // Find all thickness readings hidden fields
-          const readingsFields = document.querySelectorAll('[name^="thickness_readings_"]');
+          document.querySelectorAll('[name^="thickness_readings_"]').forEach(function(field) {
+            const nameBody = field.name.replace('thickness_readings_', '');
+            let treatmentId, batchNumber;
 
-          readingsFields.forEach(function(field) {
-            // Extract treatment_id from field name: thickness_readings_abc123
-            const treatmentId = field.name.replace('thickness_readings_', '');
-
-            // Get the readings data (JSON array)
-            let readings = [];
-            try {
-              readings = JSON.parse(field.value || '[]');
-            } catch(e) {
-              console.error('Error parsing readings:', e);
+            const m = nameBody.match(/^(.+)_b(\d+)$/);
+            if (m) {
+              treatmentId  = m[1];
+              batchNumber  = parseInt(m[2]);
+            } else {
+              treatmentId  = nameBody;
+              batchNumber  = 1;
             }
 
-            if (readings.length > 0) {
-              // Get treatment info from the controller element
-              const controller = field.closest('[data-controller="elcometer"]');
-              const processType = controller.dataset.elcometerProcessTypeValue;
-              const targetThickness = parseFloat(controller.dataset.elcometerTargetThicknessValue) || 0;
-              const displayName = controller.dataset.elcometerDisplayNameValue;
+            let readings = [];
+            try { readings = JSON.parse(field.value || '[]'); } catch(e) {}
 
-              measurements.push({
-                treatment_id: treatmentId,
-                process_type: processType,
-                target_thickness: targetThickness,
-                display_name: displayName,
-                readings: readings
-              });
+            if (readings.length > 0) {
+              if (!treatmentBatches[treatmentId]) treatmentBatches[treatmentId] = {};
+              treatmentBatches[treatmentId][batchNumber] = readings;
+
+              if (!treatmentMeta[treatmentId]) {
+                const ctrl = field.closest('[data-controller="elcometer"]');
+                if (ctrl) {
+                  treatmentMeta[treatmentId] = {
+                    process_type:     ctrl.dataset.elcometerProcessTypeValue,
+                    target_thickness: parseFloat(ctrl.dataset.elcometerTargetThicknessValue) || 0,
+                    display_name:     ctrl.dataset.elcometerDisplayNameValue
+                  };
+                }
+              }
             }
           });
 
-          // Add hidden field with JSON data for all measurements
-          const hiddenField = document.createElement('input');
-          hiddenField.type = 'hidden';
-          hiddenField.name = 'release_note[measured_thicknesses]';
-          hiddenField.value = JSON.stringify({ measurements: measurements });
-          form.appendChild(hiddenField);
+          // --- ENP measurements ---
+          // Field names: enp_measurements_<treatment_id>_b<n>
+          const enpBatches = {};  // pure_treatment_id -> { batch_number -> enp_measurements[] }
+
+          document.querySelectorAll('[name^="enp_measurements_"]').forEach(function(field) {
+            const nameBody = field.name.replace('enp_measurements_', '');
+            let treatmentId, batchNumber;
+
+            const m = nameBody.match(/^(.+)_b(\d+)$/);
+            if (m) {
+              treatmentId = m[1];
+              batchNumber = parseInt(m[2]);
+            } else {
+              treatmentId = nameBody;
+              batchNumber = 1;
+            }
+
+            let enp = [];
+            try { enp = JSON.parse(field.value || '[]'); } catch(e) {}
+
+            if (enp.length > 0) {
+              if (!enpBatches[treatmentId]) enpBatches[treatmentId] = {};
+              enpBatches[treatmentId][batchNumber] = enp;
+            }
+          });
+
+          // --- Build final measurements array ---
+          const measurements = [];
+
+          // Anodic
+          Object.entries(treatmentBatches).forEach(([treatmentId, batchesObj]) => {
+            const batches = Object.entries(batchesObj)
+              .map(([bNum, readings]) => ({ batch_number: parseInt(bNum), readings }))
+              .sort((a, b) => a.batch_number - b.batch_number);
+
+            measurements.push({
+              treatment_id: treatmentId,
+              ...(treatmentMeta[treatmentId] || {}),
+              batches
+            });
+          });
+
+          // ENP
+          Object.entries(enpBatches).forEach(([treatmentId, batchesObj]) => {
+            // Avoid duplicating if already added via anodic loop (shouldn't overlap, but safe)
+            const existing = measurements.find(m => m.treatment_id === treatmentId);
+            const batches = Object.entries(batchesObj)
+              .map(([bNum, enp]) => ({ batch_number: parseInt(bNum), enp_measurements: enp }))
+              .sort((a, b) => a.batch_number - b.batch_number);
+
+            if (existing) {
+              existing.batches = batches;
+            } else {
+              measurements.push({ treatment_id: treatmentId, batches });
+            }
+          });
+
+          if (measurements.length > 0) {
+            const hiddenField = document.createElement('input');
+            hiddenField.type  = 'hidden';
+            hiddenField.name  = 'release_note[measured_thicknesses]';
+            hiddenField.value = JSON.stringify({ measurements });
+            form.appendChild(hiddenField);
+          }
         });
       });
     </script>
 
-    <!-- JavaScript for ENP measurements -->
+    <!-- ====================================================================
+         ENP JavaScript
+         Keys in enpData are now batch_tid values (e.g. "abc123_b1")
+         so each batch maintains independent state.
+         ==================================================================== -->
     <script>
-      // Store ENP measurements for each treatment
       const enpData = {};
 
       function updateENPMeasurement(input) {
-        const treatmentId = input.dataset.treatment;
-        const index = parseInt(input.dataset.index);
-        const isStart = input.classList.contains('enp-start');
+        const treatmentId = input.dataset.treatment; // e.g. "abc123_b1"
+        const index       = parseInt(input.dataset.index);
+        const isStart     = input.classList.contains('enp-start');
 
-        // Initialize data structure if needed
         if (!enpData[treatmentId]) {
           enpData[treatmentId] = [{}, {}, {}, {}, {}, {}];
         }
@@ -614,52 +737,42 @@
         const value = parseFloat(input.value);
 
         if (isStart) {
-          // Update start value
           if (!isNaN(value) && value > 0) {
             enpData[treatmentId][index].start_mm = value;
-            enpData[treatmentId][index].point = String.fromCharCode(65 + index); // A-F
+            enpData[treatmentId][index].point    = String.fromCharCode(65 + index);
 
-            // AUTO-COMPLETE: If this is point A, copy to all other points
+            // Auto-fill: copy point A's before-value to all other points
             if (index === 0) {
               for (let i = 1; i < 6; i++) {
                 enpData[treatmentId][i].start_mm = value;
-                enpData[treatmentId][i].point = String.fromCharCode(65 + i);
+                enpData[treatmentId][i].point    = String.fromCharCode(65 + i);
 
-                // Update the input field
-                const section = document.querySelector(`[data-enp-section="${treatmentId}"]`);
-                const startInputs = section.querySelectorAll('.enp-start');
+                const section      = document.querySelector(`[data-enp-section="${treatmentId}"]`);
+                const startInputs  = section.querySelectorAll('.enp-start');
                 startInputs[i].value = value;
-
-                // Flash the field
                 startInputs[i].classList.add('ring-2', 'ring-blue-400', 'bg-blue-50');
-                setTimeout(() => {
-                  startInputs[i].classList.remove('ring-2', 'ring-blue-400', 'bg-blue-50');
-                }, 800);
+                setTimeout(() => startInputs[i].classList.remove('ring-2', 'ring-blue-400', 'bg-blue-50'), 800);
 
-                // Recalculate growth if finish exists
                 if (enpData[treatmentId][i].finish_mm) {
                   const diff = enpData[treatmentId][i].finish_mm - value;
                   enpData[treatmentId][i].growth_um = Math.round((diff * 1000 / 2) * 10) / 10;
                 }
               }
-
-              // Show notification
               showENPNotification('Initial size copied to all measurement points', 'success');
             }
           } else if (input.value === '') {
             delete enpData[treatmentId][index].start_mm;
           }
         } else {
-          // Update finish value
           if (!isNaN(value) && value > 0) {
             enpData[treatmentId][index].finish_mm = value;
-            enpData[treatmentId][index].point = String.fromCharCode(65 + index);
+            enpData[treatmentId][index].point     = String.fromCharCode(65 + index);
           } else if (input.value === '') {
             delete enpData[treatmentId][index].finish_mm;
           }
         }
 
-        // Calculate growth - DIVIDE BY 2 for dual-sided plating
+        // Calculate growth (divide by 2 for dual-sided plating)
         const measurement = enpData[treatmentId][index];
         if (measurement.start_mm && measurement.finish_mm) {
           const diff = measurement.finish_mm - measurement.start_mm;
@@ -677,8 +790,7 @@
         if (!section) return;
 
         // Update growth displays
-        const growthDisplays = section.querySelectorAll('.enp-growth');
-        growthDisplays.forEach((display, index) => {
+        section.querySelectorAll('.enp-growth').forEach((display, index) => {
           const measurement = enpData[treatmentId][index];
           if (measurement && measurement.growth_um !== null && measurement.growth_um !== undefined) {
             display.textContent = `${measurement.growth_um} µm`;
@@ -699,30 +811,17 @@
         const statsDiv = section.querySelector('.enp-statistics');
         if (validMeasurements.length > 0) {
           const growths = validMeasurements.map(m => m.growth_um);
-          const count = growths.length;
-          const sum = growths.reduce((a, b) => a + b, 0);
-          const mean = Math.round((sum / count) * 10) / 10;
-          const min = Math.min(...growths);
-          const max = Math.max(...growths);
+          const count   = growths.length;
+          const mean    = Math.round((growths.reduce((a, b) => a + b, 0) / count) * 10) / 10;
+          const min     = Math.min(...growths);
+          const max     = Math.max(...growths);
 
           statsDiv.innerHTML = `
             <div class="grid grid-cols-4 gap-4 p-3 bg-gray-50 rounded-md">
-              <div>
-                <div class="text-xs text-gray-500">Count</div>
-                <div class="text-lg font-semibold text-gray-900">${count}</div>
-              </div>
-              <div>
-                <div class="text-xs text-gray-500">Mean Film Thickness</div>
-                <div class="text-lg font-semibold text-blue-600">${mean} µm</div>
-              </div>
-              <div>
-                <div class="text-xs text-gray-500">Min</div>
-                <div class="text-lg font-semibold text-gray-900">${min} µm</div>
-              </div>
-              <div>
-                <div class="text-xs text-gray-500">Max</div>
-                <div class="text-lg font-semibold text-gray-900">${max} µm</div>
-              </div>
+              <div><div class="text-xs text-gray-500">Count</div><div class="text-lg font-semibold text-gray-900">${count}</div></div>
+              <div><div class="text-xs text-gray-500">Mean Film Thickness</div><div class="text-lg font-semibold text-blue-600">${mean} µm</div></div>
+              <div><div class="text-xs text-gray-500">Min</div><div class="text-lg font-semibold text-gray-900">${min} µm</div></div>
+              <div><div class="text-xs text-gray-500">Max</div><div class="text-lg font-semibold text-gray-900">${max} µm</div></div>
             </div>
           `;
         } else {
@@ -740,6 +839,7 @@
       }
 
       function saveENPToHiddenField(treatmentId) {
+        // Field name: enp_measurements_<treatmentId>  where treatmentId is already the batch_tid
         const hiddenField = document.querySelector(`[name="enp_measurements_${treatmentId}"]`);
         if (!hiddenField) return;
 
@@ -747,10 +847,10 @@
           .map((m, index) => {
             if (!m || (!m.start_mm && !m.finish_mm)) return null;
             return {
-              point: String.fromCharCode(65 + index),
-              start_mm: m.start_mm || null,
-              finish_mm: m.finish_mm || null,
-              growth_um: m.growth_um || null
+              point:      String.fromCharCode(65 + index),
+              start_mm:   m.start_mm  || null,
+              finish_mm:  m.finish_mm || null,
+              growth_um:  m.growth_um || null
             };
           })
           .filter(m => m !== null);
@@ -759,16 +859,12 @@
       }
 
       function clearENPMeasurements(treatmentId) {
-        if (!confirm('Clear all ENP measurements for this treatment?')) return;
-
+        if (!confirm('Clear all ENP measurements for this batch?')) return;
         enpData[treatmentId] = [{}, {}, {}, {}, {}, {}];
 
         const section = document.querySelector(`[data-enp-section="${treatmentId}"]`);
-        const startInputs = section.querySelectorAll('.enp-start');
-        const finishInputs = section.querySelectorAll('.enp-finish');
-
-        startInputs.forEach(input => input.value = '');
-        finishInputs.forEach(input => input.value = '');
+        section.querySelectorAll('.enp-start').forEach(i => i.value = '');
+        section.querySelectorAll('.enp-finish').forEach(i => i.value = '');
 
         updateENPDisplay(treatmentId);
         saveENPToHiddenField(treatmentId);
@@ -786,11 +882,11 @@
 
         const colors = {
           success: 'bg-green-50 border-green-200 text-green-800',
-          error: 'bg-red-50 border-red-200 text-red-800'
+          error:   'bg-red-50 border-red-200 text-red-800'
         };
 
         const notification = document.createElement('div');
-        notification.className = `${colors[type]} border rounded-md p-3 shadow-lg max-w-sm animate-fade-in`;
+        notification.className = `${colors[type]} border rounded-md p-3 shadow-lg max-w-sm`;
         notification.innerHTML = `
           <div class="flex items-start">
             <div class="flex-1 text-sm">${message}</div>
@@ -801,45 +897,39 @@
             </button>
           </div>
         `;
-
         container.appendChild(notification);
-
-        setTimeout(() => {
-          notification.remove();
-        }, 4000);
+        setTimeout(() => notification.remove(), 4000);
       }
 
-      // Initialize ENP data from existing values on page load
+      // Initialise ENP data from existing values on page load
+      // Iterates ALL data-enp-section elements (covers all batch containers)
       document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('[data-enp-section]').forEach(section => {
           const treatmentId = section.getAttribute('data-enp-section');
           const hiddenField = section.querySelector('.enp-data');
 
+          enpData[treatmentId] = [{}, {}, {}, {}, {}, {}];
+
           if (hiddenField && hiddenField.value) {
             try {
               const data = JSON.parse(hiddenField.value);
-              enpData[treatmentId] = [{}, {}, {}, {}, {}, {}];
-
               if (Array.isArray(data)) {
                 data.forEach(m => {
                   const index = m.point.charCodeAt(0) - 65;
                   if (index >= 0 && index < 6) {
                     enpData[treatmentId][index] = {
-                      point: m.point,
-                      start_mm: m.start_mm,
+                      point:     m.point,
+                      start_mm:  m.start_mm,
                       finish_mm: m.finish_mm,
                       growth_um: m.growth_um
                     };
                   }
                 });
               }
-
               updateENPDisplay(treatmentId);
             } catch (err) {
-              console.error('Error loading ENP measurements:', err);
+              console.error('Error loading ENP measurements for', treatmentId, err);
             }
-          } else {
-            enpData[treatmentId] = [{}, {}, {}, {}, {}, {}];
           }
         });
       });
