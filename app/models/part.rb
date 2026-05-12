@@ -404,7 +404,7 @@ class Part < ApplicationRecord
     add_enp_strip_mask_ops(sequence) if has_enp_strip_mask_operations?
 
     # 3. Final inspection (after all processing including masking removal and heat treatment)
-    safe_add_to_sequence(sequence, OperationLibrary::InspectFinalInspectVatInspect.get_final_inspection_operation, "Final Inspection")
+    safe_add_to_sequence(sequence, OperationLibrary::InspectFinalInspectVatInspect.get_final_inspection_operation(operations_sequence: sequence, aerospace: aerospace_defense?), "Final Inspection")
 
     # 4. Pack (always last)
     safe_add_to_sequence(sequence, OperationLibrary::PackOperations.get_pack_operation, "Pack")
