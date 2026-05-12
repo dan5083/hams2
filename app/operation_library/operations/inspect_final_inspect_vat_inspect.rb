@@ -1,8 +1,8 @@
 # app/operation_library/operations/inspect_final_inspect_vat_inspect.rb
 module OperationLibrary
   class InspectFinalInspectVatInspect
-    ANODIC_PROCESS_TYPES = %w[chromic hard sulphuric].freeze
-    ENP_PROCESS_TYPES    = %w[enp].freeze
+    ANODIC_PROCESS_TYPES = %w[standard_anodising hard_anodising chromic_anodising].freeze
+    ENP_PROCESS_TYPES    = %w[electroless_nickel_plating].freeze
 
     def self.operations
       [
