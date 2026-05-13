@@ -100,6 +100,8 @@ class User < ApplicationRecord
       'daniel@hardanodisingstl.com',
       'tariq@hardanodisingstl.com',
       'phil@hardanodisingstl.com',
+      'brian@hardanodisingstl.com',
+      'chris@hardanodisingstl.com',
       'sophie@hardanodisingstl.com',
       'julia@hardanodisingstl.com'
     ])
