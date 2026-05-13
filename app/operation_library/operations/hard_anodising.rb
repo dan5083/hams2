@@ -469,7 +469,7 @@ module OperationLibrary
           anodic_classes: ['class_2'],
           target_thickness: 40,
           vat_numbers: [5],
-          operation_text: "Hard anodise 25V↗️30V over 25 minutes in vat 5"
+          operation_text: "Hard anodise 20V↗️35V over 30 minutes in vat 5"
         },
 
         {
