@@ -51,6 +51,10 @@ class WorksOrdersController < ApplicationController
 
     # Order by works order number descending (largest numbers first) and paginate
     @works_orders = @works_orders.order(number: :desc).page(params[:page]).per(20)
+
+    # For route card visibility — one query for the page, not one per row
+    part_ids = @works_orders.map(&:part_id).compact
+    @part_wo_counts = WorksOrder.where(part_id: part_ids).group(:part_id).count
   end
 
   def show

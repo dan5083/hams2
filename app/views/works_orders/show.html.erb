@@ -5,7 +5,8 @@
       <%= link_to "Edit", edit_works_order_path(@works_order),
           class: "bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded" %>
 
-      <% if WorksOrder.where(part_id: @works_order.part_id).count > 1 %>
+      <% if WorksOrder.where(part_id: @works_order.part_id).count > 1 ||
+            @works_order.customer_order.contract_reviewed? %>
         <%= link_to "Route Card",
             "javascript:void(0)",
             onclick: "printRouteCard('#{route_card_works_order_path(@works_order)}')",
@@ -16,7 +17,6 @@
           class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" %>
 
       <%
-        # Check for uninvoiced release notes across the entire customer order
         customer_order_uninvoiced = ReleaseNote.joins(:works_order)
                                               .where(works_orders: { customer_order_id: @works_order.customer_order_id })
                                               .requires_invoicing
@@ -47,220 +47,272 @@
   </div>
 
   <% if @works_order.customer_reference.present? %>
-    <div>
+    <div class="mb-4">
       <dt class="text-sm font-medium text-gray-500">Customer Reference</dt>
       <dd class="text-sm text-gray-900"><%= @works_order.customer_reference %></dd>
     </div>
   <% end %>
 
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <!-- Basic Details -->
-    <div class="bg-white shadow rounded-lg p-6">
-      <h2 class="text-xl font-semibold text-gray-900 mb-4">Basic Details</h2>
+  <%
+    operations = @works_order.operations_with_auto_ops rescue []
+  %>
 
-      <dl class="space-y-3">
-        <div>
-          <dt class="text-sm font-medium text-gray-500">Customer</dt>
-          <dd class="text-sm text-gray-900"><%= @works_order.customer.name %></dd>
-        </div>
+  <!-- Main layout: narrow left (details) + wide right (operations preview) -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
 
-        <div>
-          <dt class="text-sm font-medium text-gray-500">Customer Order</dt>
-          <dd class="text-sm text-gray-900">
-            <%= link_to @works_order.customer_order.number, @works_order.customer_order,
-                class: "text-blue-600 hover:text-blue-900" %>
-          </dd>
-        </div>
+    <!-- LEFT COLUMN: stacked detail panels -->
+    <div class="lg:col-span-1 space-y-6">
 
-        <div>
-          <dt class="text-sm font-medium text-gray-500">Part Number</dt>
-          <dd class="text-sm text-gray-900">
-            <%= link_to "#{@works_order.part_number}-#{@works_order.part_issue}", @works_order.part,
-                class: "text-blue-600 hover:text-blue-900" %>
-          </dd>
-        </div>
-
-        <div>
-          <dt class="text-sm font-medium text-gray-500">Description</dt>
-          <dd class="text-sm text-gray-900"><%= @works_order.part_description %></dd>
-        </div>
-
-        <div>
-          <dt class="text-sm font-medium text-gray-500">Specification</dt>
-          <dd class="text-sm text-gray-900"><%= @works_order.specification %></dd>
-        </div>
-      </dl>
-    </div>
-
-    <!-- Quantity & Pricing -->
-    <div class="bg-white shadow rounded-lg p-6">
-      <h2 class="text-xl font-semibold text-gray-900 mb-4">Quantity & Pricing</h2>
-
-      <dl class="space-y-3">
-        <div>
-          <dt class="text-sm font-medium text-gray-500">Quantity Ordered</dt>
-          <dd class="text-sm text-gray-900"><%= @works_order.quantity %></dd>
-        </div>
-
-        <div>
-          <dt class="text-sm font-medium text-gray-500">Quantity Released</dt>
-          <dd class="text-sm text-gray-900"><%= @works_order.quantity_released %></dd>
-        </div>
-
-        <div>
-          <dt class="text-sm font-medium text-gray-500">Quantity Remaining</dt>
-          <dd class="text-sm text-gray-900 font-semibold <%= @works_order.quantity_remaining > 0 ? 'text-green-600' : 'text-red-600' %>">
-            <%= @works_order.quantity_remaining %>
-          </dd>
-        </div>
-
-        <div>
-          <dt class="text-sm font-medium text-gray-500">Price Type</dt>
-          <dd class="text-sm text-gray-900"><%= @works_order.price_type.capitalize %></dd>
-        </div>
-
-        <% if @works_order.each_price.present? %>
-          <div>
-            <dt class="text-sm font-medium text-gray-500">Each Price</dt>
-            <dd class="text-sm text-gray-900">£<%= sprintf("%.2f", @works_order.each_price) %></dd>
-          </div>
-        <% end %>
-
-        <div>
-          <dt class="text-sm font-medium text-gray-500">Lot Price</dt>
-          <dd class="text-sm text-gray-900">£<%= sprintf("%.2f", @works_order.lot_price) %></dd>
-        </div>
-      </dl>
-    </div>
-
-    <!-- Additional Charges -->
-    <% if @works_order.selected_charge_ids.present? && @works_order.selected_charge_ids.any? %>
+      <!-- Basic Details -->
       <div class="bg-white shadow rounded-lg p-6">
-        <h2 class="text-xl font-semibold text-gray-900 mb-4">Additional Charges</h2>
-
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Basic Details</h2>
         <dl class="space-y-3">
-          <%
-            selected_charges = @works_order.get_selected_additional_charges
-            total_additional_charges = 0.0
-          %>
-
-          <% selected_charges.each do |charge| %>
-            <div class="flex justify-between items-start">
-              <dt class="text-sm font-medium text-gray-500">
-                <%= charge.name %>
-                <% if charge.is_variable? %>
-                  <% custom_amount = @works_order.get_custom_amount(charge.id)&.to_f %>
-                  <% if custom_amount.present? && custom_amount > 0 %>
-                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 ml-1">
-                      Custom
-                    </span>
-                  <% else %>
-                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800 ml-1">
-                      Variable (Default)
-                    </span>
-                  <% end %>
-                <% end %>
-              </dt>
-              <dd class="text-sm text-gray-900 font-medium">
-                <%
-                  if charge.is_variable?
-                    custom_amount = @works_order.get_custom_amount(charge.id).to_f
-                    display_amount = custom_amount > 0 ? custom_amount : (charge.amount || 0).to_f
-                    total_additional_charges += display_amount
-                %>
-                  £<%= sprintf("%.2f", display_amount) %>
-                <% else
-                    total_additional_charges += (charge.amount || 0).to_f
-                %>
-                  £<%= sprintf("%.2f", charge.amount || 0) %>
-                <% end %>
-              </dd>
-            </div>
-          <% end %>
-
-          <!-- Total Additional Charges -->
-          <div class="flex justify-between items-start pt-3 border-t border-gray-200">
-            <dt class="text-sm font-semibold text-gray-700">Total Additional Charges</dt>
-            <dd class="text-sm font-bold text-gray-900">
-              £<%= sprintf("%.2f", total_additional_charges) %>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Customer</dt>
+            <dd class="text-sm text-gray-900"><%= @works_order.customer.name %></dd>
+          </div>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Customer Order</dt>
+            <dd class="text-sm text-gray-900">
+              <%= link_to @works_order.customer_order.number, @works_order.customer_order,
+                  class: "text-blue-600 hover:text-blue-900" %>
             </dd>
           </div>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Part Number</dt>
+            <dd class="text-sm text-gray-900">
+              <%= link_to "#{@works_order.part_number}-#{@works_order.part_issue}", @works_order.part,
+                  class: "text-blue-600 hover:text-blue-900" %>
+            </dd>
+          </div>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Description</dt>
+            <dd class="text-sm text-gray-900"><%= @works_order.part_description %></dd>
+          </div>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Specification</dt>
+            <dd class="text-sm text-gray-900"><%= @works_order.specification.presence || "—" %></dd>
+          </div>
+        </dl>
+      </div>
 
-          <!-- Grand Total -->
-          <div class="flex justify-between items-start pt-2 border-t-2 border-gray-300">
-            <dt class="text-base font-bold text-gray-900">Grand Total (Lot + Charges)</dt>
-            <dd class="text-base font-bold text-blue-600">
-              £<%= sprintf("%.2f", @works_order.lot_price + total_additional_charges) %>
+      <!-- Quantity & Pricing -->
+      <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Quantity & Pricing</h2>
+        <dl class="space-y-3">
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Quantity Ordered</dt>
+            <dd class="text-sm text-gray-900"><%= @works_order.quantity %></dd>
+          </div>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Quantity Released</dt>
+            <dd class="text-sm text-gray-900"><%= @works_order.quantity_released %></dd>
+          </div>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Quantity Remaining</dt>
+            <dd class="text-sm font-semibold <%= @works_order.quantity_remaining > 0 ? 'text-green-600' : 'text-red-600' %>">
+              <%= @works_order.quantity_remaining %>
+            </dd>
+          </div>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Price Type</dt>
+            <dd class="text-sm text-gray-900"><%= @works_order.price_type.capitalize %></dd>
+          </div>
+          <% if @works_order.each_price.present? %>
+            <div>
+              <dt class="text-sm font-medium text-gray-500">Each Price</dt>
+              <dd class="text-sm text-gray-900">£<%= sprintf("%.2f", @works_order.each_price) %></dd>
+            </div>
+          <% end %>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Lot Price</dt>
+            <dd class="text-sm text-gray-900">£<%= sprintf("%.2f", @works_order.lot_price) %></dd>
+          </div>
+        </dl>
+      </div>
+
+      <!-- Additional Charges -->
+      <% if @works_order.selected_charge_ids.present? && @works_order.selected_charge_ids.any? %>
+        <div class="bg-white shadow rounded-lg p-6">
+          <h2 class="text-lg font-semibold text-gray-900 mb-4">Additional Charges</h2>
+          <dl class="space-y-3">
+            <%
+              selected_charges = @works_order.get_selected_additional_charges
+              total_additional_charges = 0.0
+            %>
+            <% selected_charges.each do |charge| %>
+              <div class="flex justify-between items-start">
+                <dt class="text-sm font-medium text-gray-500">
+                  <%= charge.name %>
+                  <% if charge.is_variable? %>
+                    <% custom_amount = @works_order.get_custom_amount(charge.id)&.to_f %>
+                    <% if custom_amount.present? && custom_amount > 0 %>
+                      <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 ml-1">Custom</span>
+                    <% else %>
+                      <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800 ml-1">Variable</span>
+                    <% end %>
+                  <% end %>
+                </dt>
+                <dd class="text-sm text-gray-900 font-medium">
+                  <%
+                    if charge.is_variable?
+                      custom_amount = @works_order.get_custom_amount(charge.id).to_f
+                      display_amount = custom_amount > 0 ? custom_amount : (charge.amount || 0).to_f
+                      total_additional_charges += display_amount
+                  %>
+                    £<%= sprintf("%.2f", display_amount) %>
+                  <% else
+                      total_additional_charges += (charge.amount || 0).to_f
+                  %>
+                    £<%= sprintf("%.2f", charge.amount || 0) %>
+                  <% end %>
+                </dd>
+              </div>
+            <% end %>
+            <div class="flex justify-between items-start pt-3 border-t border-gray-200">
+              <dt class="text-sm font-semibold text-gray-700">Total Additional Charges</dt>
+              <dd class="text-sm font-bold text-gray-900">£<%= sprintf("%.2f", total_additional_charges) %></dd>
+            </div>
+            <div class="flex justify-between items-start pt-2 border-t-2 border-gray-300">
+              <dt class="text-base font-bold text-gray-900">Grand Total</dt>
+              <dd class="text-base font-bold text-blue-600">£<%= sprintf("%.2f", @works_order.lot_price + total_additional_charges) %></dd>
+            </div>
+          </dl>
+        </div>
+      <% end %>
+
+      <!-- Status & Dates -->
+      <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Status & Dates</h2>
+        <dl class="space-y-3">
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Created</dt>
+            <dd class="text-sm text-gray-900"><%= @works_order.created_at.strftime("%d/%m/%Y %H:%M") %></dd>
+          </div>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Status</dt>
+            <dd class="text-sm">
+              <% if @works_order.is_open %>
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Open</span>
+              <% else %>
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">Closed</span>
+              <% end %>
+            </dd>
+          </div>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Manufacturing Status</dt>
+            <dd class="text-sm">
+              <% if @works_order.manufacturing_complete? %>
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">Complete</span>
+              <% elsif @works_order.quantity_released > 0 %>
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">In Progress</span>
+              <% else %>
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">Pending</span>
+              <% end %>
             </dd>
           </div>
         </dl>
       </div>
-    <% end %>
 
-    <!-- Status & Dates -->
-    <div class="bg-white shadow rounded-lg p-6">
-      <h2 class="text-xl font-semibold text-gray-900 mb-4">Status & Dates</h2>
-
-      <dl class="space-y-3">
-        <div>
-          <dt class="text-sm font-medium text-gray-500">Created</dt>
-          <dd class="text-sm text-gray-900"><%= @works_order.created_at.strftime("%d/%m/%Y %H:%M") %></dd>
-        </div>
-
-        <div>
-          <dt class="text-sm font-medium text-gray-500">Status</dt>
-          <dd class="text-sm">
-            <% if @works_order.is_open %>
-              <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                Open
-              </span>
-            <% else %>
-              <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
-                Closed
-              </span>
-            <% end %>
-          </dd>
-        </div>
-
-        <div>
-          <dt class="text-sm font-medium text-gray-500">Manufacturing Status</dt>
-          <dd class="text-sm">
-            <% if @works_order.manufacturing_complete? %>
-              <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                Complete
-              </span>
-            <% elsif @works_order.quantity_released > 0 %>
-              <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                In Progress
-              </span>
-            <% else %>
-              <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
-                Pending
-              </span>
-            <% end %>
-          </dd>
-        </div>
-      </dl>
     </div>
 
-    <!-- Customer Order Invoicing Status -->
-    <div class="bg-white shadow rounded-lg p-6">
-      <h2 class="text-xl font-semibold text-gray-900 mb-4">Customer Order Invoicing</h2>
+    <!-- RIGHT COLUMN: operations preview -->
+    <div class="lg:col-span-2">
+      <div class="bg-white shadow rounded-lg p-6 h-full">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-lg font-semibold text-gray-900">Process Operations</h2>
+          <% if operations.any? %>
+            <span class="text-sm text-gray-500"><%= operations.length %> operation<%= operations.length == 1 ? '' : 's' %></span>
+          <% end %>
+        </div>
 
-      <dl class="space-y-3">
-        <%
-          all_customer_order_release_notes = ReleaseNote.joins(:works_order)
-                                                        .where(works_orders: { customer_order_id: @works_order.customer_order_id })
+        <% if @works_order.special_instructions.present? %>
+          <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p class="text-xs font-semibold text-yellow-800 uppercase tracking-wide mb-1">Special Instructions</p>
+            <p class="text-sm text-yellow-900"><%= simple_format(@works_order.special_instructions) %></p>
+          </div>
+        <% end %>
 
-          uninvoiced_across_order = all_customer_order_release_notes.requires_invoicing
-          invoiced_across_order = all_customer_order_release_notes.joins(:invoice_item)
+        <% if operations.any? %>
+          <div class="space-y-3">
+            <% operations.each_with_index do |op, index| %>
+              <div class="border border-gray-200 rounded-lg overflow-hidden">
+                <div class="flex items-stretch">
+                  <!-- Op number -->
+                  <div class="flex-none w-12 bg-gray-100 border-r border-gray-200 flex items-center justify-center">
+                    <span class="text-sm font-bold text-gray-700"><%= index + 1 %></span>
+                  </div>
+                  <!-- Op content -->
+                  <div class="flex-1 px-4 py-3 text-sm text-gray-900 leading-relaxed">
+                    <% op_text = op.respond_to?(:operation_text) ? op.operation_text : op.respond_to?(:display_name) ? op.display_name : op.to_s %>
+                    <%= simple_format(op_text.to_s) %>
+                  </div>
+                  <!-- Contract review indicator for op 1 -->
+                  <% if index == 0 %>
+                    <div class="flex-none w-32 border-l border-gray-200 flex flex-col items-center justify-center p-2 bg-gray-50">
+                      <% if @works_order.customer_order.contract_reviewed? %>
+                        <span class="text-xs text-green-700 font-semibold text-center">✓ Reviewed</span>
+                        <span class="text-xs text-gray-500 text-center mt-1"><%= @works_order.customer_order.contract_reviewed_by.display_name %></span>
+                      <% else %>
+                        <span class="text-xs text-yellow-700 font-semibold text-center">⚠ Not reviewed</span>
+                      <% end %>
+                    </div>
+                  <% else %>
+                    <!-- Batch sign-off boxes to mirror route card -->
+                    <div class="flex-none w-32 border-l border-gray-200 flex items-center justify-center p-2 bg-gray-50">
+                      <div class="flex gap-1">
+                        <% 3.times do %>
+                          <div class="w-7 h-7 border border-gray-300 rounded bg-white"></div>
+                        <% end %>
+                      </div>
+                    </div>
+                  <% end %>
+                </div>
+              </div>
+            <% end %>
+          </div>
 
-          uninvoiced_wo_count = @works_order.customer_order.works_orders
-                                          .joins(:release_notes)
-                                          .merge(ReleaseNote.requires_invoicing)
-                                          .distinct.count
-        %>
+          <% if @works_order.specification.present? %>
+            <div class="mt-4 pt-4 border-t border-gray-200">
+              <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Specification</p>
+              <p class="text-sm text-gray-900"><%= @works_order.specification %></p>
+            </div>
+          <% end %>
 
+        <% else %>
+          <div class="flex flex-col items-center justify-center py-16 text-center">
+            <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+            <p class="text-gray-500 font-medium">No operations configured</p>
+            <p class="text-sm text-gray-400 mt-1">
+              <%= link_to "Set up this part", @works_order.part, class: "text-blue-600 hover:text-blue-900" %> to add processing instructions.
+            </p>
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Customer Order Invoicing Status -->
+  <div class="bg-white shadow rounded-lg p-6 mb-6">
+    <h2 class="text-xl font-semibold text-gray-900 mb-4">Customer Order Invoicing</h2>
+    <dl class="space-y-3">
+      <%
+        all_customer_order_release_notes = ReleaseNote.joins(:works_order)
+                                                      .where(works_orders: { customer_order_id: @works_order.customer_order_id })
+
+        uninvoiced_across_order = all_customer_order_release_notes.requires_invoicing
+        invoiced_across_order = all_customer_order_release_notes.joins(:invoice_item)
+
+        uninvoiced_wo_count = @works_order.customer_order.works_orders
+                                        .joins(:release_notes)
+                                        .merge(ReleaseNote.requires_invoicing)
+                                        .distinct.count
+      %>
+
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div>
           <dt class="text-sm font-medium text-gray-500">Customer Order</dt>
           <dd class="text-sm text-gray-900">
@@ -268,67 +320,50 @@
                 class: "text-blue-600 hover:text-blue-900" %>
           </dd>
         </div>
-
         <div>
-          <dt class="text-sm font-medium text-gray-500">Works Orders with Uninvoiced Items</dt>
-          <dd class="text-sm text-gray-900 font-semibold <%= uninvoiced_wo_count > 0 ? 'text-orange-600' : 'text-green-600' %>">
+          <dt class="text-sm font-medium text-gray-500">WOs with Uninvoiced Items</dt>
+          <dd class="text-sm font-semibold <%= uninvoiced_wo_count > 0 ? 'text-orange-600' : 'text-green-600' %>">
             <%= uninvoiced_wo_count %> of <%= @works_order.customer_order.works_orders.active.count %>
           </dd>
         </div>
-
         <div>
           <dt class="text-sm font-medium text-gray-500">Total Uninvoiced Parts</dt>
-          <dd class="text-sm text-gray-900 font-semibold <%= uninvoiced_across_order.any? ? 'text-orange-600' : 'text-green-600' %>">
+          <dd class="text-sm font-semibold <%= uninvoiced_across_order.any? ? 'text-orange-600' : 'text-green-600' %>">
             <%= uninvoiced_across_order.sum(:quantity_accepted) %> parts
             <% if uninvoiced_across_order.any? %>
-              (<%= uninvoiced_across_order.count %> release notes)
+              <span class="text-xs text-gray-500">(<%= uninvoiced_across_order.count %> notes)</span>
             <% end %>
           </dd>
         </div>
-
         <div>
           <dt class="text-sm font-medium text-gray-500">Total Invoiced Parts</dt>
-          <dd class="text-sm text-gray-900 font-semibold text-blue-600">
+          <dd class="text-sm font-semibold text-blue-600">
             <%= invoiced_across_order.sum(:quantity_accepted) %> parts
             <% if invoiced_across_order.any? %>
-              (<%= invoiced_across_order.count %> release notes)
+              <span class="text-xs text-gray-500">(<%= invoiced_across_order.count %> notes)</span>
             <% end %>
           </dd>
         </div>
-
-        <% if uninvoiced_across_order.any? %>
-          <div class="pt-2">
-            <% if uninvoiced_wo_count > 1 %>
-              <span class="text-sm text-orange-600 font-medium">
-                ⚠️ Ready to invoice entire customer order (<%= uninvoiced_wo_count %> works orders)
-              </span>
-            <% else %>
-              <span class="text-sm text-orange-600 font-medium">
-                ⚠️ Ready to invoice <%= uninvoiced_across_order.sum(:quantity_accepted) %> parts
-              </span>
-            <% end %>
-          </div>
-        <% elsif @works_order.customer_order.works_orders.active.sum(:quantity_released) > 0 %>
-          <div class="pt-2">
-            <span class="text-sm text-green-600 font-medium">
-              ✅ Customer order fully invoiced
-            </span>
-          </div>
-        <% end %>
-      </dl>
-    </div>
-
-    <!-- Special Instructions -->
-    <% if @works_order.special_instructions.present? %>
-      <div class="bg-white shadow rounded-lg p-6 lg:col-span-2">
-        <h2 class="text-xl font-semibold text-gray-900 mb-4">Special Instructions</h2>
-        <p class="text-sm text-gray-900"><%= simple_format(@works_order.special_instructions) %></p>
       </div>
-    <% end %>
+
+      <% if uninvoiced_across_order.any? %>
+        <div class="pt-2">
+          <% if uninvoiced_wo_count > 1 %>
+            <span class="text-sm text-orange-600 font-medium">⚠️ Ready to invoice entire customer order (<%= uninvoiced_wo_count %> works orders)</span>
+          <% else %>
+            <span class="text-sm text-orange-600 font-medium">⚠️ Ready to invoice <%= uninvoiced_across_order.sum(:quantity_accepted) %> parts</span>
+          <% end %>
+        </div>
+      <% elsif @works_order.customer_order.works_orders.active.sum(:quantity_released) > 0 %>
+        <div class="pt-2">
+          <span class="text-sm text-green-600 font-medium">✅ Customer order fully invoiced</span>
+        </div>
+      <% end %>
+    </dl>
   </div>
 
   <!-- Release Notes -->
-  <div class="bg-white shadow rounded-lg p-6 mt-6">
+  <div class="bg-white shadow rounded-lg p-6">
     <div class="flex justify-between items-center mb-4">
       <h2 class="text-xl font-semibold text-gray-900">Release Notes (This Works Order)</h2>
     </div>
@@ -338,58 +373,30 @@
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Number
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Date
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Accepted
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Rejected
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Invoice Status
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Number</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Accepted</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rejected</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice Status</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
             <% @works_order.release_notes.recent.each do |release_note| %>
               <tr class="hover:bg-gray-50">
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  RN<%= release_note.number %>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <%= release_note.date.strftime("%d/%m/%Y") %>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <%= release_note.quantity_accepted %>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <%= release_note.quantity_rejected %>
-                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">RN<%= release_note.number %></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><%= release_note.date.strftime("%d/%m/%Y") %></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><%= release_note.quantity_accepted %></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><%= release_note.quantity_rejected %></td>
                 <td class="px-6 py-4 whitespace-nowrap">
                   <% if release_note.voided %>
-                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                      Voided
-                    </span>
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Voided</span>
                   <% elsif release_note.invoice_item.present? %>
-                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                      Invoiced
-                    </span>
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">Invoiced</span>
                   <% elsif release_note.can_be_invoiced? %>
-                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
-                      Ready to Invoice
-                    </span>
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">Ready to Invoice</span>
                   <% else %>
-                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
-                      No Invoice
-                    </span>
+                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">No Invoice</span>
                   <% end %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -406,14 +413,11 @@
   </div>
 </div>
 
-<!-- JavaScript for Route Card Print Functionality -->
 <script>
 function printRouteCard(url) {
   const printWindow = window.open(url, '_blank', 'width=800,height=600');
   printWindow.onload = function() {
     printWindow.print();
-    // Optionally auto-close after printing (uncomment if desired)
-    // printWindow.onafterprint = function() { printWindow.close(); };
   };
 }
 </script>
