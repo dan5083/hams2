@@ -336,7 +336,7 @@
     <% end %>
 
     <section class="operations">
-      <%= render 'route_card_ops', operations: @operations %>
+      <%= render 'route_card_ops', operations: @operations, works_order: @works_order %>
     </section>
 
     <div class="page-identification">
@@ -346,17 +346,12 @@
     <!-- Aerospace/Defence Contract Review Checklist -->
     <% if @works_order&.aerospace_defense? %>
       <%
-        # For Lufthansa Technik, only show checklist on first works order in customer order
-        # For all other customers, show on every aerospace works order
         show_checklist = true
         customer_name = @works_order.customer&.name
 
         if customer_name == "Lufthansa Technik Landing Gear Services UK"
-          # Get all active works orders in this customer order, sorted by number (ascending)
           all_wos_in_order = @works_order.customer_order.works_orders.active.order(:number)
           first_wo = all_wos_in_order.first
-
-          # Only show checklist if this is the first (lowest numbered) works order
           show_checklist = (@works_order.id == first_wo&.id)
         end
       %>
@@ -535,7 +530,6 @@
           if (node.nodeType === 3) {
             highlightTextNode(node);
           } else if (node.nodeType === 1 && node.tagName !== 'SCRIPT' && node.tagName !== 'STYLE' && !node.classList.contains('no-colour-highlight')) {
-            // Work on a snapshot so replacements don't affect iteration
             var children = Array.prototype.slice.call(node.childNodes);
             children.forEach(walkNode);
           }

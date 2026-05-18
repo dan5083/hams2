@@ -4,10 +4,14 @@
     <div class="flex space-x-2">
       <%= link_to "Edit", edit_works_order_path(@works_order),
           class: "bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded" %>
-      <%= link_to "Route Card",
-          "javascript:void(0)",
-          onclick: "printRouteCard('#{route_card_works_order_path(@works_order)}')",
-          class: "bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded" %>
+
+      <% if WorksOrder.where(part_id: @works_order.part_id).count > 1 %>
+        <%= link_to "Route Card",
+            "javascript:void(0)",
+            onclick: "printRouteCard('#{route_card_works_order_path(@works_order)}')",
+            class: "bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded" %>
+      <% end %>
+
       <%= link_to "New Release Note", new_works_order_release_note_path(@works_order),
           class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" %>
 
@@ -42,7 +46,7 @@
     </div>
   </div>
 
-    <% if @works_order.customer_reference.present? %>
+  <% if @works_order.customer_reference.present? %>
     <div>
       <dt class="text-sm font-medium text-gray-500">Customer Reference</dt>
       <dd class="text-sm text-gray-900"><%= @works_order.customer_reference %></dd>
@@ -245,14 +249,12 @@
 
       <dl class="space-y-3">
         <%
-          # Get invoicing status across the entire customer order
           all_customer_order_release_notes = ReleaseNote.joins(:works_order)
                                                         .where(works_orders: { customer_order_id: @works_order.customer_order_id })
 
           uninvoiced_across_order = all_customer_order_release_notes.requires_invoicing
           invoiced_across_order = all_customer_order_release_notes.joins(:invoice_item)
 
-          # Count works orders with uninvoiced items
           uninvoiced_wo_count = @works_order.customer_order.works_orders
                                           .joins(:release_notes)
                                           .merge(ReleaseNote.requires_invoicing)

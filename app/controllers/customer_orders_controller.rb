@@ -1,16 +1,14 @@
 class CustomerOrdersController < ApplicationController
-  before_action :set_customer_order, only: [:show, :edit, :update, :destroy, :void, :create_invoice]
+  before_action :set_customer_order, only: [:show, :edit, :update, :destroy, :void, :create_invoice,
+                                            :mark_contract_reviewed, :unmark_contract_reviewed]
 
-  # app/controllers/customer_orders_controller.rb
   def index
     @customer_orders = CustomerOrder.includes(:customer, :works_orders)
 
-    # Filter by customer if provided
     if params[:customer_id].present?
       @customer_orders = @customer_orders.for_customer(params[:customer_id])
     end
 
-    # Filter by status
     case params[:status]
     when 'outstanding'
       @customer_orders = @customer_orders.outstanding
@@ -20,7 +18,6 @@ class CustomerOrdersController < ApplicationController
       @customer_orders = @customer_orders.active
     end
 
-    # Search by order number or customer name
     if params[:search].present?
       search_term = params[:search].strip
       @customer_orders = @customer_orders.joins(:customer)
@@ -30,16 +27,8 @@ class CustomerOrdersController < ApplicationController
                                         )
     end
 
-    # For the filter dropdown - include all enabled organizations
     @customers = Organization.enabled.order(:name)
 
-    # OPTIMIZED: Sort using cached columns in pure SQL
-    # Priority:
-    # 0 = Fully released with uninvoiced items (READY TO INVOICE) 🟢
-    # 1 = Partially released (IN PROGRESS) 🟠
-    # 2 = Not started yet ⚪
-    # 3 = Fully invoiced ⚪
-    # 4 = Voided 🔴
     @customer_orders = @customer_orders.order(
       Arel.sql("
         CASE
@@ -61,13 +50,18 @@ class CustomerOrdersController < ApplicationController
 
   def show
     @works_orders = @customer_order.works_orders
-                                  .includes(:part)
-                                  .order(created_at: :desc)
+                                   .includes(:part)
+                                   .order(created_at: :desc)
+
+    # Fetch part WO counts in one query rather than once per row
+    part_ids = @works_orders.map(&:part_id).compact
+    @part_wo_counts = WorksOrder.where(part_id: part_ids)
+                                .group(:part_id)
+                                .count
   end
 
   def new
     @customer_order = CustomerOrder.new
-    # Include all enabled organizations for consistency
     @customers = Organization.enabled.order(:name)
   end
 
@@ -77,14 +71,12 @@ class CustomerOrdersController < ApplicationController
     if @customer_order.save
       redirect_to @customer_order, notice: 'Customer order was successfully created.'
     else
-      # Include all enabled organizations for consistency
       @customers = Organization.enabled.order(:name)
       render :new, status: :unprocessable_entity
     end
   end
 
   def create_invoice
-    # Check if ALL works orders are fully released (quantity_released >= quantity for each)
     active_works_orders = @customer_order.works_orders.active
 
     if active_works_orders.empty?
@@ -92,7 +84,6 @@ class CustomerOrdersController < ApplicationController
       return
     end
 
-    # Check that ALL works orders are fully released
     incomplete_works_orders = active_works_orders.select { |wo| wo.quantity_released < wo.quantity }
 
     if incomplete_works_orders.any?
@@ -102,7 +93,6 @@ class CustomerOrdersController < ApplicationController
       return
     end
 
-    # Check if any quantity has been released
     total_released = active_works_orders.sum(:quantity_released)
 
     if total_released <= 0
@@ -111,19 +101,16 @@ class CustomerOrdersController < ApplicationController
     end
 
     begin
-      # Get all uninvoiced release notes for this customer order
       uninvoiced_release_notes = ReleaseNote.joins(:works_order)
-                                          .where(works_orders: { customer_order_id: @customer_order.id })
-                                          .requires_invoicing
+                                            .where(works_orders: { customer_order_id: @customer_order.id })
+                                            .requires_invoicing
 
       if uninvoiced_release_notes.empty?
         redirect_to customer_orders_path, alert: 'No release notes available for invoicing. All items may already be invoiced.'
         return
       end
 
-      # Create invoice from all uninvoiced release notes
       customer = @customer_order.customer
-
       invoice = Invoice.create_from_release_notes(uninvoiced_release_notes, customer, Current.user)
 
       if invoice.nil?
@@ -131,20 +118,16 @@ class CustomerOrdersController < ApplicationController
         return
       end
 
-      # Add additional charges from all works orders in this customer order
       @customer_order.works_orders.active.each do |works_order|
         if works_order.selected_charge_ids.present?
           add_additional_charges_to_invoice(invoice, works_order.selected_charge_ids, works_order.custom_amounts || {})
         end
       end
 
-      # Recalculate totals after adding all charges
       invoice.calculate_totals!
 
-      # Build summary message
       works_order_count = uninvoiced_release_notes.joins(:works_order).select('works_orders.id').distinct.count
       release_note_count = uninvoiced_release_notes.count
-
       summary = "Invoice created for fully completed customer order #{@customer_order.number} (#{works_order_count} works orders, #{release_note_count} release notes)"
 
       redirect_to customer_orders_path,
@@ -160,7 +143,6 @@ class CustomerOrdersController < ApplicationController
   end
 
   def edit
-    # Include all enabled organizations for consistency
     @customers = Organization.enabled.order(:name)
   end
 
@@ -168,7 +150,6 @@ class CustomerOrdersController < ApplicationController
     if @customer_order.update(customer_order_params)
       redirect_to @customer_order, notice: 'Customer order was successfully updated.'
     else
-      # Include all enabled organizations for consistency
       @customers = Organization.enabled.order(:name)
       render :edit, status: :unprocessable_entity
     end
@@ -192,13 +173,23 @@ class CustomerOrdersController < ApplicationController
     end
   end
 
+  def mark_contract_reviewed
+    @customer_order.mark_contract_reviewed!(Current.user)
+    redirect_to @customer_order, notice: "Contract marked as reviewed by #{Current.user.display_name}."
+  end
+
+  def unmark_contract_reviewed
+    @customer_order.unmark_contract_reviewed!
+    redirect_to @customer_order, notice: 'Contract review cleared.'
+  end
+
   def search_customers
     if params[:q].present?
       search_term = params[:q].strip
       @customers = Organization.enabled
-                            .where("name ILIKE ?", "%#{search_term}%")
-                            .order(:name)
-                            .limit(10)
+                               .where("name ILIKE ?", "%#{search_term}%")
+                               .order(:name)
+                               .limit(10)
     else
       @customers = Organization.none
     end
@@ -226,7 +217,6 @@ class CustomerOrdersController < ApplicationController
     charge_ids.reject(&:blank?).each do |charge_id|
       charge = AdditionalChargePreset.find(charge_id)
       custom_amount = custom_amounts[charge_id]
-
       InvoiceItem.create_from_additional_charge(charge, invoice, custom_amount)
     end
   end

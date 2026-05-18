@@ -1,6 +1,9 @@
 # app/models/customer_order.rb - Fixed outstanding logic and auto-marking
 class CustomerOrder < ApplicationRecord
   belongs_to :customer, class_name: 'Organization'
+  belongs_to :contract_reviewed_by, class_name: 'User',
+             foreign_key: :contract_reviewed_by_user_id,
+             optional: true
   has_many :works_orders, dependent: :restrict_with_error
 
   validates :number, presence: true
@@ -21,7 +24,6 @@ class CustomerOrder < ApplicationRecord
   }
 
   after_initialize :set_defaults, if: :new_record?
-  # NEW: Auto-mark organizations as customers when they place their first order
   after_create :mark_customer_as_customer
 
   def display_name
@@ -72,13 +74,24 @@ class CustomerOrder < ApplicationRecord
   # FIXED: Outstanding logic - should check for open works orders
   def outstanding?
     return false if voided?
-
-    # Outstanding if: no works orders OR has open works orders
     works_orders.empty? || works_orders.where(voided: false, is_open: true).exists?
   end
 
   def can_be_deleted?
     works_orders.empty?
+  end
+
+  # Contract review
+  def contract_reviewed?
+    contract_reviewed_by_user_id.present?
+  end
+
+  def mark_contract_reviewed!(user)
+    update!(contract_reviewed_by_user_id: user.id)
+  end
+
+  def unmark_contract_reviewed!
+    update!(contract_reviewed_by_user_id: nil)
   end
 
   private
@@ -88,7 +101,6 @@ class CustomerOrder < ApplicationRecord
     self.date_received = Date.current if date_received.blank?
   end
 
-  # NEW: Auto-mark organizations as customers when they place orders
   def mark_customer_as_customer
     unless customer.is_customer?
       customer.update!(is_customer: true)

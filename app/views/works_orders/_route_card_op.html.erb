@@ -7,6 +7,11 @@
   rowspan = has_variables ? 2 : 1
   is_op_1 = op[:number] == 1
 
+  # Contract review info for op 1 merged cell
+  if is_op_1
+    reviewer = works_order&.customer_order&.contract_reviewed_by
+  end
+
   # Parse operation content to extract OCV batches and test result lines
   main_content = []
   ocv_batches = []
@@ -82,7 +87,6 @@
               end
 
               # Extract all batches using scan with negative lookahead
-              # Pattern captures: "Batch X: [anything that's not the start of another Batch or **CapitalLetter]"
               batch_matches = line.scan(/(Batch\s+(?:___|[0-9]+):\s*(?:(?!Batch\s+(?:___|[0-9]+):|\*\*[A-Z]).)*?)(?=Batch\s+(?:___|[0-9]+):|\*\*[A-Z]|$)/m)
 
               batch_matches.each do |match|
@@ -144,10 +148,15 @@
   </td>
 
   <% if is_op_1 %>
-    <!-- For OP 1, merge all batch columns into one -->
-    <td colspan="<%= batch_cols %>" style="<%= top_style %>"></td>
+    <!-- Op 1: merged batch columns, show contract reviewer if set -->
+    <td colspan="<%= batch_cols %>" style="<%= top_style %> vertical-align: middle; text-align: center;">
+      <% if reviewer %>
+        <div style="font-size: 9pt; color: #555;">Contract reviewed by</div>
+        <div style="font-weight: bold; font-size: 10pt;"><%= reviewer.display_name %></div>
+      <% end %>
+    </td>
   <% else %>
-    <!-- For all other operations, use separate columns -->
+    <!-- All other operations: separate batch columns -->
     <% batch_cols.times do %>
       <td style="<%= top_style %>"></td>
     <% end %>
@@ -165,10 +174,8 @@
     </td>
 
     <% if is_op_1 %>
-      <!-- For OP 1, merge all batch columns into one -->
       <td colspan="<%= batch_cols %>" style="<%= bottom_style %>"></td>
     <% else %>
-      <!-- For all other operations, use separate columns -->
       <% batch_cols.times do %>
         <td style="<%= bottom_style %>"></td>
       <% end %>

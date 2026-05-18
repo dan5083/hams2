@@ -28,7 +28,7 @@
 
   <% operations.each do |op| %>
     <tbody style="page-break-inside: avoid;">
-      <%= render 'route_card_op', op: op, batch_cols: batch_cols %>
+      <%= render 'route_card_op', op: op, batch_cols: batch_cols, works_order: works_order %>
     </tbody>
   <% end %>
 </table>

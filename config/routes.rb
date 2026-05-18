@@ -52,6 +52,8 @@ Rails.application.routes.draw do
     member do
       patch :void
       patch :create_invoice
+      patch :mark_contract_reviewed
+      patch :unmark_contract_reviewed
     end
     collection do
       get :search_customers
