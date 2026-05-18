@@ -1,7 +1,6 @@
-# db/migrate/YYYYMMDDHHMMSS_add_contract_reviewed_by_user_id_to_customer_orders.rb
 class AddContractReviewedByUserIdToCustomerOrders < ActiveRecord::Migration[7.1]
   def change
-    add_column :customer_orders, :contract_reviewed_by_user_id, :integer, null: true, default: nil
+    add_column :customer_orders, :contract_reviewed_by_user_id, :uuid, null: true, default: nil
 
     add_index :customer_orders, :contract_reviewed_by_user_id
 
