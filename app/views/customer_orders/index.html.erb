@@ -89,16 +89,33 @@
             has_uninvoiced = uninvoiced_count > 0
             show_create_invoice = all_works_orders_fully_released && has_uninvoiced
 
-            # Load works_orders once for the display (already eager loaded)
             works_orders = customer_order.works_orders.active
             fully_released_wo_count = customer_order.fully_released_works_orders_count
+
+            # Purple if: has a new-part WO AND not yet contract reviewed
+            # Green takes precedence if also ready to invoice
+            needs_review = !customer_order.contract_reviewed? &&
+                           @cos_with_new_parts.include?(customer_order.id)
+
+            row_class = if all_works_orders_fully_released
+                          'bg-green-50'
+                        elsif needs_review
+                          'bg-purple-50'
+                        else
+                          ''
+                        end
           %>
-          <tr class="hover:bg-gray-50 <%= 'bg-green-50' if all_works_orders_fully_released %>">
+          <tr class="hover:bg-gray-50 cursor-pointer <%= row_class %>"
+              onclick="if(!event.target.closest('a, button, form')) window.location='<%= customer_order_path(customer_order) %>'">
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
               <%= link_to customer_order.number, customer_order, class: "text-blue-600 hover:text-blue-900" %>
               <% if all_works_orders_fully_released %>
                 <span class="ml-2 inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
                   Ready
+                </span>
+              <% elsif needs_review %>
+                <span class="ml-2 inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                  Review needed
                 </span>
               <% end %>
             </td>

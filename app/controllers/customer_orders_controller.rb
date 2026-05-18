@@ -46,6 +46,19 @@ class CustomerOrdersController < ApplicationController
       "),
       date_received: :desc
     ).page(params[:page]).per(20)
+
+    # Build set of customer order IDs that have at least one new-part WO —
+    # used to highlight orders needing contract review before route cards can print.
+    # Two queries regardless of page size; no per-row lookups.
+    co_ids = @customer_orders.map(&:id)
+    wo_part_data = WorksOrder.where(customer_order_id: co_ids, voided: false)
+                             .pluck(:customer_order_id, :part_id)
+    part_ids = wo_part_data.map(&:last).uniq
+    part_wo_counts = WorksOrder.where(part_id: part_ids).group(:part_id).count
+    @cos_with_new_parts = Set.new
+    wo_part_data.each do |co_id, part_id|
+      @cos_with_new_parts << co_id if (part_wo_counts[part_id] || 0) <= 1
+    end
   end
 
   def show
