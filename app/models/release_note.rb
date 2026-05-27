@@ -1,4 +1,5 @@
 # app/models/release_note.rb - Updated to support multiple batches per treatment
+# and MIL-PRF-8625F Type III NADCAP sample-plan thickness measurements.
 require 'digest/sha2'
 
 class ReleaseNote < ApplicationRecord
@@ -49,6 +50,21 @@ class ReleaseNote < ApplicationRecord
     enp_high_phosphorous
     enp_medium_phosphorous
   ].freeze
+
+  # ==========================================================================
+  # NADCAP sample plan (MIL-PRF-8625F Type III hard anodise)
+  # parts_per_batch -> sample size; 8 readings per sampled part.
+  # ==========================================================================
+  def self.nadcap_sample_size(parts_per_batch)
+    n = parts_per_batch.to_i
+    return 0 if n < 1
+    return n if n <= 12       # All parts tested
+    return 12 if n <= 288
+    return 16 if n <= 544
+    return 20 if n <= 960
+    return 24 if n <= 1632
+    32
+  end
 
   def display_name
     "RN#{number}"
@@ -167,9 +183,9 @@ class ReleaseNote < ApplicationRecord
 
   # ==========================================================================
   # THICKNESS MEASUREMENT METHODS
-  # Supports multi-batch measurements (audit requirement: 8 readings per batch).
+  # Supports multi-batch measurements.
   #
-  # Data structure (new format):
+  # Data structure:
   #   measured_thicknesses = {
   #     'measurements' => [
   #       {
@@ -178,8 +194,19 @@ class ReleaseNote < ApplicationRecord
   #         'display_name' => 'Hard Anodising',
   #         'target_thickness' => 25,
   #         'batches' => [
-  #           { 'batch_number' => 1, 'readings' => [70.5, 70.7, ...] },   # anodic
-  #           { 'batch_number' => 2, 'readings' => [71.0, 70.8, ...] }
+  #           # Standard anodic batch (8 readings):
+  #           { 'batch_number' => 1, 'readings' => [70.5, 70.7, ...] },
+  #
+  #           # NADCAP sample-plan batch (MIL-PRF-8625F Type III):
+  #           { 'batch_number' => 2,
+  #             'parts_per_batch' => 300,
+  #             'parts' => [
+  #               { 'part_label' => 'B2p1', 'readings' => [70.5, 70.8, ...] },  # 8 readings
+  #               { 'part_label' => 'B2p2', 'readings' => [...] },
+  #               ...                                                            # sample_size parts total
+  #             ],
+  #             'readings' => [...flattened sample_size*8 readings...]
+  #           }
   #         ]
   #       },
   #       {
@@ -207,6 +234,7 @@ class ReleaseNote < ApplicationRecord
 
     begin
       treatments_data = works_order.part.send(:parse_treatments_data)
+      nadcap_spec     = nadcap_sampling_specification?
 
       measurable_treatments = treatments_data.select do |treatment|
         MEASURABLE_PROCESS_TYPES.include?(treatment["type"])
@@ -214,16 +242,28 @@ class ReleaseNote < ApplicationRecord
 
       measurable_treatments.map.with_index do |treatment, index|
         {
-          treatment_id: generate_treatment_id(treatment, index),
-          process_type: treatment["type"],
-          target_thickness: treatment["target_thickness"] || 0,
-          display_name: generate_display_name(treatment)
+          treatment_id:             generate_treatment_id(treatment, index),
+          process_type:             treatment["type"],
+          target_thickness:         treatment["target_thickness"] || 0,
+          display_name:             generate_display_name(treatment),
+          # NADCAP trigger: works_order spec contains "PRF" AND "III"
+          # AND the treatment itself is hard anodising
+          requires_nadcap_sampling: nadcap_spec && treatment["type"] == "hard_anodising"
         }
       end
     rescue => e
       Rails.logger.error "Error getting required treatments for thickness measurement: #{e.message}"
       []
     end
+  end
+
+  # Detects if works_order.specification triggers MIL-PRF-8625F Type III NADCAP
+  # sampling. Matches "PRF" anywhere and "III" as a whole token (word-bounded)
+  # so we don't false-positive on "IIIA" etc.
+  def nadcap_sampling_specification?
+    spec = works_order&.specification.to_s.upcase
+    return false if spec.blank?
+    spec.include?("PRF") && /\bIII\b/.match?(spec)
   end
 
   # -------------------------------------------------------------------------
@@ -241,6 +281,19 @@ class ReleaseNote < ApplicationRecord
     else
       1 # Legacy single-batch data
     end
+  end
+
+  # Generic batch fetcher - returns the raw batch hash (legacy or NADCAP shape),
+  # or an empty hash if not found.
+  def get_batch(treatment_id, batch_number)
+    return {} unless measured_thicknesses.is_a?(Hash)
+    measurement = measured_thicknesses['measurements']&.find { |m| m['treatment_id'] == treatment_id }
+    return {} unless measurement
+
+    batches = measurement['batches']
+    return {} unless batches.is_a?(Array)
+
+    batches.find { |b| b['batch_number'].to_i == batch_number.to_i } || {}
   end
 
   # -------------------------------------------------------------------------
@@ -317,6 +370,7 @@ class ReleaseNote < ApplicationRecord
 
   # Accepts either:
   #   - An array of batch hashes: [{ 'batch_number' => 1, 'readings' => [...] }, ...]
+  #     (may also include NADCAP keys 'parts_per_batch' and 'parts')
   #   - A flat readings array (legacy): [70.5, 70.7, ...]  → stored as batch 1
   def set_thickness_measurement(treatment_id, batches_or_readings, treatment_info = {})
     self.measured_thicknesses = { 'measurements' => [] } unless measured_thicknesses.is_a?(Hash)
@@ -347,6 +401,30 @@ class ReleaseNote < ApplicationRecord
     true
   rescue ArgumentError
     false
+  end
+
+  # -------------------------------------------------------------------------
+  # NADCAP sample-plan helpers (per-batch)
+  # -------------------------------------------------------------------------
+
+  # Returns the structured NADCAP data for a batch:
+  #   { parts_per_batch: 300, parts: [{ 'part_label' => 'B1p1', 'readings' => [...] }, ...] }
+  def get_nadcap_data_for_batch(treatment_id, batch_number)
+    batch = get_batch(treatment_id, batch_number)
+    {
+      parts_per_batch: batch['parts_per_batch'],
+      parts:           batch['parts'] || []
+    }
+  end
+
+  # Serialised JSON string for the form's hidden field. Returns "" if no data yet.
+  def get_nadcap_json_for_batch(treatment_id, batch_number)
+    batch = get_batch(treatment_id, batch_number)
+    return "" if batch.empty? || batch['parts_per_batch'].blank?
+    {
+      parts_per_batch: batch['parts_per_batch'],
+      parts:           batch['parts'] || []
+    }.to_json
   end
 
   # -------------------------------------------------------------------------
@@ -622,6 +700,9 @@ class ReleaseNote < ApplicationRecord
     end
   end
 
+  # ---------------------------------------------------------------------------
+  # Thickness validation dispatcher - branches on treatment type / NADCAP flag.
+  # ---------------------------------------------------------------------------
   def validate_thickness_measurements
     return unless requires_thickness_measurements?
 
@@ -632,50 +713,107 @@ class ReleaseNote < ApplicationRecord
       batch_count  = get_batch_count(treatment[:treatment_id])
 
       if treatment_is_enp?(treatment[:process_type])
-        (1..batch_count).each do |batch_number|
-          batch_prefix = batch_count > 1 ? "Batch #{batch_number} - " : ""
-          enp_measurements = get_enp_measurements_for_batch(treatment[:treatment_id], batch_number)
-
-          if enp_measurements.blank? || enp_measurements.empty?
-            errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} ENP measurements are required for aerospace/defense parts")
-          else
-            enp_measurements.each do |m|
-              point  = m['point']
-              growth = m['growth_um']
-              if growth.nil?
-                errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} point #{point} is incomplete")
-              elsif growth < 0
-                errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} point #{point} has negative growth (#{growth}µm)")
-              elsif growth > 1000
-                errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} point #{point} seems unrealistically high (#{growth}µm)")
-              end
-            end
-
-            if enp_measurements.count < 6
-              errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} requires all 6 measurement points (A-F)")
-            end
-          end
-        end
+        validate_enp_treatment(treatment, display_name, batch_count)
+      elsif treatment[:requires_nadcap_sampling]
+        validate_nadcap_treatment(treatment, display_name, batch_count)
       else
-        # Anodic
-        (1..batch_count).each do |batch_number|
-          batch_prefix = batch_count > 1 ? "Batch #{batch_number} - " : ""
-          readings = get_thickness_readings_for_batch(treatment[:treatment_id], batch_number)
+        validate_anodic_treatment(treatment, display_name, batch_count)
+      end
+    end
+  end
 
-          if readings.blank? || readings.empty?
-            errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} thickness measurement is required for aerospace/defense parts")
-          else
-            unless readings.count % 8 == 0
-              errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} requires a multiple of 8 readings (#{readings.count} provided)")
-            end
+  def validate_enp_treatment(treatment, display_name, batch_count)
+    (1..batch_count).each do |batch_number|
+      batch_prefix     = batch_count > 1 ? "Batch #{batch_number} - " : ""
+      enp_measurements = get_enp_measurements_for_batch(treatment[:treatment_id], batch_number)
 
-            readings.each_with_index do |reading, index|
-              if reading <= 0
-                errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} reading #{index + 1} must be greater than 0")
-              elsif reading > 1000
-                errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} reading #{index + 1} seems unrealistically high (>1000µm)")
-              end
-            end
+      if enp_measurements.blank?
+        errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} ENP measurements are required for aerospace/defense parts")
+        next
+      end
+
+      enp_measurements.each do |m|
+        point  = m['point']
+        growth = m['growth_um']
+        if growth.nil?
+          errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} point #{point} is incomplete")
+        elsif growth < 0
+          errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} point #{point} has negative growth (#{growth}µm)")
+        elsif growth > 1000
+          errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} point #{point} seems unrealistically high (#{growth}µm)")
+        end
+      end
+
+      if enp_measurements.count < 6
+        errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} requires all 6 measurement points (A-F)")
+      end
+    end
+  end
+
+  def validate_anodic_treatment(treatment, display_name, batch_count)
+    (1..batch_count).each do |batch_number|
+      batch_prefix = batch_count > 1 ? "Batch #{batch_number} - " : ""
+      readings     = get_thickness_readings_for_batch(treatment[:treatment_id], batch_number)
+
+      if readings.blank?
+        errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} thickness measurement is required for aerospace/defense parts")
+        next
+      end
+
+      unless readings.count % 8 == 0
+        errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} requires a multiple of 8 readings (#{readings.count} provided)")
+      end
+
+      readings.each_with_index do |reading, index|
+        if reading <= 0
+          errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} reading #{index + 1} must be greater than 0")
+        elsif reading > 1000
+          errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} reading #{index + 1} seems unrealistically high (>1000µm)")
+        end
+      end
+    end
+  end
+
+  def validate_nadcap_treatment(treatment, display_name, batch_count)
+    (1..batch_count).each do |batch_number|
+      batch_prefix    = batch_count > 1 ? "Batch #{batch_number} - " : ""
+      batch           = get_batch(treatment[:treatment_id], batch_number)
+      parts_per_batch = batch['parts_per_batch'].to_i
+      parts           = batch['parts'] || []
+
+      if parts_per_batch < 1
+        errors.add(:measured_thicknesses,
+                   "#{batch_prefix}#{display_name} requires 'Parts in this batch' (NADCAP sampling)")
+        next
+      end
+
+      expected_sample_size = self.class.nadcap_sample_size(parts_per_batch)
+
+      if parts.count != expected_sample_size
+        errors.add(:measured_thicknesses,
+                   "#{batch_prefix}#{display_name} requires #{expected_sample_size} sampled part(s) " \
+                   "for a lot of #{parts_per_batch} (got #{parts.count})")
+        next
+      end
+
+      parts.each_with_index do |part, idx|
+        part_label = part['part_label'].presence || "p#{idx + 1}"
+        readings   = part['readings'] || []
+
+        unless readings.count == 8
+          errors.add(:measured_thicknesses,
+                     "#{batch_prefix}#{display_name} #{part_label} requires 8 readings (got #{readings.count})")
+          next
+        end
+
+        readings.each_with_index do |r, ri|
+          rf = r.to_f
+          if rf <= 0
+            errors.add(:measured_thicknesses,
+                       "#{batch_prefix}#{display_name} #{part_label} reading #{ri + 1} must be greater than 0")
+          elsif rf > 1000
+            errors.add(:measured_thicknesses,
+                       "#{batch_prefix}#{display_name} #{part_label} reading #{ri + 1} seems unrealistically high")
           end
         end
       end
@@ -700,14 +838,33 @@ class ReleaseNote < ApplicationRecord
     treatment["type"].humanize.gsub('_', ' ').titleize
   end
 
-  # Normalises input to an array of { 'batch_number' => n, 'readings' => [...] }
+  # Normalises input to an array of batch hashes. Each batch hash is at minimum:
+  #   { 'batch_number' => n, 'readings' => [...] }
+  # NADCAP batches additionally carry:
+  #   { 'parts_per_batch' => n, 'parts' => [{ 'part_label' => ..., 'readings' => [...] }, ...] }
   def normalise_anodic_batches(input)
     batches = if input.is_a?(Array) && input.first.is_a?(Hash) && input.first.key?('batch_number')
       input.map do |b|
-        {
+        hash = {
           'batch_number' => b['batch_number'].to_i,
           'readings'     => process_thickness_readings(b['readings'] || [])
         }
+
+        # Preserve NADCAP sampling keys when present
+        if b['parts_per_batch'].present?
+          hash['parts_per_batch'] = b['parts_per_batch'].to_i
+        end
+
+        if b['parts'].is_a?(Array)
+          hash['parts'] = b['parts'].map.with_index do |part, idx|
+            {
+              'part_label' => part['part_label'].presence || "p#{idx + 1}",
+              'readings'   => process_thickness_readings(part['readings'] || [])
+            }
+          end
+        end
+
+        hash
       end
     elsif input.is_a?(Array)
       readings = process_thickness_readings(input)
@@ -716,7 +873,8 @@ class ReleaseNote < ApplicationRecord
       []
     end
 
-    batches.reject { |b| b['readings'].empty? }
+    # A batch is empty only if it has neither flat readings nor sampled parts
+    batches.reject { |b| (b['readings'] || []).empty? && (b['parts'] || []).empty? }
   end
 
   # Normalises input to an array of { 'batch_number' => n, 'enp_measurements' => [...] }

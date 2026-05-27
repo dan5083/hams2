@@ -1,4 +1,5 @@
-# app/controllers/release_notes_controller.rb - Updated to handle multi-batch measurements
+# app/controllers/release_notes_controller.rb - Updated to handle multi-batch
+# measurements and MIL-PRF-8625F Type III NADCAP sample-plan readings.
 class ReleaseNotesController < ApplicationController
   before_action :set_release_note, only: [:show, :edit, :update, :destroy, :void, :pdf]
   before_action :set_works_order, only: [:new, :create]
@@ -186,7 +187,7 @@ class ReleaseNotesController < ApplicationController
 
   # ---------------------------------------------------------------------------
   # Primary path: the form's submit handler packs everything into a single JSON
-  # blob at release_note[measured_thicknesses].  The blob now uses the batches
+  # blob at release_note[measured_thicknesses].  The blob uses the batches
   # structure:
   #
   #   { "measurements": [
@@ -195,8 +196,18 @@ class ReleaseNotesController < ApplicationController
   #         "display_name": "Hard Anodising",
   #         "target_thickness": 25,
   #         "batches": [
+  #           # Standard anodic batch:
   #           { "batch_number": 1, "readings": [70.5, 70.7, ...] },
-  #           { "batch_number": 2, "readings": [71.0, 70.8, ...] }
+  #
+  #           # NADCAP sample-plan batch (MIL-PRF-8625F Type III):
+  #           { "batch_number": 2,
+  #             "parts_per_batch": 300,
+  #             "parts": [
+  #               { "part_label": "B2p1", "readings": [70.5, 70.8, ...] },
+  #               ...
+  #             ],
+  #             "readings": [...flattened sample_size*8 readings...]
+  #           }
   #         ]
   #       },
   #       { "treatment_id": "def456",
@@ -211,6 +222,7 @@ class ReleaseNotesController < ApplicationController
   #
   # Fallback path: individual per-batch fields (legacy or if JS failed).
   #   Anodic field names: thickness_readings_<treatment_id>_b<n>
+  #     - value is either a JSON array (standard) or JSON object (NADCAP).
   #   ENP field names:    enp_measurements_<treatment_id>_b<n>
   # ---------------------------------------------------------------------------
   def process_thickness_measurements
@@ -262,11 +274,25 @@ class ReleaseNotesController < ApplicationController
       treatment_info = required_treatments.find { |t| t[:treatment_id] == treatment_id }
       next unless treatment_info
 
-      batches = batches_hash
-        .map { |batch_number, field_value| { 'batch_number' => batch_number, 'readings' => parse_readings_field(field_value) } }
-        .sort_by { |b| b['batch_number'] }
+      batches = batches_hash.map do |batch_number, field_value|
+        parsed = parse_readings_field(field_value)
 
-      if batches.any? { |b| b['readings'].any? }
+        if parsed.is_a?(Hash) && parsed['parts'].is_a?(Array)
+          # NADCAP shape: { parts_per_batch, parts: [{ part_label, readings }, ...] }
+          flat = parsed['parts'].flat_map { |p| Array(p['readings']) }
+          {
+            'batch_number'    => batch_number,
+            'parts_per_batch' => parsed['parts_per_batch'],
+            'parts'           => parsed['parts'],
+            'readings'        => flat
+          }
+        else
+          { 'batch_number' => batch_number, 'readings' => Array(parsed) }
+        end
+      end.sort_by { |b| b['batch_number'] }
+
+      has_data = batches.any? { |b| (b['readings'] || []).any? || (b['parts'] || []).any? }
+      if has_data
         Rails.logger.info "Processing #{batches.count} anodic batch(es) for treatment #{treatment_id}"
         success = @release_note.set_thickness_measurement(treatment_id, batches, treatment_info)
         unless success
@@ -321,15 +347,23 @@ class ReleaseNotesController < ApplicationController
     end
   end
 
-  # Parses a readings field value which may be a JSON array ("[]") or a single value.
+  # Parses a readings field value. Accepts:
+  #   - JSON array string  "[70.5, 70.7]"            → returns Array
+  #   - JSON object string '{"parts_per_batch":...}' → returns Hash (NADCAP)
+  #   - Anything else                                → returns [value]
   def parse_readings_field(field_value)
     return [] if field_value.blank?
 
-    if field_value.is_a?(String) && field_value.strip.start_with?('[')
-      begin
-        JSON.parse(field_value)
-      rescue JSON::ParserError
-        []
+    if field_value.is_a?(String)
+      stripped = field_value.strip
+      if stripped.start_with?('[') || stripped.start_with?('{')
+        begin
+          JSON.parse(stripped)
+        rescue JSON::ParserError
+          stripped.start_with?('{') ? {} : []
+        end
+      else
+        [field_value]
       end
     else
       [field_value]

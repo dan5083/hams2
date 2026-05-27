@@ -190,8 +190,9 @@
         <!-- ================================================================
              Thickness Measurements Section
              Supports multiple batches per treatment.
-             Audit requirement: 8 readings per batch for anodic films.
-             ENP: A-F (6 points) per batch, before/after unchanged.
+             Standard anodic: 8 readings per batch.
+             MIL-PRF-8625F Type III: NADCAP sample plan based on parts per batch.
+             ENP: A-F (6 points) per batch.
              ================================================================ -->
         <% if @release_note.requires_thickness_measurements? %>
           <div class="sm:col-span-6">
@@ -201,7 +202,8 @@
                 <span class="text-sm font-normal text-gray-500">(Required for Aerospace/Defense)</span>
               </h3>
               <p class="text-xs text-gray-500 mb-4">
-                Audit requirement: <strong>8 readings per batch</strong> for anodic films.
+                Audit requirement: <strong>8 readings per sampled part</strong>.
+                Standard anodic films use 1 part per batch; MIL-PRF-8625F Type III follows the NADCAP sample plan based on parts per batch.
                 Use "Number of Batches" to record measurements from multiple production batches on a single release.
               </p>
 
@@ -212,6 +214,7 @@
                     display_name  = treatment[:display_name]
                     process_type  = treatment[:process_type]
                     is_enp        = @release_note.treatment_is_enp?(process_type)
+                    is_nadcap     = treatment[:requires_nadcap_sampling]
                     target_thickness = treatment[:target_thickness]
                     max_batches   = 20
                     saved_batch_count = @release_note.persisted? ? @release_note.get_batch_count(treatment_id) : 1
@@ -227,6 +230,11 @@
                         <span class="text-sm font-semibold text-gray-800"><%= display_name %></span>
                         <% unless is_enp %>
                           <span class="ml-2 text-xs text-gray-500">Target: <%= target_thickness %> µm</span>
+                        <% end %>
+                        <% if is_nadcap %>
+                          <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                            MIL-PRF-8625F Type III · NADCAP sample plan
+                          </span>
                         <% end %>
                         <span class="text-red-500 ml-1">*</span>
                       </div>
@@ -356,6 +364,92 @@
                               <%= hidden_field_tag "enp_measurements_#{batch_tid}",
                                                   existing_enp.to_json,
                                                   class: "enp-data" %>
+                            </div>
+
+                          <% elsif is_nadcap %>
+                            <%#
+                              ---- NADCAP sample-plan batch container ----
+                              For MIL-PRF-8625F Type III hard anodise. User enters parts-in-batch,
+                              JS computes sample size, renders sample_size × 8 inputs labelled
+                              B{n}p{m}. Hidden field carries a JSON object payload.
+                            %>
+                            <%
+                              nadcap_data = @release_note.get_nadcap_data_for_batch(treatment_id, batch_number)
+                            %>
+
+                            <div data-controller="nadcap-sampling"
+                                 data-nadcap-sampling-treatment-id-value="<%= batch_tid %>"
+                                 data-nadcap-sampling-batch-number-value="<%= batch_number %>"
+                                 data-nadcap-sampling-batch-label-value="B<%= batch_number %>"
+                                 data-nadcap-sampling-process-type-value="<%= process_type %>"
+                                 data-nadcap-sampling-target-thickness-value="<%= target_thickness %>"
+                                 data-nadcap-sampling-display-name-value="<%= display_name %>"
+                                 class="bg-gray-50 rounded-md p-3">
+
+                              <!-- Header: parts-per-batch input + Elcometer / Clear buttons -->
+                              <div class="flex items-center justify-between mb-3 flex-wrap gap-3">
+                                <div class="flex items-center gap-2">
+                                  <label class="text-xs font-medium text-gray-700 whitespace-nowrap">
+                                    Parts in this batch:
+                                  </label>
+                                  <input type="number" min="1"
+                                         data-nadcap-sampling-target="partsPerBatchInput"
+                                         data-action="change->nadcap-sampling#updateSampleSize"
+                                         value="<%= nadcap_data[:parts_per_batch] %>"
+                                         class="w-24 text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" />
+                                  <span data-nadcap-sampling-target="sampleSizeDisplay"
+                                        class="text-xs text-gray-600 ml-2"></span>
+                                </div>
+
+                                <div class="flex gap-2">
+                                  <!-- Connect Button -->
+                                  <button type="button"
+                                          data-nadcap-sampling-target="connectButton"
+                                          data-action="click->nadcap-sampling#connectElcometer"
+                                          class="inline-flex items-center px-3 py-1.5 border border-blue-600 rounded text-xs font-medium text-blue-600 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500">
+                                    <svg class="h-3.5 w-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                    </svg>
+                                    Connect Elcometer
+                                  </button>
+
+                                  <!-- Stop Button (hidden initially) -->
+                                  <button type="button"
+                                          data-nadcap-sampling-target="stopButton"
+                                          data-action="click->nadcap-sampling#stopReading"
+                                          class="hidden inline-flex items-center px-3 py-1.5 border border-red-600 rounded text-xs font-medium text-red-600 bg-white hover:bg-red-50">
+                                    <svg class="h-3.5 w-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                    Stop
+                                  </button>
+
+                                  <!-- Clear Button -->
+                                  <button type="button"
+                                          data-action="click->nadcap-sampling#clearReadings"
+                                          class="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded text-xs font-medium text-gray-700 bg-white hover:bg-gray-50">
+                                    <svg class="h-3.5 w-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                    Clear
+                                  </button>
+                                </div>
+                              </div>
+
+                              <!-- Batch-level statistics (rendered by the controller) -->
+                              <div data-nadcap-sampling-target="statistics" class="mb-3"></div>
+
+                              <!-- Parts grid: B{n}p1, B{n}p2, ... (rendered by the controller) -->
+                              <div data-nadcap-sampling-target="partsContainer" class="space-y-2"></div>
+
+                              <p class="mt-2 text-xs text-gray-500">
+                                MIL-PRF-8625F Type III · 8 readings per sampled part · Enter readings and press TAB, or connect the Elcometer.
+                              </p>
+
+                              <!-- Hidden field carries the NADCAP JSON payload -->
+                              <%= hidden_field_tag "thickness_readings_#{batch_tid}",
+                                                   @release_note.get_nadcap_json_for_batch(treatment_id, batch_number),
+                                                   data: { nadcap_sampling_target: "readingsData" } %>
                             </div>
 
                           <% else %>
@@ -605,6 +699,11 @@
       // Submit handler – collects per-batch readings and ENP measurements,
       // groups them by treatment_id (stripping the _b{n} suffix), and
       // builds the batches JSON payload for release_note[measured_thicknesses].
+      //
+      // Anodic hidden fields hold one of two shapes:
+      //   Legacy/standard: a JSON array of readings  [70.5, 70.7, ...]
+      //   NADCAP:          a JSON object             {parts_per_batch, parts: [...]}
+      // The handler detects which and assembles the batches accordingly.
       // --------------------------------------------------------------------
       document.addEventListener('DOMContentLoaded', function() {
         const form = document.querySelector('form');
@@ -613,7 +712,7 @@
         form.addEventListener('submit', function() {
           // --- Anodic readings ---
           // Field names: thickness_readings_<treatment_id>_b<n>
-          const treatmentBatches = {};  // pure_treatment_id -> { batch_number -> readings[] }
+          const treatmentBatches = {};  // pure_treatment_id -> { batch_number -> batchValue }
           const treatmentMeta    = {};  // pure_treatment_id -> { process_type, target_thickness, display_name }
 
           document.querySelectorAll('[name^="thickness_readings_"]').forEach(function(field) {
@@ -629,12 +728,37 @@
               batchNumber  = 1;
             }
 
-            let readings = [];
-            try { readings = JSON.parse(field.value || '[]'); } catch(e) {}
+            let parsed = null;
+            try { parsed = JSON.parse(field.value || '[]'); } catch(e) {}
+            if (parsed == null) return;
 
-            if (readings.length > 0) {
+            // Detect NADCAP shape vs flat readings array
+            const isNadcap = typeof parsed === 'object'
+                             && !Array.isArray(parsed)
+                             && Array.isArray(parsed.parts);
+
+            if (isNadcap && parsed.parts.length > 0) {
               if (!treatmentBatches[treatmentId]) treatmentBatches[treatmentId] = {};
-              treatmentBatches[treatmentId][batchNumber] = readings;
+              treatmentBatches[treatmentId][batchNumber] = {
+                parts_per_batch: parsed.parts_per_batch,
+                parts:           parsed.parts,
+                readings:        parsed.parts.flatMap(p => p.readings || [])
+              };
+
+              if (!treatmentMeta[treatmentId]) {
+                const ctrl = field.closest('[data-controller="nadcap-sampling"]');
+                if (ctrl) {
+                  treatmentMeta[treatmentId] = {
+                    process_type:     ctrl.dataset.nadcapSamplingProcessTypeValue,
+                    target_thickness: parseFloat(ctrl.dataset.nadcapSamplingTargetThicknessValue) || 0,
+                    display_name:     ctrl.dataset.nadcapSamplingDisplayNameValue
+                  };
+                }
+              }
+            } else if (Array.isArray(parsed) && parsed.length > 0) {
+              // Standard anodic: flat readings array
+              if (!treatmentBatches[treatmentId]) treatmentBatches[treatmentId] = {};
+              treatmentBatches[treatmentId][batchNumber] = { readings: parsed };
 
               if (!treatmentMeta[treatmentId]) {
                 const ctrl = field.closest('[data-controller="elcometer"]');
@@ -681,7 +805,12 @@
           // Anodic
           Object.entries(treatmentBatches).forEach(([treatmentId, batchesObj]) => {
             const batches = Object.entries(batchesObj)
-              .map(([bNum, readings]) => ({ batch_number: parseInt(bNum), readings }))
+              .map(([bNum, val]) => {
+                const batch = { batch_number: parseInt(bNum), readings: val.readings || [] };
+                if (val.parts_per_batch != null) batch.parts_per_batch = val.parts_per_batch;
+                if (val.parts != null)           batch.parts           = val.parts;
+                return batch;
+              })
               .sort((a, b) => a.batch_number - b.batch_number);
 
             measurements.push({
@@ -693,7 +822,6 @@
 
           // ENP
           Object.entries(enpBatches).forEach(([treatmentId, batchesObj]) => {
-            // Avoid duplicating if already added via anodic loop (shouldn't overlap, but safe)
             const existing = measurements.find(m => m.treatment_id === treatmentId);
             const batches = Object.entries(batchesObj)
               .map(([bNum, enp]) => ({ batch_number: parseInt(bNum), enp_measurements: enp }))

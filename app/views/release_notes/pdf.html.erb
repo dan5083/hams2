@@ -136,6 +136,24 @@
       .anodic-table td.stat-mean { font-weight: bold; color: #1d4ed8; }
 
       /* ----------------------------------------------------------------
+         NADCAP sample-plan: batch sub-header above per-part table
+         ---------------------------------------------------------------- */
+      .nadcap-batch-label {
+        font-size: 8pt;
+        font-weight: bold;
+        color: #1d4ed8;
+        background-color: #eff6ff;
+        border: 1pt solid #bfdbfe;
+        padding: 0.25rem 0.4rem;
+        margin: 0.4rem 0 0.2rem 0;
+      }
+      .nadcap-batch-label .stat {
+        font-weight: normal;
+        color: #1e3a8a;
+        margin-left: 0.5rem;
+      }
+
+      /* ----------------------------------------------------------------
          ENP compact table (before / after / growth per point, per batch)
          ---------------------------------------------------------------- */
       .enp-batch-label {
@@ -485,66 +503,137 @@
 
               <% else %>
                 <%# ============================================================
-                    Anodic: compact table — one row per batch.
-                    Columns: [Batch] | Mean | Min | Max | R1 | R2 | ... | Rn
+                    Anodic. Two rendering modes:
+                      1. Standard - one row per batch, R1..Rn columns
+                      2. NADCAP sample-plan - per batch, one row per sampled part
+                         with R1..R8 columns plus batch sub-header
+                    Mode detected from data: any batch with 'parts' → NADCAP.
                     ============================================================ %>
                 <%
                   anodic_batches = if has_batches
-                    raw_batches.select { |b| b.key?('readings') }
+                    raw_batches.select { |b| b.key?('readings') || b.key?('parts') }
                   else
                     legacy = measurement['readings'] || []
                     legacy.any? ? [{ 'batch_number' => 1, 'readings' => legacy }] : []
                   end
                   next if anodic_batches.empty?
+
+                  is_nadcap    = anodic_batches.any? { |b| b['parts'].is_a?(Array) && b['parts'].any? }
                   multi_batch  = anodic_batches.count > 1
                   all_readings = anodic_batches.flat_map { |b| b['readings'] || [] }
-                  max_readings = anodic_batches.map { |b| (b['readings'] || []).count }.max
+                  next if all_readings.empty?
                 %>
 
-                <% if multi_batch %>
+                <% if multi_batch || is_nadcap %>
+                  <%
+                    total_parts = anodic_batches.sum { |b| (b['parts'] || []).count }
+                  %>
                   <div class="overall-stats">
-                    <strong>Overall (<%= anodic_batches.count %> batches):</strong>
+                    <strong>Overall (<%= anodic_batches.count %> batch<%= anodic_batches.count == 1 ? '' : 'es' %>):</strong>
                     Mean: <strong><%= (all_readings.sum / all_readings.count.to_f).round(1) %> µm</strong> |
                     Min: <%= all_readings.min %> µm | Max: <%= all_readings.max %> µm |
-                    Total: <%= all_readings.count %> readings
+                    Total: <%= all_readings.count %> reading<%= all_readings.count == 1 ? '' : 's' %>
+                    <% if is_nadcap %>
+                      from <%= total_parts %> sampled part<%= total_parts == 1 ? '' : 's' %>
+                    <% end %>
                   </div>
                 <% end %>
 
-                <table class="anodic-table">
-                  <thead>
-                    <tr>
-                      <% if multi_batch %><th class="stat-col">Batch</th><% end %>
-                      <th class="stat-col">Mean</th>
-                      <th class="stat-col">Min</th>
-                      <th class="stat-col">Max</th>
-                      <% max_readings.times do |i| %>
-                        <th class="reading-col">R<%= i + 1 %></th>
-                      <% end %>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <% anodic_batches.each do |batch| %>
-                      <%
-                        readings     = batch['readings'] || []
-                        batch_number = batch['batch_number']
-                        next if readings.empty?
-                        bmean = (readings.sum / readings.count.to_f).round(1)
-                      %>
+                <% if is_nadcap %>
+                  <%# ---------- NADCAP: per-part rows, grouped by batch ---------- %>
+                  <% anodic_batches.each do |batch| %>
+                    <%
+                      parts          = batch['parts'] || []
+                      batch_number   = batch['batch_number']
+                      next if parts.empty?
+                      batch_readings = parts.flat_map { |p| p['readings'] || [] }
+                      next if batch_readings.empty?
+                      bmean          = (batch_readings.sum / batch_readings.count.to_f).round(1)
+                    %>
+
+                    <div class="nadcap-batch-label">
+                      Batch <%= batch_number %> — <%= parts.count %> sampled part<%= parts.count == 1 ? '' : 's' %>
+                      <span class="stat">Mean: <%= bmean %> µm</span>
+                      <span class="stat">Min: <%= batch_readings.min %> µm</span>
+                      <span class="stat">Max: <%= batch_readings.max %> µm</span>
+                    </div>
+
+                    <table class="anodic-table">
+                      <thead>
+                        <tr>
+                          <th class="stat-col">Part</th>
+                          <th class="stat-col">Mean</th>
+                          <th class="stat-col">Min</th>
+                          <th class="stat-col">Max</th>
+                          <% 8.times do |i| %>
+                            <th class="reading-col">R<%= i + 1 %></th>
+                          <% end %>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <% parts.each_with_index do |part, idx| %>
+                          <%
+                            readings = part['readings'] || []
+                            next if readings.empty?
+                            pmean = (readings.sum / readings.count.to_f).round(1)
+                            label = part['part_label'].presence || "B#{batch_number}p#{idx + 1}"
+                          %>
+                          <tr>
+                            <td class="batch-label"><%= label %></td>
+                            <td class="stat-mean"><%= pmean %> µm</td>
+                            <td><%= readings.min %> µm</td>
+                            <td><%= readings.max %> µm</td>
+                            <% readings.first(8).each do |r| %>
+                              <td><%= r %> µm</td>
+                            <% end %>
+                            <% (8 - [readings.count, 8].min).times do %><td></td><% end %>
+                          </tr>
+                        <% end %>
+                      </tbody>
+                    </table>
+                  <% end %>
+
+                <% else %>
+                  <%# ---------- Standard anodic: one row per batch ---------- %>
+                  <%
+                    max_readings = anodic_batches.map { |b| (b['readings'] || []).count }.max
+                  %>
+                  <table class="anodic-table">
+                    <thead>
                       <tr>
-                        <% if multi_batch %>
-                          <td class="batch-label">B<%= batch_number %></td>
+                        <% if multi_batch %><th class="stat-col">Batch</th><% end %>
+                        <th class="stat-col">Mean</th>
+                        <th class="stat-col">Min</th>
+                        <th class="stat-col">Max</th>
+                        <% max_readings.times do |i| %>
+                          <th class="reading-col">R<%= i + 1 %></th>
                         <% end %>
-                        <td class="stat-mean"><%= bmean %> µm</td>
-                        <td><%= readings.min %> µm</td>
-                        <td><%= readings.max %> µm</td>
-                        <% readings.each do |r| %>
-                          <td><%= r %> µm</td>
-                        <% end %>
-                        <% (max_readings - readings.count).times do %><td></td><% end %>
                       </tr>
-                    <% end %>
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      <% anodic_batches.each do |batch| %>
+                        <%
+                          readings     = batch['readings'] || []
+                          batch_number = batch['batch_number']
+                          next if readings.empty?
+                          bmean = (readings.sum / readings.count.to_f).round(1)
+                        %>
+                        <tr>
+                          <% if multi_batch %>
+                            <td class="batch-label">B<%= batch_number %></td>
+                          <% end %>
+                          <td class="stat-mean"><%= bmean %> µm</td>
+                          <td><%= readings.min %> µm</td>
+                          <td><%= readings.max %> µm</td>
+                          <% readings.each do |r| %>
+                            <td><%= r %> µm</td>
+                          <% end %>
+                          <% (max_readings - readings.count).times do %><td></td><% end %>
+                        </tr>
+                      <% end %>
+                    </tbody>
+                  </table>
+                <% end %>
 
               <% end %><!-- /is_enp else -->
             </div>
