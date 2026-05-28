@@ -1012,12 +1012,6 @@ end
     safe_add_to_sequence(sequence, op, "Main Operation")
     safe_add_to_sequence(sequence, get_rinse(op, has_enp, masking), "Rinse after Main Operation")
 
-    # 8.5. Foil verification (for anodising treatments if aerospace/defense)
-    if is_anodising?(op) && aerospace_defense?
-      foil_verification_op = OperationLibrary::FoilVerification.get_foil_verification_operation_for_treatment(op.process_type)
-      safe_add_to_sequence(sequence, foil_verification_op, "Foil Verification")
-    end
-
     # 9. Dye + rinse (for anodising operations only)
     if dye["enabled"] && dye["color"].present? && is_anodising?(op)
       dye_op = OperationLibrary::Dye.get_dye_operation(dye["color"], aerospace_defense: aerospace_defense)
@@ -1055,6 +1049,17 @@ end
           safe_add_to_sequence(sequence, removal_op, "Masking Removal")
         end
       end
+    end
+
+    # 13.5. Foil verification (for anodising treatments if aerospace/defense)
+    # Positioned AFTER unjig (step 12) and masking removal/unmask check (step 13):
+    # auditors require that it does not appear before sealing. Kept INSIDE
+    # add_treatment_cycle so we generate one foil verification per anodic treatment
+    # rather than one per job (a single end-of-job FINAL_INSPECT would only ever
+    # yield one). When masking removal isn't required this lands directly after unjig.
+    if is_anodising?(op) && aerospace_defense?
+      foil_verification_op = OperationLibrary::FoilVerification.get_foil_verification_operation_for_treatment(op.process_type)
+      safe_add_to_sequence(sequence, foil_verification_op, "Foil Verification")
     end
 
     # 14. Local treatment (after masking removal, only for anodising operations)
