@@ -67,6 +67,37 @@
       .header-table       { margin-bottom: 0.75rem; }
       .detail-table       { margin-top: 0.5rem; margin-bottom: 0.75rem; }
 
+      /* ----------------------------------------------------------------
+         Advice-note order summary — one row per release note on the order
+         ---------------------------------------------------------------- */
+      .summary-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 0.75rem;
+        font-size: 8pt;
+      }
+      .summary-table th {
+        width: auto;                 /* override global th { width: 30% } */
+        text-align: left;
+        background-color: #f1f5f9;
+        font-weight: bold;
+        padding: 0.3rem 0.4rem;
+        border: 1pt solid #94a3b8;
+        white-space: nowrap;
+      }
+      .summary-table td {
+        padding: 0.3rem 0.4rem;
+        border: 1pt solid #cbd5e1;
+        vertical-align: top;
+      }
+      .summary-table th.num,
+      .summary-table td.num { text-align: right; white-space: nowrap; }
+      .summary-table tfoot th,
+      .summary-table tfoot td {
+        background-color: #f8f9fa;
+        font-weight: bold;
+      }
+
       .signature-table    { table-layout: fixed; margin-top: 0.75rem; }
       .signature-table th { width: 25%; }
       .signature-table td { height: 2.5rem; }
@@ -251,79 +282,106 @@
     %>
 
     <!-- ================================================================
-         Page 1: Advice Note
+         Page 1: Advice Note (consolidated, one per collection)
+         Rendered ONLY on the "lead" release note for the customer order
+         (the lowest-numbered active one). That single advice note
+         summarises every release note on the order, so the driver signs
+         once per collection instead of once per release note.
+         On every other release note this whole block is skipped and the
+         Certificate of Conformity becomes the first page.
          ================================================================ -->
-    <div class="advice-note">
-      <div class="logo-header">
-        <%= image_tag("logo-with-company-name.png", alt: "Hard Anodising Surface Treatments Ltd") %>
-        <div class="company-contact">
-          Firs Industrial Estate, Rickets Close, Kidderminster DY11 7QN<br/>
-          Tel: 01562 747100 | <a href="https://www.hard-anodising.co.uk/">www.hard-anodising.co.uk</a>
+    <%
+      customer_order       = @release_note.works_order.customer_order
+      advice_release_notes = customer_order.delivery_release_notes.to_a
+      is_advice_lead       = advice_release_notes.first&.id == @release_note.id
+    %>
+    <% if is_advice_lead %>
+      <div class="advice-note">
+        <div class="logo-header">
+          <%= image_tag("logo-with-company-name.png", alt: "Hard Anodising Surface Treatments Ltd") %>
+          <div class="company-contact">
+            Firs Industrial Estate, Rickets Close, Kidderminster DY11 7QN<br/>
+            Tel: 01562 747100 | <a href="https://www.hard-anodising.co.uk/">www.hard-anodising.co.uk</a>
+          </div>
         </div>
+
+        <h1>Advice Note</h1>
+
+        <table class="header-table">
+          <tbody>
+            <tr><th>Customer Order</th><td><%= customer_order.number %></td></tr>
+            <tr><th>Date</th><td><%= @release_note.date.strftime("%d/%m/%Y") %></td></tr>
+          </tbody>
+        </table>
+
+        <table class="addresses">
+          <tbody>
+            <tr>
+              <td class="address">
+                <h2>Invoice To</h2>
+                <p>
+                  <%= customer_order.customer.display_name %><br/>
+                  <%= simple_format(customer_order.customer.pdf_address) %>
+                </p>
+              </td>
+              <td class="address">
+                <h2>Deliver To</h2>
+                <p>
+                  <%= customer_order.customer.display_name %><br/>
+                  <%= simple_format(customer_order.customer.pdf_address) %>
+                </p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <%# ---- Order summary: one row per release note on this order ---- %>
+        <table class="summary-table">
+          <thead>
+            <tr>
+              <th>Release Note</th>
+              <th>Part Number</th>
+              <th>Issue</th>
+              <th>Description</th>
+              <th>Specification</th>
+              <th class="num">Qty Acc.</th>
+              <th class="num">Qty Rej.</th>
+              <th>Works Order</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% advice_release_notes.each do |rn| %>
+              <tr>
+                <td>RN<%= rn.number %></td>
+                <td><%= rn.works_order.part_number %></td>
+                <td><%= rn.works_order.part_issue %></td>
+                <td><%= rn.works_order.part_description %></td>
+                <td><%= rn.specification %></td>
+                <td class="num"><%= rn.quantity_accepted %></td>
+                <td class="num"><%= rn.quantity_rejected %></td>
+                <td>WO<%= rn.works_order.number %></td>
+              </tr>
+            <% end %>
+          </tbody>
+          <tfoot>
+            <tr>
+              <th colspan="5" style="text-align:right;">Totals</th>
+              <td class="num"><%= advice_release_notes.sum(&:quantity_accepted) %></td>
+              <td class="num"><%= advice_release_notes.sum(&:quantity_rejected) %></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <table class="signature-table">
+          <tbody>
+            <tr><th>Name</th><td></td></tr>
+            <tr><th>Signature</th><td></td></tr>
+            <tr><th>Date</th><td></td></tr>
+          </tbody>
+        </table>
       </div>
-
-      <h1>Advice Note</h1>
-
-      <table class="header-table">
-        <tbody>
-          <tr><th>Release Note Number</th><td>RN<%= @release_note.number %></td></tr>
-          <tr><th>Date</th><td><%= @release_note.date.strftime("%d/%m/%Y") %></td></tr>
-        </tbody>
-      </table>
-
-      <table class="addresses">
-        <tbody>
-          <tr>
-            <td class="address">
-              <h2>Invoice To</h2>
-              <p>
-                <%= @release_note.works_order.customer_order.customer.display_name %><br/>
-                <%= simple_format(@release_note.works_order.customer_order.customer.pdf_address) %>
-              </p>
-            </td>
-            <td class="address">
-              <h2>Deliver To</h2>
-              <p>
-                <%= @release_note.works_order.customer_order.customer.display_name %><br/>
-                <%= simple_format(@release_note.works_order.customer_order.customer.pdf_address) %>
-              </p>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      <table class="detail-table">
-        <tbody>
-          <tr>
-            <th>Customer Order</th>
-            <td>
-              <%= @release_note.works_order.customer_order.number %>
-              <% if @release_note.works_order.respond_to?(:customer_order_line) && @release_note.works_order.customer_order_line.present? %>
-                (line <%= @release_note.works_order.customer_order_line %>)
-              <% end %>
-            </td>
-          </tr>
-          <% if @release_note.works_order.customer_reference.present? %>
-            <tr><th>Customer Reference</th><td><%= @release_note.works_order.customer_reference %></td></tr>
-          <% end %>
-          <tr><th>Part Number</th><td><%= @release_note.works_order.part_number %></td></tr>
-          <tr><th>Issue</th><td><%= @release_note.works_order.part_issue %></td></tr>
-          <tr><th>Description</th><td><%= @release_note.works_order.part_description %></td></tr>
-          <tr><th>Specification</th><td><%= @release_note.specification %></td></tr>
-          <tr><th>Quantity Accepted</th><td><%= @release_note.quantity_accepted %></td></tr>
-          <tr><th>Quantity Rejected</th><td><%= @release_note.quantity_rejected %></td></tr>
-          <tr><th>Our Works Order Number</th><td>WO<%= @release_note.works_order.number %></td></tr>
-        </tbody>
-      </table>
-
-      <table class="signature-table">
-        <tbody>
-          <tr><th>Name</th><td></td></tr>
-          <tr><th>Signature</th><td></td></tr>
-          <tr><th>Date</th><td></td></tr>
-        </tbody>
-      </table>
-    </div>
+    <% end %>
 
     <!-- ================================================================
          Certificate of Conformity
