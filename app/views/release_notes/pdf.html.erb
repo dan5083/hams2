@@ -291,9 +291,8 @@
          Certificate of Conformity becomes the first page.
          ================================================================ -->
     <%
-      customer_order       = @release_note.works_order.customer_order
-      advice_release_notes = customer_order.delivery_release_notes.to_a
-      is_advice_lead       = advice_release_notes.first&.id == @release_note.id
+      customer_order = @release_note.works_order.customer_order
+      is_advice_lead = customer_order.lead_release_note&.id == @release_note.id
     %>
     <% if is_advice_lead %>
       <div class="advice-note">
@@ -305,7 +304,7 @@
           </div>
         </div>
 
-        <h1>Advice Note</h1>
+        <h1>Proof of Collection RN<%= @release_note.number %></h1>
 
         <table class="header-table">
           <tbody>
@@ -335,40 +334,38 @@
           </tbody>
         </table>
 
-        <%# ---- Order summary: one row per release note on this order ---- %>
+        <h2>Customer Order Summary</h2>
+        <%# ---- One row per works order on this customer order. Driven from
+            works orders (not release notes) so the document is complete even
+            when later release notes haven't been raised yet at print time. ---- %>
+        <% order_works_orders = customer_order.works_orders.active.includes(:part).order(:number).to_a %>
         <table class="summary-table">
           <thead>
             <tr>
-              <th>Release Note</th>
+              <th>Works Order</th>
               <th>Part Number</th>
               <th>Issue</th>
               <th>Description</th>
               <th>Specification</th>
-              <th class="num">Qty Acc.</th>
-              <th class="num">Qty Rej.</th>
-              <th>Works Order</th>
+              <th class="num">Quantity</th>
             </tr>
           </thead>
           <tbody>
-            <% advice_release_notes.each do |rn| %>
+            <% order_works_orders.each do |wo| %>
               <tr>
-                <td>RN<%= rn.number %></td>
-                <td><%= rn.works_order.part_number %></td>
-                <td><%= rn.works_order.part_issue %></td>
-                <td><%= rn.works_order.part_description %></td>
-                <td><%= rn.specification %></td>
-                <td class="num"><%= rn.quantity_accepted %></td>
-                <td class="num"><%= rn.quantity_rejected %></td>
-                <td>WO<%= rn.works_order.number %></td>
+                <td>WO<%= wo.number %></td>
+                <td><%= wo.part_number %></td>
+                <td><%= wo.part_issue %></td>
+                <td><%= wo.part_description %></td>
+                <td><%= wo.specification %></td>
+                <td class="num"><%= wo.quantity %></td>
               </tr>
             <% end %>
           </tbody>
           <tfoot>
             <tr>
-              <th colspan="5" style="text-align:right;">Totals</th>
-              <td class="num"><%= advice_release_notes.sum(&:quantity_accepted) %></td>
-              <td class="num"><%= advice_release_notes.sum(&:quantity_rejected) %></td>
-              <td></td>
+              <th colspan="5" style="text-align:right;">Total Quantity</th>
+              <td class="num"><%= order_works_orders.sum(&:quantity) %></td>
             </tr>
           </tfoot>
         </table>
