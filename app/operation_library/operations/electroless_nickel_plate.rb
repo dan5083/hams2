@@ -147,7 +147,7 @@ module OperationLibrary
       Operation.new(
         id: 'TEST_PIECE',
         process_type: 'test_piece',
-        operation_text: 'Include a 4 test samples of the same generic material (25mm x 100mm 0.6mm thick minimum) with batch. Keep this sample to batch until it has passed adhesion bend. Record material CofC No: ______'
+        operation_text: "Include 4 test pieces of the same generic material (25mm x 100mm 0.6mm thick minimum) with batch. Keep these test pieces to batch until they have been tested. Record material CofC No: ______\nRecord PASS/FAIL Test piece 1 _____ Test piece 2 _____ Test piece 3 _____ Test piece 4 _____"
       )
     end
 
