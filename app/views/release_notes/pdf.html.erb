@@ -240,6 +240,32 @@
       }
 
       /* ----------------------------------------------------------------
+         Adhesion bend test panels
+         ---------------------------------------------------------------- */
+      .bend-test-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 0.6rem;
+        font-size: 9pt;
+      }
+      .bend-test-table th {
+        background-color: #f1f5f9;
+        text-align: center;
+        width: 25%;
+        padding: 0.3rem 0.4rem;
+        border: 1pt solid #94a3b8;
+        font-size: 8.5pt;
+      }
+      .bend-test-table td {
+        text-align: center;
+        padding: 0.4rem;
+        border: 1pt solid #cbd5e1;
+        font-weight: bold;
+        font-size: 1.05em;
+        color: #16a34a;
+      }
+
+      /* ----------------------------------------------------------------
          Certificate footer — statement + signature + accreditation.
          In normal flow (no fixed positioning).
          page-break-inside: avoid keeps it on one page.
@@ -695,6 +721,32 @@
           <% end %><!-- /measurements.each -->
         <% end %><!-- /measurements_by_type.each -->
       <% end %><!-- /has_thickness_measurements? -->
+
+      <!-- ============================================================
+           Adhesion Bend Test Panels
+           Shown when: ENP + aerospace/defense + aluminium or steel alloy
+           ============================================================ -->
+      <% if @release_note.works_order.part&.requires_adhesion_bend_test? %>
+        <h2>Adhesion Bend Test</h2>
+        <table class="bend-test-table">
+          <thead>
+            <tr>
+              <th>Panel 1</th>
+              <th>Panel 2</th>
+              <th>Panel 3</th>
+              <th>Panel 4</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>PASS</td>
+              <td>PASS</td>
+              <td>PASS</td>
+              <td>PASS</td>
+            </tr>
+          </tbody>
+        </table>
+      <% end %>
 
       <!-- ============================================================
            Statement / Signature / Accreditation

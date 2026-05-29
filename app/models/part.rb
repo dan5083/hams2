@@ -331,6 +331,25 @@ class Part < ApplicationRecord
     false
   end
 
+  # Alloys that require an adhesion bend test on 4 test panels (ENP + aerospace/defense)
+  ADHESION_BEND_TEST_ALLOYS = %w[
+    aluminium
+    steel
+    stainless_steel
+    316_stainless_steel
+    stainless_steel_with_oxides
+    cope_rolled_aluminium
+    2000_series_alloys
+  ].freeze
+
+  def requires_adhesion_bend_test?
+    return false unless aerospace_defense?
+    parse_treatments_data.any? do |t|
+      t["type"] == "electroless_nickel_plating" &&
+        ADHESION_BEND_TEST_ALLOYS.include?(t["selected_alloy"])
+    end
+  end
+
   # Get aerospace/defense flag from customisation data
   def aerospace_defense?
     operation_selection["aerospace_defense"] == true || operation_selection["aerospace_defense"] == "true"
