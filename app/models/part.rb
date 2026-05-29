@@ -342,11 +342,17 @@ class Part < ApplicationRecord
     2000_series_alloys
   ].freeze
 
+  ENP_TREATMENT_TYPES = %w[
+    electroless_nickel_plating
+    enp_medium_phosphorous
+    enp_high_phosphorous
+  ].freeze
+
   def requires_adhesion_bend_test?
     return false unless aerospace_defense?
     parse_treatments_data.any? do |t|
-      t["type"] == "electroless_nickel_plating" &&
-        ADHESION_BEND_TEST_ALLOYS.include?(t["selected_alloy"])
+      ENP_TREATMENT_TYPES.include?(t["type"]) &&
+        (ADHESION_BEND_TEST_ALLOYS.include?(t["selected_alloy"]) || t["selected_alloy"].blank?)
     end
   end
 
