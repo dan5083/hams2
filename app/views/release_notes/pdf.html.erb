@@ -459,7 +459,13 @@
         </div>
       <% end %>
 
-      <table class="detail-table">
+      <table class="detail-table" style="table-layout: fixed;">
+        <colgroup>
+          <col style="width: 20%;">
+          <col style="width: 30%;">
+          <col style="width: 20%;">
+          <col style="width: 30%;">
+        </colgroup>
         <tbody>
           <tr>
             <th>Customer Order</th>
@@ -472,6 +478,8 @@
                 / CS-Order: <%= cs_order %>
               <% end %>
             </td>
+            <th>Our Works Order</th>
+            <td>WO<%= @release_note.works_order.number %></td>
           </tr>
           <tr>
             <th>Part Number</th>
@@ -481,15 +489,27 @@
                 / S/N: <%= serial_no %>
               <% end %>
             </td>
+            <% unless is_special_customer %>
+              <th>Issue</th>
+              <td><%= @release_note.works_order.part_issue %></td>
+            <% else %>
+              <td colspan="2"></td>
+            <% end %>
           </tr>
-          <% unless is_special_customer %>
-            <tr><th>Issue</th><td><%= @release_note.works_order.part_issue %></td></tr>
-          <% end %>
-          <tr><th>Description</th><td><%= @release_note.works_order.part_description %></td></tr>
-          <tr><th>Specification</th><td><%= @release_note.specification %></td></tr>
-          <tr><th>Quantity Accepted</th><td><%= @release_note.quantity_accepted %></td></tr>
-          <tr><th>Quantity Rejected</th><td><%= @release_note.quantity_rejected %></td></tr>
-          <tr><th>Our Works Order Number</th><td>WO<%= @release_note.works_order.number %></td></tr>
+          <tr>
+            <th>Description</th>
+            <td colspan="3"><%= @release_note.works_order.part_description %></td>
+          </tr>
+          <tr>
+            <th>Specification</th>
+            <td colspan="3"><%= @release_note.specification %></td>
+          </tr>
+          <tr>
+            <th>Quantity Accepted</th>
+            <td><%= @release_note.quantity_accepted %></td>
+            <th>Quantity Rejected</th>
+            <td><%= @release_note.quantity_rejected %></td>
+          </tr>
         </tbody>
       </table>
 
