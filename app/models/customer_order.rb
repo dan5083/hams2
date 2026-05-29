@@ -5,6 +5,7 @@ class CustomerOrder < ApplicationRecord
              foreign_key: :contract_reviewed_by_user_id,
              optional: true
   has_many :works_orders, dependent: :restrict_with_error
+  has_many :release_notes, through: :works_orders
 
   validates :number, presence: true
   validates :number, uniqueness: { scope: :customer_id }
@@ -69,6 +70,27 @@ class CustomerOrder < ApplicationRecord
 
   def total_quantity
     works_orders.active.sum(:quantity)
+  end
+
+  # ---------------------------------------------------------------------------
+  # Delivery / advice note consolidation
+  #
+  # A collection for an order can cover several release notes. Instead of making
+  # the driver sign one advice note per release note, the advice note is printed
+  # only on the "lead" release note (the lowest-numbered active one for the
+  # order), and that single advice note summarises every release note on the
+  # order. See app/views/release_notes/pdf.html.erb.
+  # ---------------------------------------------------------------------------
+
+  # Active (non-voided) release notes for this order, lowest number first.
+  # Eager-loads works_order to avoid N+1 when building the advice-note summary.
+  def delivery_release_notes
+    release_notes.active.includes(:works_order).order(:number)
+  end
+
+  # The release note that carries the consolidated advice note.
+  def lead_release_note
+    delivery_release_notes.first
   end
 
   # FIXED: Outstanding logic - should check for open works orders
