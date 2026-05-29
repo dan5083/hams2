@@ -147,7 +147,7 @@ module OperationLibrary
       Operation.new(
         id: 'TEST_PIECE',
         process_type: 'test_piece',
-        operation_text: "Include 4 test pieces of the same generic material (25mm x 100mm 0.6mm thick minimum) with batch. Keep these test pieces to batch until they have been tested. Record material CofC No: ______\nRecord PASS/FAIL Test piece 1 _____ Test piece 2 _____ Test piece 3 _____ Test piece 4 _____"
+        operation_text: "Include 4 test pieces of the same generic material (25mm x 100mm 0.6mm thick minimum) with batch. Keep these test pieces to batch until they have been tested. Record material CofC No: ______"
       )
     end
 
@@ -157,13 +157,11 @@ module OperationLibrary
         id: 'ADHESION_BEND',
         process_type: 'adhesion_bend',
         operation_text: <<~TEXT.strip
-          Bend test piece through an angle of 180°, or until fracture, over a mandrel having a radius equal to four times the thickness of the sample (minimum radius 1.5 mm)
+          Bend test pieces through an angle of 180°, or until fracture, over a mandrel having a radius equal to four times the thickness of the sample (minimum radius 1.5 mm)
 
           The portion of the specimen that is bent shall not show any separation or peeling of the plate when examined at low magnification, such as 4X. Except at the very edges of the test specimens at the point of bending, the plate shall not detach from the base metal using a sharp instrument.
 
-          **Result:** PASS / FAIL
-
-          *PASS: apply stamp only. FAIL: circle 'FAIL'.*
+          Record PASS/FAIL Test piece 1 _____ Test piece 2 _____ Test piece 3 _____ Test piece 4 _____
         TEXT
       )
     end
