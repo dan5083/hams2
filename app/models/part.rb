@@ -175,55 +175,117 @@ class Part < ApplicationRecord
   end
 
   def insert_operation_at(position, operation_text, display_name = nil)
-    return false unless locked_for_editing?
     return false if operation_text.blank?
 
-    locked_ops = customisation_data.dig('operation_selection', 'locked_operations') || []
-
-    locked_ops.each_with_index do |op, index|
-    end
-
-    # Shift existing operations at or after this position
-    locked_ops.each do |op|
-      current_pos = op["position"].to_i
-      if current_pos >= position
-        old_pos = current_pos
-        op["position"] = current_pos + 1
-      end
-    end
-
-    # Create new operation
-    new_operation = {
+    insert_locked_operation(position, {
       "id" => "CUSTOM_OP_#{Time.current.to_i}_#{rand(1000)}",
       "display_name" => display_name.presence || "Custom Operation",
       "operation_text" => operation_text.strip,
-      "position" => position,
       "specifications" => "",
       "vat_numbers" => [],
       "process_type" => "manual",
       "target_thickness" => 0,
       "auto_inserted" => false
-    }
+    })
+  end
 
-    # Insert at correct array position
-    insert_index = locked_ops.find_index { |op| op["position"].to_i > position } || locked_ops.length
+  # Insert a known operation from the operations library, preserving its real
+  # identity and metadata (specifications, process_type, target_thickness, etc.)
+  # rather than creating a free-text custom operation. The display name and
+  # operation text may be overridden (e.g. the user tweaked the prefilled text);
+  # when omitted the library values are used verbatim.
+  def insert_library_operation_at(position, operation_id, display_name_override = nil, operation_text_override = nil)
+    op = find_library_operation(operation_id)
+    return false unless op
 
-    locked_ops.insert(insert_index, new_operation)
+    insert_locked_operation(position, {
+      "id" => op.id,
+      "display_name" => display_name_override.presence || op.display_name,
+      "operation_text" => operation_text_override.presence || op.operation_text,
+      "specifications" => op.respond_to?(:specifications) ? (op.specifications || "") : "",
+      "vat_numbers" => op.respond_to?(:vat_numbers) ? (op.vat_numbers || []) : [],
+      "process_type" => op.respond_to?(:process_type) ? (op.process_type || "manual") : "manual",
+      "target_thickness" => op.respond_to?(:target_thickness) ? (op.target_thickness || 0) : 0,
+      "auto_inserted" => false
+    })
+  end
 
-    locked_ops.each_with_index do |op, index|
+  # Resolve a single library operation by id from the same corpus the modal
+  # search offers, so anything searchable is also insertable.
+  def find_library_operation(operation_id)
+    return nil if operation_id.blank?
+
+    searchable_library_operations.find { |op| op.id == operation_id }
+  end
+
+  # Operations that can be manually inserted in locked editing mode: the
+  # user-selectable process operations PLUS the common fixed support operations
+  # (degrease, inspections, contract review, pack, unjig) that are normally
+  # auto-inserted during sequence building and so never appear in
+  # Operation.all_operations. Parameterised families (dye, sealing, stripping,
+  # heat treatments, local treatments, masking, per-jig operations) are not yet
+  # included here — they need enumerating across their option sets.
+  def searchable_library_operations
+    ops = Operation.all_operations(nil, aerospace_defense?).dup
+    ops.concat(fixed_support_operations)
+    ops.compact.uniq(&:id)
+  end
+
+  # Best-effort collection of the fixed (no-argument) support operations. Each
+  # source is guarded so a missing library class or signature change degrades
+  # gracefully rather than 500-ing the search.
+  def fixed_support_operations
+    ad = aerospace_defense?
+
+    sources = []
+    if defined?(OperationLibrary::ContractReviewOperations)
+      sources << -> { OperationLibrary::ContractReviewOperations.get_contract_review_operation }
+    end
+    if defined?(OperationLibrary::InspectFinalInspectVatInspect)
+      sources << -> { OperationLibrary::InspectFinalInspectVatInspect.get_incoming_inspection_operation }
+      sources << -> { OperationLibrary::InspectFinalInspectVatInspect.get_vat_inspection_operation }
+      sources << -> { OperationLibrary::InspectFinalInspectVatInspect.get_final_inspection_operation(operations_sequence: [], aerospace: ad) }
+    end
+    if defined?(OperationLibrary::DegreaseOperations)
+      sources << -> { OperationLibrary::DegreaseOperations.get_degrease_operation(aerospace_defense: ad) }
+    end
+    sources << -> { OperationLibrary::JigUnjig.get_unjig_operation } if defined?(OperationLibrary::JigUnjig)
+    sources << -> { OperationLibrary::PackOperations.get_pack_operation } if defined?(OperationLibrary::PackOperations)
+
+    sources.flat_map do |source|
+      begin
+        Array(source.call)
+      rescue => e
+        Rails.logger.warn("fixed_support_operations skipped a source: #{e.class}: #{e.message}")
+        []
+      end
+    end.compact
+  end
+
+  # Shared insertion logic for both custom and library operations: shift
+  # existing operations down, insert the new operation hash at the requested
+  # 1-based position, then persist and renumber.
+  def insert_locked_operation(position, attributes)
+    return false unless locked_for_editing?
+
+    position = position.to_i
+    locked_ops = customisation_data.dig('operation_selection', 'locked_operations') || []
+
+    locked_ops.each do |op|
+      current_pos = op["position"].to_i
+      op["position"] = current_pos + 1 if current_pos >= position
     end
 
-    # Update atomically
+    new_operation = attributes.merge("position" => position)
+
+    insert_index = locked_ops.find_index { |op| op["position"].to_i > position } || locked_ops.length
+    locked_ops.insert(insert_index, new_operation)
+
     self.customisation_data = customisation_data.dup
     self.customisation_data["operation_selection"]["locked_operations"] = locked_ops
 
-    result = save!
-
+    save!
     renumber_operations
-
-    locked_operations.each do |op|
-    end
-
     true
   rescue => e
     false

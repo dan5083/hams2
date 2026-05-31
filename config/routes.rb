@@ -20,6 +20,7 @@ Rails.application.routes.draw do
       patch :reorder_operation
       delete :delete_operation
       patch :update_locked_operation
+      get :search_operations
       get :copy_operations
       post :upload_file
       delete 'delete_file/:index', action: :delete_file, as: :delete_file

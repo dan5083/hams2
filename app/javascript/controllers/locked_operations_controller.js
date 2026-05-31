@@ -26,8 +26,9 @@ export default class extends Controller {
 
     this.currentInsertPosition = null
     this.deleteInProgress = false
+    this.selectedOperation = null // set when a library operation is chosen
 
-    this.createInsertModal()
+    this.setupModalEventListeners()
 
     // Delegate add/delete/reorder clicks within this section.
     this.boundClickHandler = this.handleClick.bind(this)
@@ -43,7 +44,6 @@ export default class extends Controller {
     if (this.boundEscHandler) {
       document.removeEventListener("keydown", this.boundEscHandler)
     }
-    document.getElementById(MODAL_ID)?.remove()
   }
 
   // ---------------------------------------------------------------------------
@@ -102,79 +102,55 @@ export default class extends Controller {
   }
 
   // ---------------------------------------------------------------------------
-  // Modal
+  // Modal (markup is rendered server-side in the partial)
   // ---------------------------------------------------------------------------
-
-  createInsertModal() {
-    // Avoid duplicate modals across Turbo reconnects.
-    document.getElementById(MODAL_ID)?.remove()
-
-    const modalHTML = `
-      <div id="${MODAL_ID}" class="fixed inset-0 z-50 hidden">
-        <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity modal-backdrop"></div>
-        <div class="fixed inset-0 z-10 overflow-y-auto">
-          <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-            <div class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
-
-              <!-- Modal Header -->
-              <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div class="sm:flex sm:items-start">
-                  <div class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
-                    <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                    </svg>
-                  </div>
-                  <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                    <h3 class="text-lg font-medium text-gray-900" id="modal-title">Add Operation</h3>
-                    <p class="text-sm text-gray-500" id="modal-subtitle">Adding operation at position X</p>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Modal Body -->
-              <div class="bg-white px-4 pb-4 sm:p-6 sm:pt-0">
-                <div class="mb-4">
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Operation Name (optional)</label>
-                  <input type="text" id="modal-operation-name" class="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., Custom Inspection">
-                </div>
-                <div class="mb-4">
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Operation Instructions</label>
-                  <textarea id="modal-operation-text" class="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" rows="4" placeholder="Enter detailed operation instructions..."></textarea>
-                </div>
-              </div>
-
-              <!-- Modal Footer -->
-              <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
-                <button type="button" id="modal-confirm-btn" class="inline-flex w-full justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm">
-                  Add Operation
-                </button>
-                <button type="button" id="modal-cancel-btn" class="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
-                  Cancel
-                </button>
-              </div>
-
-            </div>
-          </div>
-        </div>
-      </div>
-    `
-
-    document.body.insertAdjacentHTML("beforeend", modalHTML)
-    this.setupModalEventListeners()
-  }
 
   setupModalEventListeners() {
     const modal = document.getElementById(MODAL_ID)
+    if (!modal) return
+
     const closeModal = () => this.hideInsertModal()
 
     document.getElementById("modal-cancel-btn").addEventListener("click", closeModal)
     modal.querySelector(".modal-backdrop").addEventListener("click", closeModal)
     document.getElementById("modal-confirm-btn").addEventListener("click", () => this.confirmInsert())
 
+    // Typing in the name field (real keystrokes, not a programmatic fill from a
+    // suggestion) means the user is naming their own operation: drop back to
+    // custom mode so we don't silently attach a stale library identity.
+    document.getElementById("modal-operation-name").addEventListener("input", () => {
+      this.clearLibrarySelection()
+    })
+
     this.boundEscHandler = (e) => {
       if (e.key === "Escape" && !modal.classList.contains("hidden")) closeModal()
     }
     document.addEventListener("keydown", this.boundEscHandler)
+  }
+
+  // Fired by the modal's autocomplete (autocomplete:select) when the user picks
+  // a known operation from the library. Prefill the instructions and remember
+  // the operation so confirm inserts it with its real identity/metadata.
+  useLibraryOperation(event) {
+    const op = event.detail.item
+    this.selectedOperation = op
+
+    const textInput = document.getElementById("modal-operation-text")
+    if (textInput) textInput.value = op.operation_text || ""
+
+    this.setModeIndicator(`Using library operation: ${op.display_name}`, true)
+  }
+
+  clearLibrarySelection() {
+    this.selectedOperation = null
+    this.setModeIndicator("No match selected — a custom operation will be created.", false)
+  }
+
+  setModeIndicator(text, isLibrary) {
+    const indicator = document.getElementById("modal-operation-mode")
+    if (!indicator) return
+    indicator.textContent = text
+    indicator.className = `text-xs mb-4 ${isLibrary ? "text-green-700" : "text-gray-500"}`
   }
 
   showInsertModal(position) {
@@ -187,9 +163,10 @@ export default class extends Controller {
     document.getElementById("modal-subtitle").textContent = `Adding operation at position ${position}`
     nameInput.value = ""
     textInput.value = ""
+    this.clearLibrarySelection()
 
     modal.classList.remove("hidden")
-    setTimeout(() => textInput.focus(), 100)
+    setTimeout(() => nameInput.focus(), 100)
   }
 
   hideInsertModal() {
@@ -208,10 +185,24 @@ export default class extends Controller {
       return
     }
 
+    // A library operation only "sticks" if one was selected and the name hasn't
+    // since been edited (editing the name clears the selection → custom op).
+    const library = this.selectedOperation
+    const operationId = library ? library.id : null
+    const meta = library
+      ? {
+          specifications: library.specifications,
+          process_type: library.process_type,
+          target_thickness: library.target_thickness
+        }
+      : null
+
     this.insertOperationAtPosition(
       this.currentInsertPosition,
       operationText,
-      operationName || "Custom Operation"
+      operationName || (library ? library.display_name : "Custom Operation"),
+      operationId,
+      meta
     )
     this.hideInsertModal()
   }
@@ -220,7 +211,7 @@ export default class extends Controller {
   // Insert / delete / reorder
   // ---------------------------------------------------------------------------
 
-  async insertOperationAtPosition(position, operationText, displayName) {
+  async insertOperationAtPosition(position, operationText, displayName, operationId = null, meta = null) {
     const tempId = `temp_${Date.now()}`
     const container = this.operationsContainer
     const existingOperations = Array.from(container.querySelectorAll(".operation-item"))
@@ -229,7 +220,7 @@ export default class extends Controller {
     const insertBeforeElement =
       existingOperations.find((op) => parseInt(op.dataset.position) >= position) || null
 
-    const newOperationHTML = this.createOperationHTML(position, displayName, operationText, tempId)
+    const newOperationHTML = this.createOperationHTML(position, displayName, operationText, tempId, meta)
 
     if (insertBeforeElement) {
       // If an "Add Operation" button sits immediately before, insert before it.
@@ -253,11 +244,10 @@ export default class extends Controller {
     this.regenerateAddButtons()
 
     try {
-      const data = await this.request(`/parts/${this.partId}/insert_operation`, "POST", {
-        position,
-        operation_text: operationText,
-        display_name: displayName
-      })
+      const body = { position, operation_text: operationText, display_name: displayName }
+      if (operationId) body.operation_id = operationId
+
+      const data = await this.request(`/parts/${this.partId}/insert_operation`, "POST", body)
 
       if (data.success) {
         const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`)
@@ -395,7 +385,20 @@ export default class extends Controller {
     `
   }
 
-  createOperationHTML(position, displayName, operationText, tempId) {
+  createOperationHTML(position, displayName, operationText, tempId, meta = null) {
+    const processType = meta?.process_type || "manual"
+    const typeLabel = processType.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+    const thickness = meta?.target_thickness
+    const specifications = meta?.specifications
+
+    const specsHtml = specifications
+      ? `<p class="mt-2 text-xs text-purple-600"><strong>Specifications:</strong> ${specifications}</p>`
+      : ""
+    const thicknessBadge =
+      thickness && thickness > 0
+        ? `<span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Target: ${thickness}μm</span>`
+        : ""
+
     return `
       <div class="border border-gray-200 rounded-lg p-4 bg-green-100 operation-item transition-colors duration-1000" data-position="${position}" data-temp-id="${tempId}">
         <div class="flex justify-between items-start mb-3">
@@ -409,6 +412,11 @@ export default class extends Controller {
           </div>
         </div>
         <textarea name="locked_operations[${position}]" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">${operationText}</textarea>
+        ${specsHtml}
+        <div class="flex flex-wrap gap-2 mt-2 text-xs text-gray-500">
+          <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded">Type: ${typeLabel}</span>
+          ${thicknessBadge}
+        </div>
       </div>
     `
   }

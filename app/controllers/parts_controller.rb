@@ -1,7 +1,8 @@
 class PartsController < ApplicationController
  before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled, :toggle_aerospace_defense,
                                   :insert_operation, :reorder_operation, :delete_operation,
-                                  :update_locked_operation, :upload_file, :delete_file, :download_file]
+                                  :update_locked_operation, :search_operations,
+                                  :upload_file, :delete_file, :download_file]
 
   def index
     @parts = Part.includes(:customer, :works_orders)
@@ -429,56 +430,53 @@ end
   end
 
   def insert_operation
-    @part = Part.find(params[:id])
-
     position = params[:position]&.to_i
+    operation_id = params[:operation_id].presence
     operation_text = params[:operation_text]
     display_name = params[:display_name]
 
-    @part.locked_operations.each do |op|
-    end
-
-    if position.nil? || operation_text.blank?
+    if position.nil? || (operation_id.blank? && operation_text.blank?)
       render json: { success: false, error: 'Position and operation text are required' }, status: :unprocessable_entity
       return
     end
 
-    if @part.insert_operation_at(position, operation_text, display_name)
-      # Reload to get fresh data from database
-      @part.reload
-
-      @part.locked_operations.each do |op|
+    inserted =
+      if operation_id
+        # Known library operation: keep its real identity/metadata, allowing the
+        # user's (possibly edited) name and text to override.
+        @part.insert_library_operation_at(position, operation_id, display_name, operation_text)
+      else
+        @part.insert_operation_at(position, operation_text, display_name)
       end
 
-      # Return the updated operations list for optimistic UI sync
+    if inserted
+      @part.reload
       render json: {
         success: true,
         message: 'Operation inserted successfully',
-        operations: @part.locked_operations.map { |op|
-          {
-            id: op["id"],
-            display_name: op["display_name"],
-            operation_text: op["operation_text"],
-            position: op["position"],
-            specifications: op["specifications"],
-            vat_numbers: op["vat_numbers"] || [],
-            process_type: op["process_type"],
-            target_thickness: op["target_thickness"] || 0,
-            auto_inserted: op["auto_inserted"] || false
-          }
-        }
+        operations: serialize_locked_operations(@part)
       }
     else
-      render json: {
-        success: false,
-        error: 'Failed to insert operation'
-      }, status: :unprocessable_entity
+      render json: { success: false, error: 'Failed to insert operation' }, status: :unprocessable_entity
     end
   rescue => e
-    render json: {
-      success: false,
-      error: 'An error occurred while inserting the operation'
-    }, status: :internal_server_error
+    render json: { success: false, error: 'An error occurred while inserting the operation' }, status: :internal_server_error
+  end
+
+  # Free-text search of the operations library, used by the "add operation"
+  # modal so users preferentially pick a known operation over a rogue custom one.
+  def search_operations
+    query = params[:q].to_s.strip
+    if query.length < 2
+      render json: []
+      return
+    end
+
+    matches = @part.searchable_library_operations
+                   .select { |op| operation_matches?(op, query) }
+                   .first(15)
+
+    render json: matches.map { |op| operation_json(op) }
   end
 
   def reorder_operation
@@ -496,19 +494,7 @@ end
       render json: {
         success: true,
         message: 'Operation reordered successfully',
-        operations: @part.locked_operations.map { |op|
-          {
-            id: op["id"],
-            display_name: op["display_name"],
-            operation_text: op["operation_text"],
-            position: op["position"],
-            specifications: op["specifications"],
-            vat_numbers: op["vat_numbers"] || [],
-            process_type: op["process_type"],
-            target_thickness: op["target_thickness"] || 0,
-            auto_inserted: op["auto_inserted"] || false
-          }
-        }
+        operations: serialize_locked_operations(@part)
       }
     else
       render json: {
@@ -537,19 +523,7 @@ end
       render json: {
         success: true,
         message: 'Operation deleted successfully',
-        operations: @part.locked_operations.map { |op|
-          {
-            id: op["id"],
-            display_name: op["display_name"],
-            operation_text: op["operation_text"],
-            position: op["position"],
-            specifications: op["specifications"],
-            vat_numbers: op["vat_numbers"] || [],
-            process_type: op["process_type"],
-            target_thickness: op["target_thickness"] || 0,
-            auto_inserted: op["auto_inserted"] || false
-          }
-        }
+        operations: serialize_locked_operations(@part)
       }
     else
       render json: {
@@ -731,7 +705,60 @@ end
   private
 
   def operation_params
-    params.permit(:position, :operation_text, :display_name, :from_position, :to_position)
+    params.permit(:position, :operation_text, :display_name, :operation_id, :from_position, :to_position)
+  end
+
+  # Shared JSON shape for a part's locked operations (used by insert/reorder/delete).
+  def serialize_locked_operations(part)
+    part.locked_operations.map do |op|
+      {
+        id: op["id"],
+        display_name: op["display_name"],
+        operation_text: op["operation_text"],
+        position: op["position"],
+        specifications: op["specifications"],
+        vat_numbers: op["vat_numbers"] || [],
+        process_type: op["process_type"],
+        target_thickness: op["target_thickness"] || 0,
+        auto_inserted: op["auto_inserted"] || false
+      }
+    end
+  end
+
+  # JSON shape for a single library Operation suggestion.
+  def operation_json(op)
+    {
+      id: op.id,
+      display_name: operation_display_name(op),
+      operation_text: op.operation_text,
+      specifications: op.respond_to?(:specifications) ? op.specifications : nil,
+      process_type: op.respond_to?(:process_type) ? op.process_type : nil,
+      target_thickness: op.respond_to?(:target_thickness) ? op.target_thickness : nil
+    }
+  end
+
+  # Some library operations (e.g. degrease) carry no explicit display name;
+  # fall back to a humanised id so suggestions are never blank.
+  def operation_display_name(op)
+    name = op.display_name if op.respond_to?(:display_name)
+    name.presence || op.id.to_s.titleize
+  end
+
+  # Match an operation against a free-text query. Separators are normalised so
+  # "C8", "C-8" and "c 8" are equivalent, and every query token must appear
+  # somewhere across the id, display name and operation text.
+  def operation_matches?(op, query)
+    haystack = [op.id, operation_display_name(op), op.operation_text].compact.join(" ").downcase
+    spaced = haystack.gsub(/[^a-z0-9]+/, " ").squish
+    squished = haystack.gsub(/[^a-z0-9]+/, "")
+
+    q = query.downcase
+    q_squished = q.gsub(/[^a-z0-9]+/, "")
+    tokens = q.gsub(/[^a-z0-9]+/, " ").split
+    return false if tokens.empty?
+
+    tokens.all? { |t| spaced.include?(t) } ||
+      (q_squished.length >= 2 && squished.include?(q_squished))
   end
 
   def set_part
