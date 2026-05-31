@@ -286,8 +286,8 @@
             <h2>Customer</h2>
             <p>
               <%= @external_ncr.customer_name %><br/>
-              <% if (addr = @external_ncr.customer&.address_data&.dig("delivery")).present? %>
-                <%= [addr["line1"], addr["line2"], addr["city"], addr["region"], addr["postcode"], addr["country"]].compact_blank.join("<br/>").html_safe %>
+              <% if @external_ncr.customer&.has_address? %>
+                <%= @external_ncr.customer.formatted_address.split("\n").map { |line| ERB::Util.html_escape(line) }.join("<br/>").html_safe %>
               <% end %>
             </p>
           </td>
