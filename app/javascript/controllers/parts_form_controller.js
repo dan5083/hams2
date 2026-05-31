@@ -1,5 +1,227 @@
 // app/javascript/controllers/parts_form_controller.js
+//
+// Unlocked-mode treatment builder.
+//
+// This controller is attached to the part <form> in every mode, but it only
+// does anything when the unlocked "Processing Instructions" section is on the
+// page (i.e. when its treatment targets are present). In locked editing mode
+// the form renders a different section that is driven by
+// `locked_operations_controller.js`, so here we simply no-op.
 import { Controller } from "@hotwired/stimulus"
+
+// ---------------------------------------------------------------------------
+// Static configuration (module-level so it isn't rebuilt on every connect)
+// ---------------------------------------------------------------------------
+
+const MAX_TREATMENTS = 5
+
+const TREATMENT_NAMES = {
+  stripping_only: "Strip Only",
+  standard_anodising: "Standard Anodising",
+  hard_anodising: "Hard Anodising",
+  chromic_anodising: "Chromic Anodising",
+  chemical_conversion: "Chemical Conversion",
+  electroless_nickel_plating: "Electroless Nickel Plating"
+}
+
+// [borderColor, bgColor, badgeColor] applied when a treatment is selected.
+const TREATMENT_BUTTON_COLORS = {
+  standard_anodising: ["border-blue-500", "bg-blue-50", "bg-blue-500"],
+  hard_anodising: ["border-purple-500", "bg-purple-50", "bg-purple-500"],
+  chromic_anodising: ["border-green-500", "bg-green-50", "bg-green-500"],
+  chemical_conversion: ["border-orange-500", "bg-orange-50", "bg-orange-500"],
+  electroless_nickel_plating: ["border-indigo-500", "bg-indigo-50", "bg-indigo-500"],
+  stripping_only: ["border-red-500", "bg-red-50", "bg-red-500"]
+}
+
+// All colour classes any button can hold, used when resetting appearance.
+const TREATMENT_BUTTON_RESET_CLASSES = Object.values(TREATMENT_BUTTON_COLORS).flat()
+const TREATMENT_BADGE_RESET_CLASSES = Object.values(TREATMENT_BUTTON_COLORS)
+  .map(([, , badge]) => badge)
+  .concat("text-white")
+
+const ANODISING_TYPES = ["standard_anodising", "hard_anodising", "chromic_anodising"]
+
+const JIG_TYPES = [
+  "a secure titanium-to-part assy",
+  "Wire (aluminium)",
+  "Wire (steel)",
+  "aluminium hooks",
+  "steel hooks",
+  "Expanding Jig",
+  "Large Aluminum Expanding Jig",
+  "Rotor Jig",
+  "Vertical AllThread Jig",
+  "Twisted Double Strap Jig",
+  "Long Twisted Double Strap Jig",
+  "Double Strap Jig",
+  "3 Prong Jig",
+  "4 Prong Jig",
+  "Flat 3 Prong Jig",
+  "Flat 4 Prong Jig",
+  "M6 Jig (Metric)",
+  "M6 Jig (UNC)",
+  "Thin-stem M8 Jig",
+  "Thick-stem M8 Jig",
+  "Spring Jig",
+  "Circular Spring Jig",
+  "Aluminum Clamp Jig",
+  "Wheel Nut Jig",
+  "Muller Jigs",
+  "Flat Piston Jig",
+  "Upright Piston Jig",
+  "Thick Wrap Around Jig",
+  "Thin Wrap Around Jig",
+  "Monobloc Jig",
+  "Hytorque Jig"
+]
+
+const STRIPPING_TYPES = [
+  { value: "anodising_stripping", label: "Anodising Stripping" },
+  { value: "enp_stripping", label: "ENP Stripping" }
+]
+
+const STRIPPING_METHODS = {
+  anodising_stripping: [
+    { value: "chromic_phosphoric", label: "Chromic-Phosphoric Acid" },
+    { value: "E28", label: "Oxidite E28" }
+  ],
+  enp_stripping: [
+    { value: "nitric", label: "Nitric Acid" },
+    { value: "metex_dekote", label: "Metex Dekote" }
+  ]
+}
+
+const STRIPPING_PREVIEW_TEXT = {
+  anodising_stripping: {
+    chromic_phosphoric: "Strip anodising in chromic-phosphoric acid solution",
+    E28: "Strip in Oxidite E28 - wait till fizzing starts and hold for 30 seconds"
+  },
+  enp_stripping: {
+    nitric: "Strip ENP in nitric acid solution 30 to 40 minutes per 25 microns [or until black smut dissolves]",
+    metex_dekote: "Strip ENP in Metex Dekote at 80 to 90°C, for approximately 20 microns per hour strip rate"
+  }
+}
+
+const LOCAL_TREATMENTS = [
+  { value: "none", label: "No Local Treatment" },
+  { value: "LOCAL_ALOCHROM_1200_PEN", label: "Alochrom 1200 (Pen)" },
+  { value: "LOCAL_SURTEC_650V_PEN", label: "SurTec 650V (Pen)" },
+  { value: "LOCAL_PTFE_APPLICATION", label: "PTFE Application" }
+]
+
+// Criteria option lists. Some selects historically persisted their selection
+// in the markup and some did not; that distinction is preserved by whether the
+// render call passes the treatment's stored value (see generators below).
+const ANODISING_ALLOYS = [
+  { value: "", label: "Select alloy..." },
+  { value: "6000_series", label: "6000 Series" },
+  { value: "7075", label: "7075" },
+  { value: "2014", label: "2014" },
+  { value: "5083", label: "5083" },
+  { value: "titanium", label: "Titanium" },
+  { value: "general", label: "General" }
+]
+
+const ANODISING_THICKNESSES = [
+  { value: "", label: "Select thickness..." },
+  ...[5, 10, 15, 20, 25, 30, 40, 50, 60].map((t) => ({ value: String(t), label: `${t}μm` }))
+]
+
+const ANODIC_CLASSES = [
+  { value: "", label: "Select class..." },
+  { value: "class_1", label: "Class 1 (Undyed)" },
+  { value: "class_2", label: "Class 2 (Dyed)" }
+]
+
+const CHROMIC_ALLOYS = [
+  { value: "", label: "Select alloy..." },
+  { value: "general", label: "General" },
+  { value: "aluminium", label: "Aluminium" },
+  { value: "6000_series", label: "6000 Series" },
+  { value: "7075", label: "7075 (Standard Voltage Only)" },
+  { value: "2024", label: "2024" }
+]
+
+const ENP_ALLOYS = [
+  { value: "", label: "Select material..." },
+  { value: "steel", label: "Steel" },
+  { value: "stainless_steel", label: "Stainless Steel" },
+  { value: "316_stainless_steel", label: "316 Stainless Steel" },
+  { value: "aluminium", label: "Aluminium" },
+  { value: "copper", label: "Copper" },
+  { value: "brass", label: "Brass" },
+  { value: "2000_series_alloys", label: "2000 Series Alloys" },
+  { value: "stainless_steel_with_oxides", label: "Stainless Steel with Oxides" },
+  { value: "copper_sans_electrical_contact", label: "Copper (Sans Electrical Contact)" },
+  { value: "cope_rolled_aluminium", label: "Cope Rolled Aluminium" },
+  { value: "mclaren_sta142_procedure_d", label: "McLaren STA142 Procedure D" }
+]
+
+const ENP_TYPES = [
+  { value: "", label: "Select ENP type..." },
+  { value: "high_phosphorous", label: "High Phosphorous" },
+  { value: "medium_phosphorous", label: "Medium Phosphorous" },
+  { value: "low_phosphorous", label: "Low Phosphorous" },
+  { value: "ptfe_composite", label: "PTFE Composite" }
+]
+
+const MATERIAL_TYPES = [
+  { value: "", label: "Select material type..." },
+  { value: "aerospace_minimal", label: "Aerospace (Minimal Pretreatment)" },
+  { value: "castings_plate", label: "Castings/Plate" },
+  { value: "machined_wrought", label: "Machined/Wrought" },
+  { value: "magnesium", label: "Magnesium" }
+]
+
+const SECONDARY_STRIPPING = [
+  { value: "none", label: "No Stripping" },
+  { value: "chromic_phosphoric", label: "Chromic-Phosphoric Acid" },
+  { value: "E28", label: "Oxidite E28" },
+  { value: "nitric", label: "Nitric Acid" },
+  { value: "metex_dekote", label: "Metex Dekote" }
+]
+
+const DYE_COLORS = [
+  { value: "none", label: "No Dye" },
+  { value: "BLACK_DYE", label: "Black" },
+  { value: "RED_DYE", label: "Red" },
+  { value: "BLUE_DYE", label: "Blue" },
+  { value: "GOLD_DYE", label: "Gold" },
+  { value: "GREEN_DYE", label: "Green" }
+]
+
+const SEALING_METHODS = [
+  { value: "none", label: "No Sealing" },
+  { value: "SODIUM_DICHROMATE_SEAL", label: "Sodium Dichromate Seal" },
+  { value: "OXIDITE_SECO_SEAL", label: "Oxidite SE-CO Seal" },
+  { value: "HOT_WATER_DIP", label: "Hot Water Dip" },
+  { value: "HOT_SEAL", label: "Hot Seal" },
+  { value: "SURTEC_650V_SEAL", label: "SurTec 650V Seal" },
+  { value: "DEIONISED_WATER_SEAL", label: "Deionised Water Seal" }
+]
+
+const MASKING_METHODS = [
+  { method: "bungs", label: "Bungs", noun: "bungs" },
+  { method: "pc21_polyester_tape", label: "PC21 - Polyester Tape", noun: "tape" },
+  { method: "45_stopping_off_lacquer", label: "45 Stopping Off Lacquer", noun: "lacquer" }
+]
+
+// ---------------------------------------------------------------------------
+// Small render helpers
+// ---------------------------------------------------------------------------
+
+// Render <option> tags. When `selected` is undefined no option is pre-selected,
+// matching the legacy behaviour of selects that did not persist their value.
+const optionsHtml = (items, selected) =>
+  items
+    .map(
+      (item) =>
+        `<option value="${item.value}"${
+          selected !== undefined && item.value === selected ? " selected" : ""
+        }>${item.label}</option>`
+    )
+    .join("")
 
 export default class extends Controller {
   static targets = [
@@ -17,7 +239,11 @@ export default class extends Controller {
     "enpStripMaskCheckbox",
     "enpStripMaskField",
     "aerospaceDefenseCheckbox",
-    "aerospaceDefenseField"
+    "aerospaceDefenseField",
+    "treatmentSection",
+    "formActions",
+    "switchButton",
+    "manualModeField"
   ]
 
   static values = {
@@ -28,27 +254,17 @@ export default class extends Controller {
   }
 
   connect() {
-    console.log("Parts Form controller connected");
-
-    // Check if we're in locked editing mode
-    this.isLockedMode = this.element.querySelector('.bg-orange-100.text-orange-800') !== null ||
-                       document.querySelector('[data-locked-mode="true"]') !== null ||
-                       document.getElementById('operations-container') !== null;
-
-    if (this.isLockedMode) {
-      console.log("Parts form in locked editing mode - setting up manual operation management");
-      this.setupLockedMode();
-      return;
+    // Only the unlocked treatment-builder section uses this controller. If its
+    // core targets are absent we're on a locked/copy/other view, so do nothing.
+    if (
+      !this.hasTreatmentsFieldTarget ||
+      !this.hasTreatmentsContainerTarget ||
+      !this.hasSelectedContainerTarget
+    ) {
+      return
     }
 
-    // Check if we have the required targets for unlocked mode
-    if (!this.hasTreatmentsFieldTarget || !this.hasTreatmentsContainerTarget || !this.hasSelectedContainerTarget) {
-      console.log("Required targets missing - likely in locked mode or different view");
-      return;
-    }
-
-    // Initialize unlocked mode variables and setup
-    this.treatments = [];
+    this.treatments = []
     this.treatmentCounts = {
       standard_anodising: 0,
       hard_anodising: 0,
@@ -56,903 +272,291 @@ export default class extends Controller {
       chemical_conversion: 0,
       electroless_nickel_plating: 0,
       stripping_only: 0
-    };
-    this.maxTreatments = 5;
-    this.enpStripType = 'nitric';
-    this.enpStripMaskEnabled = false;
-    this.selectedEnpPreHeatTreatment = 'none';
-    this.selectedEnpHeatTreatment = 'none';
-    this.aerospaceDefense = false;
-    this.treatmentIdCounter = 0;
-
-    // Available jig types
-    this.availableJigTypes = [
-      'a secure titanium-to-part assy',
-      'Wire (aluminium)',
-      'Wire (steel)',
-      'aluminium hooks',
-      'steel hooks',
-      'Expanding Jig',
-      'Large Aluminum Expanding Jig',
-      'Rotor Jig',
-      'Vertical AllThread Jig',
-      'Twisted Double Strap Jig',
-      'Long Twisted Double Strap Jig',
-      'Double Strap Jig',
-      '3 Prong Jig',
-      '4 Prong Jig',
-      'Flat 3 Prong Jig',
-      'Flat 4 Prong Jig',
-      'M6 Jig (Metric)',
-      'M6 Jig (UNC)',
-      'Thin-stem M8 Jig',
-      'Thick-stem M8 Jig',
-      'Spring Jig',
-      'Circular Spring Jig',
-      'Aluminum Clamp Jig',
-      'Wheel Nut Jig',
-      'Muller Jigs',
-      'Flat Piston Jig',
-      'Upright Piston Jig',
-      'Thick Wrap Around Jig',
-      'Thin Wrap Around Jig',
-      'Monobloc Jig',
-      'Hytorque Jig'
-    ];
-
-    // Available stripping types and methods
-    this.availableStrippingTypes = [
-      { value: 'anodising_stripping', label: 'Anodising Stripping' },
-      { value: 'enp_stripping', label: 'ENP Stripping' }
-    ];
-
-    this.availableStrippingMethods = {
-      anodising_stripping: [
-        { value: 'chromic_phosphoric', label: 'Chromic-Phosphoric Acid' },
-        { value: 'E28', label: 'Oxidite E28' }
-      ],
-      enp_stripping: [
-        { value: 'nitric', label: 'Nitric Acid' },
-        { value: 'metex_dekote', label: 'Metex Dekote' }
-      ]
-    };
-
-    // Available local treatments for anodising
-    this.availableLocalTreatments = [
-      { value: 'none', label: 'No Local Treatment' },
-      { value: 'LOCAL_ALOCHROM_1200_PEN', label: 'Alochrom 1200 (Pen)' },
-      { value: 'LOCAL_SURTEC_650V_PEN', label: 'SurTec 650V (Pen)' },
-      { value: 'LOCAL_PTFE_APPLICATION', label: 'PTFE Application' }
-    ];
-
-    this.initializeExistingData();
-    this.setupTreatmentButtons();
-    this.setupENPPreHeatTreatmentListener();
-    this.setupENPHeatTreatmentListener();
-    this.setupENPStripTypeListener();
-    this.setupENPStripMaskListener();
-    this.setupAerospaceDefenseListener();
-  }
-
-  disconnect() {
-    // Clean up event listeners when controller disconnects
-    if (this.isLockedMode && this.boundEventHandler) {
-      document.removeEventListener('click', this.boundEventHandler);
     }
+    this.enpStripType = "nitric"
+    this.enpStripMaskEnabled = false
+    this.selectedEnpPreHeatTreatment = "none"
+    this.selectedEnpHeatTreatment = "none"
+    this.aerospaceDefense = false
+    this.treatmentIdCounter = 0
+
+    this.initializeExistingData()
+    this.setupTreatmentButtons()
+    this.setupEnpPreHeatTreatmentListener()
+    this.setupEnpHeatTreatmentListener()
+    this.setupEnpStripTypeListener()
+    this.setupEnpStripMaskListener()
+    this.setupAerospaceDefenseListener()
   }
 
-  // Setup locked mode - modal-based operation management
-  setupLockedMode() {
-    console.log("Setting up locked mode with modal-based operation management");
+  // ---------------------------------------------------------------------------
+  // Networking
+  // ---------------------------------------------------------------------------
 
-    // Get part ID from URL or form
-    this.partId = this.getPartIdFromUrl();
-    if (!this.partId) {
-      console.error('Part ID not found for manual operation management');
-      return;
+  async postJson(url, body) {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRF-Token": this.csrfTokenValue
+      },
+      body: JSON.stringify(body)
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
 
-    // Create and inject the modal HTML
-    this.createInsertModal();
-
-    // Set up single event delegation handler to avoid duplicates
-    this.boundEventHandler = this.handleLockedModeClick.bind(this);
-    document.addEventListener('click', this.boundEventHandler);
-
-    // Initialize modal variables
-    this.currentInsertPosition = null;
-    this.deleteInProgress = false; // Prevent multiple delete confirmations
+    return response.json()
   }
 
-  createInsertModal() {
-    const modalHTML = `
-      <div id="insert-operation-modal" class="fixed inset-0 z-50 hidden">
-        <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity modal-backdrop"></div>
-        <div class="fixed inset-0 z-10 overflow-y-auto">
-          <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-            <div class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
-
-              <!-- Modal Header -->
-              <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div class="sm:flex sm:items-start">
-                  <div class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
-                    <svg class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                    </svg>
-                  </div>
-                  <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                    <h3 class="text-lg font-medium text-gray-900" id="modal-title">Add Operation</h3>
-                    <p class="text-sm text-gray-500" id="modal-subtitle">Adding operation at position X</p>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Modal Body -->
-              <div class="bg-white px-4 pb-4 sm:p-6 sm:pt-0">
-                <div class="mb-4">
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Operation Name (optional)</label>
-                  <input type="text" id="modal-operation-name" class="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., Custom Inspection">
-                </div>
-                <div class="mb-4">
-                  <label class="block text-sm font-medium text-gray-700 mb-1">Operation Instructions</label>
-                  <textarea id="modal-operation-text" class="w-full text-sm border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" rows="4" placeholder="Enter detailed operation instructions..."></textarea>
-                </div>
-              </div>
-
-              <!-- Modal Footer -->
-              <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
-                <button type="button" id="modal-confirm-btn" class="inline-flex w-full justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-base font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm">
-                  Add Operation
-                </button>
-                <button type="button" id="modal-cancel-btn" class="mt-3 inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-base font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
-                  Cancel
-                </button>
-              </div>
-
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-
-    // Inject modal into page
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-
-    // Set up modal event listeners
-    this.setupModalEventListeners();
+  fetchOperations(criteria) {
+    return this.postJson(this.filterPathValue, criteria)
   }
 
-  setupModalEventListeners() {
-    const modal = document.getElementById('insert-operation-modal');
-    const cancelBtn = document.getElementById('modal-cancel-btn');
-    const confirmBtn = document.getElementById('modal-confirm-btn');
-    const backdrop = modal.querySelector('.modal-backdrop');
+  // ---------------------------------------------------------------------------
+  // Initialisation
+  // ---------------------------------------------------------------------------
 
-    // Close modal handlers
-    const closeModal = () => this.hideInsertModal();
-
-    cancelBtn.addEventListener('click', closeModal);
-    backdrop.addEventListener('click', closeModal);
-
-    // Confirm button
-    confirmBtn.addEventListener('click', () => this.confirmInsert());
-
-    // ESC key to close
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
-        closeModal();
-      }
-    });
-  }
-
-  handleLockedModeClick(e) {
-    // Prevent event bubbling for our handled events
-    const handled = this.processLockedModeEvent(e);
-    if (handled) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  }
-
-  processLockedModeEvent(e) {
-    // Add operation buttons
-    if (e.target.classList.contains('add-operation-btn')) {
-      const position = parseInt(e.target.dataset.insertPosition);
-      this.showInsertModal(position);
-      return true;
-    }
-
-    // Delete operation buttons - with debounce protection
-    if (e.target.classList.contains('delete-operation-btn') && !this.deleteInProgress) {
-      const position = parseInt(e.target.dataset.position);
-      this.deleteOperation(position);
-      return true;
-    }
-
-    // Reorder buttons
-    if (e.target.classList.contains('reorder-up-btn')) {
-      const fromPosition = parseInt(e.target.dataset.position);
-      const toPosition = fromPosition - 1;
-      this.reorderOperation(fromPosition, toPosition);
-      return true;
-    }
-
-    if (e.target.classList.contains('reorder-down-btn')) {
-      const fromPosition = parseInt(e.target.dataset.position);
-      const toPosition = fromPosition + 1;
-      this.reorderOperation(fromPosition, toPosition);
-      return true;
-    }
-
-    return false;
-  }
-
-  getPartIdFromUrl() {
-    const pathParts = window.location.pathname.split('/');
-    const partsIndex = pathParts.indexOf('parts');
-    return partsIndex !== -1 && pathParts[partsIndex + 1] ? pathParts[partsIndex + 1] : null;
-  }
-
-  showInsertModal(position) {
-    this.currentInsertPosition = position;
-    const modal = document.getElementById('insert-operation-modal');
-    const subtitle = document.getElementById('modal-subtitle');
-    const nameInput = document.getElementById('modal-operation-name');
-    const textInput = document.getElementById('modal-operation-text');
-
-    // Update modal content
-    subtitle.textContent = `Adding operation at position ${position}`;
-
-    // Clear inputs
-    nameInput.value = '';
-    textInput.value = '';
-
-    // Show modal
-    modal.classList.remove('hidden');
-
-    // Focus on first input
-    setTimeout(() => textInput.focus(), 100);
-  }
-
-  hideInsertModal() {
-    const modal = document.getElementById('insert-operation-modal');
-    modal.classList.add('hidden');
-    this.currentInsertPosition = null;
-  }
-
-  confirmInsert() {
-    const nameInput = document.getElementById('modal-operation-name');
-    const textInput = document.getElementById('modal-operation-text');
-
-    const operationName = nameInput.value.trim();
-    const operationText = textInput.value.trim();
-
-    if (!operationText) {
-      alert('Please enter operation instructions');
-      textInput.focus();
-      return;
-    }
-
-    this.insertOperationAtPosition(
-      this.currentInsertPosition,
-      operationText,
-      operationName || 'Custom Operation'
-    );
-
-    this.hideInsertModal();
-  }
-
-  async insertOperationAtPosition(position, operationText, displayName) {
-    console.log(`🔍 JS: Attempting to insert at position ${position}`);
-
-    // Generate temp ID for optimistic update
-    const tempId = 'temp_' + Date.now();
-
-    // Find the operations container
-    const operationsContainer = document.getElementById('operations-container');
-
-    // Get all existing operation items (not buttons)
-    const existingOperations = Array.from(operationsContainer.querySelectorAll('.operation-item'));
-
-    console.log(`🔍 JS: Found ${existingOperations.length} existing operations`);
-
-    // Find the correct insertion point by looking for the first operation with position >= target position
-    let insertBeforeElement = null;
-
-    for (let op of existingOperations) {
-      const currentPosition = parseInt(op.dataset.position);
-      console.log(`🔍 JS: Checking operation at position ${currentPosition} against target ${position}`);
-      if (currentPosition >= position) {
-        insertBeforeElement = op;
-        console.log(`🔍 JS: Found insertion point before position ${currentPosition}`);
-        break;
-      }
-    }
-
-    if (!insertBeforeElement) {
-      console.log(`🔍 JS: No insertion point found, will insert at end`);
-    }
-
-    // Insert at correct DOM position
-    const newOperationHTML = this.createOperationHTML(position, displayName, operationText, tempId);
-
-    if (insertBeforeElement) {
-      console.log(`🔍 JS: Inserting before element with position ${insertBeforeElement.dataset.position}`);
-
-      // Find any "Add Operation" button div immediately before this operation
-      let actualInsertionPoint = insertBeforeElement;
-      let previousElement = insertBeforeElement.previousElementSibling;
-
-      // If there's an "Add Operation" button div right before this operation,
-      // insert before that instead
-      if (previousElement && previousElement.querySelector('.add-operation-btn')) {
-        actualInsertionPoint = previousElement;
-        console.log(`🔍 JS: Found Add Operation button before target, inserting before that instead`);
-      }
-
-      actualInsertionPoint.insertAdjacentHTML('beforebegin', newOperationHTML);
-    } else {
-      console.log(`🔍 JS: Inserting at end of container`);
-      const lastAddButton = operationsContainer.querySelector('.add-operation-btn[data-insert-position]:last-of-type');
-      if (lastAddButton) {
-        lastAddButton.closest('div').insertAdjacentHTML('beforebegin', newOperationHTML);
-      } else {
-        operationsContainer.insertAdjacentHTML('beforeend', newOperationHTML);
-      }
-    }
-
-    // Update positions AND regenerate "Add Operation" buttons
-    this.updateAllOperationPositionsAndButtons();
-
-    try {
-      // Sync with server
-      const response = await fetch(`/parts/${this.partId}/insert_operation`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': this.csrfTokenValue
-        },
-        body: JSON.stringify({
-          position: position,
-          operation_text: operationText,
-          display_name: displayName
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        // Update the temp operation to show success
-        const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`);
-        if (tempOp) {
-          tempOp.removeAttribute('data-temp-id');
-          tempOp.classList.remove('bg-green-100');
-          tempOp.classList.add('bg-gray-50');
-        }
-        this.showSuccessMessage('Operation added successfully');
-
-        // Regenerate the add buttons with correct positions
-        this.regenerateAddOperationButtons();
-      } else {
-        // Remove the optimistic update on failure
-        const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`);
-        if (tempOp) tempOp.remove();
-        this.revertOperationPositions();
-        alert('Error: ' + data.error);
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      // Remove the optimistic update on error
-      const tempOp = document.querySelector(`[data-temp-id="${tempId}"]`);
-      if (tempOp) tempOp.remove();
-      this.revertOperationPositions();
-      alert('An error occurred while adding the operation');
-    }
-  }
-
-  // New method to update positions AND regenerate buttons
-  updateAllOperationPositionsAndButtons() {
-    const operations = document.querySelectorAll('.operation-item');
-    operations.forEach((item, index) => {
-      const newPosition = index + 1;
-
-      // Update data attribute
-      item.dataset.position = newPosition;
-
-      // Update header text
-      const header = item.querySelector('h4');
-      if (header) {
-        header.textContent = header.textContent.replace(/Operation \d+:/, `Operation ${newPosition}:`);
-      }
-
-      // Update textarea name (only for non-temp operations)
-      if (!item.dataset.tempId) {
-        const textarea = item.querySelector('textarea');
-        if (textarea) {
-          textarea.name = `locked_operations[${newPosition}]`;
-        }
-      }
-
-      // Update reorder button positions
-      const reorderButtons = item.querySelectorAll('.reorder-up-btn, .reorder-down-btn');
-      reorderButtons.forEach(btn => {
-        btn.dataset.position = newPosition;
-      });
-
-      // Update delete button position
-      const deleteBtn = item.querySelector('.delete-operation-btn');
-      if (deleteBtn) {
-        deleteBtn.dataset.position = newPosition;
-      }
-    });
-
-    // Now regenerate the "Add Operation" buttons
-    this.regenerateAddOperationButtons();
-  }
-
-  // New method to regenerate "Add Operation" buttons with correct positioning
-  regenerateAddOperationButtons() {
-    const operationsContainer = document.getElementById('operations-container');
-
-    // Remove all existing "Add Operation" button divs
-    operationsContainer.querySelectorAll('div').forEach(div => {
-      if (div.querySelector('.add-operation-btn')) {
-        div.remove();
-      }
-    });
-
-    const operations = Array.from(operationsContainer.querySelectorAll('.operation-item'));
-
-    // Add button before each operation (except the first)
-    operations.forEach((operation, index) => {
-      if (index > 0) { // Skip first operation
-        const position = parseInt(operation.dataset.position);
-        const buttonHTML = `
-          <div class="flex justify-center py-2">
-            <button type="button" class="add-operation-btn bg-blue-100 hover:bg-blue-200 text-blue-700 px-4 py-2 rounded-lg text-sm border border-blue-300 transition-colors"
-                    data-insert-position="${position}">
-              + Add Operation Here
-            </button>
-          </div>
-        `;
-        operation.insertAdjacentHTML('beforebegin', buttonHTML);
-      }
-    });
-
-    // Add button at the end
-    const lastPosition = operations.length > 0 ? parseInt(operations[operations.length - 1].dataset.position) + 1 : 1;
-    const endButtonHTML = `
-      <div class="flex justify-center py-2">
-        <button type="button" class="add-operation-btn bg-blue-100 hover:bg-blue-200 text-blue-700 px-4 py-2 rounded-lg text-sm border border-blue-300 transition-colors"
-                data-insert-position="${lastPosition}">
-          + Add Operation at End
-        </button>
-      </div>
-    `;
-    operationsContainer.insertAdjacentHTML('beforeend', endButtonHTML);
-  }
-
-  createOperationHTML(position, displayName, operationText, tempId) {
-    return `
-      <div class="border border-gray-200 rounded-lg p-4 bg-green-100 operation-item transition-colors duration-1000" data-position="${position}" data-temp-id="${tempId}">
-        <div class="flex justify-between items-start mb-3">
-          <div class="flex items-center space-x-3">
-            <h4 class="font-medium text-gray-900">Operation ${position}: ${displayName}</h4>
-          </div>
-          <div class="flex items-center space-x-2">
-            <button type="button" class="reorder-up-btn text-blue-600 hover:text-blue-800 text-sm font-medium" data-position="${position}" title="Move up">↑</button>
-            <button type="button" class="reorder-down-btn text-blue-600 hover:text-blue-800 text-sm font-medium" data-position="${position}" title="Move down">↓</button>
-            <button type="button" class="delete-operation-btn text-red-600 hover:text-red-800 text-xl font-bold" data-position="${position}" title="Delete this operation">×</button>
-          </div>
-        </div>
-        <textarea name="locked_operations[${position}]" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">${operationText}</textarea>
-      </div>
-    `;
-  }
-
-  // Update all operation positions to maintain proper sequence
-  updateAllOperationPositions() {
-    const operations = document.querySelectorAll('.operation-item');
-    operations.forEach((item, index) => {
-      const newPosition = index + 1;
-      const oldPosition = parseInt(item.dataset.position);
-
-      // Update data attribute
-      item.dataset.position = newPosition;
-
-      // Update header text
-      const header = item.querySelector('h4');
-      if (header) {
-        header.textContent = header.textContent.replace(/Operation \d+:/, `Operation ${newPosition}:`);
-      }
-
-      // Update textarea name (only for non-temp operations)
-      if (!item.dataset.tempId) {
-        const textarea = item.querySelector('textarea');
-        if (textarea) {
-          textarea.name = `locked_operations[${newPosition}]`;
-        }
-      }
-
-      // Update reorder button positions
-      const reorderButtons = item.querySelectorAll('.reorder-up-btn, .reorder-down-btn');
-      reorderButtons.forEach(btn => {
-        btn.dataset.position = newPosition;
-      });
-
-      // Update delete button position
-      const deleteBtn = item.querySelector('.delete-operation-btn');
-      if (deleteBtn) {
-        deleteBtn.dataset.position = newPosition;
-      }
-    });
-  }
-
-  // Store original positions for reverting on error
-  storeOriginalPositions() {
-    this.originalPositions = [];
-    document.querySelectorAll('.operation-item').forEach(item => {
-      this.originalPositions.push({
-        element: item,
-        position: parseInt(item.dataset.position)
-      });
-    });
-  }
-
-  revertOperationPositions() {
-    if (!this.originalPositions) return;
-
-    this.originalPositions.forEach(({element, position}) => {
-      element.dataset.position = position;
-
-      const header = element.querySelector('h4');
-      if (header) {
-        header.textContent = header.textContent.replace(/Operation \d+:/, `Operation ${position}:`);
-      }
-
-      const textarea = element.querySelector('textarea');
-      if (textarea) {
-        textarea.name = `locked_operations[${position}]`;
-      }
-
-      const reorderButtons = element.querySelectorAll('.reorder-up-btn, .reorder-down-btn');
-      reorderButtons.forEach(btn => {
-        btn.dataset.position = position;
-      });
-
-      const deleteBtn = element.querySelector('.delete-operation-btn');
-      if (deleteBtn) {
-        deleteBtn.dataset.position = position;
-      }
-    });
-  }
-
-  async deleteOperation(position) {
-    // Prevent multiple delete operations
-    if (this.deleteInProgress) {
-      console.log('Delete operation already in progress, ignoring');
-      return;
-    }
-
-    this.deleteInProgress = true;
-
-    try {
-      const confirmed = confirm('Are you sure you want to delete this operation? This cannot be undone.');
-
-      if (!confirmed) {
-        this.deleteInProgress = false;
-        return;
-      }
-
-      const response = await fetch(`/parts/${this.partId}/delete_operation`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': this.csrfTokenValue
-        },
-        body: JSON.stringify({ position: position })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        location.reload(); // Reload to get fresh state
-      } else {
-        alert('Error: ' + data.error);
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      alert('An error occurred while deleting the operation');
-    } finally {
-      // Reset the flag after a delay to prevent rapid clicks
-      setTimeout(() => {
-        this.deleteInProgress = false;
-      }, 1000);
-    }
-  }
-
-  async reorderOperation(fromPosition, toPosition) {
-    try {
-      const response = await fetch(`/parts/${this.partId}/reorder_operation`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': this.csrfTokenValue
-        },
-        body: JSON.stringify({
-          from_position: fromPosition,
-          to_position: toPosition
-        })
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        location.reload(); // Reload to get fresh state
-      } else {
-        alert('Error: ' + data.error);
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      alert('An error occurred while reordering the operation');
-    }
-  }
-
-  showSuccessMessage(message) {
-    const successDiv = document.createElement('div');
-    successDiv.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50';
-    successDiv.textContent = message;
-    document.body.appendChild(successDiv);
-    setTimeout(() => successDiv.remove(), 3000);
-  }
-
-  // =====================
-  // UNLOCKED MODE METHODS (keeping existing functionality)
-  // =====================
-
-  // Initialize with existing treatment data (unlocked mode only)
   initializeExistingData() {
-    if (this.isLockedMode || !this.hasTreatmentsFieldTarget) return;
-
     try {
-      const existingData = JSON.parse(this.treatmentsFieldTarget.value || '[]');
-      this.treatments = existingData;
-      this.updateTreatmentCounts();
-      this.renderTreatmentCards();
+      this.treatments = JSON.parse(this.treatmentsFieldTarget.value || "[]")
+      this.updateTreatmentCounts()
+      this.renderTreatmentCards()
 
-      // Initialize ENP pre-heat treatment selection
       if (this.hasEnpPreHeatTreatmentFieldTarget && this.hasEnpPreHeatTreatmentSelectTarget) {
-        this.selectedEnpPreHeatTreatment = this.enpPreHeatTreatmentFieldTarget.value || 'none';
-        this.enpPreHeatTreatmentSelectTarget.value = this.selectedEnpPreHeatTreatment;
+        this.selectedEnpPreHeatTreatment = this.enpPreHeatTreatmentFieldTarget.value || "none"
+        this.enpPreHeatTreatmentSelectTarget.value = this.selectedEnpPreHeatTreatment
       }
 
-      // Initialize ENP post-heat treatment selection
       if (this.hasEnpHeatTreatmentFieldTarget && this.hasEnpHeatTreatmentSelectTarget) {
-        this.selectedEnpHeatTreatment = this.enpHeatTreatmentFieldTarget.value || 'none';
-        this.enpHeatTreatmentSelectTarget.value = this.selectedEnpHeatTreatment;
+        this.selectedEnpHeatTreatment = this.enpHeatTreatmentFieldTarget.value || "none"
+        this.enpHeatTreatmentSelectTarget.value = this.selectedEnpHeatTreatment
       }
 
-      // Initialize aerospace/defense flag
       if (this.hasAerospaceDefenseCheckboxTarget && this.hasAerospaceDefenseFieldTarget) {
-        this.aerospaceDefense = this.aerospaceDefenseCheckboxTarget.checked;
-        this.aerospaceDefenseFieldTarget.value = this.aerospaceDefense;
+        this.aerospaceDefense = this.aerospaceDefenseCheckboxTarget.checked
+        this.aerospaceDefenseFieldTarget.value = this.aerospaceDefense
       }
 
-      // Show ENP options if ENP treatments are present
-      this.updateENPOptionsVisibility();
-      this.updatePreview();
-    } catch(e) {
-      console.error("Error parsing existing treatments:", e);
-      this.treatments = [];
+      this.updateEnpOptionsVisibility()
+      this.updatePreview()
+    } catch (error) {
+      console.error("Error parsing existing treatments:", error)
+      this.treatments = []
     }
   }
 
-  // Set up treatment button click handlers (unlocked mode only)
   setupTreatmentButtons() {
-    if (this.isLockedMode) return;
-
-    this.element.querySelectorAll('.treatment-btn').forEach(button => {
-      button.addEventListener('click', (e) => this.handleTreatmentClick(e));
-    });
+    this.element
+      .querySelectorAll(".treatment-btn")
+      .forEach((button) => button.addEventListener("click", (e) => this.handleTreatmentClick(e)))
   }
 
-  // Set up ENP pre-heat treatment dropdown listener (unlocked mode only)
-  setupENPPreHeatTreatmentListener() {
-    if (this.isLockedMode || !this.hasEnpPreHeatTreatmentSelectTarget || !this.hasEnpPreHeatTreatmentFieldTarget) return;
+  setupEnpPreHeatTreatmentListener() {
+    if (!this.hasEnpPreHeatTreatmentSelectTarget || !this.hasEnpPreHeatTreatmentFieldTarget) return
 
-    this.enpPreHeatTreatmentSelectTarget.addEventListener('change', (e) => {
-      this.selectedEnpPreHeatTreatment = e.target.value;
-      this.enpPreHeatTreatmentFieldTarget.value = this.selectedEnpPreHeatTreatment;
-      console.log("ENP Pre-Heat Treatment changed to:", this.selectedEnpPreHeatTreatment);
-      this.updatePreview();
-    });
+    this.enpPreHeatTreatmentSelectTarget.addEventListener("change", (e) => {
+      this.selectedEnpPreHeatTreatment = e.target.value
+      this.enpPreHeatTreatmentFieldTarget.value = this.selectedEnpPreHeatTreatment
+      this.updatePreview()
+    })
   }
 
-  // Set up ENP post-heat treatment dropdown listener (unlocked mode only)
-  setupENPHeatTreatmentListener() {
-    if (this.isLockedMode || !this.hasEnpHeatTreatmentSelectTarget || !this.hasEnpHeatTreatmentFieldTarget) return;
+  setupEnpHeatTreatmentListener() {
+    if (!this.hasEnpHeatTreatmentSelectTarget || !this.hasEnpHeatTreatmentFieldTarget) return
 
-    this.enpHeatTreatmentSelectTarget.addEventListener('change', (e) => {
-      this.selectedEnpHeatTreatment = e.target.value;
-      this.enpHeatTreatmentFieldTarget.value = this.selectedEnpHeatTreatment;
-      console.log("ENP Post-Heat Treatment changed to:", this.selectedEnpHeatTreatment);
-      this.updatePreview();
-    });
+    this.enpHeatTreatmentSelectTarget.addEventListener("change", (e) => {
+      this.selectedEnpHeatTreatment = e.target.value
+      this.enpHeatTreatmentFieldTarget.value = this.selectedEnpHeatTreatment
+      this.updatePreview()
+    })
   }
 
-  // Set up ENP strip type radio button listener (unlocked mode only)
-  setupENPStripTypeListener() {
-    if (this.isLockedMode || !this.hasEnpStripTypeRadioTarget || !this.hasEnpStripTypeFieldTarget) return;
+  setupEnpStripTypeListener() {
+    if (!this.hasEnpStripTypeRadioTarget || !this.hasEnpStripTypeFieldTarget) return
 
-    this.enpStripTypeRadioTargets.forEach(radio => {
-      radio.addEventListener('change', (e) => {
-        this.enpStripType = e.target.value;
-        this.enpStripTypeFieldTarget.value = this.enpStripType;
-        this.updatePreview();
-      });
-    });
+    this.enpStripTypeRadioTargets.forEach((radio) => {
+      radio.addEventListener("change", (e) => {
+        this.enpStripType = e.target.value
+        this.enpStripTypeFieldTarget.value = this.enpStripType
+        this.updatePreview()
+      })
+    })
   }
 
-  // Set up ENP strip mask checkbox listener (unlocked mode only)
-  setupENPStripMaskListener() {
-    if (this.isLockedMode || !this.hasEnpStripMaskCheckboxTarget || !this.hasEnpStripMaskFieldTarget) return;
+  setupEnpStripMaskListener() {
+    if (!this.hasEnpStripMaskCheckboxTarget || !this.hasEnpStripMaskFieldTarget) return
 
-    this.enpStripMaskCheckboxTarget.addEventListener('change', (e) => {
-      this.enpStripMaskEnabled = e.target.checked;
-      this.updateENPStripMaskField();
-      this.updatePreview();
-    });
+    this.enpStripMaskCheckboxTarget.addEventListener("change", (e) => {
+      this.enpStripMaskEnabled = e.target.checked
+      this.updateEnpStripMaskField()
+      this.updatePreview()
+    })
   }
 
-  // Set up aerospace/defense checkbox listener (unlocked mode only)
   setupAerospaceDefenseListener() {
-    if (this.isLockedMode || !this.hasAerospaceDefenseCheckboxTarget || !this.hasAerospaceDefenseFieldTarget) return;
+    if (!this.hasAerospaceDefenseCheckboxTarget || !this.hasAerospaceDefenseFieldTarget) return
 
-    this.aerospaceDefenseCheckboxTarget.addEventListener('change', (e) => {
-      this.aerospaceDefense = e.target.checked;
-      this.aerospaceDefenseFieldTarget.value = this.aerospaceDefense;
-      this.updatePreview();
-
-      // Provide visual feedback when enabled
-      if (this.aerospaceDefense) {
-        console.log("Aerospace/Defense mode enabled - foil verification, water break tests and OCV operations will be included");
-      }
-    });
+    this.aerospaceDefenseCheckboxTarget.addEventListener("change", (e) => {
+      this.aerospaceDefense = e.target.checked
+      this.aerospaceDefenseFieldTarget.value = this.aerospaceDefense
+      this.updatePreview()
+    })
   }
 
-  // Handle treatment button clicks (unlocked mode only)
+  // ---------------------------------------------------------------------------
+  // Treatment add / remove
+  // ---------------------------------------------------------------------------
+
   handleTreatmentClick(event) {
-    if (this.isLockedMode) return;
+    event.preventDefault()
+    const button = event.currentTarget
+    const treatmentType = button.dataset.treatment
 
-    event.preventDefault();
-    const button = event.currentTarget;
-    const treatmentType = button.dataset.treatment;
-
-    if (this.treatments.length >= this.maxTreatments) {
-      alert(`Maximum ${this.maxTreatments} treatments allowed`);
-      return;
+    if (this.treatments.length >= MAX_TREATMENTS) {
+      alert(`Maximum ${MAX_TREATMENTS} treatments allowed`)
+      return
     }
 
-    this.addTreatment(treatmentType, button);
+    this.addTreatment(treatmentType, button)
   }
 
-  // Add a new treatment (unlocked mode only)
   addTreatment(treatmentType, button) {
-    if (this.isLockedMode) return;
+    this.treatmentIdCounter++
 
-    this.treatmentIdCounter++;
+    const isStripOnly = treatmentType === "stripping_only"
 
-    const treatment = {
+    this.treatments.push({
       id: `treatment_${this.treatmentIdCounter}`,
       type: treatmentType,
       operation_id: null,
       selected_alloy: null,
-      selected_material_type: null, // Add material type for chemical conversion
+      selected_material_type: null,
       target_thickness: null,
       selected_jig_type: null,
-      stripping_type: treatmentType === 'stripping_only' ? 'anodising_stripping' : null,
-      stripping_method: treatmentType === 'stripping_only' ? 'chromic_phosphoric' : null,
+      stripping_type: isStripOnly ? "anodising_stripping" : null,
+      stripping_method: isStripOnly ? "chromic_phosphoric" : null,
       masking_methods: {},
       stripping_enabled: false,
-      stripping_type_secondary: 'none',
-      stripping_method_secondary: 'none',
-      sealing_method: 'none',
-      dye_color: 'none',
+      stripping_type_secondary: "none",
+      stripping_method_secondary: "none",
+      sealing_method: "none",
+      dye_color: "none",
       ptfe_enabled: false,
-      local_treatment_type: 'none'
-    };
+      local_treatment_type: "none"
+    })
 
-    this.treatments.push(treatment);
-    this.treatmentCounts[treatmentType]++;
-    this.updateButtonAppearance(button, treatmentType);
-    this.renderTreatmentCards();
-    this.updateTreatmentsField();
-    this.updateENPOptionsVisibility();
+    this.treatmentCounts[treatmentType]++
+    this.updateButtonAppearance(button, treatmentType)
+    this.renderTreatmentCards()
+    this.updateTreatmentsField()
+    this.updateEnpOptionsVisibility()
   }
 
-  // Update ENP options visibility based on treatment selection (unlocked mode only)
-  updateENPOptionsVisibility() {
-    if (this.isLockedMode || !this.hasEnpOptionsContainerTarget) return;
+  removeTreatment(event) {
+    const treatmentId = event.params.treatmentId
+    const treatmentIndex = this.treatments.findIndex((t) => t.id === treatmentId)
+    if (treatmentIndex === -1) return
 
-    const hasENPTreatment = this.treatments.some(t => t.type === 'electroless_nickel_plating');
-    this.enpOptionsContainerTarget.style.display = hasENPTreatment ? 'block' : 'none';
-  }
+    const treatment = this.treatments[treatmentIndex]
+    this.treatmentCounts[treatment.type]--
+    this.treatments.splice(treatmentIndex, 1)
 
-  // Update button appearance (unlocked mode only)
-  updateButtonAppearance(button, treatmentType) {
-    if (this.isLockedMode) return;
-
-    const countBadge = button.querySelector('.count-badge');
-    button.classList.remove('border-gray-300');
-
-    const colors = {
-      'standard_anodising': ['border-blue-500', 'bg-blue-50', 'bg-blue-500'],
-      'hard_anodising': ['border-purple-500', 'bg-purple-50', 'bg-purple-500'],
-      'chromic_anodising': ['border-green-500', 'bg-green-50', 'bg-green-500'],
-      'chemical_conversion': ['border-orange-500', 'bg-orange-50', 'bg-orange-500'],
-      'electroless_nickel_plating': ['border-indigo-500', 'bg-indigo-50', 'bg-indigo-500'],
-      'stripping_only': ['border-red-500', 'bg-red-50', 'bg-red-500']
-    };
-
-    const [borderColor, bgColor, badgeColor] = colors[treatmentType];
-    button.classList.add(borderColor, bgColor);
-    countBadge.classList.remove('bg-gray-100');
-    countBadge.classList.add(badgeColor, 'text-white');
-    countBadge.textContent = this.treatmentCounts[treatmentType];
-  }
-
-  // Update treatment counts from current treatments array (unlocked mode only)
-  updateTreatmentCounts() {
-    if (this.isLockedMode) return;
-
-    // Reset counts
-    Object.keys(this.treatmentCounts).forEach(type => {
-      this.treatmentCounts[type] = 0;
-    });
-
-    // Count current treatments
-    this.treatments.forEach(treatment => {
-      if (this.treatmentCounts.hasOwnProperty(treatment.type)) {
-        this.treatmentCounts[treatment.type]++;
-      }
-    });
-
-    // Update button appearances
-    this.element.querySelectorAll('.treatment-btn').forEach(button => {
-      const treatmentType = button.dataset.treatment;
-      const count = this.treatmentCounts[treatmentType];
-
-      if (count > 0) {
-        this.updateButtonAppearance(button, treatmentType);
-      }
-    });
-  }
-
-  // Render treatment cards (unlocked mode only)
-  renderTreatmentCards() {
-    if (this.isLockedMode || !this.hasTreatmentsContainerTarget) return;
-
-    if (this.treatments.length === 0) {
-      this.treatmentsContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">Select treatments above to configure them</p>';
-      return;
+    const button = this.element.querySelector(`[data-treatment="${treatment.type}"]`)
+    if (this.treatmentCounts[treatment.type] === 0) {
+      if (button) this.resetButtonAppearance(button)
+    } else if (button) {
+      const countBadge = button.querySelector(".count-badge")
+      if (countBadge) countBadge.textContent = this.treatmentCounts[treatment.type]
     }
 
-    this.treatmentsContainerTarget.innerHTML = this.treatments.map((treatment, index) => {
-      return this.generateTreatmentCardHTML(treatment, index);
-    }).join('');
-
-    // Add event listeners to the newly created elements
-    this.addTreatmentCardListeners();
+    this.renderTreatmentCards()
+    this.updateTreatmentsField()
+    this.updateEnpOptionsVisibility()
+    this.updatePreview()
   }
 
-  // Generate HTML for a treatment card (unlocked mode only)
-  generateTreatmentCardHTML(treatment, index) {
-    if (this.isLockedMode) return '';
+  // ---------------------------------------------------------------------------
+  // Button / count appearance
+  // ---------------------------------------------------------------------------
 
-    const treatmentName = this.formatTreatmentName(treatment.type);
-    const isENP = treatment.type === 'electroless_nickel_plating';
-    const isStripOnly = treatment.type === 'stripping_only';
-    const isAnodising = ['standard_anodising', 'hard_anodising', 'chromic_anodising'].includes(treatment.type);
-    const isChemicalConversion = treatment.type === 'chemical_conversion';
+  updateButtonAppearance(button, treatmentType) {
+    const countBadge = button.querySelector(".count-badge")
+    const [borderColor, bgColor, badgeColor] = TREATMENT_BUTTON_COLORS[treatmentType]
+
+    button.classList.remove("border-gray-300")
+    button.classList.add(borderColor, bgColor)
+    countBadge.classList.remove("bg-gray-100")
+    countBadge.classList.add(badgeColor, "text-white")
+    countBadge.textContent = this.treatmentCounts[treatmentType]
+  }
+
+  resetButtonAppearance(button) {
+    const countBadge = button.querySelector(".count-badge")
+
+    button.classList.remove(...TREATMENT_BUTTON_RESET_CLASSES)
+    button.classList.add("border-gray-300")
+
+    if (countBadge) {
+      countBadge.classList.remove(...TREATMENT_BADGE_RESET_CLASSES)
+      countBadge.classList.add("bg-gray-100")
+      countBadge.textContent = "0"
+    }
+  }
+
+  updateTreatmentCounts() {
+    Object.keys(this.treatmentCounts).forEach((type) => {
+      this.treatmentCounts[type] = 0
+    })
+
+    this.treatments.forEach((treatment) => {
+      if (Object.prototype.hasOwnProperty.call(this.treatmentCounts, treatment.type)) {
+        this.treatmentCounts[treatment.type]++
+      }
+    })
+
+    this.element.querySelectorAll(".treatment-btn").forEach((button) => {
+      const treatmentType = button.dataset.treatment
+      if (this.treatmentCounts[treatmentType] > 0) {
+        this.updateButtonAppearance(button, treatmentType)
+      }
+    })
+  }
+
+  updateEnpOptionsVisibility() {
+    if (!this.hasEnpOptionsContainerTarget) return
+
+    const hasEnp = this.treatments.some((t) => t.type === "electroless_nickel_plating")
+    this.enpOptionsContainerTarget.style.display = hasEnp ? "block" : "none"
+  }
+
+  // ---------------------------------------------------------------------------
+  // Treatment card rendering
+  // ---------------------------------------------------------------------------
+
+  renderTreatmentCards() {
+    if (!this.hasTreatmentsContainerTarget) return
+
+    if (this.treatments.length === 0) {
+      this.treatmentsContainerTarget.innerHTML =
+        '<p class="text-gray-500 text-sm">Select treatments above to configure them</p>'
+      return
+    }
+
+    this.treatmentsContainerTarget.innerHTML = this.treatments
+      .map((treatment, index) => this.generateTreatmentCardHTML(treatment, index))
+      .join("")
+
+    this.addTreatmentCardListeners()
+  }
+
+  generateTreatmentCardHTML(treatment, index) {
+    const treatmentName = this.formatTreatmentName(treatment.type)
+    const isStripOnly = treatment.type === "stripping_only"
+    const isENP = treatment.type === "electroless_nickel_plating"
+    const isChemicalConversion = treatment.type === "chemical_conversion"
+    const isAnodising = ANODISING_TYPES.includes(treatment.type)
 
     return `
       <div class="border border-gray-200 rounded-lg p-4 bg-gray-50" data-treatment-id="${treatment.id}">
@@ -961,60 +565,70 @@ export default class extends Controller {
           <button type="button" class="text-red-600 hover:text-red-800 text-xl font-bold" data-action="click->parts-form#removeTreatment" data-parts-form-treatment-id-param="${treatment.id}">×</button>
         </div>
 
-        ${isAnodising && this.aerospaceDefense ? `
+        ${
+          isAnodising && this.aerospaceDefense
+            ? `
         <div class="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
           <strong>Aerospace/Defense:</strong> Foil verification will be included for this anodising treatment
         </div>
-        ` : ''}
+        `
+            : ""
+        }
 
         <!-- Jig Selection (Per-treatment) -->
         <div class="mb-4">
           <label class="block text-sm font-medium text-gray-700 mb-2">Jig Type</label>
           <select class="jig-type-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" data-treatment-id="${treatment.id}" required>
             <option value="">Select jig type...</option>
-            ${this.availableJigTypes.map(jig =>
-              `<option value="${jig}" ${treatment.selected_jig_type === jig ? 'selected' : ''}>${jig}</option>`
-            ).join('')}
+            ${JIG_TYPES.map(
+              (jig) =>
+                `<option value="${jig}" ${
+                  treatment.selected_jig_type === jig ? "selected" : ""
+                }>${jig}</option>`
+            ).join("")}
           </select>
           <p class="mt-1 text-xs text-gray-500">Required for jigging operations in this treatment</p>
         </div>
 
         ${isStripOnly ? this.generateStripOnlySelectionHTML(treatment) : this.generateOperationSelectionHTML(treatment)}
 
-        <!-- Criteria Selection -->
-        ${isStripOnly ? '' : this.generateCriteriaHTML(treatment)}
+        ${isStripOnly ? "" : this.generateCriteriaHTML(treatment)}
 
-        <!-- Treatment Modifiers -->
-        ${isENP || isStripOnly || isChemicalConversion ? '' : this.generateTreatmentModifiersHTML(treatment)}
+        ${isENP || isStripOnly || isChemicalConversion ? "" : this.generateTreatmentModifiersHTML(treatment)}
 
-        ${isStripOnly ? this.generateStripOnlyModifiersHTML(treatment) : ''}
+        ${isStripOnly ? this.generateStripOnlyModifiersHTML(treatment) : ""}
       </div>
-    `;
+    `
   }
 
-  // Generate strip-only selection HTML
+  generateOperationSelectionHTML() {
+    return `
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Select Operation</label>
+        <div class="operations-list space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded p-3 bg-white">
+          <p class="text-gray-500 text-xs">Configure criteria below to see operations</p>
+        </div>
+      </div>
+    `
+  }
+
   generateStripOnlySelectionHTML(treatment) {
     return `
       <div class="mb-4">
         <h5 class="text-sm font-medium text-gray-700 mb-3">Strip Configuration</h5>
 
-        <!-- Strip Type Selection -->
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 mb-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Strip Type</label>
             <select class="strip-type-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm" data-treatment-id="${treatment.id}">
-              ${this.availableStrippingTypes.map(type =>
-                `<option value="${type.value}" ${treatment.stripping_type === type.value ? 'selected' : ''}>${type.label}</option>`
-              ).join('')}
+              ${optionsHtml(STRIPPING_TYPES, treatment.stripping_type)}
             </select>
           </div>
 
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Strip Method</label>
             <select class="strip-method-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm" data-treatment-id="${treatment.id}">
-              ${this.getStrippingMethodsForType(treatment.stripping_type).map(method =>
-                `<option value="${method.value}" ${treatment.stripping_method === method.value ? 'selected' : ''}>${method.label}</option>`
-              ).join('')}
+              ${optionsHtml(this.getStrippingMethodsForType(treatment.stripping_type), treatment.stripping_method)}
             </select>
           </div>
         </div>
@@ -1026,1010 +640,954 @@ export default class extends Controller {
           </p>
         </div>
       </div>
-    `;
+    `
   }
 
-  // Generate operation selection HTML for non-strip-only treatments
-  generateOperationSelectionHTML(treatment) {
+  // Masking method rows, shared between strip-only and anodising modifiers.
+  // `optional` switches the placeholder wording and adds the explanatory note.
+  generateMaskingMethodsHTML(treatment, { optional }) {
+    const rows = MASKING_METHODS.map(({ method, label, noun }) => {
+      const value = treatment.masking_methods?.[method]
+      const checked = value !== undefined
+      const suffix = optional ? " (optional)" : ""
+      return `
+              <div class="flex items-center space-x-3">
+                <label class="flex items-center">
+                  <input type="checkbox" class="masking-checkbox rounded border-gray-300 text-teal-600" data-treatment-id="${treatment.id}" data-method="${method}" ${checked ? "checked" : ""}>
+                  <span class="ml-2 text-sm text-gray-700">${label}</span>
+                </label>
+                <input type="text" class="masking-location flex-1 border border-gray-300 rounded-md px-2 py-1 text-sm" data-treatment-id="${treatment.id}" data-method="${method}" placeholder="Location/notes for ${noun}${suffix}..." value="${value || ""}" ${checked ? "" : 'style="display: none;"'}>
+              </div>`
+    }).join("")
+
     return `
-      <!-- Operation Selection -->
-      <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-2">Select Operation</label>
-        <div class="operations-list space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded p-3 bg-white">
-          <p class="text-gray-500 text-xs">Configure criteria below to see operations</p>
-        </div>
-      </div>
-    `;
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Masking Methods</label>
+            <div class="space-y-2">${rows}
+            </div>${
+              optional
+                ? '\n            <p class="mt-2 text-xs text-gray-500">Masking protects areas that should not be stripped. Location details are optional.</p>'
+                : ""
+            }
+          </div>`
   }
 
-  // Generate strip-only modifiers HTML
   generateStripOnlyModifiersHTML(treatment) {
     return `
       <div class="border-t border-gray-200 pt-4 mt-4">
         <h5 class="text-sm font-medium text-gray-700 mb-3">Strip Modifiers</h5>
 
         <div class="space-y-4">
-          <!-- Multiple Masking Methods with Individual Locations -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Masking Methods</label>
-            <div class="space-y-2">
-              <div class="flex items-center space-x-3">
-                <label class="flex items-center">
-                  <input type="checkbox" class="masking-checkbox rounded border-gray-300 text-teal-600" data-treatment-id="${treatment.id}" data-method="bungs" ${treatment.masking_methods?.bungs !== undefined ? 'checked' : ''}>
-                  <span class="ml-2 text-sm text-gray-700">Bungs</span>
-                </label>
-                <input type="text" class="masking-location flex-1 border border-gray-300 rounded-md px-2 py-1 text-sm" data-treatment-id="${treatment.id}" data-method="bungs" placeholder="Location/notes for bungs (optional)..." value="${treatment.masking_methods?.bungs || ''}" ${treatment.masking_methods?.bungs !== undefined ? '' : 'style="display: none;"'}>
-              </div>
-
-              <div class="flex items-center space-x-3">
-                <label class="flex items-center">
-                  <input type="checkbox" class="masking-checkbox rounded border-gray-300 text-teal-600" data-treatment-id="${treatment.id}" data-method="pc21_polyester_tape" ${treatment.masking_methods?.pc21_polyester_tape !== undefined ? 'checked' : ''}>
-                  <span class="ml-2 text-sm text-gray-700">PC21 - Polyester Tape</span>
-                </label>
-                <input type="text" class="masking-location flex-1 border border-gray-300 rounded-md px-2 py-1 text-sm" data-treatment-id="${treatment.id}" data-method="pc21_polyester_tape" placeholder="Location/notes for tape (optional)..." value="${treatment.masking_methods?.pc21_polyester_tape || ''}" ${treatment.masking_methods?.pc21_polyester_tape !== undefined ? '' : 'style="display: none;"'}>
-              </div>
-
-              <div class="flex items-center space-x-3">
-                <label class="flex items-center">
-                  <input type="checkbox" class="masking-checkbox rounded border-gray-300 text-teal-600" data-treatment-id="${treatment.id}" data-method="45_stopping_off_lacquer" ${treatment.masking_methods?.['45_stopping_off_lacquer'] !== undefined ? 'checked' : ''}>
-                  <span class="ml-2 text-sm text-gray-700">45 Stopping Off Lacquer</span>
-                </label>
-                <input type="text" class="masking-location flex-1 border border-gray-300 rounded-md px-2 py-1 text-sm" data-treatment-id="${treatment.id}" data-method="45_stopping_off_lacquer" placeholder="Location/notes for lacquer (optional)..." value="${treatment.masking_methods?.['45_stopping_off_lacquer'] || ''}" ${treatment.masking_methods?.['45_stopping_off_lacquer'] !== undefined ? '' : 'style="display: none;"'}>
-              </div>
-            </div>
-            <p class="mt-2 text-xs text-gray-500">Masking protects areas that should not be stripped. Location details are optional.</p>
-          </div>
+          ${this.generateMaskingMethodsHTML(treatment, { optional: true })}
         </div>
       </div>
-    `;
+    `
   }
 
-  // Get stripping methods for a given type
-  getStrippingMethodsForType(strippingType) {
-    return this.availableStrippingMethods[strippingType] || [];
-  }
+  // ---------------------------------------------------------------------------
+  // Criteria selection
+  // ---------------------------------------------------------------------------
 
-  // Get preview text for stripping operation
-  getStrippingPreviewText(strippingType, strippingMethod) {
-    if (!strippingType || !strippingMethod) return 'Select strip type and method to see preview';
-
-    const methodMap = {
-      'anodising_stripping': {
-        'chromic_phosphoric': 'Strip anodising in chromic-phosphoric acid solution',
-        'E28': 'Strip in Oxidite E28 - wait till fizzing starts and hold for 30 seconds'
-      },
-      'enp_stripping': {
-        'nitric': 'Strip ENP in nitric acid solution 30 to 40 minutes per 25 microns [or until black smut dissolves]',
-        'metex_dekote': 'Strip ENP in Metex Dekote at 80 to 90°C, for approximately 20 microns per hour strip rate'
-      }
-    };
-
-    return methodMap[strippingType]?.[strippingMethod] || 'Strip as specified';
-  }
-
-  // Generate criteria selection HTML (unlocked mode only)
   generateCriteriaHTML(treatment) {
-    if (this.isLockedMode) return '';
-
-    if (treatment.type === 'chemical_conversion') {
-      return this.generateChemicalConversionCriteriaHTML(treatment);
+    switch (treatment.type) {
+      case "chemical_conversion":
+        return this.generateChemicalConversionCriteriaHTML(treatment)
+      case "electroless_nickel_plating":
+        return this.generateENPCriteriaHTML(treatment)
+      case "chromic_anodising":
+        return this.generateChromicCriteriaHTML(treatment)
+      default:
+        return this.generateAnodisingCriteriaHTML(treatment)
     }
-
-    if (treatment.type === 'electroless_nickel_plating') {
-      return this.generateENPCriteriaHTML(treatment);
-    }
-
-    if (treatment.type === 'chromic_anodising') {
-      return this.generateChromicCriteriaHTML(treatment);
-    }
-
-    return this.generateAnodisingCriteriaHTML(treatment);
   }
 
-  // Generate chemical conversion criteria HTML (unlocked mode only)
   generateChemicalConversionCriteriaHTML(treatment) {
-    if (this.isLockedMode) return '';
-
     return `
       <div class="grid grid-cols-1 gap-4 mb-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Material Type</label>
           <select class="material-type-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm" data-treatment-id="${treatment.id}">
-            <option value="">Select material type...</option>
-            <option value="aerospace_minimal" ${treatment.selected_material_type === 'aerospace_minimal' ? 'selected' : ''}>Aerospace (Minimal Pretreatment)</option>
-            <option value="castings_plate" ${treatment.selected_material_type === 'castings_plate' ? 'selected' : ''}>Castings/Plate</option>
-            <option value="machined_wrought" ${treatment.selected_material_type === 'machined_wrought' ? 'selected' : ''}>Machined/Wrought</option>
-            <option value="magnesium" ${treatment.selected_material_type === 'magnesium' ? 'selected' : ''}>Magnesium</option>
-            </select>
+            ${optionsHtml(MATERIAL_TYPES, treatment.selected_material_type)}
+          </select>
           <p class="mt-1 text-xs text-gray-500">Material type determines required pretreatment sequence</p>
         </div>
       </div>
-    `;
+    `
   }
 
-  // Generate chromic criteria HTML (unlocked mode only)
   generateChromicCriteriaHTML(treatment) {
-    if (this.isLockedMode) return '';
-
     return `
       <div class="grid grid-cols-1 gap-4 mb-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Alloy</label>
           <select class="alloy-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm" data-treatment-id="${treatment.id}">
-            <option value="">Select alloy...</option>
-            <option value="general" ${treatment.selected_alloy === 'general' ? 'selected' : ''}>General</option>
-            <option value="aluminium" ${treatment.selected_alloy === 'aluminium' ? 'selected' : ''}>Aluminium</option>
-            <option value="6000_series" ${treatment.selected_alloy === '6000_series' ? 'selected' : ''}>6000 Series</option>
-            <option value="7075" ${treatment.selected_alloy === '7075' ? 'selected' : ''}>7075 (Standard Voltage Only)</option>
-            <option value="2024" ${treatment.selected_alloy === '2024' ? 'selected' : ''}>2024</option>
+            ${optionsHtml(CHROMIC_ALLOYS, treatment.selected_alloy)}
           </select>
           <p class="mt-1 text-xs text-gray-500">Chromic anodising - no class selection needed</p>
         </div>
       </div>
-    `;
+    `
   }
 
-  // Generate ENP criteria HTML (unlocked mode only)
   generateENPCriteriaHTML(treatment) {
-    if (this.isLockedMode) return '';
-
     return `
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Alloy/Material</label>
           <select class="alloy-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" data-treatment-id="${treatment.id}">
-            <option value="">Select material...</option>
-            <option value="steel" ${treatment.selected_alloy === 'steel' ? 'selected' : ''}>Steel</option>
-            <option value="stainless_steel" ${treatment.selected_alloy === 'stainless_steel' ? 'selected' : ''}>Stainless Steel</option>
-            <option value="316_stainless_steel" ${treatment.selected_alloy === '316_stainless_steel' ? 'selected' : ''}>316 Stainless Steel</option>
-            <option value="aluminium" ${treatment.selected_alloy === 'aluminium' ? 'selected' : ''}>Aluminium</option>
-            <option value="copper" ${treatment.selected_alloy === 'copper' ? 'selected' : ''}>Copper</option>
-            <option value="brass" ${treatment.selected_alloy === 'brass' ? 'selected' : ''}>Brass</option>
-            <option value="2000_series_alloys" ${treatment.selected_alloy === '2000_series_alloys' ? 'selected' : ''}>2000 Series Alloys</option>
-            <option value="stainless_steel_with_oxides" ${treatment.selected_alloy === 'stainless_steel_with_oxides' ? 'selected' : ''}>Stainless Steel with Oxides</option>
-            <option value="copper_sans_electrical_contact" ${treatment.selected_alloy === 'copper_sans_electrical_contact' ? 'selected' : ''}>Copper (Sans Electrical Contact)</option>
-            <option value="cope_rolled_aluminium" ${treatment.selected_alloy === 'cope_rolled_aluminium' ? 'selected' : ''}>Cope Rolled Aluminium</option>
-            <option value="mclaren_sta142_procedure_d" ${treatment.selected_alloy === 'mclaren_sta142_procedure_d' ? 'selected' : ''}>McLaren STA142 Procedure D</option>
+            ${optionsHtml(ENP_ALLOYS, treatment.selected_alloy)}
           </select>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">ENP Type</label>
           <select class="enp-type-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" data-treatment-id="${treatment.id}">
-            <option value="">Select ENP type...</option>
-            <option value="high_phosphorous">High Phosphorous</option>
-            <option value="medium_phosphorous">Medium Phosphorous</option>
-            <option value="low_phosphorous">Low Phosphorous</option>
-            <option value="ptfe_composite">PTFE Composite</option>
+            ${optionsHtml(ENP_TYPES)}
           </select>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Target Thickness (μm)</label>
-          <input type="number" class="thickness-input mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" data-treatment-id="${treatment.id}" placeholder="e.g., 25" min="1" max="100" value="${treatment.target_thickness || ''}">
+          <input type="number" class="thickness-input mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" data-treatment-id="${treatment.id}" placeholder="e.g., 25" min="1" max="100" value="${treatment.target_thickness || ""}">
         </div>
       </div>
-    `;
+    `
   }
 
-  // Generate anodising criteria HTML (unlocked mode only)
   generateAnodisingCriteriaHTML(treatment) {
-    if (this.isLockedMode) return '';
-
     return `
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Alloy</label>
           <select class="alloy-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" data-treatment-id="${treatment.id}">
-            <option value="">Select alloy...</option>
-            <option value="6000_series">6000 Series</option>
-            <option value="7075">7075</option>
-            <option value="2014">2014</option>
-            <option value="5083">5083</option>
-            <option value="titanium">Titanium</option>
-            <option value="general">General</option>
+            ${optionsHtml(ANODISING_ALLOYS)}
           </select>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Target Thickness (μm)</label>
           <select class="thickness-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" data-treatment-id="${treatment.id}">
-            <option value="">Select thickness...</option>
-            <option value="5">5μm</option>
-            <option value="10">10μm</option>
-            <option value="15">15μm</option>
-            <option value="20">20μm</option>
-            <option value="25">25μm</option>
-            <option value="30">30μm</option>
-            <option value="40">40μm</option>
-            <option value="50">50μm</option>
-            <option value="60">60μm</option>
+            ${optionsHtml(ANODISING_THICKNESSES)}
           </select>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">Anodic Class</label>
           <select class="anodic-select mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" data-treatment-id="${treatment.id}">
-            <option value="">Select class...</option>
-            <option value="class_1">Class 1 (Undyed)</option>
-            <option value="class_2">Class 2 (Dyed)</option>
+            ${optionsHtml(ANODIC_CLASSES)}
           </select>
         </div>
       </div>
-    `;
+    `
   }
 
-  // Generate treatment modifiers HTML (unlocked mode only)
-  generateTreatmentModifiersHTML(treatment) {
-    if (this.isLockedMode) return '';
+  // ---------------------------------------------------------------------------
+  // Treatment modifiers (anodising)
+  // ---------------------------------------------------------------------------
 
-    const anodisingTypes = ['standard_anodising', 'hard_anodising', 'chromic_anodising'];
-    const showSealing = anodisingTypes.includes(treatment.type);
-    const showDye = anodisingTypes.includes(treatment.type);
-    const showLocalTreatment = anodisingTypes.includes(treatment.type);
+  generateTreatmentModifiersHTML(treatment) {
+    const show = ANODISING_TYPES.includes(treatment.type)
+    const gridCols = show ? "sm:grid-cols-3" : "sm:grid-cols-1"
 
     return `
       <div class="border-t border-gray-200 pt-4 mt-4">
         <h5 class="text-sm font-medium text-gray-700 mb-3">Treatment Modifiers</h5>
 
         <div class="space-y-4">
-          <!-- Multiple Masking Methods with Individual Locations -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Masking Methods</label>
-            <div class="space-y-2">
-              <div class="flex items-center space-x-3">
-                <label class="flex items-center">
-                  <input type="checkbox" class="masking-checkbox rounded border-gray-300 text-teal-600" data-treatment-id="${treatment.id}" data-method="bungs" ${treatment.masking_methods?.bungs !== undefined ? 'checked' : ''}>
-                  <span class="ml-2 text-sm text-gray-700">Bungs</span>
-                </label>
-                <input type="text" class="masking-location flex-1 border border-gray-300 rounded-md px-2 py-1 text-sm" data-treatment-id="${treatment.id}" data-method="bungs" placeholder="Location/notes for bungs..." value="${treatment.masking_methods?.bungs || ''}" ${treatment.masking_methods?.bungs !== undefined ? '' : 'style="display: none;"'}>
-              </div>
+          ${this.generateMaskingMethodsHTML(treatment, { optional: false })}
 
-              <div class="flex items-center space-x-3">
-                <label class="flex items-center">
-                  <input type="checkbox" class="masking-checkbox rounded border-gray-300 text-teal-600" data-treatment-id="${treatment.id}" data-method="pc21_polyester_tape" ${treatment.masking_methods?.pc21_polyester_tape !== undefined ? 'checked' : ''}>
-                  <span class="ml-2 text-sm text-gray-700">PC21 - Polyester Tape</span>
-                </label>
-                <input type="text" class="masking-location flex-1 border border-gray-300 rounded-md px-2 py-1 text-sm" data-treatment-id="${treatment.id}" data-method="pc21_polyester_tape" placeholder="Location/notes for tape..." value="${treatment.masking_methods?.pc21_polyester_tape || ''}" ${treatment.masking_methods?.pc21_polyester_tape !== undefined ? '' : 'style="display: none;"'}>
-              </div>
-
-              <div class="flex items-center space-x-3">
-                <label class="flex items-center">
-                  <input type="checkbox" class="masking-checkbox rounded border-gray-300 text-teal-600" data-treatment-id="${treatment.id}" data-method="45_stopping_off_lacquer" ${treatment.masking_methods?.['45_stopping_off_lacquer'] !== undefined ? 'checked' : ''}>
-                  <span class="ml-2 text-sm text-gray-700">45 Stopping Off Lacquer</span>
-                </label>
-                <input type="text" class="masking-location flex-1 border border-gray-300 rounded-md px-2 py-1 text-sm" data-treatment-id="${treatment.id}" data-method="45_stopping_off_lacquer" placeholder="Location/notes for lacquer..." value="${treatment.masking_methods?.['45_stopping_off_lacquer'] || ''}" ${treatment.masking_methods?.['45_stopping_off_lacquer'] !== undefined ? '' : 'style="display: none;"'}>
-              </div>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-1 gap-4 ${showSealing && showDye ? 'sm:grid-cols-3' : (showSealing || showDye ? 'sm:grid-cols-2' : 'sm:grid-cols-1')}">
+          <div class="grid grid-cols-1 gap-4 ${gridCols}">
             <!-- Stripping Method -->
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Stripping</label>
               <select class="stripping-method-select w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 sm:text-sm" data-treatment-id="${treatment.id}">
-                <option value="none" ${treatment.stripping_method_secondary === 'none' ? 'selected' : ''}>No Stripping</option>
-                <option value="chromic_phosphoric" ${treatment.stripping_method_secondary === 'chromic_phosphoric' ? 'selected' : ''}>Chromic-Phosphoric Acid</option>
-                <option value="E28" ${treatment.stripping_method_secondary === 'E28' ? 'selected' : ''}>Oxidite E28</option>
-                <option value="nitric" ${treatment.stripping_method_secondary === 'nitric' ? 'selected' : ''}>Nitric Acid</option>
-                <option value="metex_dekote" ${treatment.stripping_method_secondary === 'metex_dekote' ? 'selected' : ''}>Metex Dekote</option>
+                ${optionsHtml(SECONDARY_STRIPPING, treatment.stripping_method_secondary)}
               </select>
             </div>
 
+            ${
+              show
+                ? `
             <!-- Dye Selection (for anodising only) -->
-            ${showDye ? `
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Dye Color</label>
               <select class="dye-color-select w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm" data-treatment-id="${treatment.id}">
-                <option value="none" ${treatment.dye_color === 'none' ? 'selected' : ''}>No Dye</option>
-                <option value="BLACK_DYE" ${treatment.dye_color === 'BLACK_DYE' ? 'selected' : ''}>Black</option>
-                <option value="RED_DYE" ${treatment.dye_color === 'RED_DYE' ? 'selected' : ''}>Red</option>
-                <option value="BLUE_DYE" ${treatment.dye_color === 'BLUE_DYE' ? 'selected' : ''}>Blue</option>
-                <option value="GOLD_DYE" ${treatment.dye_color === 'GOLD_DYE' ? 'selected' : ''}>Gold</option>
-                <option value="GREEN_DYE" ${treatment.dye_color === 'GREEN_DYE' ? 'selected' : ''}>Green</option>
+                ${optionsHtml(DYE_COLORS, treatment.dye_color)}
               </select>
             </div>
-            ` : ''}
+            `
+                : ""
+            }
 
+            ${
+              show
+                ? `
             <!-- Sealing Method (for anodising only) -->
-            ${showSealing ? `
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Sealing</label>
               <select class="sealing-method-select w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm" data-treatment-id="${treatment.id}">
-                <option value="none" ${treatment.sealing_method === 'none' ? 'selected' : ''}>No Sealing</option>
-                <option value="SODIUM_DICHROMATE_SEAL" ${treatment.sealing_method === 'SODIUM_DICHROMATE_SEAL' ? 'selected' : ''}>Sodium Dichromate Seal</option>
-                <option value="OXIDITE_SECO_SEAL" ${treatment.sealing_method === 'OXIDITE_SECO_SEAL' ? 'selected' : ''}>Oxidite SE-CO Seal</option>
-                <option value="HOT_WATER_DIP" ${treatment.sealing_method === 'HOT_WATER_DIP' ? 'selected' : ''}>Hot Water Dip</option>
-                <option value="HOT_SEAL" ${treatment.sealing_method === 'HOT_SEAL' ? 'selected' : ''}>Hot Seal</option>
-                <option value="SURTEC_650V_SEAL" ${treatment.sealing_method === 'SURTEC_650V_SEAL' ? 'selected' : ''}>SurTec 650V Seal</option>
-                <option value="DEIONISED_WATER_SEAL" ${treatment.sealing_method === 'DEIONISED_WATER_SEAL' ? 'selected' : ''}>Deionised Water Seal</option>
+                ${optionsHtml(SEALING_METHODS, treatment.sealing_method)}
               </select>
             </div>
-            ` : ''}
+            `
+                : ""
+            }
           </div>
 
+          ${
+            show
+              ? `
           <!-- PTFE Toggle (for anodising only) -->
-          ${showDye ? `
           <div class="pt-2 border-t border-gray-200">
             <label class="flex items-center">
-              <input type="checkbox" class="ptfe-checkbox rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-offset-0 focus:ring-blue-200 focus:ring-opacity-50" data-treatment-id="${treatment.id}" ${treatment.ptfe_enabled ? 'checked' : ''}>
+              <input type="checkbox" class="ptfe-checkbox rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-offset-0 focus:ring-blue-200 focus:ring-opacity-50" data-treatment-id="${treatment.id}" ${treatment.ptfe_enabled ? "checked" : ""}>
               <span class="ml-2 text-sm font-medium text-gray-700">Apply PTFE Treatment</span>
             </label>
             <p class="mt-1 text-xs text-gray-500">Anolube treatment applied after sealing</p>
           </div>
-          ` : ''}
+          `
+              : ""
+          }
 
+          ${
+            show
+              ? `
           <!-- Local Treatment Selection (for anodising only) -->
-          ${showLocalTreatment ? `
           <div class="pt-2 border-t border-gray-200">
             <label class="block text-sm font-medium text-gray-700 mb-2">Local Treatment</label>
             <select class="local-treatment-select w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-teal-500 focus:border-teal-500 sm:text-sm" data-treatment-id="${treatment.id}">
-              ${this.availableLocalTreatments.map(localTreat =>
-                `<option value="${localTreat.value}" ${treatment.local_treatment_type === localTreat.value ? 'selected' : ''}>${localTreat.label}</option>`
-              ).join('')}
+              ${optionsHtml(LOCAL_TREATMENTS, treatment.local_treatment_type)}
             </select>
             <p class="mt-1 text-xs text-gray-500">Applied after masking removal operations</p>
           </div>
-          ` : ''}
+          `
+              : ""
+          }
         </div>
       </div>
-    `;
+    `
   }
 
-  // Add event listeners to treatment cards (unlocked mode only)
+  // ---------------------------------------------------------------------------
+  // Strip helpers
+  // ---------------------------------------------------------------------------
+
+  getStrippingMethodsForType(strippingType) {
+    return STRIPPING_METHODS[strippingType] || []
+  }
+
+  getStrippingPreviewText(strippingType, strippingMethod) {
+    if (!strippingType || !strippingMethod) return "Select strip type and method to see preview"
+    return STRIPPING_PREVIEW_TEXT[strippingType]?.[strippingMethod] || "Strip as specified"
+  }
+
+  updateStripMethodDropdown(treatmentId, stripType) {
+    const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
+    const methodSelect = card?.querySelector(".strip-method-select")
+    if (!methodSelect) return
+
+    const methods = this.getStrippingMethodsForType(stripType)
+    methodSelect.innerHTML = optionsHtml(methods)
+
+    const treatment = this.treatments.find((t) => t.id === treatmentId)
+    if (treatment && methods.length > 0) {
+      treatment.stripping_method = methods[0].value
+      methodSelect.value = methods[0].value
+    }
+  }
+
+  updateStripPreview(treatmentId, stripType, stripMethod) {
+    const previewElement = this.treatmentsContainerTarget.querySelector(
+      `[data-strip-preview="${treatmentId}"]`
+    )
+    if (previewElement) {
+      previewElement.textContent = this.getStrippingPreviewText(stripType, stripMethod)
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Card listeners & change handling
+  // ---------------------------------------------------------------------------
+
   addTreatmentCardListeners() {
-    if (this.isLockedMode || !this.hasTreatmentsContainerTarget) return;
+    if (!this.hasTreatmentsContainerTarget) return
 
-    this.treatmentsContainerTarget.querySelectorAll('select, input').forEach(element => {
-      element.addEventListener('change', (e) => this.handleTreatmentChange(e));
-      if (element.type === 'text') {
-        element.addEventListener('input', (e) => this.handleTreatmentChange(e));
+    this.treatmentsContainerTarget.querySelectorAll("select, input").forEach((element) => {
+      element.addEventListener("change", (e) => this.handleTreatmentChange(e))
+      if (element.type === "text") {
+        element.addEventListener("input", (e) => this.handleTreatmentChange(e))
       }
-    });
+    })
 
-    // Load operations for each non-strip-only treatment
-    this.treatments.forEach(treatment => {
-      if (treatment.type !== 'stripping_only') {
-        this.loadOperationsForTreatment(treatment.id);
+    this.treatments.forEach((treatment) => {
+      if (treatment.type !== "stripping_only") {
+        this.loadOperationsForTreatment(treatment.id)
       }
-    });
+    })
   }
 
-  // Handle changes in treatment configuration (unlocked mode only)
   handleTreatmentChange(event) {
-    if (this.isLockedMode) return;
+    const treatmentId = event.target.dataset.treatmentId
+    if (!treatmentId) return
 
-    const treatmentId = event.target.dataset.treatmentId;
-    if (!treatmentId) return;
+    const treatment = this.treatments.find((t) => t.id === treatmentId)
+    if (!treatment) return
 
-    const treatment = this.treatments.find(t => t.id === treatmentId);
-    if (!treatment) return;
+    const target = event.target
+    const has = (className) => target.classList.contains(className)
 
-    // Handle jig selection changes
-    if (event.target.classList.contains('jig-type-select')) {
-      treatment.selected_jig_type = event.target.value;
+    if (has("jig-type-select")) {
+      treatment.selected_jig_type = target.value
     }
 
-    // Handle chemical conversion material type changes
-    if (event.target.classList.contains('material-type-select')) {
-      treatment.selected_material_type = event.target.value;
-      // Load operations for chemical conversion treatments (they all use the same operations but different pretreatments)
-      this.loadOperationsForTreatment(treatmentId);
+    if (has("material-type-select")) {
+      treatment.selected_material_type = target.value
+      this.loadOperationsForTreatment(treatmentId)
     }
 
-    // Handle strip-only specific changes
-    if (event.target.classList.contains('strip-type-select')) {
-      treatment.stripping_type = event.target.value;
-      // Update the strip method dropdown
-      this.updateStripMethodDropdown(treatmentId, treatment.stripping_type);
-      // Update the preview
-      this.updateStripPreview(treatmentId, treatment.stripping_type, treatment.stripping_method);
+    if (has("strip-type-select")) {
+      treatment.stripping_type = target.value
+      this.updateStripMethodDropdown(treatmentId, treatment.stripping_type)
+      this.updateStripPreview(treatmentId, treatment.stripping_type, treatment.stripping_method)
     }
 
-    if (event.target.classList.contains('strip-method-select')) {
-      treatment.stripping_method = event.target.value;
-      // Update the preview
-      this.updateStripPreview(treatmentId, treatment.stripping_type, treatment.stripping_method);
+    if (has("strip-method-select")) {
+      treatment.stripping_method = target.value
+      this.updateStripPreview(treatmentId, treatment.stripping_type, treatment.stripping_method)
     }
 
-    // Store alloy selection for ENP treatments
-    if (event.target.classList.contains('alloy-select') && treatment.type === 'electroless_nickel_plating') {
-      treatment.selected_alloy = event.target.value;
+    if (has("alloy-select") && treatment.type === "electroless_nickel_plating") {
+      treatment.selected_alloy = target.value
     }
 
-    // Store alloy selection for chromic treatments
-    if (event.target.classList.contains('alloy-select') && treatment.type === 'chromic_anodising') {
-      treatment.selected_alloy = event.target.value;
+    if (has("alloy-select") && treatment.type === "chromic_anodising") {
+      treatment.selected_alloy = target.value
     }
 
-    // Store thickness for ENP treatments
-    if (event.target.classList.contains('thickness-input') && treatment.type === 'electroless_nickel_plating') {
-      treatment.target_thickness = parseFloat(event.target.value) || null;
+    if (has("thickness-input") && treatment.type === "electroless_nickel_plating") {
+      treatment.target_thickness = parseFloat(target.value) || null
     }
 
-    // Handle masking checkbox changes
-    if (event.target.classList.contains('masking-checkbox')) {
-      const method = event.target.dataset.method;
-      const isChecked = event.target.checked;
+    if (has("masking-checkbox")) {
+      const method = target.dataset.method
+      const locationInput = this.treatmentsContainerTarget.querySelector(
+        `input[data-treatment-id="${treatmentId}"][data-method="${method}"].masking-location`
+      )
 
-      if (isChecked) {
-        treatment.masking_methods[method] = '';
-        const locationInput = this.treatmentsContainerTarget.querySelector(`input[data-treatment-id="${treatmentId}"][data-method="${method}"].masking-location`);
+      if (target.checked) {
+        treatment.masking_methods[method] = ""
         if (locationInput) {
-          locationInput.style.display = '';
-          locationInput.focus();
+          locationInput.style.display = ""
+          locationInput.focus()
         }
       } else {
-        delete treatment.masking_methods[method];
-        const locationInput = this.treatmentsContainerTarget.querySelector(`input[data-treatment-id="${treatmentId}"][data-method="${method}"].masking-location`);
+        delete treatment.masking_methods[method]
         if (locationInput) {
-          locationInput.style.display = 'none';
-          locationInput.value = '';
+          locationInput.style.display = "none"
+          locationInput.value = ""
         }
       }
     }
 
-    // Handle masking location input changes
-    if (event.target.classList.contains('masking-location')) {
-      const method = event.target.dataset.method;
-      treatment.masking_methods[method] = event.target.value;
+    if (has("masking-location")) {
+      treatment.masking_methods[target.dataset.method] = target.value
     }
 
-    // Handle other modifier changes
-    if (event.target.classList.contains('stripping-method-select')) {
-      treatment.stripping_method_secondary = event.target.value;
-      treatment.stripping_enabled = (event.target.value !== 'none');
+    if (has("stripping-method-select")) {
+      treatment.stripping_method_secondary = target.value
+      treatment.stripping_enabled = target.value !== "none"
     }
 
-    if (event.target.classList.contains('sealing-method-select')) {
-      treatment.sealing_method = event.target.value;
+    if (has("sealing-method-select")) {
+      treatment.sealing_method = target.value
     }
 
-    if (event.target.classList.contains('dye-color-select')) {
-      treatment.dye_color = event.target.value;
+    if (has("dye-color-select")) {
+      treatment.dye_color = target.value
     }
 
-    if (event.target.classList.contains('ptfe-checkbox')) {
-      treatment.ptfe_enabled = event.target.checked;
+    if (has("ptfe-checkbox")) {
+      treatment.ptfe_enabled = target.checked
     }
 
-    if (event.target.classList.contains('local-treatment-select')) {
-      treatment.local_treatment_type = event.target.value;
+    if (has("local-treatment-select")) {
+      treatment.local_treatment_type = target.value
     }
 
-    // Update treatment data based on the changed element
-    if (event.target.classList.contains('alloy-select') ||
-        event.target.classList.contains('material-type-select') ||
-        event.target.classList.contains('thickness-select') ||
-        event.target.classList.contains('thickness-input') ||
-        event.target.classList.contains('anodic-select') ||
-        event.target.classList.contains('enp-type-select')) {
-
-      this.loadOperationsForTreatment(treatmentId);
+    if (
+      has("alloy-select") ||
+      has("material-type-select") ||
+      has("thickness-select") ||
+      has("thickness-input") ||
+      has("anodic-select") ||
+      has("enp-type-select")
+    ) {
+      this.loadOperationsForTreatment(treatmentId)
     }
 
-    this.updateTreatmentsField();
-    this.updatePreview();
+    this.updateTreatmentsField()
+    this.updatePreview()
   }
 
-  // Update strip method dropdown based on selected strip type
-  updateStripMethodDropdown(treatmentId, stripType) {
-    const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`);
-    const methodSelect = card?.querySelector('.strip-method-select');
+  // ---------------------------------------------------------------------------
+  // Operation loading & selection
+  // ---------------------------------------------------------------------------
 
-    if (methodSelect) {
-      const methods = this.getStrippingMethodsForType(stripType);
-      methodSelect.innerHTML = methods.map(method =>
-        `<option value="${method.value}">${method.label}</option>`
-      ).join('');
-
-      // Update the treatment data
-      const treatment = this.treatments.find(t => t.id === treatmentId);
-      if (treatment && methods.length > 0) {
-        treatment.stripping_method = methods[0].value;
-        methodSelect.value = methods[0].value;
-      }
-    }
-  }
-
-  // Update strip preview text
-  updateStripPreview(treatmentId, stripType, stripMethod) {
-    const previewElement = this.treatmentsContainerTarget.querySelector(`[data-strip-preview="${treatmentId}"]`);
-    if (previewElement) {
-      previewElement.textContent = this.getStrippingPreviewText(stripType, stripMethod);
-    }
-  }
-
-  // Load operations for a treatment (unlocked mode only)
   async loadOperationsForTreatment(treatmentId) {
-    if (this.isLockedMode || !this.hasTreatmentsContainerTarget) return;
+    if (!this.hasTreatmentsContainerTarget) return
 
-    const treatment = this.treatments.find(t => t.id === treatmentId);
-    if (!treatment || treatment.type === 'stripping_only') return;
+    const treatment = this.treatments.find((t) => t.id === treatmentId)
+    if (!treatment || treatment.type === "stripping_only") return
 
-    const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`);
-    if (!card) return;
-
-    const operationsList = card.querySelector('.operations-list');
-    if (!operationsList) return;
+    const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
+    const operationsList = card?.querySelector(".operations-list")
+    if (!operationsList) return
 
     try {
-      const criteria = this.buildCriteriaForTreatment(treatment, card);
-      const operations = await this.fetchOperations(criteria);
-      this.displayOperationsInCard(operations, operationsList, treatmentId);
+      const criteria = this.buildCriteriaForTreatment(treatment, card)
+      const operations = await this.fetchOperations(criteria)
+      this.displayOperationsInCard(operations, operationsList, treatmentId)
     } catch (error) {
-      console.error('Error loading operations:', error);
-      operationsList.innerHTML = '<p class="text-red-500 text-xs">Error loading operations</p>';
+      console.error("Error loading operations:", error)
+      operationsList.innerHTML = '<p class="text-red-500 text-xs">Error loading operations</p>'
     }
   }
 
-  // Build criteria for operation filtering (unlocked mode only)
   buildCriteriaForTreatment(treatment, card) {
-    if (this.isLockedMode) return {};
+    const criteria = { anodising_types: [treatment.type] }
 
-    const criteria = { anodising_types: [treatment.type] };
+    if (treatment.type === "electroless_nickel_plating") {
+      const alloy = card.querySelector(".alloy-select")?.value
+      const enpType = card.querySelector(".enp-type-select")?.value
+      const thicknessValue = card.querySelector(".thickness-input")?.value
 
-    if (treatment.type === 'electroless_nickel_plating') {
-      const alloySelect = card.querySelector('.alloy-select');
-      const enpTypeSelect = card.querySelector('.enp-type-select');
-      const thicknessInput = card.querySelector('.thickness-input');
-
-      if (alloySelect?.value) criteria.alloys = [alloySelect.value];
-      if (enpTypeSelect?.value) criteria.enp_types = [enpTypeSelect.value];
-      if (thicknessInput?.value) {
-        const thickness = parseFloat(thicknessInput.value);
-        criteria.target_thicknesses = [thickness];
-        treatment.target_thickness = thickness;
+      if (alloy) criteria.alloys = [alloy]
+      if (enpType) criteria.enp_types = [enpType]
+      if (thicknessValue) {
+        const thickness = parseFloat(thicknessValue)
+        criteria.target_thicknesses = [thickness]
+        treatment.target_thickness = thickness
       }
-    } else if (treatment.type === 'chromic_anodising') {
-      const alloySelect = card.querySelector('.alloy-select');
-      if (alloySelect?.value) criteria.alloys = [alloySelect.value];
-    } else if (treatment.type !== 'chemical_conversion') {
-      const alloySelect = card.querySelector('.alloy-select');
-      const thicknessSelect = card.querySelector('.thickness-select');
-      const anodicSelect = card.querySelector('.anodic-select');
+    } else if (treatment.type === "chromic_anodising") {
+      const alloy = card.querySelector(".alloy-select")?.value
+      if (alloy) criteria.alloys = [alloy]
+    } else if (treatment.type !== "chemical_conversion") {
+      const alloy = card.querySelector(".alloy-select")?.value
+      const thickness = card.querySelector(".thickness-select")?.value
+      const anodic = card.querySelector(".anodic-select")?.value
 
-      if (alloySelect?.value) criteria.alloys = [alloySelect.value];
-      if (thicknessSelect?.value) criteria.target_thicknesses = [parseFloat(thicknessSelect.value)];
-      if (anodicSelect?.value) criteria.anodic_classes = [anodicSelect.value];
+      if (alloy) criteria.alloys = [alloy]
+      if (thickness) criteria.target_thicknesses = [parseFloat(thickness)]
+      if (anodic) criteria.anodic_classes = [anodic]
     }
 
-    return criteria;
+    return criteria
   }
 
-  // Display operations in card with event delegation support
   displayOperationsInCard(operations, container, treatmentId) {
-    if (this.isLockedMode) return;
-
     if (operations.length === 0) {
-      container.innerHTML = '<p class="text-gray-500 text-xs">No matching operations found</p>';
-      return;
+      container.innerHTML = '<p class="text-gray-500 text-xs">No matching operations found</p>'
+      return
     }
 
-    container.innerHTML = operations.map(op => `
+    container.innerHTML = operations
+      .map(
+        (op) => `
       <div class="bg-white border border-gray-200 rounded px-2 py-1 cursor-pointer hover:bg-blue-50 text-xs operation-card"
            data-operation-id="${op.id}"
            data-treatment-id="${treatmentId}">
         <div class="flex justify-between items-center">
-          <span class="font-medium">${op.display_name || op.id.replace(/_/g, ' ')}</span>
+          <span class="font-medium">${op.display_name || op.id.replace(/_/g, " ")}</span>
           <span class="select-operation-indicator text-blue-600 text-xs font-medium">Select</span>
         </div>
         <p class="text-gray-600 mt-1">${op.operation_text}</p>
-        ${op.specifications ? `<p class="text-purple-600 text-xs mt-1">${op.specifications}</p>` : ''}
+        ${op.specifications ? `<p class="text-purple-600 text-xs mt-1">${op.specifications}</p>` : ""}
       </div>
-    `).join('');
+    `
+      )
+      .join("")
 
-    // Add click handlers for the entire operation card
-    container.querySelectorAll('.operation-card').forEach(card => {
-      card.addEventListener('click', (e) => {
-        const operationId = card.dataset.operationId;
-        const treatmentId = card.dataset.treatmentId;
-        this.selectOperationForTreatment(operationId, treatmentId);
-      });
-    });
+    container.querySelectorAll(".operation-card").forEach((card) => {
+      card.addEventListener("click", () =>
+        this.selectOperationForTreatment(card.dataset.operationId, card.dataset.treatmentId)
+      )
+    })
   }
 
-  // Select operation for treatment
   selectOperationForTreatment(operationId, treatmentId) {
-    if (this.isLockedMode) return;
-
-    const treatment = this.treatments.find(t => t.id === treatmentId);
+    const treatment = this.treatments.find((t) => t.id === treatmentId)
     if (!treatment) {
-      console.error(`Treatment not found: ${treatmentId}`);
-      return;
+      console.error(`Treatment not found: ${treatmentId}`)
+      return
     }
 
-    console.log(`Selecting operation ${operationId} for treatment ${treatmentId}`);
-    treatment.operation_id = operationId;
+    treatment.operation_id = operationId
 
-    // For ENP treatments, store alloy and thickness
-    if (treatment.type === 'electroless_nickel_plating') {
-      const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`);
-      const alloySelect = card?.querySelector('.alloy-select');
-      const thicknessInput = card?.querySelector('.thickness-input');
+    const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
 
-      if (alloySelect && alloySelect.value && !treatment.selected_alloy) {
-        treatment.selected_alloy = alloySelect.value;
-      }
-
-      if (thicknessInput && thicknessInput.value) {
-        treatment.target_thickness = parseFloat(thicknessInput.value);
-      }
+    // Backfill criteria values that drive downstream film-reading requirements.
+    if (treatment.type === "electroless_nickel_plating") {
+      const alloy = card?.querySelector(".alloy-select")
+      const thickness = card?.querySelector(".thickness-input")
+      if (alloy?.value && !treatment.selected_alloy) treatment.selected_alloy = alloy.value
+      if (thickness?.value) treatment.target_thickness = parseFloat(thickness.value)
     }
 
-    // For chromic treatments, store alloy
-    if (treatment.type === 'chromic_anodising') {
-      const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`);
-      const alloySelect = card?.querySelector('.alloy-select');
+    if (treatment.type === "chromic_anodising") {
+      const alloy = card?.querySelector(".alloy-select")
+      if (alloy?.value && !treatment.selected_alloy) treatment.selected_alloy = alloy.value
+    }
 
-      if (alloySelect && alloySelect.value && !treatment.selected_alloy) {
-        treatment.selected_alloy = alloySelect.value;
+    if (treatment.type === "chemical_conversion") {
+      const materialType = card?.querySelector(".material-type-select")
+      if (materialType?.value && !treatment.selected_material_type) {
+        treatment.selected_material_type = materialType.value
       }
     }
 
-    // For chemical conversion treatments, store material type
-    if (treatment.type === 'chemical_conversion') {
-      const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`);
-      const materialTypeSelect = card?.querySelector('.material-type-select');
+    this.highlightSelectedOperation(card, operationId)
 
-      if (materialTypeSelect && materialTypeSelect.value && !treatment.selected_material_type) {
-        treatment.selected_material_type = materialTypeSelect.value;
-      }
-    }
-
-    // Update visual feedback
-    if (this.hasTreatmentsContainerTarget) {
-      const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`);
-      const operationsList = card?.querySelector('.operations-list');
-
-      if (operationsList) {
-        // Reset all cards
-        operationsList.querySelectorAll('.operation-card').forEach(div => {
-          div.classList.remove('bg-blue-100', 'border-blue-400');
-          div.classList.add('bg-white', 'border-gray-200');
-          const indicator = div.querySelector('.select-operation-indicator');
-          if (indicator) {
-            indicator.textContent = 'Select';
-            indicator.classList.remove('text-green-600', 'font-bold');
-            indicator.classList.add('text-blue-600');
-          }
-        });
-
-        // Highlight selected card
-        const selectedDiv = operationsList.querySelector(`[data-operation-id="${operationId}"]`);
-        if (selectedDiv) {
-          selectedDiv.classList.remove('bg-white', 'border-gray-200');
-          selectedDiv.classList.add('bg-blue-100', 'border-blue-400');
-          const indicator = selectedDiv.querySelector('.select-operation-indicator');
-          if (indicator) {
-            indicator.textContent = '✓ Selected';
-            indicator.classList.remove('text-blue-600');
-            indicator.classList.add('text-green-600', 'font-bold');
-          }
-        }
-      }
-    }
-
-    this.updateTreatmentsField();
-    this.updatePreview();
+    this.updateTreatmentsField()
+    this.updatePreview()
   }
 
-  // Remove treatment (unlocked mode only)
-  removeTreatment(event) {
-    if (this.isLockedMode) return;
+  highlightSelectedOperation(card, operationId) {
+    const operationsList = card?.querySelector(".operations-list")
+    if (!operationsList) return
 
-    const treatmentId = event.params.treatmentId;
-    const treatmentIndex = this.treatments.findIndex(t => t.id === treatmentId);
-
-    if (treatmentIndex === -1) return;
-
-    const treatment = this.treatments[treatmentIndex];
-    this.treatmentCounts[treatment.type]--;
-    this.treatments.splice(treatmentIndex, 1);
-
-    // Reset button if no more of this type
-    if (this.treatmentCounts[treatment.type] === 0) {
-      const button = this.element.querySelector(`[data-treatment="${treatment.type}"]`);
-      if (button) {
-        this.resetButtonAppearance(button);
+    operationsList.querySelectorAll(".operation-card").forEach((div) => {
+      div.classList.remove("bg-blue-100", "border-blue-400")
+      div.classList.add("bg-white", "border-gray-200")
+      const indicator = div.querySelector(".select-operation-indicator")
+      if (indicator) {
+        indicator.textContent = "Select"
+        indicator.classList.remove("text-green-600", "font-bold")
+        indicator.classList.add("text-blue-600")
       }
-    } else {
-      // Update count badge
-      const button = this.element.querySelector(`[data-treatment="${treatment.type}"]`);
-      if (button) {
-        const countBadge = button.querySelector('.count-badge');
-        if (countBadge) countBadge.textContent = this.treatmentCounts[treatment.type];
+    })
+
+    const selectedDiv = operationsList.querySelector(`[data-operation-id="${operationId}"]`)
+    if (selectedDiv) {
+      selectedDiv.classList.remove("bg-white", "border-gray-200")
+      selectedDiv.classList.add("bg-blue-100", "border-blue-400")
+      const indicator = selectedDiv.querySelector(".select-operation-indicator")
+      if (indicator) {
+        indicator.textContent = "✓ Selected"
+        indicator.classList.remove("text-blue-600")
+        indicator.classList.add("text-green-600", "font-bold")
       }
-    }
-
-    this.renderTreatmentCards();
-    this.updateTreatmentsField();
-    this.updateENPOptionsVisibility();
-    this.updatePreview();
-  }
-
-  // Reset button appearance (unlocked mode only)
-  resetButtonAppearance(button) {
-    if (this.isLockedMode) return;
-
-    const countBadge = button.querySelector('.count-badge');
-
-    // Remove all color classes
-    const colorClasses = [
-      'border-blue-500', 'bg-blue-50', 'bg-blue-500',
-      'border-purple-500', 'bg-purple-50', 'bg-purple-500',
-      'border-green-500', 'bg-green-50', 'bg-green-500',
-      'border-orange-500', 'bg-orange-50', 'bg-orange-500',
-      'border-indigo-500', 'bg-indigo-50', 'bg-indigo-500',
-      'border-red-500', 'bg-red-50', 'bg-red-500'
-    ];
-
-    button.classList.remove(...colorClasses);
-    button.classList.add('border-gray-300');
-
-    if (countBadge) {
-      countBadge.classList.remove('bg-blue-500', 'bg-purple-500', 'bg-green-500', 'bg-orange-500', 'bg-indigo-500', 'bg-red-500', 'text-white');
-      countBadge.classList.add('bg-gray-100');
-      countBadge.textContent = '0';
     }
   }
 
-  // Update ENP strip mask field (unlocked mode only)
-  updateENPStripMaskField() {
-    if (this.isLockedMode || !this.hasEnpStripMaskFieldTarget) return;
+  // ---------------------------------------------------------------------------
+  // ENP strip/mask & field persistence
+  // ---------------------------------------------------------------------------
 
-    const enpStripMaskOps = this.enpStripMaskEnabled ? this.getENPStripMaskOperationIds(this.enpStripType) : [];
-    this.enpStripMaskFieldTarget.value = JSON.stringify(enpStripMaskOps);
+  updateEnpStripMaskField() {
+    if (!this.hasEnpStripMaskFieldTarget) return
+
+    const ops = this.enpStripMaskEnabled ? this.getEnpStripMaskOperationIds(this.enpStripType) : []
+    this.enpStripMaskFieldTarget.value = JSON.stringify(ops)
   }
 
-  // Get ENP Strip Mask operation IDs (unlocked mode only)
-  getENPStripMaskOperationIds(stripType) {
-    if (this.isLockedMode) return [];
-
-    const stripOperation = stripType === 'metex_dekote' ? 'ENP_STRIP_METEX' : 'ENP_STRIP_NITRIC';
-    return [
-      'ENP_MASK',
-      'ENP_MASKING_CHECK',
-      stripOperation,
-      'ENP_STRIP_MASKING',
-      'ENP_MASKING_CHECK_FINAL'
-    ];
+  getEnpStripMaskOperationIds(stripType) {
+    const stripOperation = stripType === "metex_dekote" ? "ENP_STRIP_METEX" : "ENP_STRIP_NITRIC"
+    return ["ENP_MASK", "ENP_MASKING_CHECK", stripOperation, "ENP_STRIP_MASKING", "ENP_MASKING_CHECK_FINAL"]
   }
 
-  // Update treatments field (unlocked mode only)
   updateTreatmentsField() {
-    if (this.isLockedMode || !this.hasTreatmentsFieldTarget) return;
-
-    this.treatmentsFieldTarget.value = JSON.stringify(this.treatments);
+    if (!this.hasTreatmentsFieldTarget) return
+    this.treatmentsFieldTarget.value = JSON.stringify(this.treatments)
   }
 
-  // Update preview (unlocked mode only)
-  async updatePreview() {
-    if (this.isLockedMode || !this.hasSelectedContainerTarget) return;
+  formatTreatmentName(treatmentType) {
+    return (
+      TREATMENT_NAMES[treatmentType] ||
+      treatmentType
+        .replace("_anodising", "")
+        .replace("_conversion", "")
+        .replace("_nickel_plating", "")
+        .split("_")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ")
+    )
+  }
 
-    console.log('Updating preview with treatments:', this.treatments, 'ENP Pre-Heat:', this.selectedEnpPreHeatTreatment, 'ENP Post-Heat:', this.selectedEnpHeatTreatment, 'Aerospace/Defense:', this.aerospaceDefense);
+  // ---------------------------------------------------------------------------
+  // Live preview
+  // ---------------------------------------------------------------------------
+
+  async updatePreview() {
+    if (!this.hasSelectedContainerTarget) return
+
+    const clearSpecification = () => {
+      if (this.hasSpecificationFieldTarget) this.specificationFieldTarget.value = ""
+    }
 
     if (this.treatments.length === 0) {
-      this.selectedContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">No treatments selected</p>';
-      if (this.hasSpecificationFieldTarget) this.specificationFieldTarget.value = '';
-      return;
+      this.selectedContainerTarget.innerHTML =
+        '<p class="text-gray-500 text-sm">No treatments selected</p>'
+      clearSpecification()
+      return
     }
 
-    // Filter treatments that have operations selected OR are strip-only
-    const treatmentsWithOperations = this.treatments.filter(t => t.operation_id || t.type === 'stripping_only');
+    const treatmentsWithOperations = this.treatments.filter(
+      (t) => t.operation_id || t.type === "stripping_only"
+    )
 
     if (treatmentsWithOperations.length === 0) {
-      this.selectedContainerTarget.innerHTML = '<p class="text-gray-500 text-sm">Select operations for treatments to see preview</p>';
-      if (this.hasSpecificationFieldTarget) this.specificationFieldTarget.value = '';
-      return;
+      this.selectedContainerTarget.innerHTML =
+        '<p class="text-gray-500 text-sm">Select operations for treatments to see preview</p>'
+      clearSpecification()
+      return
     }
 
-    // Check if all treatments have jig types selected
-    const treatmentsWithoutJigs = treatmentsWithOperations.filter(t => !t.selected_jig_type);
-    if (treatmentsWithoutJigs.length > 0) {
-      this.selectedContainerTarget.innerHTML = '<p class="text-yellow-600 text-sm">Select jig types for all treatments to see preview</p>';
-      if (this.hasSpecificationFieldTarget) this.specificationFieldTarget.value = '';
-      return;
+    if (treatmentsWithOperations.some((t) => !t.selected_jig_type)) {
+      this.selectedContainerTarget.innerHTML =
+        '<p class="text-yellow-600 text-sm">Select jig types for all treatments to see preview</p>'
+      clearSpecification()
+      return
     }
 
     try {
-      // Convert data structure for server
-      const treatmentsData = treatmentsWithOperations.map(treatment => ({
-        id: treatment.id,
-        type: treatment.type,
-        operation_id: treatment.operation_id,
-        selected_alloy: treatment.selected_alloy,
-        selected_material_type: treatment.selected_material_type, // Add material type for chemical conversion
-        target_thickness: treatment.target_thickness,
-        selected_jig_type: treatment.selected_jig_type,
-        stripping_type: treatment.stripping_type,
-        stripping_method: treatment.stripping_method,
-        masking: {
-          enabled: Object.keys(treatment.masking_methods || {}).length > 0,
-          methods: treatment.masking_methods || {}
-        },
-        stripping: {
-          enabled: treatment.stripping_method_secondary !== 'none',
-          type: treatment.stripping_method_secondary !== 'none' ?
-            (treatment.stripping_method_secondary === 'nitric' || treatment.stripping_method_secondary === 'metex_dekote' ? 'enp_stripping' : 'anodising_stripping') : null,
-          method: treatment.stripping_method_secondary !== 'none' ? treatment.stripping_method_secondary : null
-        },
-        sealing: {
-          enabled: treatment.sealing_method !== 'none',
-          type: treatment.sealing_method !== 'none' ? treatment.sealing_method : null
-        },
-        dye: {
-          enabled: treatment.dye_color !== 'none',
-          color: treatment.dye_color !== 'none' ? treatment.dye_color : null
-        },
-        ptfe: {
-          enabled: treatment.ptfe_enabled
-        },
-        local_treatment: {
-          enabled: treatment.local_treatment_type !== 'none',
-          type: treatment.local_treatment_type !== 'none' ? treatment.local_treatment_type : null
-        }
-      }));
-
       const requestData = {
-        treatments_data: treatmentsData,
+        treatments_data: treatmentsWithOperations.map((t) => this.serializeTreatment(t)),
         aerospace_defense: this.aerospaceDefense,
         selected_enp_pre_heat_treatment: this.selectedEnpPreHeatTreatment,
         selected_enp_heat_treatment: this.selectedEnpHeatTreatment
-      };
+      }
 
-      console.log('🔍 JS sending aerospace_defense:', this.aerospaceDefense);
-
-
-      // Add ENP strip mask if enabled
       if (this.enpStripMaskEnabled) {
-        requestData.enp_strip_type = this.enpStripType;
-        requestData.selected_operations = this.getENPStripMaskOperationIds(this.enpStripType);
+        requestData.enp_strip_type = this.enpStripType
+        requestData.selected_operations = this.getEnpStripMaskOperationIds(this.enpStripType)
       }
 
-      const response = await fetch(this.previewPathValue, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': this.csrfTokenValue
-        },
-        body: JSON.stringify(requestData)
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const operations = data.operations || [];
+      const data = await this.postJson(this.previewPathValue, requestData)
+      const operations = data.operations || []
 
       if (operations.length === 0) {
-        this.selectedContainerTarget.innerHTML = '<p class="text-yellow-600 text-sm">No operations generated - check treatment configuration</p>';
-        if (this.hasSpecificationFieldTarget) this.specificationFieldTarget.value = '';
-        return;
+        this.selectedContainerTarget.innerHTML =
+          '<p class="text-yellow-600 text-sm">No operations generated - check treatment configuration</p>'
+        clearSpecification()
+        return
       }
 
-      this.selectedContainerTarget.innerHTML = operations.map((op, index) => {
-        const isAutoInserted = op.auto_inserted;
-        const isWaterBreakTest = op.id === 'WATER_BREAK_TEST';
-        const isFoilVerification = op.id && (op.id === 'FOIL_VERIFICATION' || op.id.startsWith('FOIL_VERIFICATION_'));
-        const isOcvCheck = op.id === 'OCV_CHECK';
-        const isDye = op.id && (op.id.includes('_DYE') || op.display_name?.includes('Dye'));
-        const isPreHeatTreatment = op.id && op.id.startsWith('PRE_ENP_HEAT_TREAT');
-        const isPostHeatTreatment = op.id && (op.id.startsWith('POST_ENP_HEAT_TREAT') || op.id.includes('ENP_POST_HEAT_TREAT') || op.id.includes('ENP_BAKE'));
-        const isLocalTreatment = op.id && op.id.startsWith('LOCAL_');
-        const isStripping = op.id === 'STRIPPING' || op.display_name?.includes('Strip');
+      this.selectedContainerTarget.innerHTML = operations
+        .map((op, index) => this.renderPreviewOperation(op, index))
+        .join("")
+    } catch (error) {
+      console.error("Error updating preview:", error)
+      this.selectedContainerTarget.innerHTML =
+        '<p class="text-red-500 text-sm">Error loading preview</p>'
+    }
+  }
 
-        let bgColor = 'bg-blue-100 border border-blue-300';
-        let textColor = 'text-gray-900';
-        let autoLabel = '';
+  // Convert the internal treatment shape into the payload the server expects.
+  serializeTreatment(treatment) {
+    const secondary = treatment.stripping_method_secondary
+    const hasSecondaryStrip = secondary !== "none"
+    const isEnpStrip = secondary === "nitric" || secondary === "metex_dekote"
 
-        if (isAutoInserted) {
-          bgColor = 'bg-gray-100 border border-gray-300';
-          textColor = 'italic text-gray-600';
-          autoLabel = '<span class="text-xs text-gray-500 ml-2">(auto-inserted)</span>';
-        }
+    return {
+      id: treatment.id,
+      type: treatment.type,
+      operation_id: treatment.operation_id,
+      selected_alloy: treatment.selected_alloy,
+      selected_material_type: treatment.selected_material_type,
+      target_thickness: treatment.target_thickness,
+      selected_jig_type: treatment.selected_jig_type,
+      stripping_type: treatment.stripping_type,
+      stripping_method: treatment.stripping_method,
+      masking: {
+        enabled: Object.keys(treatment.masking_methods || {}).length > 0,
+        methods: treatment.masking_methods || {}
+      },
+      stripping: {
+        enabled: hasSecondaryStrip,
+        type: hasSecondaryStrip ? (isEnpStrip ? "enp_stripping" : "anodising_stripping") : null,
+        method: hasSecondaryStrip ? secondary : null
+      },
+      sealing: {
+        enabled: treatment.sealing_method !== "none",
+        type: treatment.sealing_method !== "none" ? treatment.sealing_method : null
+      },
+      dye: {
+        enabled: treatment.dye_color !== "none",
+        color: treatment.dye_color !== "none" ? treatment.dye_color : null
+      },
+      ptfe: { enabled: treatment.ptfe_enabled },
+      local_treatment: {
+        enabled: treatment.local_treatment_type !== "none",
+        type: treatment.local_treatment_type !== "none" ? treatment.local_treatment_type : null
+      }
+    }
+  }
 
-        if (isWaterBreakTest) {
-          bgColor = 'bg-red-50 border border-red-200';
-          textColor = 'text-red-800';
-          autoLabel = '<span class="text-xs text-red-600 ml-2">(requires manual recording)</span>';
-        }
+  renderPreviewOperation(op, index) {
+    const { bgColor, textColor, autoLabel } = this.previewOperationStyle(op)
+    const text = op.id === "OCV_CHECK" ? op.operation_text.replace(/\n/g, "<br>") : op.operation_text
 
-        if (isFoilVerification) {
-          bgColor = 'bg-yellow-50 border border-yellow-200';
-          textColor = 'text-yellow-800';
-          autoLabel = '<span class="text-xs text-yellow-600 ml-2">(per-treatment verification)</span>';
-        }
-
-        if (isOcvCheck) {
-          bgColor = 'bg-cyan-50 border border-cyan-200';
-          textColor = 'text-cyan-800';
-          autoLabel = '<span class="text-xs text-cyan-600 ml-2">(aerospace/defense monitoring)</span>';
-        }
-
-        if (isDye) {
-          bgColor = 'bg-purple-50 border border-purple-200';
-          textColor = 'text-purple-800';
-          autoLabel = '<span class="text-xs text-purple-600 ml-2">(dye operation)</span>';
-        }
-
-        if (isPreHeatTreatment) {
-          bgColor = 'bg-amber-50 border border-amber-200';
-          textColor = 'text-amber-800';
-          autoLabel = '<span class="text-xs text-amber-600 ml-2">(ENP pre-heat treatment)</span>';
-        }
-
-        if (isPostHeatTreatment) {
-          bgColor = 'bg-orange-50 border border-orange-200';
-          textColor = 'text-orange-800';
-          autoLabel = '<span class="text-xs text-orange-600 ml-2">(ENP post-heat treatment)</span>';
-        }
-
-        if (isLocalTreatment) {
-          bgColor = 'bg-teal-50 border border-teal-200';
-          textColor = 'text-teal-800';
-          autoLabel = '<span class="text-xs text-teal-600 ml-2">(local treatment)</span>';
-        }
-
-        if (isStripping) {
-          bgColor = 'bg-red-100 border border-red-300';
-          textColor = 'text-red-900';
-          autoLabel = '<span class="text-xs text-red-600 ml-2">(strip-only treatment)</span>';
-        }
-
-        return `
+    return `
           <div class="${bgColor} rounded px-3 py-2">
             <span class="text-sm ${textColor}">
               <strong>${index + 1}.</strong>
-              ${op.display_name}: ${isOcvCheck ? op.operation_text.replace(/\n/g, '<br>') : op.operation_text}
+              ${op.display_name}: ${text}
               ${autoLabel}
             </span>
           </div>
-        `;
-      }).join('');
+        `
+  }
 
+  // Determine the colour scheme and badge for a previewed operation. Order
+  // matters: later matches override earlier ones (mirrors the original cascade).
+  previewOperationStyle(op) {
+    const id = op.id || ""
+    const displayName = op.display_name || ""
+
+    let style = { bgColor: "bg-blue-100 border border-blue-300", textColor: "text-gray-900", autoLabel: "" }
+
+    if (op.auto_inserted) {
+      style = {
+        bgColor: "bg-gray-100 border border-gray-300",
+        textColor: "italic text-gray-600",
+        autoLabel: '<span class="text-xs text-gray-500 ml-2">(auto-inserted)</span>'
+      }
+    }
+
+    if (id === "WATER_BREAK_TEST") {
+      style = {
+        bgColor: "bg-red-50 border border-red-200",
+        textColor: "text-red-800",
+        autoLabel: '<span class="text-xs text-red-600 ml-2">(requires manual recording)</span>'
+      }
+    }
+
+    if (id === "FOIL_VERIFICATION" || id.startsWith("FOIL_VERIFICATION_")) {
+      style = {
+        bgColor: "bg-yellow-50 border border-yellow-200",
+        textColor: "text-yellow-800",
+        autoLabel: '<span class="text-xs text-yellow-600 ml-2">(per-treatment verification)</span>'
+      }
+    }
+
+    if (id === "OCV_CHECK") {
+      style = {
+        bgColor: "bg-cyan-50 border border-cyan-200",
+        textColor: "text-cyan-800",
+        autoLabel: '<span class="text-xs text-cyan-600 ml-2">(aerospace/defense monitoring)</span>'
+      }
+    }
+
+    if (id.includes("_DYE") || displayName.includes("Dye")) {
+      style = {
+        bgColor: "bg-purple-50 border border-purple-200",
+        textColor: "text-purple-800",
+        autoLabel: '<span class="text-xs text-purple-600 ml-2">(dye operation)</span>'
+      }
+    }
+
+    if (id.startsWith("PRE_ENP_HEAT_TREAT")) {
+      style = {
+        bgColor: "bg-amber-50 border border-amber-200",
+        textColor: "text-amber-800",
+        autoLabel: '<span class="text-xs text-amber-600 ml-2">(ENP pre-heat treatment)</span>'
+      }
+    }
+
+    if (id.startsWith("POST_ENP_HEAT_TREAT") || id.includes("ENP_POST_HEAT_TREAT") || id.includes("ENP_BAKE")) {
+      style = {
+        bgColor: "bg-orange-50 border border-orange-200",
+        textColor: "text-orange-800",
+        autoLabel: '<span class="text-xs text-orange-600 ml-2">(ENP post-heat treatment)</span>'
+      }
+    }
+
+    if (id.startsWith("LOCAL_")) {
+      style = {
+        bgColor: "bg-teal-50 border border-teal-200",
+        textColor: "text-teal-800",
+        autoLabel: '<span class="text-xs text-teal-600 ml-2">(local treatment)</span>'
+      }
+    }
+
+    if (id === "STRIPPING" || displayName.includes("Strip")) {
+      style = {
+        bgColor: "bg-red-100 border border-red-300",
+        textColor: "text-red-900",
+        autoLabel: '<span class="text-xs text-red-600 ml-2">(strip-only treatment)</span>'
+      }
+    }
+
+    return style
+  }
+
+  // ---------------------------------------------------------------------------
+  // Switch to manual mode (was the inline `switchToManualMode` global)
+  // ---------------------------------------------------------------------------
+
+  switchToManual() {
+    if (this.treatments.length === 0) {
+      alert("Please configure some treatments first before switching to manual mode.")
+      return
+    }
+
+    const hasOperations = this.treatments.some((t) => t.operation_id || t.type === "stripping_only")
+    if (!hasOperations) {
+      alert("Please select operations for your treatments before switching to manual mode.")
+      return
+    }
+
+    if (
+      confirm(
+        "Switch to manual editing mode? This will save your current configuration and allow you to customize each operation individually. You cannot return to automatic mode after this change."
+      )
+    ) {
+      if (this.hasManualModeFieldTarget) this.manualModeFieldTarget.value = "true"
+      this.element.submit()
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Copy from existing part (was the inline `copyPartOperations` /
+  // `switchToManualModeWithOperations` globals). Triggered by the copy search's
+  // `autocomplete:select` event.
+  // ---------------------------------------------------------------------------
+
+  async copyFromPart(event) {
+    const part = event.detail.item
+    const input = event.detail.input
+
+    if (input) {
+      input.value = `Copying from: ${part.part_number} (${part.customer_name})`
+      input.disabled = true
+      input.style.backgroundColor = "#f9fafb"
+    }
+
+    try {
+      const response = await fetch(`/parts/${part.id}/copy_operations`, {
+        method: "GET",
+        headers: { Accept: "application/json", "X-Requested-With": "XMLHttpRequest" }
+      })
+      const data = await response.json()
+
+      if (data.success) {
+        this.switchToManualWithOperations(data.operations, part.part_number, part.id)
+      } else {
+        alert("Failed to copy operations: " + data.error)
+        if (input) {
+          input.disabled = false
+          input.style.backgroundColor = ""
+        }
+      }
     } catch (error) {
-      console.error('Error updating preview:', error);
-      this.selectedContainerTarget.innerHTML = '<p class="text-red-500 text-sm">Error loading preview</p>';
+      console.error("Error copying operations:", error)
+      alert("An error occurred while copying operations")
+      if (input) {
+        input.disabled = false
+        input.style.backgroundColor = ""
+      }
     }
   }
 
-  // Fetch operations from server (unlocked mode only)
-  async fetchOperations(criteria) {
-    if (this.isLockedMode) return [];
+  switchToManualWithOperations(operations, sourcePart, sourcePartId) {
+    if (this.hasTreatmentSectionTarget) this.treatmentSectionTarget.style.display = "none"
 
-    const response = await fetch(this.filterPathValue, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-Token': this.csrfTokenValue
-      },
-      body: JSON.stringify(criteria)
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    // Record the source part so the server can copy treatment metadata.
+    if (sourcePartId) {
+      let hiddenInput = this.element.querySelector("#source_part_id_field")
+      if (!hiddenInput) {
+        hiddenInput = document.createElement("input")
+        hiddenInput.type = "hidden"
+        hiddenInput.name = "source_part_id"
+        hiddenInput.id = "source_part_id_field"
+        this.element.appendChild(hiddenInput)
+      }
+      hiddenInput.value = sourcePartId
     }
 
-    return await response.json();
+    const manualSection = document.createElement("div")
+    manualSection.className = "bg-white shadow rounded-lg p-6"
+    manualSection.innerHTML = `
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-medium text-gray-900">Manual Operations Mode</h3>
+        <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+          Copied from: ${sourcePart}
+        </span>
+      </div>
+      <p class="text-sm text-gray-600 mb-6">Operations copied from existing part. You can modify, add, or remove operations below. Changes to operation text are automatically saved when you click away.</p>
+      <div class="space-y-1" id="operations-container">
+        ${this.generateCopiedOperationsHTML(operations)}
+      </div>
+    `
+
+    if (this.hasFormActionsTarget) {
+      this.formActionsTarget.parentNode.insertBefore(manualSection, this.formActionsTarget)
+    }
+
+    if (this.hasManualModeFieldTarget) this.manualModeFieldTarget.value = "true"
+    if (this.hasSwitchButtonTarget) this.switchButtonTarget.style.display = "none"
   }
 
-  // Format treatment name (unlocked mode only)
-  formatTreatmentName(treatmentType) {
-    if (this.isLockedMode) return '';
+  generateCopiedOperationsHTML(operations) {
+    const addButton = (position, label) => `
+      <div class="flex justify-center py-2">
+        <button type="button" class="add-operation-btn bg-blue-100 hover:bg-blue-200 text-blue-700 px-4 py-2 rounded-lg text-sm border border-blue-300 transition-colors"
+                data-insert-position="${position}">
+          ${label}
+        </button>
+      </div>
+    `
 
-    const nameMap = {
-      'stripping_only': 'Strip Only',
-      'standard_anodising': 'Standard Anodising',
-      'hard_anodising': 'Hard Anodising',
-      'chromic_anodising': 'Chromic Anodising',
-      'chemical_conversion': 'Chemical Conversion',
-      'electroless_nickel_plating': 'Electroless Nickel Plating'
-    };
+    const rows = operations
+      .map((op, index) => {
+        const vatBadge =
+          op.vat_numbers && op.vat_numbers.length > 0
+            ? `<span class="text-xs text-gray-500">Vats ${op.vat_numbers.join(", ")}</span>`
+            : ""
+        const upButton =
+          index > 0
+            ? `<button type="button" class="reorder-up-btn text-blue-600 hover:text-blue-800 text-sm font-medium" data-position="${op.position}" title="Move up">↑</button>`
+            : ""
+        const downButton =
+          index < operations.length - 1
+            ? `<button type="button" class="reorder-down-btn text-blue-600 hover:text-blue-800 text-sm font-medium" data-position="${op.position}" title="Move down">↓</button>`
+            : ""
 
-    return nameMap[treatmentType] || treatmentType
-      .replace('_anodising', '')
-      .replace('_conversion', '')
-      .replace('_nickel_plating', '')
-      .split('_')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
+        return `
+      ${index > 0 ? addButton(op.position, "+ Add Operation Here") : ""}
+      <div class="border border-gray-200 rounded-lg p-4 bg-gray-50 operation-item" data-position="${op.position}">
+        <div class="flex justify-between items-start mb-3">
+          <div class="flex items-center space-x-3">
+            <h4 class="font-medium text-gray-900">Operation ${op.position}: ${op.display_name}</h4>
+            ${vatBadge}
+          </div>
+          <div class="flex items-center space-x-2">
+            ${upButton}
+            ${downButton}
+            <button type="button" class="delete-operation-btn text-red-600 hover:text-red-800 text-xl font-bold" data-position="${op.position}" title="Delete this operation">×</button>
+          </div>
+        </div>
+        <textarea name="locked_operations[${op.position}]" rows="3" autocomplete="off"
+                  class="operation-textarea mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  placeholder="Enter operation text..." data-original-value="${op.operation_text}">${op.operation_text}</textarea>
+        ${
+          op.specifications
+            ? `<p class="mt-2 text-xs text-purple-600"><strong>Specifications:</strong> ${op.specifications}</p>`
+            : ""
+        }
+        <div class="flex flex-wrap gap-2 mt-2 text-xs text-gray-500">
+          <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded">Type: ${
+            op.process_type ? op.process_type.replace(/_/g, " ") : "Manual"
+          }</span>
+          ${
+            op.target_thickness && op.target_thickness > 0
+              ? `<span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Target: ${op.target_thickness}μm</span>`
+              : ""
+          }
+          ${op.auto_inserted ? '<span class="bg-gray-100 text-gray-800 px-2 py-1 rounded">Auto-inserted</span>' : ""}
+        </div>
+        <input type="hidden" name="locked_operations_display_names[${op.position}]" value="${op.display_name}">
+      </div>
+    `
+      })
+      .join("")
+
+    return rows + addButton(operations.length + 1, "+ Add Operation at End")
   }
 }
