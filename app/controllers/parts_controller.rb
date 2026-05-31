@@ -472,15 +472,9 @@ end
       return
     end
 
-    term = query.downcase
-    matches = Operation.all_operations(nil, @part.aerospace_defense?)
-                       .reject(&:auto_inserted?)
-                       .select do |op|
-                         [op.id, op.display_name, op.operation_text].any? do |field|
-                           field.to_s.downcase.include?(term)
-                         end
-                       end
-                       .first(15)
+    matches = @part.searchable_library_operations
+                   .select { |op| operation_matches?(op, query) }
+                   .first(15)
 
     render json: matches.map { |op| operation_json(op) }
   end
@@ -735,12 +729,36 @@ end
   def operation_json(op)
     {
       id: op.id,
-      display_name: op.display_name,
+      display_name: operation_display_name(op),
       operation_text: op.operation_text,
       specifications: op.respond_to?(:specifications) ? op.specifications : nil,
       process_type: op.respond_to?(:process_type) ? op.process_type : nil,
       target_thickness: op.respond_to?(:target_thickness) ? op.target_thickness : nil
     }
+  end
+
+  # Some library operations (e.g. degrease) carry no explicit display name;
+  # fall back to a humanised id so suggestions are never blank.
+  def operation_display_name(op)
+    name = op.display_name if op.respond_to?(:display_name)
+    name.presence || op.id.to_s.titleize
+  end
+
+  # Match an operation against a free-text query. Separators are normalised so
+  # "C8", "C-8" and "c 8" are equivalent, and every query token must appear
+  # somewhere across the id, display name and operation text.
+  def operation_matches?(op, query)
+    haystack = [op.id, operation_display_name(op), op.operation_text].compact.join(" ").downcase
+    spaced = haystack.gsub(/[^a-z0-9]+/, " ").squish
+    squished = haystack.gsub(/[^a-z0-9]+/, "")
+
+    q = query.downcase
+    q_squished = q.gsub(/[^a-z0-9]+/, "")
+    tokens = q.gsub(/[^a-z0-9]+/, " ").split
+    return false if tokens.empty?
+
+    tokens.all? { |t| spaced.include?(t) } ||
+      (q_squished.length >= 2 && squished.include?(q_squished))
   end
 
   def set_part

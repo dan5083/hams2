@@ -210,12 +210,56 @@ class Part < ApplicationRecord
     })
   end
 
-  # Resolve a single library operation by id, using this part's
-  # aerospace/defense flag so interpolated text matches what will be inserted.
+  # Resolve a single library operation by id from the same corpus the modal
+  # search offers, so anything searchable is also insertable.
   def find_library_operation(operation_id)
     return nil if operation_id.blank?
 
-    Operation.all_operations(nil, aerospace_defense?).find { |op| op.id == operation_id }
+    searchable_library_operations.find { |op| op.id == operation_id }
+  end
+
+  # Operations that can be manually inserted in locked editing mode: the
+  # user-selectable process operations PLUS the common fixed support operations
+  # (degrease, inspections, contract review, pack, unjig) that are normally
+  # auto-inserted during sequence building and so never appear in
+  # Operation.all_operations. Parameterised families (dye, sealing, stripping,
+  # heat treatments, local treatments, masking, per-jig operations) are not yet
+  # included here — they need enumerating across their option sets.
+  def searchable_library_operations
+    ops = Operation.all_operations(nil, aerospace_defense?).dup
+    ops.concat(fixed_support_operations)
+    ops.compact.uniq(&:id)
+  end
+
+  # Best-effort collection of the fixed (no-argument) support operations. Each
+  # source is guarded so a missing library class or signature change degrades
+  # gracefully rather than 500-ing the search.
+  def fixed_support_operations
+    ad = aerospace_defense?
+
+    sources = []
+    if defined?(OperationLibrary::ContractReviewOperations)
+      sources << -> { OperationLibrary::ContractReviewOperations.get_contract_review_operation }
+    end
+    if defined?(OperationLibrary::InspectFinalInspectVatInspect)
+      sources << -> { OperationLibrary::InspectFinalInspectVatInspect.get_incoming_inspection_operation }
+      sources << -> { OperationLibrary::InspectFinalInspectVatInspect.get_vat_inspection_operation }
+      sources << -> { OperationLibrary::InspectFinalInspectVatInspect.get_final_inspection_operation(operations_sequence: [], aerospace: ad) }
+    end
+    if defined?(OperationLibrary::DegreaseOperations)
+      sources << -> { OperationLibrary::DegreaseOperations.get_degrease_operation(aerospace_defense: ad) }
+    end
+    sources << -> { OperationLibrary::JigUnjig.get_unjig_operation } if defined?(OperationLibrary::JigUnjig)
+    sources << -> { OperationLibrary::PackOperations.get_pack_operation } if defined?(OperationLibrary::PackOperations)
+
+    sources.flat_map do |source|
+      begin
+        Array(source.call)
+      rescue => e
+        Rails.logger.warn("fixed_support_operations skipped a source: #{e.class}: #{e.message}")
+        []
+      end
+    end.compact
   end
 
   # Shared insertion logic for both custom and library operations: shift
