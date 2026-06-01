@@ -98,6 +98,18 @@
             <dt class="text-sm font-medium text-gray-500">Specification</dt>
             <dd class="text-sm text-gray-900"><%= @works_order.specification.presence || "—" %></dd>
           </div>
+          <% if @works_order.material.present? %>
+            <div>
+              <dt class="text-sm font-medium text-gray-500">Material</dt>
+              <dd class="text-sm text-gray-900"><%= @works_order.material %></dd>
+            </div>
+          <% end %>
+          <% if @works_order.specified_thicknesses.present? %>
+            <div>
+              <dt class="text-sm font-medium text-gray-500">Specified Thickness(es)</dt>
+              <dd class="text-sm text-gray-900"><%= @works_order.specified_thicknesses %></dd>
+            </div>
+          <% end %>
         </dl>
       </div>
 

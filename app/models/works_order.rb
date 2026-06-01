@@ -118,6 +118,14 @@ class WorksOrder < ApplicationRecord
     part&.specification.presence || ""
   end
 
+  def material
+    part&.material.presence || ""
+  end
+
+  def specified_thicknesses
+    part&.specified_thicknesses.presence || ""
+  end
+
   def special_instructions
     part&.special_instructions
   end
