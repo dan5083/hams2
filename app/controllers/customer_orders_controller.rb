@@ -29,42 +29,36 @@ class CustomerOrdersController < ApplicationController
 
     @customers = Organization.enabled.order(:name)
 
-    # Build set of customer order IDs that have at least one new-part WO —
-    # used to highlight orders needing contract review before route cards can print,
-    # and to inform the sort order below. Computed across the full filtered set
-    # (not just the current page) so badges and ordering are consistent on all pages.
-    all_co_ids = @customer_orders.pluck(:id)
-    wo_part_data = WorksOrder.where(customer_order_id: all_co_ids, voided: false)
-                             .pluck(:customer_order_id, :part_id)
-    part_ids = wo_part_data.map(&:last).uniq
-    part_wo_counts = part_ids.any? ? WorksOrder.where(part_id: part_ids).group(:part_id).count : {}
-    @cos_with_new_parts = Set.new
-    wo_part_data.each do |co_id, part_id|
-      @cos_with_new_parts << co_id if (part_wo_counts[part_id] || 0) <= 1
-    end
-
-    # Fall back to '0' so the IN () clause is always valid SQL when the set is empty.
-    needs_review_ids_sql = @cos_with_new_parts.any? ? @cos_with_new_parts.to_a.join(',') : '0'
-
     @customer_orders = @customer_orders.order(
       Arel.sql("
         CASE
-          WHEN customer_orders.voided = true THEN 5
+          WHEN customer_orders.voided = true THEN 4
           WHEN customer_orders.fully_released_works_orders_count = customer_orders.open_works_orders_count
                AND customer_orders.open_works_orders_count > 0
                AND customer_orders.uninvoiced_accepted_quantity > 0 THEN 0
-          WHEN customer_orders.contract_reviewed_by_user_id IS NULL
-               AND customer_orders.id IN (#{needs_review_ids_sql}) THEN 1
           WHEN customer_orders.open_works_orders_count > 0
                AND customer_orders.fully_released_works_orders_count > 0
-               AND customer_orders.fully_released_works_orders_count < customer_orders.open_works_orders_count THEN 2
+               AND customer_orders.fully_released_works_orders_count < customer_orders.open_works_orders_count THEN 1
           WHEN customer_orders.open_works_orders_count > 0
-               AND customer_orders.uninvoiced_accepted_quantity = 0 THEN 4
-          ELSE 3
+               AND customer_orders.uninvoiced_accepted_quantity = 0 THEN 3
+          ELSE 2
         END
       "),
       date_received: :desc
     ).page(params[:page]).per(20)
+
+    # Build set of customer order IDs that have at least one new-part WO —
+    # used to highlight orders needing contract review before route cards can print.
+    # Two queries regardless of page size; no per-row lookups.
+    co_ids = @customer_orders.map(&:id)
+    wo_part_data = WorksOrder.where(customer_order_id: co_ids, voided: false)
+                             .pluck(:customer_order_id, :part_id)
+    part_ids = wo_part_data.map(&:last).uniq
+    part_wo_counts = WorksOrder.where(part_id: part_ids).group(:part_id).count
+    @cos_with_new_parts = Set.new
+    wo_part_data.each do |co_id, part_id|
+      @cos_with_new_parts << co_id if (part_wo_counts[part_id] || 0) <= 1
+    end
   end
 
   def show
