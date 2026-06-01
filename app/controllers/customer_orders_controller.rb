@@ -29,19 +29,42 @@ class CustomerOrdersController < ApplicationController
 
     @customers = Organization.enabled.order(:name)
 
+    # Priority ordering for the list. Lower number = higher up the page.
+    #   0  Green  - all WOs fully released and there's uninvoiced qty -> "Create invoice"
+    #   1  Purple - contract not yet reviewed AND has a new-part WO    -> "Review needed"
+    #   2  Partial release in progress
+    #   3  Everything else (default)
+    #   4  Open but nothing left to invoice
+    #   5  Voided
+    #
+    # Green is tested before Purple so an order that is BOTH ready-to-invoice and
+    # review-needed still sorts (and renders) green, matching the view's
+    # "green takes precedence" rule.
+    #
+    # The Purple/"needs review" test here mirrors EXACTLY the definition used to
+    # build @cos_with_new_parts below (and in the view): contract not reviewed,
+    # plus a non-voided WO whose part has only ever appeared on one WO (<= 1).
+    # If that definition ever changes, change it in BOTH places.
     @customer_orders = @customer_orders.order(
       Arel.sql("
         CASE
-          WHEN customer_orders.voided = true THEN 4
+          WHEN customer_orders.voided = true THEN 5
           WHEN customer_orders.fully_released_works_orders_count = customer_orders.open_works_orders_count
                AND customer_orders.open_works_orders_count > 0
                AND customer_orders.uninvoiced_accepted_quantity > 0 THEN 0
+          WHEN customer_orders.contract_reviewed_by_user_id IS NULL
+               AND EXISTS (
+                 SELECT 1 FROM works_orders w
+                 WHERE w.customer_order_id = customer_orders.id
+                   AND w.voided = false
+                   AND (SELECT COUNT(*) FROM works_orders w2 WHERE w2.part_id = w.part_id) <= 1
+               ) THEN 1
           WHEN customer_orders.open_works_orders_count > 0
                AND customer_orders.fully_released_works_orders_count > 0
-               AND customer_orders.fully_released_works_orders_count < customer_orders.open_works_orders_count THEN 1
+               AND customer_orders.fully_released_works_orders_count < customer_orders.open_works_orders_count THEN 2
           WHEN customer_orders.open_works_orders_count > 0
-               AND customer_orders.uninvoiced_accepted_quantity = 0 THEN 3
-          ELSE 2
+               AND customer_orders.uninvoiced_accepted_quantity = 0 THEN 4
+          ELSE 3
         END
       "),
       date_received: :desc
