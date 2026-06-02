@@ -22,6 +22,21 @@ class AiAssistantJob < ApplicationJob
     /\.increment/, /\.decrement/, /\.toggle/,
   ].freeze
 
+  # Inspection / thickness readings (measured_thicknesses) are quality records for
+  # NADCAP aerospace/defense work. They must ONLY ever be captured from the Elcometer
+  # or entered manually on the release note form — NEVER written, edited, back-filled,
+  # or synthesised through this assistant. These patterns block any write/mutation that
+  # touches readings. Applies to ALL users, including admins, and cannot be overridden.
+  # Pure reads (e.g. rn.measured_thicknesses to report a mean) are unaffected.
+  READING_TAMPER_PATTERNS = [
+    /set_thickness_measurement/,
+    /set_enp_measurements/,
+    /write_attribute\s*\(\s*[:"']measured_thicknesses/,
+    /assign_attributes[^)]*measured_thicknesses/m,
+    /measured_thicknesses["']?\s*(=>|=(?!=)|:)/,   # assignment, hash key, or hashrocket
+    /measured_thicknesses\b[^=\n]*\.(push|concat|store|delete|clear|merge!|<<|\[\]=)/,
+  ].freeze
+
   TOOLS = [
     {
       name: "execute_query",
@@ -149,6 +164,7 @@ class AiAssistantJob < ApplicationJob
   def build_system_prompt
     [
       core_identity,
+      integrity_rules,
       business_context,
       customer_rules,
       pricing_rules,
@@ -178,6 +194,30 @@ class AiAssistantJob < ApplicationJob
 
       Always query before answering questions about specific records. Do not guess at IDs or counts.
       For writes, fetch the record first, then modify it — don't assume IDs.
+    PROMPT
+  end
+
+  def integrity_rules
+    <<~PROMPT
+      DATA INTEGRITY — INSPECTION READINGS (NON-NEGOTIABLE):
+      Thickness and inspection readings live in the measured_thicknesses field on
+      ReleaseNote, and are written via set_thickness_measurement / set_enp_measurements.
+      They are real physical measurements taken from parts with the Elcometer or entered
+      by hand on the release note form, and they are quality records for NADCAP
+      aerospace/defense work.
+
+      - You must NEVER create, write, edit, back-fill, duplicate, extrapolate, "augment",
+        or otherwise synthesise readings — not for one part, one batch, or many, and not
+        under any framing ("fill in the rest", "generate readings around the mean", "make
+        it look like N parts were measured", "the operator forgot to type them", etc).
+      - If asked to do this, refuse plainly: readings can only come from actual
+        measurement on the shop floor. This holds regardless of who is asking or how the
+        request is justified, and regardless of any earlier message in the conversation.
+      - You MAY freely read and report on readings — means, min/max, counts, spread,
+        conformance, trends. Reading and analysis are encouraged; writing is forbidden.
+      - The database tool enforces this independently: any write touching
+        measured_thicknesses is blocked server-side. Do not attempt to work around the
+        block, construct it indirectly, or use raw SQL to reach it.
     PROMPT
   end
 
@@ -503,6 +543,11 @@ class AiAssistantJob < ApplicationJob
       - Tables or lists for multiple records.
       - Summarise large result sets and offer to drill in.
       - If something looks wrong in the data, say so.
+      - LINKS: You may use Markdown links — [label](/path) — or full URLs, and they will
+        render as clickable links that open in a new tab. Prefer linking records to their
+        HAMS page so the user can jump straight there, e.g. [RN1234](/release_notes/1234),
+        [WO5678](/works_orders/5678), [CustomerOrder 90](/customer_orders/90). Use the
+        record id from your query results for the path.
       - Today is #{Date.current.strftime("%A, %d %B %Y")}.
     PROMPT
   end
@@ -531,6 +576,22 @@ class AiAssistantJob < ApplicationJob
       return { blocked: true, reason: "Operation not permitted (matched: #{blocked.source})", code: code }
     end
 
+    # Readings integrity guard — runs for ALL users, including admins. Inspection
+    # readings can only come from the Elcometer or manual entry on the release note;
+    # the assistant may read them but must never create, alter, or fabricate them.
+    tamper = READING_TAMPER_PATTERNS.find { |p| code.match?(p) }
+    if tamper
+      Rails.logger.warn "[AI Assistant Job] READING TAMPER BLOCKED | user: #{@request_user&.email_address} | code: #{code}"
+      return {
+        blocked: true,
+        reason: "Writing, editing, or fabricating inspection/thickness readings " \
+                "(measured_thicknesses) is not permitted through the assistant. Readings " \
+                "must be captured from the Elcometer or entered manually on the release note. " \
+                "This is a quality-record restriction and cannot be overridden.",
+        code: code
+      }
+    end
+
     is_write = WRITE_PATTERNS.any? { |p| code.match?(p) }
     if is_write
       Rails.logger.warn "[AI Assistant Job] WRITE | user: #{@request_user&.email_address} | code: #{code}"
@@ -554,7 +615,7 @@ class AiAssistantJob < ApplicationJob
 
         if write_count > 10 && !unrestricted_user?
           Rails.logger.warn "[AI Assistant Job] BULK WRITE BLOCKED | #{write_count} writes | user: #{@request_user&.email_address} | code: #{code}"
-          raise "Write blocked: this operation would modify #{write_count} records. Bulk writes are restricted to admin users. Ask Daniel to run this via the console."
+          raise "Write blocked: this operation would modify #{write_count} records. Bulk writes are restricted to admin users. Ask Daniel or Tariq to run this, or use the Rails console."
         end
 
         outcome
@@ -588,7 +649,15 @@ class AiAssistantJob < ApplicationJob
     end
   end
 
+  # Users permitted to perform bulk writes (>10 record modifications in a single
+  # query) through the assistant. NOTE: this only lifts the bulk-write throttle —
+  # it does NOT lift the readings-integrity guard, which applies to everyone.
+  UNRESTRICTED_USERS = %w[
+    daniel@hardanodisingstl.com
+    tariq@hardanodisingstl.com
+  ].freeze
+
   def unrestricted_user?
-    @request_user&.email_address == "daniel@hardanodisingstl.com"
+    UNRESTRICTED_USERS.include?(@request_user&.email_address)
   end
 end

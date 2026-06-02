@@ -321,10 +321,74 @@ export default class extends Controller {
       bubble.classList.add("bg-white", "text-gray-800", "border", "border-gray-200", "rounded-bl-sm", "shadow-sm")
     }
 
-    bubble.textContent = text
+    // Assistant replies are rendered as sanitised HTML so links are clickable.
+    // User and error bubbles stay as plain text — no markup is ever trusted from them.
+    if (role === "assistant") {
+      bubble.innerHTML = this.renderRich(text)
+    } else {
+      bubble.textContent = text
+    }
+
     wrapper.appendChild(bubble)
     this.messagesTarget.appendChild(wrapper)
     this.scrollToBottom()
+  }
+
+  // ── Safe rich rendering (links only) ──────────────────────────────────
+
+  // Escape-first, then linkify. Order matters: we pull Markdown links out into
+  // placeholders BEFORE escaping so their syntax survives, escape everything
+  // (neutralising any HTML/script the model may have emitted), linkify bare URLs
+  // in the now-safe text, then restore the Markdown links as anchors.
+  renderRich(text) {
+    const links = []
+    const PH = (i) => `\uE000${i}\uE001` // private-use sentinels, never in real text
+
+    // 1. Extract Markdown links [label](http(s)://… or /relative)
+    let work = String(text).replace(
+      /\[([^\]]+)\]\((https?:\/\/[^\s)]+|\/[^\s)]+)\)/g,
+      (_m, label, url) => {
+        const i = links.push({ label, url }) - 1
+        return PH(i)
+      }
+    )
+
+    // 2. Escape all remaining text
+    work = this.escapeHtml(work)
+
+    // 3. Linkify bare URLs left in the escaped text
+    work = work.replace(/(https?:\/\/[^\s<]+)/g, (m) => {
+      const href = m.replace(/&amp;/g, "&")  // undo escaping for the href value only
+      return this.anchor(href, m)
+    })
+
+    // 4. Restore Markdown links (label is escaped; href is validated)
+    work = work.replace(/\uE000(\d+)\uE001/g, (_m, i) => {
+      const { label, url } = links[parseInt(i, 10)]
+      return this.anchor(url, this.escapeHtml(label))
+    })
+
+    return work
+  }
+
+  anchor(href, innerHtml) {
+    const safeHref = /^(https?:\/\/|\/)/.test(href) ? href : "#"
+    return `<a href="${this.escapeAttr(safeHref)}" target="_blank" rel="noopener noreferrer" ` +
+           `class="underline text-blue-600 hover:text-blue-800 break-words">${innerHtml}</a>`
+  }
+
+  escapeHtml(str) {
+    const div = document.createElement("div")
+    div.textContent = String(str)
+    return div.innerHTML
+  }
+
+  escapeAttr(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
   }
 
   setSending(state) {
