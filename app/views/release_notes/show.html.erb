@@ -122,46 +122,90 @@
 
       <% measurements_by_type = @release_note.thickness_measurements_by_type %>
       <% if measurements_by_type.any? %>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="space-y-6">
           <% measurements_by_type.each do |process_type, measurements| %>
-            <div class="border border-gray-200 rounded-lg p-4">
-              <h3 class="text-lg font-medium text-gray-900 mb-3">
-                <%= process_type.humanize.gsub('_', ' ').titleize %>
-              </h3>
+            <% measurements.each do |measurement| %>
+              <%
+                treatment_id = measurement['treatment_id']
+                display_name = measurement['display_name'] || process_type.to_s.humanize.titleize
+                is_enp       = @release_note.treatment_is_enp?(process_type)
+                batch_stats  = is_enp ?
+                  @release_note.get_enp_statistics_by_batch(treatment_id) :
+                  @release_note.get_thickness_statistics_by_batch(treatment_id)
+                multi_batch  = batch_stats.size > 1
+              %>
 
-              <div class="space-y-2">
-                <% measurements.each do |measurement| %>
-                  <div class="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
-                    <div>
-                      <span class="text-sm font-medium text-gray-700">
-                        <%= measurement['display_name'] || measurement['process_type'].humanize.titleize %>
-                      </span>
-                      <% if measurement['target_thickness'] && measurement['target_thickness'] > 0 %>
-                        <span class="text-xs text-gray-500 block">
-                          Target: <%= measurement['target_thickness'] %>μm
-                        </span>
-                      <% end %>
-                    </div>
-                    <div class="text-right">
-                      <span class="text-sm font-semibold text-gray-900">
-                        <%= measurement['measured_thickness'] %>μm
-                      </span>
-                      <% if measurement['target_thickness'] && measurement['target_thickness'] > 0 %>
-                        <%
-                          target = measurement['target_thickness'].to_f
-                          measured = measurement['measured_thickness'].to_f
-                          deviation_pct = ((measured - target) / target * 100).round(1)
-                          deviation_class = deviation_pct.abs > 20 ? 'text-red-600' : (deviation_pct.abs > 10 ? 'text-yellow-600' : 'text-green-600')
-                        %>
-                        <span class="text-xs <%= deviation_class %> block">
-                          <%= deviation_pct > 0 ? '+' : '' %><%= deviation_pct %>%
-                        </span>
-                      <% end %>
-                    </div>
+              <div class="border border-gray-200 rounded-lg p-4">
+                <h3 class="text-lg font-medium text-gray-900 mb-3"><%= display_name %></h3>
+
+                <% if batch_stats.blank? %>
+                  <p class="text-sm text-gray-500">No readings recorded.</p>
+                <% else %>
+                  <div class="space-y-4">
+                    <% batch_stats.each do |bs| %>
+                      <%
+                        nadcap_data     = is_enp ? nil : @release_note.get_nadcap_data_for_batch(treatment_id, bs[:batch_number])
+                        is_nadcap_batch = nadcap_data && nadcap_data[:parts_per_batch].present?
+                        sampled_parts   = is_nadcap_batch ? (bs[:count].to_f / 8).round : nil
+                      %>
+                      <div class="<%= 'border-t border-gray-100 pt-3' if multi_batch %>">
+                        <% if multi_batch || is_nadcap_batch %>
+                          <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-semibold text-gray-700">Batch <%= bs[:batch_number] %></span>
+                            <% if is_nadcap_batch %>
+                              <span class="text-xs text-gray-500">
+                                Lot of <%= nadcap_data[:parts_per_batch] %> ·
+                                <%= sampled_parts %> part<%= 's' unless sampled_parts == 1 %> sampled × 8 readings
+                              </span>
+                            <% end %>
+                          </div>
+                        <% end %>
+
+                        <!-- Per-batch statistics -->
+                        <div class="grid grid-cols-4 gap-4 p-3 bg-gray-50 rounded-md mb-2">
+                          <div>
+                            <div class="text-xs text-gray-500"><%= is_enp ? 'Points' : 'Readings' %></div>
+                            <div class="text-lg font-semibold text-gray-900"><%= bs[:count] %></div>
+                          </div>
+                          <div>
+                            <div class="text-xs text-gray-500">Mean</div>
+                            <div class="text-lg font-semibold text-blue-600"><%= bs[:mean] %> µm</div>
+                          </div>
+                          <div>
+                            <div class="text-xs text-gray-500">Min</div>
+                            <div class="text-lg font-semibold text-gray-900"><%= bs[:min] %> µm</div>
+                          </div>
+                          <div>
+                            <div class="text-xs text-gray-500">Max</div>
+                            <div class="text-lg font-semibold text-gray-900"><%= bs[:max] %> µm</div>
+                          </div>
+                        </div>
+
+                        <!-- Individual values -->
+                        <% if is_enp %>
+                          <div class="flex flex-wrap gap-2">
+                            <% bs[:enp_measurements].each do |m| %>
+                              <% next if m['growth_um'].blank? %>
+                              <span class="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm">
+                                <%= m['point'] %>: <%= m['growth_um'] %> µm
+                              </span>
+                            <% end %>
+                          </div>
+                        <% else %>
+                          <div class="flex flex-wrap gap-2">
+                            <% bs[:readings].each do |reading| %>
+                              <span class="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm">
+                                <%= reading %> µm
+                              </span>
+                            <% end %>
+                          </div>
+                        <% end %>
+                      </div>
+                    <% end %>
                   </div>
                 <% end %>
               </div>
-            </div>
+            <% end %>
           <% end %>
         </div>
 
