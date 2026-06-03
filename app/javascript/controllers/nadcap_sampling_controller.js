@@ -1,9 +1,14 @@
 // app/javascript/controllers/nadcap_sampling_controller.js
 //
 // Per-batch NADCAP sample-plan thickness measurements for MIL-PRF-8625F Type III.
-// One controller instance per batch container. Renders a dynamic grid of
-// sampled parts (B1p1, B1p2, ...), each with 8 reading inputs. Sample size
-// derived from parts-per-batch via the NADCAP plan table.
+// One controller instance per batch container. Renders a dynamic grid of sampled
+// parts (B1p1, B1p2, ...), each with 8 reading inputs. Sample size derived from
+// parts-per-batch via the NADCAP plan table.
+//
+// This controller NO LONGER owns the serial port. It registers as a "sink" with
+// the shared elcometer-session controller, which owns the single Elcometer
+// connection and routes readings here via acceptReading(). Manual entry, parts
+// grid, stats and persistence remain local.
 //
 // Hidden field payload (per batch):
 //   {
@@ -20,8 +25,6 @@ export default class extends Controller {
   static targets = [
     "partsPerBatchInput",
     "sampleSizeDisplay",
-    "connectButton",
-    "stopButton",
     "partsContainer",
     "statistics",
     "readingsData"
@@ -36,10 +39,8 @@ export default class extends Controller {
     displayName:     String
   }
 
-  // ---------------------------------------------------------------------------
-  // NADCAP sample plan: parts_per_batch -> sample size (parts to test)
+  // NADCAP sample plan: parts_per_batch -> sample size (parts to test).
   // 8 readings required per sampled part.
-  // ---------------------------------------------------------------------------
   sampleSizeFor(n) {
     if (n < 1) return 0
     if (n <= 12)   return n     // All parts tested
@@ -51,30 +52,107 @@ export default class extends Controller {
   }
 
   connect() {
-    this.parts          = []    // [{ label, readings: [r1..r8] }, ...]
-    this.partsPerBatch  = 0
-    this.port           = null
-    this.reader         = null
-    this.isReading      = false
-
-    if (!("serial" in navigator)) {
-      this.showError("Web Serial API not supported. Use Chrome or Edge.")
-      if (this.hasConnectButtonTarget) this.connectButtonTarget.disabled = true
-    }
+    this.parts = []           // [{ label, readings: [r1..r8] }, ...]
+    this.partsPerBatch = 0
+    this.session = null
 
     this.loadExisting()
+    this.registerWithSession()
+
+    this._onFocus = () => this.session && this.session.setPreferred(this)
+    this.element.addEventListener("focusin", this._onFocus)
   }
 
   disconnect() {
-    this.stopReading()
+    this.element.removeEventListener("focusin", this._onFocus)
+    if (this.session) this.session.removeSink(this)
+    const el = this.sessionEl
+    if (el && el._elcometerPendingSinks) {
+      el._elcometerPendingSinks = el._elcometerPendingSinks.filter((s) => s !== this)
+    }
   }
 
-  // ---------------------------------------------------------------------------
-  // Parts-per-batch input handler
-  // ---------------------------------------------------------------------------
+  registerWithSession() {
+    const el = this.element.closest('[data-controller~="elcometer-session"]')
+    this.sessionEl = el
+    if (!el) return
+    if (el.elcometerSession) {
+      el.elcometerSession.addSink(this)
+    } else {
+      (el._elcometerPendingSinks ||= []).push(this)
+    }
+  }
+
+  // ── Sink interface (called by the session) ───────────────────────────────
+
+  isActive() { return this.element.offsetParent !== null }
+
+  sinkLabel() {
+    return `${this.displayNameValue || "Hard Anodising"} · ${this.batchLabelValue}`
+  }
+
+  acceptsReadings() {
+    if (!this.isActive() || this.partsPerBatch < 1 || this.parts.length === 0) return false
+    return this.parts.some((p) => p.readings.some((r) => r == null))
+  }
+
+  isComplete() {
+    return this.partsPerBatch >= 1 &&
+           this.parts.length > 0 &&
+           !this.parts.some((p) => p.readings.some((r) => r == null))
+  }
+
+  progress() {
+    if (!this.isActive()) return { done: 0, expected: 0 }
+    const expected = this.sampleSizeFor(this.partsPerBatch) * 8
+    const done = this.parts.reduce(
+      (a, p) => a + p.readings.filter((r) => r != null && r !== "" && !isNaN(r)).length, 0
+    )
+    return { done, expected }
+  }
+
+  nextSlotLabel() {
+    for (let pi = 0; pi < this.parts.length; pi++) {
+      const filled = this.parts[pi].readings.filter((r) => r != null).length
+      if (filled < 8) return `${this.parts[pi].label} · ${filled}/8`
+    }
+    return ""
+  }
+
+  // Fill the first empty slot, scanning p1[0..7] -> p2[0..7] -> ...
+  // Returns true if the reading was placed.
+  acceptReading(value) {
+    const rounded = Math.round(value * 10) / 10
+    for (let pi = 0; pi < this.parts.length; pi++) {
+      for (let ri = 0; ri < 8; ri++) {
+        if (this.parts[pi].readings[ri] == null) {
+          this.parts[pi].readings[ri] = rounded
+
+          const inp = this.hasPartsContainerTarget && this.partsContainerTarget.querySelector(
+            `input[data-part-index="${pi}"][data-reading-index="${ri}"]`
+          )
+          if (inp) {
+            inp.value = rounded
+            inp.classList.add("ring-2", "ring-blue-400")
+            setTimeout(() => inp.classList.remove("ring-2", "ring-blue-400"), 300)
+          }
+
+          this.renderPartStats(pi)
+          this.renderBatchStats()
+          this.persist()
+          if (this.session) this.session.refresh()
+          return true
+        }
+      }
+    }
+    return false
+  }
+
+  // ── Parts-per-batch input handler ─────────────────────────────────────────
+
   updateSampleSize() {
     const raw = this.partsPerBatchInputTarget.value
-    const n   = parseInt(raw, 10)
+    const n = parseInt(raw, 10)
 
     if (isNaN(n) || n < 1) {
       this.partsPerBatch = 0
@@ -83,6 +161,7 @@ export default class extends Controller {
       this.partsContainerTarget.innerHTML = ""
       this.persist()
       this.renderBatchStats()
+      if (this.session) this.session.refresh()
       return
     }
 
@@ -106,6 +185,7 @@ export default class extends Controller {
     this.renderBatchStats()
     this.persist()
     this.updateSampleSizeDisplay()
+    if (this.session) this.session.refresh()
   }
 
   updateSampleSizeDisplay() {
@@ -119,9 +199,8 @@ export default class extends Controller {
   }
 
   hasAnyReadings(beyondIndex = 0) {
-    // True if any reading exists at part index >= beyondIndex
     for (let pi = beyondIndex; pi < this.parts.length; pi++) {
-      if (this.parts[pi].readings.some(r => r != null && r !== "")) return true
+      if (this.parts[pi].readings.some((r) => r != null && r !== "")) return true
     }
     return false
   }
@@ -139,9 +218,8 @@ export default class extends Controller {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Grid rendering
-  // ---------------------------------------------------------------------------
+  // ── Grid rendering ──────────────────────────────────────────────────────
+
   renderGrid() {
     if (!this.hasPartsContainerTarget) return
 
@@ -155,7 +233,7 @@ export default class extends Controller {
                value="${r ?? ''}"
                class="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                placeholder="${rIdx + 1}" />
-      `).join('')
+      `).join("")
 
       return `
         <div class="border-l-2 border-blue-200 pl-3 py-2 bg-white rounded">
@@ -166,39 +244,36 @@ export default class extends Controller {
           <div class="grid grid-cols-8 gap-1">${inputs}</div>
         </div>
       `
-    }).join('')
+    }).join("")
 
     this.partsContainerTarget.innerHTML = html
     this.parts.forEach((_, idx) => this.renderPartStats(idx))
   }
 
   // Per-part stats line; called on its own to avoid full grid re-render
-  // (which would lose input focus)
+  // (which would lose input focus).
   renderPartStats(partIdx) {
     const el = this.partsContainerTarget.querySelector(`[data-part-stats="${partIdx}"]`)
     if (!el) return
 
-    const vals = this.parts[partIdx].readings.filter(r =>
-      r != null && r !== "" && !isNaN(r)
-    )
+    const vals = this.parts[partIdx].readings.filter((r) => r != null && r !== "" && !isNaN(r))
     if (vals.length === 0) {
       el.textContent = ""
       return
     }
     const mean = (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)
-    const min  = Math.min(...vals)
-    const max  = Math.max(...vals)
+    const min = Math.min(...vals)
+    const max = Math.max(...vals)
     el.textContent = `${vals.length}/8 · mean ${mean} · min ${min} · max ${max}`
   }
 
-  // ---------------------------------------------------------------------------
-  // Manual reading entry (blur on individual cell)
-  // ---------------------------------------------------------------------------
+  // ── Manual reading entry (blur on individual cell) ────────────────────────
+
   updateReading(event) {
-    const input      = event.target
-    const partIdx    = parseInt(input.dataset.partIndex, 10)
+    const input = event.target
+    const partIdx = parseInt(input.dataset.partIndex, 10)
     const readingIdx = parseInt(input.dataset.readingIndex, 10)
-    const valueStr   = input.value.trim()
+    const valueStr = input.value.trim()
 
     if (!valueStr) {
       this.parts[partIdx].readings[readingIdx] = null
@@ -218,129 +293,26 @@ export default class extends Controller {
     this.renderPartStats(partIdx)
     this.renderBatchStats()
     this.persist()
+    if (this.session) this.session.refresh()
   }
 
-  // ---------------------------------------------------------------------------
-  // Elcometer Web Serial (mirrors elcometer_controller pattern)
-  // ---------------------------------------------------------------------------
-  async connectElcometer() {
-    if (this.parts.length === 0) {
-      this.showError("Set 'Parts in this batch' before connecting the Elcometer")
-      return
-    }
+  // ── Clear / persist / load ────────────────────────────────────────────────
 
-    try {
-      this.port = await navigator.serial.requestPort()
-      await this.port.open({ baudRate: 9600, dataBits: 8, stopBits: 1, parity: "none" })
-
-      this.showSuccess(`✅ Connected to Elcometer for ${this.batchLabelValue}`)
-      this.connectButtonTarget.classList.add("hidden")
-      this.stopButtonTarget.classList.remove("hidden")
-
-      this.isReading = true
-      this.startReading()
-    } catch (err) {
-      if (err.name === "NotFoundError") {
-        this.showError("No device selected")
-      } else {
-        this.showError(`Connection error: ${err.message}`)
-      }
-      console.error("NADCAP Elcometer connection error:", err)
-    }
-  }
-
-  async startReading() {
-    try {
-      const decoder = new TextDecoderStream()
-      this.port.readable.pipeTo(decoder.writable)
-      this.reader = decoder.readable.getReader()
-
-      let buffer = ""
-      while (this.isReading) {
-        const { value, done } = await this.reader.read()
-        if (done) break
-        buffer += value
-        const lines = buffer.split("\n")
-        buffer = lines.pop()
-        for (const line of lines) {
-          this.processSerialReading(line)
-        }
-      }
-    } catch (err) {
-      if (this.isReading) {
-        this.showError(`Reading error: ${err.message}`)
-        console.error("NADCAP reading error:", err)
-      }
-    }
-  }
-
-  processSerialReading(line) {
-    const match = line.match(/\s*([\d.]+)\s*um/i)
-    if (!match) return
-
-    const value = parseFloat(match[1])
-    if (isNaN(value) || value <= 0) return
-
-    // Fill the first empty slot, scanning p1[0..7] -> p2[0..7] -> ...
-    for (let pi = 0; pi < this.parts.length; pi++) {
-      for (let ri = 0; ri < 8; ri++) {
-        if (this.parts[pi].readings[ri] == null) {
-          const rounded = Math.round(value * 10) / 10
-          this.parts[pi].readings[ri] = rounded
-
-          const inp = this.partsContainerTarget.querySelector(
-            `input[data-part-index="${pi}"][data-reading-index="${ri}"]`
-          )
-          if (inp) {
-            inp.value = rounded
-            inp.classList.add("ring-2", "ring-blue-400")
-            setTimeout(() => inp.classList.remove("ring-2", "ring-blue-400"), 300)
-          }
-          this.renderPartStats(pi)
-          this.renderBatchStats()
-          this.persist()
-          return
-        }
-      }
-    }
-    this.showWarning(`${this.batchLabelValue} all slots full - reading ignored`)
-  }
-
-  async stopReading() {
-    this.isReading = false
-    try {
-      if (this.reader) {
-        await this.reader.cancel()
-        this.reader = null
-      }
-      if (this.port) {
-        await this.port.close()
-        this.port = null
-      }
-      if (this.hasConnectButtonTarget) this.connectButtonTarget.classList.remove("hidden")
-      if (this.hasStopButtonTarget)    this.stopButtonTarget.classList.add("hidden")
-    } catch (err) {
-      console.error("NADCAP stop error:", err)
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Clear / persist / load
-  // ---------------------------------------------------------------------------
   clearReadings() {
     if (!confirm(`Clear all readings for ${this.batchLabelValue}?`)) return
-    this.parts.forEach(p => p.readings = Array(8).fill(null))
+    this.parts.forEach((p) => (p.readings = Array(8).fill(null)))
     this.renderGrid()
     this.renderBatchStats()
     this.persist()
+    if (this.session) this.session.refresh()
     this.showSuccess(`${this.batchLabelValue} readings cleared`)
   }
 
   renderBatchStats() {
     if (!this.hasStatisticsTarget) return
 
-    const allReadings = this.parts.flatMap(p =>
-      p.readings.filter(r => r != null && r !== "" && !isNaN(r))
+    const allReadings = this.parts.flatMap((p) =>
+      p.readings.filter((r) => r != null && r !== "" && !isNaN(r))
     )
     const expected = this.sampleSizeFor(this.partsPerBatch) * 8
 
@@ -351,10 +323,10 @@ export default class extends Controller {
       return
     }
 
-    const sum  = allReadings.reduce((a, b) => a + b, 0)
+    const sum = allReadings.reduce((a, b) => a + b, 0)
     const mean = Math.round((sum / allReadings.length) * 10) / 10
-    const min  = Math.min(...allReadings)
-    const max  = Math.max(...allReadings)
+    const min = Math.min(...allReadings)
+    const max = Math.max(...allReadings)
 
     this.statisticsTarget.innerHTML = `
       <div class="grid grid-cols-4 gap-4 p-3 bg-gray-50 rounded-md">
@@ -388,9 +360,9 @@ export default class extends Controller {
 
     const payload = {
       parts_per_batch: this.partsPerBatch,
-      parts: this.parts.map(p => ({
+      parts: this.parts.map((p) => ({
         part_label: p.label,
-        readings:   p.readings.filter(r => r != null && r !== "" && !isNaN(r))
+        readings:   p.readings.filter((r) => r != null && r !== "" && !isNaN(r))
       }))
     }
     this.readingsDataTarget.value = JSON.stringify(payload)
@@ -431,11 +403,10 @@ export default class extends Controller {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Notifications
-  // ---------------------------------------------------------------------------
+  // ── Notifications ─────────────────────────────────────────────────────────
+
   showSuccess(msg) { this.showNotification(msg, "success") }
-  showError(msg)   { this.showNotification(msg, "error")   }
+  showError(msg)   { this.showNotification(msg, "error") }
   showWarning(msg) { this.showNotification(msg, "warning") }
 
   showNotification(message, type) {

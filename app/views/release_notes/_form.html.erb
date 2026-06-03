@@ -196,7 +196,7 @@
              ================================================================ -->
         <% if @release_note.requires_thickness_measurements? %>
           <div class="sm:col-span-6">
-            <div class="border-t border-gray-200 pt-6">
+            <div class="border-t border-gray-200 pt-6" data-controller="elcometer-session">
               <h3 class="text-lg font-medium text-gray-900 mb-1">
                 Thickness Measurements
                 <span class="text-sm font-normal text-gray-500">(Required for Aerospace/Defense)</span>
@@ -206,6 +206,36 @@
                 Standard anodic films use 1 part per batch; MIL-PRF-8625F Type III follows the NADCAP sample plan based on parts per batch.
                 Use "Number of Batches" to record measurements from multiple production batches on a single release.
               </p>
+
+              <!-- Shared Elcometer connection: one connection for the whole release.
+                   Readings auto-fill the first unfinished batch and roll forward.
+                   Click into any batch to send the next readings there instead. -->
+              <div class="flex items-center justify-between gap-3 mb-6 p-3 bg-white border border-gray-200 rounded-lg shadow-sm">
+                <div data-elcometer-session-target="status"
+                     class="flex-1 text-sm border rounded-md px-3 py-2 bg-gray-50 text-gray-600 border-gray-200">
+                  Connect the Elcometer to auto-fill readings across every batch.
+                </div>
+                <div class="flex gap-2 shrink-0">
+                  <button type="button"
+                          data-elcometer-session-target="connectButton"
+                          data-action="click->elcometer-session#connectElcometer"
+                          class="inline-flex items-center px-3 py-1.5 border border-blue-600 rounded text-xs font-medium text-blue-600 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500">
+                    <svg class="h-3.5 w-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    Connect Elcometer
+                  </button>
+                  <button type="button"
+                          data-elcometer-session-target="stopButton"
+                          data-action="click->elcometer-session#stopReading"
+                          class="hidden inline-flex items-center px-3 py-1.5 border border-red-600 rounded text-xs font-medium text-red-600 bg-white hover:bg-red-50">
+                    <svg class="h-3.5 w-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                    Disconnect
+                  </button>
+                </div>
+              </div>
 
               <div class="space-y-8">
                 <% @release_note.get_required_treatments.each do |treatment| %>
@@ -402,27 +432,9 @@
                                 </div>
 
                                 <div class="flex gap-2">
-                                  <!-- Connect Button -->
-                                  <button type="button"
-                                          data-nadcap-sampling-target="connectButton"
-                                          data-action="click->nadcap-sampling#connectElcometer"
-                                          class="inline-flex items-center px-3 py-1.5 border border-blue-600 rounded text-xs font-medium text-blue-600 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500">
-                                    <svg class="h-3.5 w-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                                    </svg>
-                                    Connect Elcometer
-                                  </button>
-
-                                  <!-- Stop Button (hidden initially) -->
-                                  <button type="button"
-                                          data-nadcap-sampling-target="stopButton"
-                                          data-action="click->nadcap-sampling#stopReading"
-                                          class="hidden inline-flex items-center px-3 py-1.5 border border-red-600 rounded text-xs font-medium text-red-600 bg-white hover:bg-red-50">
-                                    <svg class="h-3.5 w-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                                    </svg>
-                                    Stop
-                                  </button>
+                                  <!-- Connection is now shared at the section level
+                                       (elcometer-session). This batch just receives
+                                       routed readings; Clear remains per-batch. -->
 
                                   <!-- Clear Button -->
                                   <button type="button"
@@ -475,30 +487,12 @@
                               <!-- Elcometer controls row -->
                               <div class="flex items-center justify-between mb-3">
                                 <div class="text-xs text-gray-500">
-                                  Elcometer or manual entry · 8 readings required per batch
+                                  Manual entry or the shared Elcometer · 8 readings per batch
                                 </div>
                                 <div class="flex gap-2">
-                                  <!-- Connect Button -->
-                                  <button type="button"
-                                          data-elcometer-target="connectButton"
-                                          data-action="click->elcometer#connectElcometer"
-                                          class="inline-flex items-center px-3 py-1.5 border border-blue-600 rounded text-xs font-medium text-blue-600 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500">
-                                    <svg class="h-3.5 w-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                                    </svg>
-                                    Connect Elcometer
-                                  </button>
-
-                                  <!-- Stop Button (hidden initially) -->
-                                  <button type="button"
-                                          data-elcometer-target="stopButton"
-                                          data-action="click->elcometer#stopReading"
-                                          class="hidden inline-flex items-center px-3 py-1.5 border border-red-600 rounded text-xs font-medium text-red-600 bg-white hover:bg-red-50">
-                                    <svg class="h-3.5 w-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                                    </svg>
-                                    Stop
-                                  </button>
+                                  <!-- Connection is now shared at the section level
+                                       (elcometer-session). This batch just receives
+                                       routed readings; Clear remains per-batch. -->
 
                                   <!-- Clear Button -->
                                   <button type="button"
