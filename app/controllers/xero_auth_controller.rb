@@ -56,19 +56,24 @@ class XeroAuthController < ApplicationController
       total_contacts = 0
       org_names = []
 
-      # Process ALL connections, prioritizing Hard Anodising Surface Treatments
+      # We only trade through "Hard Anodising Surface Treatments Ltd".
+      # The connecting Xero user may also have access to the defunct
+      # "Hard Anodising Ltd" org — skip it entirely so it can never become
+      # the session tenant or get a XeroToken row that background jobs pick up.
       connections.each do |connection|
         tenant_id = connection['tenantId']
         tenant_name = connection['tenantName']
 
+        unless tenant_name.to_s.downcase.include?('surface treatments')
+          Rails.logger.info "Skipping non-trading organization: #{tenant_name}"
+          next
+        end
+
         Rails.logger.info "Processing organization: #{tenant_name}"
 
-        # Store the main organization (prioritize Hard Anodising)
-        if tenant_name.downcase.include?('hard anodising') || session[:xero_tenant_id].nil?
-          session[:xero_tenant_id] = tenant_id
-          session[:xero_tenant_name] = tenant_name
-          Rails.logger.info "Set primary organization: #{tenant_name}"
-        end
+        session[:xero_tenant_id] = tenant_id
+        session[:xero_tenant_name] = tenant_name
+        Rails.logger.info "Set primary organization: #{tenant_name}"
 
         # Persist token to database for background job access (AI assistant, etc.)
         XeroToken.store_from_callback!(token_set, tenant_id, tenant_name)
@@ -80,6 +85,11 @@ class XeroAuthController < ApplicationController
         total_contacts += contact_count
 
         Rails.logger.info "✅ Synced #{contact_count} contacts from #{tenant_name}"
+      end
+
+      if session[:xero_tenant_id].nil?
+        redirect_to root_path, alert: "Connected, but couldn't find Hard Anodising Surface Treatments Ltd in your Xero organizations"
+        return
       end
 
       if total_contacts > 0

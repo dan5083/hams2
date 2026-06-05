@@ -1,229 +1,200 @@
-# app/controllers/xero_auth_controller.rb
-class XeroAuthController < ApplicationController
-  before_action :require_xero_access, except: [:authorize, :callback]
-  allow_unauthenticated_access only: [:authorize, :callback]
+# app/controllers/invoices_controller.rb
+class InvoicesController < ApplicationController
+  before_action :require_xero_access
+  before_action :set_invoice, only: [:show, :edit, :update, :destroy, :void]
 
-  def authorize
-    Rails.logger.info "=== STARTING XERO AUTH ==="
+  def index
+    @invoices = Invoice.includes(:customer, :invoice_items)
+                      .order(created_at: :desc)
 
-    creds = {
-      client_id: ENV['XERO_CLIENT_ID'],
-      client_secret: ENV['XERO_CLIENT_SECRET'],
-      redirect_uri: ENV['XERO_REDIRECT_URI'],
-      scopes: 'accounting.contacts accounting.transactions offline_access'
-    }
+    # Filter by sync status
+    case params[:status]
+    when 'synced'
+      @invoices = @invoices.synced
+    when 'requiring_sync'
+      @invoices = @invoices.requiring_xero_sync
+    end
 
-    xero_client = XeroRuby::ApiClient.new(credentials: creds)
-    auth_url = xero_client.authorization_url
-    redirect_to auth_url, allow_other_host: true
+    # Filter by customer
+    if params[:customer_id].present?
+      @invoices = @invoices.where(customer_id: params[:customer_id])
+    end
+
+    # For the filter dropdown - include all enabled organizations for consistency
+    @customers = Organization.enabled.order(:name)
   end
 
-  def callback
-    Rails.logger.info "=== XERO CALLBACK RECEIVED ==="
+  def show
+  end
 
-    auth_code = params[:code]
-    if auth_code.blank?
-      redirect_to root_path, alert: "Xero authorization failed"
+  def new
+    @invoice = Invoice.new
+    # Include all enabled organizations for consistency
+    @customers = Organization.enabled.order(:name)
+  end
+
+  def create
+    @invoice = Invoice.new(invoice_params)
+
+    if @invoice.save
+      redirect_to @invoice, notice: 'Invoice was successfully created.'
+    else
+      # Include all enabled organizations for consistency
+      @customers = Organization.enabled.order(:name)
+      render :new, status: :unprocessable_entity
+    end
+  end
+
+  def edit
+    # Include all enabled organizations for consistency
+    @customers = Organization.enabled.order(:name)
+  end
+
+  def update
+    if @invoice.update(invoice_params)
+      redirect_to @invoice, notice: 'Invoice was successfully updated.'
+    else
+      # Include all enabled organizations for consistency
+      @customers = Organization.enabled.order(:name)
+      render :edit, status: :unprocessable_entity
+    end
+  end
+
+  def destroy
+    if @invoice.can_be_deleted?
+      @invoice.destroy
+      redirect_to invoices_url, notice: 'Invoice was successfully deleted.'
+    else
+      redirect_to @invoice, alert: 'Cannot delete invoice with associated items.'
+    end
+  end
+
+  def void
+    # Implementation for voiding invoices if needed
+    redirect_to @invoice, alert: 'Invoice voiding not yet implemented.'
+  end
+
+  # Bulk push selected invoices to Xero
+  def push_selected_to_xero
+    Rails.logger.info "🚀 BULK_PUSH: Starting bulk push to Xero"
+
+    # Check if any invoices were selected
+    invoice_ids = params[:invoice_ids]
+    if invoice_ids.blank?
+      redirect_to root_path, alert: 'No invoices selected for pushing to Xero.'
+      return
+    end
+
+    # IMPROVED: Check Xero connection with better error messages
+    unless session[:xero_token_set] && session[:xero_tenant_id]
+      Rails.logger.info "❌ BULK_PUSH: No Xero connection in session"
+      redirect_to root_path,
+                  alert: '❌ Not connected to Xero. Please click "Connect to Xero" first, then try again.'
       return
     end
 
     begin
-      creds = {
-        client_id: ENV['XERO_CLIENT_ID'],
-        client_secret: ENV['XERO_CLIENT_SECRET'],
-        redirect_uri: ENV['XERO_REDIRECT_URI']
-      }
+      # Get the selected invoices
+      invoices = Invoice.requiring_xero_sync
+                      .where(id: invoice_ids)
+                      .includes(:customer)
 
-      xero_client = XeroRuby::ApiClient.new(credentials: creds)
-      token_set = xero_client.get_token_set_from_callback(params)
+      Rails.logger.info "🔍 BULK_PUSH: Found #{invoices.count} invoices to push"
 
-      if token_set.nil? || token_set.key?('error')
-        redirect_to root_path, alert: "Failed to get valid token from Xero"
+      if invoices.empty?
+        redirect_to root_path, alert: 'No valid invoices found for pushing to Xero.'
         return
       end
 
-      xero_client.set_token_set(token_set)
-      connections = xero_client.connections
-
-      if connections.empty?
-        redirect_to root_path, alert: "No Xero organizations found"
+      # Check all customers have Xero contacts
+      missing_contacts = invoices.select { |inv| inv.customer.xero_contact&.xero_id.blank? }
+      if missing_contacts.any?
+        customer_names = missing_contacts.map { |inv| inv.customer.name }.uniq.join(', ')
+        redirect_to root_path,
+                    alert: "❌ Cannot push invoices - customers missing Xero contacts: #{customer_names}. Please sync customers from Xero first."
         return
       end
 
-      # Store the token set in session (for web UI) and database (for background jobs)
-      session[:xero_token_set] = token_set
+      # Test Xero connection with a simple API call first
+      begin
+        Rails.logger.info "🔍 BULK_PUSH: Testing Xero API connection..."
+        xero_service = XeroInvoiceService.new(session[:xero_token_set], session[:xero_tenant_id])
 
-      total_contacts = 0
-      org_names = []
+        # Try to create the service - this should validate the connection
+        # You might want to add a test method to XeroInvoiceService
 
-      # We only trade through "Hard Anodising Surface Treatments Ltd".
-      # The connecting Xero user may also have access to the defunct
-      # "Hard Anodising Ltd" org — skip it entirely so it can never become
-      # the session tenant or get a XeroToken row that background jobs pick up.
-      connections.each do |connection|
-        tenant_id = connection['tenantId']
-        tenant_name = connection['tenantName']
+      rescue => connection_error
+        Rails.logger.error "❌ BULK_PUSH: Xero connection test failed: #{connection_error.message}"
+        redirect_to root_path,
+                    alert: "❌ Xero connection failed: #{connection_error.message}. Please reconnect to Xero and try again."
+        return
+      end
 
-        unless tenant_name.to_s.downcase.include?('surface treatments')
-          Rails.logger.info "Skipping non-trading organization: #{tenant_name}"
-          next
+      # Push invoices to Xero using existing service
+      Rails.logger.info "🔍 BULK_PUSH: Pushing #{invoices.count} invoices to Xero..."
+
+      success_count = 0
+      failed_count = 0
+      failed_invoices = []
+
+      invoices.each do |invoice|
+        Rails.logger.info "🔍 BULK_PUSH: Pushing invoice INV#{invoice.number}..."
+        result = xero_service.push_invoice(invoice)
+
+        if result[:success]
+          success_count += 1
+          Rails.logger.info "✅ BULK_PUSH: Invoice INV#{invoice.number} pushed successfully"
+        else
+          failed_count += 1
+          failed_invoices << "INV#{invoice.number}"
+          Rails.logger.error "❌ BULK_PUSH: Invoice INV#{invoice.number} failed: #{result[:error]}"
         end
-
-        Rails.logger.info "Processing organization: #{tenant_name}"
-
-        session[:xero_tenant_id] = tenant_id
-        session[:xero_tenant_name] = tenant_name
-        Rails.logger.info "Set primary organization: #{tenant_name}"
-
-        # Persist token to database for background job access (AI assistant, etc.)
-        XeroToken.store_from_callback!(token_set, tenant_id, tenant_name)
-
-        org_names << tenant_name
-
-        # Sync contacts from this organization
-        contact_count = sync_contacts_from_xero(token_set, tenant_id)
-        total_contacts += contact_count
-
-        Rails.logger.info "✅ Synced #{contact_count} contacts from #{tenant_name}"
       end
 
-      if session[:xero_tenant_id].nil?
-        redirect_to root_path, alert: "Connected, but couldn't find Hard Anodising Surface Treatments Ltd in your Xero organizations"
-        return
-      end
-
-      if total_contacts > 0
-        redirect_to root_path, notice: "✅ Connected to #{org_names.join(', ')} and synced #{total_contacts} total contacts!"
+      # Build success/error message
+      if success_count > 0 && failed_count == 0
+        redirect_to root_path,
+                    notice: "✅ Successfully pushed #{success_count} invoice(s) to Xero!"
+      elsif success_count > 0 && failed_count > 0
+        redirect_to root_path,
+                    alert: "⚠️ Pushed #{success_count} invoice(s) successfully, but #{failed_count} failed: #{failed_invoices.join(', ')}. Please check Xero connection and try again."
       else
-        redirect_to root_path, alert: "Connected but no contacts were synced"
+        redirect_to root_path,
+                    alert: "❌ Failed to push all #{failed_count} invoice(s) to Xero: #{failed_invoices.join(', ')}. Please check Xero connection and try again."
       end
 
-    rescue => e
-      Rails.logger.error "Xero OAuth error: #{e.message}"
-      redirect_to root_path, alert: "Failed to connect to Xero: #{e.message}"
+    rescue StandardError => e
+      Rails.logger.error "💥 BULK_PUSH: Exception occurred: #{e.message}"
+      Rails.logger.error "💥 BULK_PUSH: Backtrace: #{e.backtrace.first(10).join("\n")}"
+
+      # Provide helpful error messages based on the error type
+      error_message = case e.message
+      when /token/i, /unauthorized/i, /authentication/i
+        "❌ Xero authentication failed. Please reconnect to Xero and try again."
+      when /network/i, /timeout/i, /connection/i
+        "❌ Network error connecting to Xero. Please check your connection and try again."
+      else
+        "❌ Failed to push invoices to Xero: #{e.message}. Please try again or contact support."
+      end
+
+      redirect_to root_path, alert: error_message
     end
   end
 
-  def test_api
-    Rails.logger.info "=== MANUAL API TEST ==="
 
-    token_set = session[:xero_token_set]
-    tenant_id = session[:xero_tenant_id]
-
-    if token_set.nil? || tenant_id.nil?
-      render plain: "❌ No token/tenant found. Connect via /auth/xero first."
-      return
-    end
-
-    begin
-      contacts_data = fetch_contacts_from_xero(token_set, tenant_id)
-      customers = contacts_data.select { |c| c['IsCustomer'] == true }
-
-      render plain: "✅ SUCCESS! API call worked.\nTotal contacts: #{contacts_data.length}\nCustomers: #{customers.length}\n\nFirst few customers:\n#{customers.first(3).map { |c| "- #{c['Name']}" }.join("\n")}"
-
-    rescue => e
-      Rails.logger.error "API test error: #{e.message}"
-      render plain: "❌ API test failed: #{e.message}"
-    end
-  end
 
   private
 
-  def sync_contacts_from_xero(token_set, tenant_id)
-    begin
-      Rails.logger.info "Fetching contacts from Xero..."
-
-      contacts_data = fetch_contacts_from_xero(token_set, tenant_id)
-      Rails.logger.info "Found #{contacts_data.length} total contacts"
-
-      customers = contacts_data.select { |c| c['IsCustomer'] == true }
-      suppliers = contacts_data.select { |c| c['IsSupplier'] == true }
-
-      Rails.logger.info "Customers: #{customers.length}, Suppliers: #{suppliers.length}"
-
-      contact_count = 0
-      contacts_data.each do |contact|
-        # Skip archived contacts
-        next if contact['ContactStatus'] == 'ARCHIVED'
-
-        # Find or create XeroContact record
-        xero_contact = XeroContact.find_or_initialize_by(xero_id: contact['ContactID'])
-        xero_contact.assign_attributes(
-          name: contact['Name'] || 'Unknown',
-          contact_status: contact['ContactStatus'] || 'ACTIVE',
-          is_customer: contact['IsCustomer'] || false,
-          is_supplier: contact['IsSupplier'] || false,
-          accounts_receivable_tax_type: contact['AccountsReceivableTaxType'],
-          accounts_payable_tax_type: contact['AccountsPayableTaxType'],
-          xero_data: contact,
-          last_synced_at: Time.current
-        )
-        xero_contact.save!
-
-        # Find or create organization
-        organization = Organization.find_or_initialize_by(xero_contact: xero_contact)
-
-        if organization.new_record?
-          organization.assign_attributes(
-            name: contact['Name'] || 'Unknown',
-            enabled: true,
-            is_customer: contact['IsCustomer'] || false,
-            is_supplier: contact['IsSupplier'] || false
-          )
-        else
-          # Update organization details from fresh Xero data
-          organization.assign_attributes(
-            name: contact['Name'] || organization.name,
-            is_customer: contact['IsCustomer'] || false,
-            is_supplier: contact['IsSupplier'] || false
-          )
-        end
-
-        organization.save!
-
-        # Sync address for customer organizations
-        if organization.is_customer
-          begin
-            organization.sync_address_from_xero!
-          rescue => e
-            Rails.logger.error "Failed to sync address for #{organization.name}: #{e.message}"
-          end
-        end
-
-        contact_count += 1
-      end
-
-      Rails.logger.info "✅ Successfully synced #{contact_count} contacts"
-      contact_count
-
-    rescue => e
-      Rails.logger.error "Sync error: #{e.message}"
-      0
-    end
+  def set_invoice
+    @invoice = Invoice.find(params[:id])
   end
 
-  def fetch_contacts_from_xero(token_set, tenant_id)
-    require 'net/http'
-    require 'uri'
-    require 'json'
-
-    uri = URI("https://api.xero.com/api.xro/2.0/Contacts?includeArchived=false")
-
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = true
-
-    request = Net::HTTP::Get.new(uri)
-    request['Authorization'] = "Bearer #{token_set['access_token']}"
-    request['xero-tenant-id'] = tenant_id
-    request['Accept'] = 'application/json'
-
-    response = http.request(request)
-
-    if response.code == '200'
-      data = JSON.parse(response.body)
-      return data['Contacts'] || []
-    else
-      raise "API call failed with status #{response.code}: #{response.body}"
-    end
+  def invoice_params
+    params.require(:invoice).permit(
+      :customer_id,
+      :date,
+      :tax_rate_pct,
+      :xero_tax_type
+    )
   end
 end
