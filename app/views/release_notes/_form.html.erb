@@ -246,7 +246,7 @@
                     is_enp        = @release_note.treatment_is_enp?(process_type)
                     is_nadcap     = treatment[:requires_nadcap_sampling]
                     target_thickness = treatment[:target_thickness]
-                    max_batches   = 20
+                    max_batches   = 30
                     saved_batch_count = @release_note.persisted? ? @release_note.get_batch_count(treatment_id) : 1
                   %>
 
@@ -673,7 +673,7 @@
       // --------------------------------------------------------------------
       function setBatchCount(treatmentId, newCountStr, type) {
         const newCount  = parseInt(newCountStr);
-        const maxBatches = 20;
+        const maxBatches = 30;
 
         for (let batch = 1; batch <= maxBatches; batch++) {
           const container = document.getElementById(`batch_container_${treatmentId}_${batch}`);
