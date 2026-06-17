@@ -54,7 +54,7 @@ class QualityDocument < ApplicationRecord
     # Only create revision if issue number actually changed (reissue)
     if current_issue_number_changed?
       revisions.create!(
-        issue_number: current_issue_number,
+        issue_number: current_issue_number_was,
         changed_by: reissue_authorised_by.presence || Current.user&.display_name || 'System',
         changed_at: Time.current,
         previous_content: content_was,
