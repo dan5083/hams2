@@ -133,35 +133,7 @@ class QualityDocumentsController < ApplicationController
       'references' => []
     }
 
-    if @document.document_type == 'M' && !@document.content.dig('skills_matrix')
-      # ── Testing Matrix ───────────────────────────────────────────────────────
-      if params[:matrix_sections].present?
-        params[:matrix_sections].to_unsafe_h.each do |_idx, section_data|
-          section = { 'heading' => section_data['heading'].to_s, 'rows' => [] }
-
-          (section_data['rows'] || {}).sort_by { |k, _| k.to_s }.each do |_ridx, row_data|
-            case row_data['type']
-            when 'ref'
-              section['rows'] << [row_data['ref_text'].to_s]
-            when 'span'
-              cols = (row_data['cols'] || {})
-                       .sort_by { |k, _| k.to_i }
-                       .map { |_, v| v.to_s }
-                       .reject(&:blank?)
-              row_hash = { 'cols' => cols, 'span' => row_data['span'].to_s }
-              row_hash['note'] = row_data['note'].to_s if row_data['note'].present?
-              section['rows'] << row_hash
-            else
-              cells = (0..6).map { |i| row_data.dig('cells', i.to_s).to_s }
-              section['rows'] << cells
-            end
-          end
-
-          content['sections'] << section
-        end
-      end
-
-    elsif @document.content.dig('skills_matrix')
+    if @document.content.dig('skills_matrix') || params[:skills_matrix].present?
       # ── Skills Matrix ────────────────────────────────────────────────────────
       sm = params[:skills_matrix].to_unsafe_h
 
@@ -186,6 +158,36 @@ class QualityDocumentsController < ApplicationController
         'sections'      => [],
         'references'    => []
       )
+
+    elsif params[:matrix_sections].present?
+      # ── Testing Matrix ───────────────────────────────────────────────────────
+      # Flag it so the form/show can identify a testing matrix by content shape
+      # rather than by document_type alone.
+      content['testing_matrix'] = true
+
+      params[:matrix_sections].to_unsafe_h.each do |_idx, section_data|
+        section = { 'heading' => section_data['heading'].to_s, 'rows' => [] }
+
+        (section_data['rows'] || {}).sort_by { |k, _| k.to_s }.each do |_ridx, row_data|
+          case row_data['type']
+          when 'ref'
+            section['rows'] << [row_data['ref_text'].to_s]
+          when 'span'
+            cols = (row_data['cols'] || {})
+                     .sort_by { |k, _| k.to_i }
+                     .map { |_, v| v.to_s }
+                     .reject(&:blank?)
+            row_hash = { 'cols' => cols, 'span' => row_data['span'].to_s }
+            row_hash['note'] = row_data['note'].to_s if row_data['note'].present?
+            section['rows'] << row_hash
+          else
+            cells = (0..6).map { |i| row_data.dig('cells', i.to_s).to_s }
+            section['rows'] << cells
+          end
+        end
+
+        content['sections'] << section
+      end
 
     else
       # ── Standard TinyMCE sections ────────────────────────────────────────────
