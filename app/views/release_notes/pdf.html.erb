@@ -292,6 +292,37 @@
         padding-top: 0.4rem;
         margin-top: 0.4rem;
       }
+
+      /* ----------------------------------------------------------------
+         Operator copy — NADCAP (MIL-PRF-8625F Type III) sample plan.
+         Appended as its own final page. The outer box is a fixed single
+         A4 content height with overflow hidden so it can never spill onto
+         a second sheet; the inner block is scaled down by script (see end
+         of body) to fit when there are a lot of readings. Each @page still
+         supplies its own 1cm margin after the break, so no padding needed.
+         ---------------------------------------------------------------- */
+      .nadcap-operator-copy {
+        page-break-before: always;
+        height: 270mm;            /* A4 content area (297mm − 2×1cm) with safety margin */
+        overflow: hidden;
+        position: relative;
+        box-sizing: border-box;
+      }
+      .nadcap-operator-fit {
+        transform-origin: top left;
+        width: 100%;
+      }
+      .nadcap-staple-banner {
+        border: 1.5pt dashed #475569;
+        background-color: #f1f5f9;
+        color: #0f172a;
+        font-weight: bold;
+        font-size: 9pt;
+        text-align: center;
+        padding: 0.35rem 0.5rem;
+        margin-bottom: 0.5rem;
+        letter-spacing: 0.02em;
+      }
     </style>
   </head>
   <body>
@@ -788,5 +819,181 @@
       </div>
 
     </div><!-- /certificate-page -->
+
+    <!-- ============================================================
+         Operator copy — NADCAP (MIL-PRF-8625F Type III) sample plan.
+         Appended as a final page ONLY when sample-plan (per-part)
+         readings exist on this release note. It restates every reading
+         and is scaled to fit a single A4 sheet so the operator can
+         staple it to the works order. Nothing above this block is
+         altered — detection is by presence of per-part sampled data,
+         which is only ever written for the Type III hard-anodise path.
+         ============================================================ -->
+    <%
+      nadcap_measurements =
+        if @release_note.has_thickness_measurements?
+          (@release_note.measured_thicknesses['measurements'] || []).filter_map do |m|
+            sample_batches = (m['batches'].is_a?(Array) ? m['batches'] : [])
+                               .select { |b| b['parts'].is_a?(Array) && b['parts'].any? }
+            next if sample_batches.empty?
+            {
+              'display_name' => m['display_name'] || m['process_type'].to_s.humanize.titleize,
+              'batches'      => sample_batches
+            }
+          end
+        else
+          []
+        end
+    %>
+    <% if nadcap_measurements.any? %>
+      <div class="nadcap-operator-copy" id="nadcap-operator-copy">
+        <div class="nadcap-operator-fit" id="nadcap-operator-fit">
+
+          <div class="nadcap-staple-banner">
+            &#9986; &nbsp; OPERATOR COPY &mdash; STAPLE TO WORKS ORDER WO<%= @release_note.works_order.number %> &nbsp; &#9986;
+          </div>
+
+          <h1 style="margin-top: 0;">MIL-PRF-8625F Type III &mdash; Sample Plan Readings</h1>
+
+          <table class="detail-table" style="table-layout: fixed;">
+            <colgroup>
+              <col style="width: 20%;">
+              <col style="width: 30%;">
+              <col style="width: 20%;">
+              <col style="width: 30%;">
+            </colgroup>
+            <tbody>
+              <tr>
+                <th>Release Note</th>
+                <td>RN<%= @release_note.number %></td>
+                <th>Works Order</th>
+                <td>WO<%= @release_note.works_order.number %></td>
+              </tr>
+              <tr>
+                <th>Part Number</th>
+                <td><%= @release_note.works_order.part_number %></td>
+                <th>Issue</th>
+                <td><%= @release_note.works_order.part_issue %></td>
+              </tr>
+              <tr>
+                <th>Specification</th>
+                <td colspan="3"><%= @release_note.specification %></td>
+              </tr>
+              <tr>
+                <th>Date</th>
+                <td><%= @release_note.date.strftime("%d/%m/%Y") %></td>
+                <th>Qty Accepted</th>
+                <td><%= @release_note.quantity_accepted %></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <% nadcap_measurements.each do |measurement| %>
+            <%
+              batches      = measurement['batches']
+              all_readings = batches.flat_map { |b| (b['parts'] || []).flat_map { |p| p['readings'] || [] } }
+              total_parts  = batches.sum { |b| (b['parts'] || []).count }
+            %>
+
+            <div class="thickness-group-header"><%= measurement['display_name'] %></div>
+
+            <% if all_readings.any? %>
+              <div class="overall-stats">
+                <strong>Overall (<%= batches.count %> batch<%= batches.count == 1 ? '' : 'es' %>):</strong>
+                Mean: <strong><%= (all_readings.sum / all_readings.count.to_f).round(1) %> µm</strong> |
+                Min: <%= all_readings.min %> µm | Max: <%= all_readings.max %> µm |
+                Total: <%= all_readings.count %> reading<%= all_readings.count == 1 ? '' : 's' %>
+                from <%= total_parts %> sampled part<%= total_parts == 1 ? '' : 's' %>
+              </div>
+            <% end %>
+
+            <% batches.each do |batch| %>
+              <%
+                parts          = batch['parts'] || []
+                batch_number   = batch['batch_number']
+                next if parts.empty?
+                batch_readings = parts.flat_map { |p| p['readings'] || [] }
+                next if batch_readings.empty?
+                bmean          = (batch_readings.sum / batch_readings.count.to_f).round(1)
+              %>
+
+              <div class="nadcap-batch-label">
+                Batch <%= batch_number %> — <%= parts.count %> sampled part<%= parts.count == 1 ? '' : 's' %>
+                <% if batch['parts_per_batch'].present? %>
+                  <span class="stat">Lot: <%= batch['parts_per_batch'] %></span>
+                <% end %>
+                <span class="stat">Mean: <%= bmean %> µm</span>
+                <span class="stat">Min: <%= batch_readings.min %> µm</span>
+                <span class="stat">Max: <%= batch_readings.max %> µm</span>
+              </div>
+
+              <table class="anodic-table">
+                <thead>
+                  <tr>
+                    <th class="stat-col">Part</th>
+                    <th class="stat-col">Mean</th>
+                    <th class="stat-col">Min</th>
+                    <th class="stat-col">Max</th>
+                    <% 8.times do |i| %>
+                      <th class="reading-col">R<%= i + 1 %></th>
+                    <% end %>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% parts.each_with_index do |part, idx| %>
+                    <%
+                      readings = part['readings'] || []
+                      next if readings.empty?
+                      pmean = (readings.sum / readings.count.to_f).round(1)
+                      label = part['part_label'].presence || "B#{batch_number}p#{idx + 1}"
+                    %>
+                    <tr>
+                      <td class="batch-label"><%= label %></td>
+                      <td class="stat-mean"><%= pmean %> µm</td>
+                      <td><%= readings.min %> µm</td>
+                      <td><%= readings.max %> µm</td>
+                      <% readings.first(8).each do |r| %>
+                        <td><%= r %> µm</td>
+                      <% end %>
+                      <% (8 - [readings.count, 8].min).times do %><td></td><% end %>
+                    </tr>
+                  <% end %>
+                </tbody>
+              </table>
+            <% end %>
+          <% end %>
+
+        </div><!-- /nadcap-operator-fit -->
+      </div><!-- /nadcap-operator-copy -->
+
+      <script>
+        /* Scale the operator copy down so it always collapses onto a single
+           A4 sheet, however many sampled parts there are. The outer box has a
+           fixed one-page height + overflow:hidden, so it can never produce a
+           second page; we only ever shrink the inner block to fit it. Runs
+           inline (element already parsed) and again on load for safety. */
+        (function () {
+          function fitNadcapOperatorCopy() {
+            var box = document.getElementById('nadcap-operator-copy');
+            var fit = document.getElementById('nadcap-operator-fit');
+            if (!box || !fit) return;
+            fit.style.transform = 'none';
+            var availH = box.clientHeight;
+            var availW = box.clientWidth;
+            var needH  = fit.scrollHeight;
+            var needW  = fit.scrollWidth;
+            if (!needH || !needW) return;
+            var scale = Math.min(1, availH / needH, availW / needW);
+            if (scale < 1) {
+              fit.style.transform = 'scale(' + scale + ')';
+            }
+          }
+          fitNadcapOperatorCopy();
+          if (document.readyState !== 'complete') {
+            window.addEventListener('load', fitNadcapOperatorCopy);
+          }
+        })();
+      </script>
+    <% end %>
   </body>
 </html>
