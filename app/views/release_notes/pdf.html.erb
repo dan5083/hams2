@@ -292,6 +292,36 @@
         padding-top: 0.4rem;
         margin-top: 0.4rem;
       }
+
+      /* ----------------------------------------------------------------
+         NADCAP sample-plan buy-off sheet — separate page, stapled to the
+         Route Card. Starts on a fresh sheet so it can be detached.
+         ---------------------------------------------------------------- */
+      .buyoff-page {
+        page-break-before: always;
+        padding: 0.8cm 0 0 0;
+      }
+      .buyoff-subtitle {
+        text-align: center;
+        font-size: 9pt;
+        font-weight: bold;
+        color: #92400e;
+        letter-spacing: 0.03em;
+        margin: -0.2rem 0 0.7rem 0;
+      }
+      .buyoff-note {
+        background-color: #fffbeb;
+        border: 1pt solid #fbbf24;
+        padding: 0.35rem 0.5rem;
+        margin: 0.6rem 0;
+        font-size: 8pt;
+        line-height: 1.4;
+        color: #92400e;
+      }
+      .buyoff-signoff { margin-top: 1rem; page-break-inside: avoid; }
+      .buyoff-signoff table { table-layout: fixed; margin-top: 0.5rem; }
+      .buyoff-signoff th { width: 25%; }
+      .buyoff-signoff td { height: 2.4rem; }
     </style>
   </head>
   <body>
@@ -788,5 +818,176 @@
       </div>
 
     </div><!-- /certificate-page -->
+
+    <!-- ================================================================
+         NADCAP Sample-Plan Buy-Off Sheet (Route Card attachment)
+         Printed ONLY when MIL-PRF-8625 Type III sample-plan thickness data
+         is present. Carries the same measured film readings as the CofC,
+         plus job identification and an inspection buy-off block, so it can
+         be detached and stapled to the Route Card per the NADCAP auditor's
+         requirement.
+         ================================================================ -->
+    <% if @release_note.has_nadcap_sample_data? %>
+      <div class="buyoff-page">
+        <div class="logo-header">
+          <%= image_tag("logo-with-company-name.png", alt: "Hard Anodising Surface Treatments Ltd") %>
+          <div class="company-contact">
+            Firs Industrial Estate, Rickets Close, Kidderminster DY11 7QN<br/>
+            Tel: 01562 747100 | <a href="https://www.hard-anodising.co.uk/">www.hard-anodising.co.uk</a>
+          </div>
+        </div>
+
+        <h1>NADCAP Sample-Plan Buy-Off &ndash; Coating Thickness</h1>
+        <div class="buyoff-subtitle">MIL-PRF-8625 Type III &middot; Staple to Route Card</div>
+
+        <table class="detail-table" style="table-layout: fixed;">
+          <colgroup>
+            <col style="width: 20%;">
+            <col style="width: 30%;">
+            <col style="width: 20%;">
+            <col style="width: 30%;">
+          </colgroup>
+          <tbody>
+            <tr>
+              <th>Works Order</th>
+              <td>WO<%= @release_note.works_order.number %></td>
+              <th>Release Note</th>
+              <td>RN<%= @release_note.number %></td>
+            </tr>
+            <tr>
+              <th>Part Number</th>
+              <td><%= @release_note.works_order.part_number %></td>
+              <th>Issue</th>
+              <td><%= @release_note.works_order.part_issue %></td>
+            </tr>
+            <tr>
+              <th>Description</th>
+              <td colspan="3"><%= @release_note.works_order.part_description %></td>
+            </tr>
+            <tr>
+              <th>Specification</th>
+              <td colspan="3"><%= @release_note.specification %></td>
+            </tr>
+            <tr>
+              <th>Quantity Accepted</th>
+              <td><%= @release_note.quantity_accepted %></td>
+              <th>Date</th>
+              <td><%= @release_note.date.strftime("%d/%m/%Y") %></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <% if is_special_customer %>
+          <div class="gauge-info">
+            <strong>Gauge Type:</strong> Elcometer 456/4, Serial # BD10146&nbsp;&nbsp;
+            <strong>Probe Type:</strong> N1, Serial # BE23306
+          </div>
+        <% end %>
+
+        <%# Same measured film data as the CofC, NADCAP sample-plan view only. %>
+        <% @release_note.nadcap_sample_measurements.each do |entry| %>
+          <%
+            measurement    = entry['measurement']
+            nadcap_batches = entry['nadcap_batches']
+            display_name   = measurement['display_name'] || measurement['process_type'].humanize.titleize
+            all_readings   = nadcap_batches.flat_map { |b| (b['parts'] || []).flat_map { |p| p['readings'] || [] } }
+            total_parts    = nadcap_batches.sum { |b| (b['parts'] || []).count }
+            next if all_readings.empty?
+          %>
+
+          <div style="margin-bottom: 0.5rem;">
+            <div class="thickness-group-header"><%= display_name %></div>
+
+            <div class="overall-stats">
+              <strong>Overall (<%= nadcap_batches.count %> batch<%= nadcap_batches.count == 1 ? '' : 'es' %>):</strong>
+              Mean: <strong><%= (all_readings.sum / all_readings.count.to_f).round(1) %> µm</strong> |
+              Min: <%= all_readings.min %> µm | Max: <%= all_readings.max %> µm |
+              Total: <%= all_readings.count %> reading<%= all_readings.count == 1 ? '' : 's' %>
+              from <%= total_parts %> sampled part<%= total_parts == 1 ? '' : 's' %>
+            </div>
+
+            <% nadcap_batches.each do |batch| %>
+              <%
+                parts          = batch['parts'] || []
+                batch_number   = batch['batch_number']
+                next if parts.empty?
+                batch_readings = parts.flat_map { |p| p['readings'] || [] }
+                next if batch_readings.empty?
+                bmean          = (batch_readings.sum / batch_readings.count.to_f).round(1)
+                parts_in_lot   = batch['parts_per_batch']
+              %>
+
+              <div class="nadcap-batch-label">
+                Batch <%= batch_number %> — <%= parts.count %> sampled part<%= parts.count == 1 ? '' : 's' %>
+                <% if parts_in_lot.present? %>
+                  of <%= parts_in_lot %> in lot
+                <% end %>
+                <span class="stat">Mean: <%= bmean %> µm</span>
+                <span class="stat">Min: <%= batch_readings.min %> µm</span>
+                <span class="stat">Max: <%= batch_readings.max %> µm</span>
+              </div>
+
+              <table class="anodic-table">
+                <thead>
+                  <tr>
+                    <th class="stat-col">Part</th>
+                    <th class="stat-col">Mean</th>
+                    <th class="stat-col">Min</th>
+                    <th class="stat-col">Max</th>
+                    <% 8.times do |i| %>
+                      <th class="reading-col">R<%= i + 1 %></th>
+                    <% end %>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% parts.each_with_index do |part, idx| %>
+                    <%
+                      readings = part['readings'] || []
+                      next if readings.empty?
+                      pmean = (readings.sum / readings.count.to_f).round(1)
+                      label = part['part_label'].presence || "B#{batch_number}p#{idx + 1}"
+                    %>
+                    <tr>
+                      <td class="batch-label"><%= label %></td>
+                      <td class="stat-mean"><%= pmean %> µm</td>
+                      <td><%= readings.min %> µm</td>
+                      <td><%= readings.max %> µm</td>
+                      <% readings.first(8).each do |r| %>
+                        <td><%= r %> µm</td>
+                      <% end %>
+                      <% (8 - [readings.count, 8].min).times do %><td></td><% end %>
+                    </tr>
+                  <% end %>
+                </tbody>
+              </table>
+            <% end %>
+          </div>
+        <% end %>
+
+        <div class="buyoff-note">
+          This sheet records the MIL-PRF-8625 Type III sample-plan coating
+          thickness readings for the above job and is to be retained with the
+          Route Card. Sampling carried out to the NADCAP sample plan
+          (8 readings per sampled part).
+        </div>
+
+        <div class="buyoff-signoff">
+          <h2>Inspection Buy-Off</h2>
+          <table class="signature-table">
+            <tbody>
+              <tr><th>Inspected By</th><td><span class="signature-name"><%= @release_note.issued_by.display_name %></span></td></tr>
+              <tr><th>Signature</th><td></td></tr>
+              <tr><th>Date</th><td><%= @release_note.date.strftime("%d/%m/%Y") %></td></tr>
+              <tr><th>Stamp</th><td></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="company-footer">
+          Hard Anodising Surface Treatments Limited has NADCAP accreditation for Chemical Processing Certificate Number 7426237911
+        </div>
+      </div><!-- /buyoff-page -->
+    <% end %>
+
   </body>
 </html>
