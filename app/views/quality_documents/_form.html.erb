@@ -1,5 +1,7 @@
-<% is_matrix = @document.document_type == 'M' && !@document.content&.dig('skills_matrix') %>
-<% is_skills_matrix = @document.document_type == 'M' && !!@document.content&.dig('skills_matrix') %>
+<% is_skills_matrix = @document.content&.dig('skills_matrix').present? %>
+<% is_matrix = @document.content&.dig('testing_matrix').present? ||
+               Array(@document.content&.dig('sections')).any? { |s| s.is_a?(Hash) && s.key?('rows') } ||
+               (@document.new_record? && @document.document_type == 'M' && !is_skills_matrix) %>
 <!-- app/views/quality_documents/_form.html.erb -->
 <%= form_with model: @document, local: true, class: "space-y-6" do |f| %>
   <% if @document.errors.any? %>
