@@ -552,48 +552,6 @@ class ReleaseNote < ApplicationRecord
     end
   end
 
-  # -------------------------------------------------------------------------
-  # NADCAP buy-off sheet (Route Card attachment)
-  #
-  # The auditor wants the MIL-PRF-8625 Type III sample-plan readings to live
-  # with the Route Card / job traveller, not only on the customer's CofC. The
-  # PDF therefore prints an extra "buy-off" sheet (to be stapled to the Route
-  # Card) whenever sample-plan data is present. Presence of sampled-part data
-  # is the reliable signal that the Type III plan was actually invoked, and it
-  # avoids ever printing a blank sheet.
-  # -------------------------------------------------------------------------
-
-  # True when any measurement carries NADCAP sampled-part data.
-  def has_nadcap_sample_data?
-    return false unless measured_thicknesses.is_a?(Hash)
-    measurements = measured_thicknesses['measurements']
-    return false unless measurements.is_a?(Array)
-
-    measurements.any? do |m|
-      batches = m['batches']
-      batches.is_a?(Array) && batches.any? { |b| b['parts'].is_a?(Array) && b['parts'].any? }
-    end
-  end
-
-  # Returns the measurements that contain NADCAP sampled-part data, each paired
-  # with just its sample-plan batches. Shape:
-  #   [{ 'measurement' => {...}, 'nadcap_batches' => [{ 'parts' => [...] }, ...] }, ...]
-  def nadcap_sample_measurements
-    return [] unless measured_thicknesses.is_a?(Hash)
-    measurements = measured_thicknesses['measurements']
-    return [] unless measurements.is_a?(Array)
-
-    measurements.filter_map do |m|
-      batches = m['batches']
-      next unless batches.is_a?(Array)
-
-      nadcap_batches = batches.select { |b| b['parts'].is_a?(Array) && b['parts'].any? }
-      next if nadcap_batches.empty?
-
-      { 'measurement' => m, 'nadcap_batches' => nadcap_batches }
-    end
-  end
-
   def thickness_measurements_summary
     return nil unless has_thickness_measurements?
 
