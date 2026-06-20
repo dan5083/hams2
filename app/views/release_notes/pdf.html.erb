@@ -886,12 +886,14 @@
                 <td><%= @release_note.quantity_accepted %></td>
               </tr>
               <tr>
-                <%# Operation number = one past the last route operation, so this
-                    inspection/release sheet slots in as the next operation. Uses
-                    the WO accessor (nil/error-guarded) so locked and unlocked
-                    parts both resolve; degrades to 1 if no ops are configured. %>
+                <%# Operation number: the last route operation is always pack, so
+                    this test/release sheet is a sub-step of the operation before
+                    it — (count - 1) with a '.b' suffix. The WO accessor is
+                    nil/error-guarded so locked and unlocked parts both resolve;
+                    floored at 1 so a tiny route can't yield 0.b or a negative. %>
+                <% op_no = [@release_note.works_order.operations_with_auto_ops.count - 1, 1].max %>
                 <th>Operation No.</th>
-                <td><%= @release_note.works_order.operations_with_auto_ops.count + 1 %></td>
+                <td><%= op_no %>.b</td>
                 <th>Released By</th>
                 <td><%= @release_note.issued_by.display_name %></td>
               </tr>
