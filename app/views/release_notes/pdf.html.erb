@@ -303,7 +303,12 @@
          ---------------------------------------------------------------- */
       .nadcap-operator-copy {
         page-break-before: always;
-        height: 270mm;            /* A4 content area (297mm − 2×1cm) with safety margin */
+        /* A4 printable height is 277mm (297mm − 2×1cm @page margin). The body's
+           1cm bottom padding renders immediately after this final block, so the
+           box must stay ≤ 267mm or it spills ~3mm onto a blank trailing page.
+           262mm leaves a small rounding buffer; the fit script scales content
+           down to this height anyway, so a slightly shorter box is harmless. */
+        height: 262mm;
         overflow: hidden;
         position: relative;
         box-sizing: border-box;
@@ -311,6 +316,21 @@
       .nadcap-operator-fit {
         transform-origin: top left;
         width: 100%;
+      }
+
+      /* In extreme cases (many sampled parts) a single column forces the
+         scale-to-fit script to shrink readings to an unreadable size. Flowing
+         the per-batch tables into two columns roughly halves the height needed,
+         so the script can keep them far larger. Each batch block is kept intact
+         so a table never splits across the column gap. */
+      .batches-grid.two-col {
+        column-count: 2;
+        column-gap: 6mm;
+      }
+      .batch-block {
+        break-inside: avoid;
+        -webkit-column-break-inside: avoid;
+        page-break-inside: avoid;
       }
       .nadcap-staple-banner {
         border: 1.5pt dashed #475569;
@@ -905,6 +925,9 @@
               batches      = measurement['batches']
               all_readings = batches.flat_map { |b| (b['parts'] || []).flat_map { |p| p['readings'] || [] } }
               total_parts  = batches.sum { |b| (b['parts'] || []).count }
+              # Above this many sampled parts a single column would shrink the
+              # readings too far to read; flow the batch tables into two columns.
+              use_two_columns = total_parts > 24
             %>
 
             <div class="thickness-group-header"><%= measurement['display_name'] %></div>
@@ -919,6 +942,7 @@
               </div>
             <% end %>
 
+            <div class="batches-grid<%= use_two_columns ? ' two-col' : '' %>">
             <% batches.each do |batch| %>
               <%
                 parts          = batch['parts'] || []
@@ -929,6 +953,7 @@
                 bmean          = (batch_readings.sum / batch_readings.count.to_f).round(1)
               %>
 
+              <div class="batch-block">
               <div class="nadcap-batch-label">
                 Batch <%= batch_number %> — <%= parts.count %> sampled part<%= parts.count == 1 ? '' : 's' %>
                 <% if batch['parts_per_batch'].present? %>
@@ -972,7 +997,9 @@
                   <% end %>
                 </tbody>
               </table>
+              </div><!-- /batch-block -->
             <% end %>
+            </div><!-- /batches-grid -->
           <% end %>
 
         </div><!-- /nadcap-operator-fit -->
