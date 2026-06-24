@@ -319,19 +319,34 @@
       }
 
       /* In extreme cases (many sampled parts) a single column forces the
-         scale-to-fit script to shrink readings to an unreadable size. Flowing
-         the per-batch tables into two columns roughly halves the height needed,
-         so the script can keep them far larger. Each batch block is kept intact
-         so a table never splits across the column gap. */
+         scale-to-fit script to shrink readings to an unreadable size. We split
+         the batches into two ordered side-by-side columns (normal block flow,
+         NOT CSS multi-column — multicol fragments unpredictably inside the
+         fixed-height clipping box and the scale script then mis-measures it and
+         clips batches). Each column is a normal block, so scrollHeight is
+         accurate and the script scales the whole copy to fit. Two columns
+         roughly halve the height, so the scale stays far larger and legible. */
       .batches-grid.two-col {
-        column-count: 2;
-        column-gap: 6mm;
+        display: flex;
+        gap: 6mm;
+        align-items: flex-start;
+      }
+      .batches-grid.two-col .batch-col {
+        flex: 1 1 0;
+        min-width: 0;
       }
       .batch-block {
         break-inside: avoid;
         -webkit-column-break-inside: avoid;
         page-break-inside: avoid;
       }
+      /* Bare numbers (unit stated once in the header), kept on one line so a
+         narrow two-column cell can't wrap "50.6" onto two rows. */
+      .anodic-table td,
+      .anodic-table th { white-space: nowrap; }
+      .batches-grid.two-col .anodic-table { font-size: 7pt; }
+      .batches-grid.two-col .anodic-table th,
+      .batches-grid.two-col .anodic-table td { padding: 0.15rem 0.1rem; }
       .nadcap-staple-banner {
         border: 1.5pt dashed #475569;
         background-color: #f1f5f9;
@@ -930,7 +945,10 @@
               use_two_columns = total_parts > 24
             %>
 
-            <div class="thickness-group-header"><%= measurement['display_name'] %></div>
+            <div class="thickness-group-header">
+              <%= measurement['display_name'] %>
+              <% if all_readings.any? %><span style="font-weight: normal; color: #555;">— all values in µm</span><% end %>
+            </div>
 
             <% if all_readings.any? %>
               <div class="overall-stats">
@@ -942,62 +960,92 @@
               </div>
             <% end %>
 
+            <%
+              # Build the column groups. For the two-column case, split the
+              # batches into two ordered runs (left = batches 1..k, right =
+              # k+1..n) so batch order still reads top-to-bottom then across.
+              # k is chosen to balance the two columns by row weight (parts +
+              # a small per-batch overhead for the label and header row).
+              if use_two_columns && batches.size > 1
+                weights   = batches.map { |b| (b['parts'] || []).count + 2 }
+                total_w   = weights.sum
+                run_w     = 0
+                best_k    = 1
+                best_diff = Float::INFINITY
+                (1...batches.size).each do |k|
+                  run_w += weights[k - 1]
+                  diff   = (run_w - (total_w - run_w)).abs
+                  if diff < best_diff
+                    best_diff = diff
+                    best_k    = k
+                  end
+                end
+                batch_columns = [batches[0...best_k], batches[best_k..]]
+              else
+                batch_columns = [batches]
+              end
+            %>
+
             <div class="batches-grid<%= use_two_columns ? ' two-col' : '' %>">
-            <% batches.each do |batch| %>
-              <%
-                parts          = batch['parts'] || []
-                batch_number   = batch['batch_number']
-                next if parts.empty?
-                batch_readings = parts.flat_map { |p| p['readings'] || [] }
-                next if batch_readings.empty?
-                bmean          = (batch_readings.sum / batch_readings.count.to_f).round(1)
-              %>
+            <% batch_columns.each do |col_batches| %>
+              <div class="batch-col">
+              <% col_batches.each do |batch| %>
+                <%
+                  parts          = batch['parts'] || []
+                  batch_number   = batch['batch_number']
+                  next if parts.empty?
+                  batch_readings = parts.flat_map { |p| p['readings'] || [] }
+                  next if batch_readings.empty?
+                  bmean          = (batch_readings.sum / batch_readings.count.to_f).round(1)
+                %>
 
-              <div class="batch-block">
-              <div class="nadcap-batch-label">
-                Batch <%= batch_number %> — <%= parts.count %> sampled part<%= parts.count == 1 ? '' : 's' %>
-                <% if batch['parts_per_batch'].present? %>
-                  <span class="stat">Lot: <%= batch['parts_per_batch'] %></span>
-                <% end %>
-                <span class="stat">Mean: <%= bmean %> µm</span>
-                <span class="stat">Min: <%= batch_readings.min %> µm</span>
-                <span class="stat">Max: <%= batch_readings.max %> µm</span>
-              </div>
-
-              <table class="anodic-table">
-                <thead>
-                  <tr>
-                    <th class="stat-col">Part</th>
-                    <th class="stat-col">Mean</th>
-                    <th class="stat-col">Min</th>
-                    <th class="stat-col">Max</th>
-                    <% 8.times do |i| %>
-                      <th class="reading-col">R<%= i + 1 %></th>
-                    <% end %>
-                  </tr>
-                </thead>
-                <tbody>
-                  <% parts.each_with_index do |part, idx| %>
-                    <%
-                      readings = part['readings'] || []
-                      next if readings.empty?
-                      pmean = (readings.sum / readings.count.to_f).round(1)
-                      label = part['part_label'].presence || "B#{batch_number}p#{idx + 1}"
-                    %>
-                    <tr>
-                      <td class="batch-label"><%= label %></td>
-                      <td class="stat-mean"><%= pmean %> µm</td>
-                      <td><%= readings.min %> µm</td>
-                      <td><%= readings.max %> µm</td>
-                      <% readings.first(8).each do |r| %>
-                        <td><%= r %> µm</td>
-                      <% end %>
-                      <% (8 - [readings.count, 8].min).times do %><td></td><% end %>
-                    </tr>
+                <div class="batch-block">
+                <div class="nadcap-batch-label">
+                  Batch <%= batch_number %> — <%= parts.count %> sampled part<%= parts.count == 1 ? '' : 's' %>
+                  <% if batch['parts_per_batch'].present? %>
+                    <span class="stat">Lot: <%= batch['parts_per_batch'] %></span>
                   <% end %>
-                </tbody>
-              </table>
-              </div><!-- /batch-block -->
+                  <span class="stat">Mean: <%= bmean %></span>
+                  <span class="stat">Min: <%= batch_readings.min %></span>
+                  <span class="stat">Max: <%= batch_readings.max %></span>
+                </div>
+
+                <table class="anodic-table">
+                  <thead>
+                    <tr>
+                      <th class="stat-col">Part</th>
+                      <th class="stat-col">Mean</th>
+                      <th class="stat-col">Min</th>
+                      <th class="stat-col">Max</th>
+                      <% 8.times do |i| %>
+                        <th class="reading-col">R<%= i + 1 %></th>
+                      <% end %>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% parts.each_with_index do |part, idx| %>
+                      <%
+                        readings = part['readings'] || []
+                        next if readings.empty?
+                        pmean = (readings.sum / readings.count.to_f).round(1)
+                        label = part['part_label'].presence || "B#{batch_number}p#{idx + 1}"
+                      %>
+                      <tr>
+                        <td class="batch-label"><%= label %></td>
+                        <td class="stat-mean"><%= pmean %></td>
+                        <td><%= readings.min %></td>
+                        <td><%= readings.max %></td>
+                        <% readings.first(8).each do |r| %>
+                          <td><%= r %></td>
+                        <% end %>
+                        <% (8 - [readings.count, 8].min).times do %><td></td><% end %>
+                      </tr>
+                    <% end %>
+                  </tbody>
+                </table>
+                </div><!-- /batch-block -->
+              <% end %>
+              </div><!-- /batch-col -->
             <% end %>
             </div><!-- /batches-grid -->
           <% end %>
