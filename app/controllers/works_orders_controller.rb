@@ -276,6 +276,7 @@ class WorksOrdersController < ApplicationController
   def create_bulk
     works_orders_params = params[:works_orders]
     results = []
+    created_works_orders = []
 
     ActiveRecord::Base.transaction do
       works_orders_params.each do |wo_params|
@@ -291,9 +292,28 @@ class WorksOrdersController < ApplicationController
 
         if validate_part_configuration(wo) && wo.save
           results << { id: wo.id, number: wo.number, status: 'created' }
+          created_works_orders << wo
         else
           results << { part_id: wo_params[:part_id], status: 'error', errors: wo.errors.full_messages }
         end
+      end
+    end
+
+    # Send one order acknowledgement email per customer order covered by this batch.
+    # Sent inline (deliver_now): the production queue adapter is :async (in-process,
+    # non-durable), so deliver_later jobs can be lost on dyno restart/deploy. The
+    # rescue keeps a mail failure from failing the order-creation request.
+    # Recipients come from Organization#buyer_emails: enabled buyers if configured,
+    # otherwise the Xero primary contact email.
+    created_works_orders.group_by(&:customer_order).each do |customer_order, wos|
+      next unless customer_order && customer_order.customer.buyer_emails.any?
+
+      begin
+        OrderAcknowledgementMailer.order_confirmation(customer_order, wos).deliver_now
+        Rails.logger.info "Order acknowledgement email sent for #{customer_order.customer.name} (Order #{customer_order.number}) to #{customer_order.customer.buyer_emails.join(', ')}"
+      rescue => e
+        Rails.logger.error "Failed to send order acknowledgement email for Order #{customer_order.number}: #{e.message}"
+        Rails.logger.error e.backtrace.first(3).join("\n")
       end
     end
 
