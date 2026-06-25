@@ -1,10 +1,6 @@
 <div class="container mx-auto px-4 py-6">
   <div class="flex justify-between items-center mb-6">
     <h1 class="text-3xl font-bold text-gray-900">Release Notes</h1>
-    <div class="flex space-x-2">
-      <%= link_to "Pending Invoice", pending_invoice_release_notes_path,
-          class: "bg-orange-500 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded" %>
-    </div>
   </div>
 
   <!-- Filters -->
@@ -18,26 +14,18 @@
             class: "border border-gray-300 rounded-md px-3 py-2 w-32" %>
       </div>
 
-      <div>
-        <%= form.label :customer_id, class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.select :customer_id,
-            options_for_select([['All Customers', '']] + @customers.map { |c| [c.name, c.id] }, params[:customer_id]),
-            {},
-            { class: "border border-gray-300 rounded-md px-3 py-2 w-48" } %>
-      </div>
-
-      <div>
-        <%= form.label :status, class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= form.select :status,
-            options_for_select([
-              ['All Release Notes', ''],
-              ['Active', 'active'],
-              ['Pending Invoice', 'pending_invoice'],
-              ['Invoiced', 'invoiced'],
-              ['Voided', 'voided']
-            ], params[:status]),
-            {},
-            { class: "border border-gray-300 rounded-md px-3 py-2" } %>
+      <!-- Customer autocomplete -->
+      <div class="relative" data-customer-autocomplete>
+        <%= form.label :customer_id, "Customer", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <input type="text"
+               id="customer_search"
+               autocomplete="off"
+               placeholder="Type a customer..."
+               value="<%= @customers.find { |c| c.id.to_s == params[:customer_id] }&.name %>"
+               class="border border-gray-300 rounded-md px-3 py-2 w-64" />
+        <%= form.hidden_field :customer_id, id: "customer_id_field", value: params[:customer_id] %>
+        <ul id="customer_options"
+            class="absolute z-10 hidden w-64 mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto"></ul>
       </div>
 
       <div>
@@ -46,6 +34,9 @@
       </div>
     <% end %>
   </div>
+
+  <!-- Customer data for the autocomplete (rendered server-side) -->
+  <script type="application/json" id="customer_data"><%= raw @customers.map { |c| { id: c.id, name: c.name } }.to_json %></script>
 
   <!-- Results Summary -->
   <div class="mb-4">
@@ -64,7 +55,7 @@
   </div>
 
   <!-- Release Notes Table -->
-  <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+  <div class="bg-white shadow overflow-x-auto sm:rounded-lg">
     <table class="min-w-full divide-y divide-gray-200">
       <thead class="bg-gray-50">
         <tr>
@@ -78,6 +69,12 @@
             Works Order
           </th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Customer Order
+          </th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Part
+          </th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
             Customer
           </th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -87,15 +84,13 @@
             Issued By
           </th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-            Status
-          </th>
-          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
             Actions
           </th>
         </tr>
       </thead>
       <tbody class="bg-white divide-y divide-gray-200">
         <% @release_notes.each do |release_note| %>
+          <% wo = release_note.works_order %>
           <tr class="hover:bg-gray-50">
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
               <%= link_to "RN#{release_note.number}", release_note, class: "text-blue-600 hover:text-blue-900" %>
@@ -104,8 +99,25 @@
               <%= release_note.date.strftime("%d/%m/%Y") %>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-              <%= link_to "WO#{release_note.works_order.number}", release_note.works_order,
-                  class: "text-blue-600 hover:text-blue-900" %>
+              <%= link_to "WO#{wo.number}", wo, class: "text-blue-600 hover:text-blue-900" %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              <% co = wo.customer_order %>
+              <% if co %>
+                <%= link_to (co.respond_to?(:number) ? "CO#{co.number}" : co.to_s), co,
+                    class: "text-blue-600 hover:text-blue-900" %>
+              <% else %>
+                <span class="text-gray-400">&mdash;</span>
+              <% end %>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              <% part = wo.part %>
+              <% part_label = "#{wo.part_number}-#{wo.part_issue}" %>
+              <% if part %>
+                <%= link_to part_label, part, class: "text-blue-600 hover:text-blue-900" %>
+              <% else %>
+                <%= part_label %>
+              <% end %>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
               <%= release_note.customer.name %>
@@ -116,42 +128,15 @@
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
               <%= release_note.issued_by.display_name %>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap">
-              <% if release_note.voided %>
-                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                  Voided
-                </span>
-              <% elsif release_note.invoice_item.present? %>
-                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                  Invoiced
-                </span>
-              <% elsif release_note.can_be_invoiced? %>
-                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
-                  Pending Invoice
-                </span>
-              <% else %>
-                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                  Active
-                </span>
-              <% end %>
-            </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
               <div class="flex space-x-2">
                 <%= link_to "View", release_note, class: "text-blue-600 hover:text-blue-900" %>
                 <%= link_to "PDF", pdf_release_note_path(release_note),
                     class: "text-green-600 hover:text-green-900", target: "_blank" %>
-                <!-- UPDATED: Allow editing for all non-voided release notes -->
                 <% if release_note.can_be_edited? %>
                   <%= link_to "Edit", edit_release_note_path(release_note),
                       class: "text-yellow-600 hover:text-yellow-900",
                       title: release_note.invoiced? ? "Edit (invoiced - changes won't affect invoice)" : "Edit" %>
-                <% end %>
-                <!-- Void only available for non-invoiced release notes -->
-                <% if release_note.can_be_voided? %>
-                  <%= link_to "Void", void_release_note_path(release_note),
-                      method: :patch,
-                      class: "text-red-600 hover:text-red-900",
-                      data: { confirm: "Are you sure you want to void this release note?" } %>
                 <% end %>
               </div>
             </td>
@@ -291,7 +276,7 @@
     </div>
   </div>
 
-  <!-- NEW: Information Panel about Post-Invoice Editing -->
+  <!-- Information Panel about Post-Invoice Editing -->
   <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
     <div class="flex">
       <div class="flex-shrink-0">
@@ -306,10 +291,128 @@
           <ul class="mt-2 list-disc list-inside">
             <li><strong>Quantities:</strong> Can be updated but won't affect existing invoices</li>
             <li><strong>Remarks:</strong> Can be freely updated and will appear in new PDFs</li>
-            <li><strong>Specifications & Details:</strong> Auto-update from part records when PDFs are regenerated</li>
+            <li><strong>Specifications &amp; Details:</strong> Auto-update from part records when PDFs are regenerated</li>
           </ul>
         </div>
       </div>
     </div>
   </div>
 </div>
+
+<script>
+  (function () {
+    function initCustomerAutocomplete() {
+      var wrapper = document.querySelector('[data-customer-autocomplete]');
+      if (!wrapper || wrapper.dataset.acInit === 'true') return;
+      wrapper.dataset.acInit = 'true';
+
+      var search = wrapper.querySelector('#customer_search');
+      var hidden = wrapper.querySelector('#customer_id_field');
+      var list   = wrapper.querySelector('#customer_options');
+      var dataEl = document.getElementById('customer_data');
+
+      var customers = [];
+      try { customers = JSON.parse(dataEl.textContent) || []; } catch (e) { customers = []; }
+
+      var filtered = [];
+      var activeIndex = -1;
+
+      function closeList() {
+        list.classList.add('hidden');
+        list.innerHTML = '';
+        activeIndex = -1;
+      }
+
+      function selectCustomer(c) {
+        hidden.value = c ? c.id : '';
+        search.value = c ? c.name : '';
+        closeList();
+      }
+
+      function renderList(items) {
+        list.innerHTML = '';
+        if (!items.length) { closeList(); return; }
+        items.forEach(function (c, i) {
+          var li = document.createElement('li');
+          li.textContent = c.name;
+          li.className = 'px-3 py-2 text-sm cursor-pointer hover:bg-gray-100';
+          li.dataset.index = i;
+          li.addEventListener('mousedown', function (ev) { ev.preventDefault(); selectCustomer(c); });
+          list.appendChild(li);
+        });
+        list.classList.remove('hidden');
+      }
+
+      function filter(term) {
+        var t = (term || '').trim().toLowerCase();
+        if (!t) {
+          filtered = customers.slice(0, 50);
+        } else {
+          filtered = customers.filter(function (c) {
+            return c.name.toLowerCase().indexOf(t) !== -1;
+          }).slice(0, 50);
+        }
+        activeIndex = -1;
+        renderList(filtered);
+      }
+
+      function highlight() {
+        Array.prototype.forEach.call(list.children, function (li, i) {
+          li.classList.toggle('bg-gray-100', i === activeIndex);
+        });
+      }
+
+      search.addEventListener('input', function () {
+        hidden.value = ''; // typing invalidates a prior selection until reselected/resolved
+        filter(search.value);
+      });
+
+      search.addEventListener('focus', function () { filter(search.value); });
+
+      search.addEventListener('keydown', function (e) {
+        if (list.classList.contains('hidden')) return;
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          activeIndex = Math.min(activeIndex + 1, filtered.length - 1);
+          highlight();
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          activeIndex = Math.max(activeIndex - 1, 0);
+          highlight();
+        } else if (e.key === 'Enter') {
+          if (activeIndex >= 0 && filtered[activeIndex]) {
+            e.preventDefault();
+            selectCustomer(filtered[activeIndex]);
+          }
+        } else if (e.key === 'Escape') {
+          closeList();
+        }
+      });
+
+      document.addEventListener('click', function (e) {
+        if (!wrapper.contains(e.target)) closeList();
+      });
+
+      // Be forgiving on submit: resolve typed text -> id if it's an exact name
+      // match or an unambiguous substring match. Empty box = All Customers.
+      var form = search.closest('form');
+      if (form) {
+        form.addEventListener('submit', function () {
+          if (hidden.value) return;
+          var t = search.value.trim().toLowerCase();
+          if (!t) { hidden.value = ''; return; }
+          var match = customers.filter(function (c) { return c.name.toLowerCase() === t; })[0];
+          if (!match) {
+            var subs = customers.filter(function (c) { return c.name.toLowerCase().indexOf(t) !== -1; });
+            if (subs.length === 1) match = subs[0];
+          }
+          if (match) { hidden.value = match.id; search.value = match.name; }
+        });
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', initCustomerAutocomplete);
+    document.addEventListener('turbo:load', initCustomerAutocomplete);
+    initCustomerAutocomplete();
+  })();
+</script>

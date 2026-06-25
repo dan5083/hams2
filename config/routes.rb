@@ -94,10 +94,6 @@ Rails.application.routes.draw do
       get :pdf              # Customer delivery/collection documentation
     end
 
-    collection do
-      get :pending_invoice  # Release notes ready for invoicing
-    end
-
     # Nested route for creating NCRs from release notes
     resources :external_ncrs, only: [:new, :create], shallow: true
   end

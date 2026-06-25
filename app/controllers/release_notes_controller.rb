@@ -142,13 +142,6 @@ class ReleaseNotesController < ApplicationController
     end
   end
 
-  def pending_invoice
-    @release_notes = ReleaseNote.requires_invoicing
-                                .includes(:works_order, :issued_by)
-                                .order(number: :desc)
-    render :index
-  end
-
   private
 
   def set_release_note
