@@ -85,22 +85,30 @@ class DashboardController < ApplicationController
     window_start = Date.current - days
 
     orders = CustomerOrder
-             .includes(:customer, works_orders: [:part, :release_notes])
+             .includes(:customer, works_orders: :part)
              .where(voided: false)
              .where(date_received: window_start..Date.current)
 
+    # One grouped query for the latest active release date per works order,
+    # instead of one ReleaseNote query per customer order.
+    wo_ids = orders.flat_map { |o| o.works_orders.map(&:id) }
+    last_release_by_wo = ReleaseNote.active
+                                    .where(works_order_id: wo_ids)
+                                    .group(:works_order_id)
+                                    .maximum(:date)
+
     completed = []
     orders.each do |order|
-      wo_ids = order.works_orders.map(&:id)
-      next if wo_ids.empty?
+      wos = order.works_orders
+      next if wos.empty?
 
-      last_release_date = ReleaseNote.active.where(works_order_id: wo_ids).maximum(:date)
+      last_release_date = wos.filter_map { |wo| last_release_by_wo[wo.id] }.max
       next unless last_release_date
 
       completed << {
         order:         order,
         customer_name: order.customer&.name,
-        aerospace:     order.works_orders.any? { |wo| wo.part&.aerospace_defense? },
+        aerospace:     wos.any? { |wo| wo.part&.aerospace_defense? },
         duration:      working_days_between(order.date_received, last_release_date)
       }
     end
@@ -144,29 +152,30 @@ class DashboardController < ApplicationController
   # Works orders with active release notes that are ready_for_invoice?.
   # Mirrors the cheat-sheet one-liner. Stalest first (days-since-release desc).
   def released_uninvoiced_rows
-    WorksOrder
-      .where("quantity_released > 0")
-      .where(voided: false)
-      .includes(:customer_order, :customer, :part, release_notes: :invoice_item)
-      .order("works_orders.number DESC")
-      .filter_map do |wo|
-        uninvoiced = wo.release_notes.active.select(&:ready_for_invoice?)
-        next if uninvoiced.empty?
+    # Drive off the live invoicing backlog (release notes that still need an
+    # invoice) rather than the full history of released works orders — the
+    # working set is bounded by what's actually outstanding, not all-time volume.
+    # ReleaseNote.ready_for_invoice is the SQL equivalent of #ready_for_invoice?.
+    ReleaseNote.ready_for_invoice
+               .includes(works_order: [:customer_order, :customer, :part])
+               .group_by(&:works_order)
+               .filter_map do |wo, release_notes|
+                 next if wo.nil? || wo.voided?
 
-        last_release_date = wo.release_notes.active.maximum(:date)
+                 last_release_date = release_notes.filter_map(&:date).max
 
-        {
-          works_order:    wo,
-          customer_order: wo.customer_order,
-          customer_name:  wo.customer_name,
-          part:           "#{wo.part_number}-#{wo.part_issue}",
-          qty_uninvoiced: uninvoiced.sum(&:quantity_accepted),
-          remaining:      wo.unreleased_quantity,
-          value:          uninvoiced.sum(&:invoice_value),
-          days_since:     last_release_date ? (Date.current - last_release_date).to_i : nil
-        }
-      end
-      .sort_by { |r| -(r[:days_since] || 0) }
+                 {
+                   works_order:    wo,
+                   customer_order: wo.customer_order,
+                   customer_name:  wo.customer_name,
+                   part:           "#{wo.part_number}-#{wo.part_issue}",
+                   qty_uninvoiced: release_notes.sum(&:quantity_accepted),
+                   remaining:      wo.unreleased_quantity,
+                   value:          release_notes.sum(&:invoice_value),
+                   days_since:     last_release_date ? (Date.current - last_release_date).to_i : nil
+                 }
+               end
+               .sort_by { |r| -(r[:days_since] || 0) }
   end
 
   def push_invoice_to_xero(invoice)
