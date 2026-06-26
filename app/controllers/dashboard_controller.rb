@@ -7,9 +7,6 @@ class DashboardController < ApplicationController
     @xero_connected = xero_connected?
     @pending_invoices = Invoice.draft.includes(:customer)
 
-    # General dashboard metrics still surfaced in the view
-    @active_customers = Organization.customers.enabled.count
-
     # Same dashboard for everyone
     load_management_metrics
   end
@@ -71,21 +68,12 @@ class DashboardController < ApplicationController
   def load_management_metrics
     # Business metrics shown to all users
     @total_revenue_pending = @pending_invoices.sum(:total_inc_tax)
-    @completion_rate = calculate_completion_rate
 
     # On-time delivery (trailing 30 days) - aerospace vs commercial
     @otd = on_time_delivery_stats(days: 30)
 
     # Released but not yet invoiced worklist
     @uninvoiced_rows = released_uninvoiced_rows
-  end
-
-  def calculate_completion_rate
-    total_works_orders = WorksOrder.active.count
-    return 0 if total_works_orders.zero?
-
-    completed_works_orders = WorksOrder.closed.count
-    ((completed_works_orders.to_f / total_works_orders) * 100).round(1)
   end
 
   # --- On-Time Delivery over a trailing window ---------------------------------
