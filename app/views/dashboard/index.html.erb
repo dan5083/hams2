@@ -2,8 +2,7 @@
   <h1 class="text-3xl font-bold text-gray-900 mb-8">HAMS 2.0 Dashboard</h1>
 
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-    <!-- Xero Integration Card - Only for authorized users -->
-    <% if Current.user.sees_xero_integration? %>
+    <!-- Xero Integration Card (Xero gates access its own side) -->
       <div class="bg-white rounded-lg shadow-md p-6">
         <h2 class="text-xl font-semibold text-gray-800 mb-4">Xero Integration</h2>
         <p class="text-gray-600 mb-4">Connect to your Xero account to sync data.</p>
@@ -32,53 +31,8 @@
           </div>
         </div>
       </div>
-    <% end %>
 
-    <!-- Organizations Card -->
-    <div class="bg-white rounded-lg shadow-md p-6">
-      <h2 class="text-xl font-semibold text-gray-800 mb-4">Organizations</h2>
-      <p class="text-gray-600 mb-4">Manage your customers and suppliers.</p>
-
-      <div class="space-y-2 text-sm">
-        <div><strong>Total:</strong> <%= @total_organizations %></div>
-        <div><strong>Customers:</strong> <%= @total_customers %></div>
-        <div><strong>Suppliers:</strong> <%= @total_suppliers %></div>
-        <div><strong>Xero Contacts:</strong> <%= @total_xero_contacts %></div>
-      </div>
-    </div>
-
-    <!-- Invoices Card - Only for Xero users -->
-    <% if Current.user.sees_xero_integration? %>
-      <div class="bg-white rounded-lg shadow-md p-6">
-        <h2 class="text-xl font-semibold text-gray-800 mb-4">Invoices</h2>
-        <p class="text-gray-600 mb-4">Manage your invoice creation and Xero sync.</p>
-
-        <div class="space-y-2 text-sm">
-          <div><strong>Total Invoices:</strong> <%= @total_invoices %></div>
-          <div><strong>Draft:</strong> <%= @total_draft_invoices %></div>
-          <div><strong>Synced with Xero:</strong> <%= @total_synced_invoices %></div>
-          <div><strong>Pending Sync:</strong>
-            <span class="<%= @pending_invoices.any? ? 'text-orange-600 font-semibold' : '' %>">
-              <%= @pending_invoices.count %>
-            </span>
-          </div>
-        </div>
-      </div>
-    <% end %>
-
-    <!-- E-card Work Summary - Only for e-card users -->
-    <% if Current.user.sees_ecards? %>
-      <div class="bg-white rounded-lg shadow-md p-6">
-        <h2 class="text-xl font-semibold text-gray-800 mb-4">My Work Area</h2>
-        <p class="text-gray-600 mb-4">Your assigned manufacturing work.</p>
-
-        <div class="space-y-2 text-sm">
-          <div><strong>Total Active:</strong> <%= @total_active_work_orders %></div>
-          <div><strong>Pending Release:</strong> <%= @my_pending_work_orders %></div>
-        </div>
-      </div>
-    <% else %>
-      <!-- Quick Actions Card for non-e-card users -->
+    <!-- Quick Actions Card (shown to all) -->
       <div class="bg-white rounded-lg shadow-md p-6">
         <h2 class="text-xl font-semibold text-gray-800 mb-4">Quick Actions</h2>
         <p class="text-gray-600 mb-4">Common tasks and operations.</p>
@@ -99,55 +53,16 @@
           </div>
         </div>
       </div>
-    <% end %>
   </div>
 
   <!-- Department-Specific Sections -->
 
-  <!-- Quality Metrics for Chris Connon & Jim Ledger -->
-  <% if Current.user.email_address.in?(['chris@hardanodisingstl.com', 'quality@hardanodisingstl.com']) %>
+  <!-- Business Metrics (shown to all) -->
     <div class="mt-8">
-      <h2 class="text-2xl font-bold text-gray-900 mb-4">Quality Management</h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div class="bg-white rounded-lg shadow-md p-6">
-          <h3 class="text-lg font-semibold text-gray-800 mb-2">NCRs</h3>
-          <div class="text-3xl font-bold text-blue-600"><%= @ncrs_count %></div>
-          <div class="text-sm text-gray-600">Total NCRs</div>
-        </div>
-        <div class="bg-white rounded-lg shadow-md p-6">
-          <h3 class="text-lg font-semibold text-gray-800 mb-2">Pending Review</h3>
-          <div class="text-3xl font-bold text-orange-600"><%= @pending_ncrs %></div>
-          <div class="text-sm text-gray-600">Draft NCRs</div>
-        </div>
-        <div class="bg-white rounded-lg shadow-md p-6">
-          <h3 class="text-lg font-semibold text-gray-800 mb-2">Aerospace Work</h3>
-          <div class="text-3xl font-bold text-green-600"><%= @aerospace_work_orders %></div>
-          <div class="text-sm text-gray-600">Active aerospace WOs</div>
-        </div>
-        <div class="bg-white rounded-lg shadow-md p-6">
-          <h3 class="text-lg font-semibold text-gray-800 mb-2">Recent Issues</h3>
-          <div class="text-3xl font-bold text-red-600"><%= @recent_quality_issues %></div>
-          <div class="text-sm text-gray-600">Last 7 days</div>
-        </div>
-      </div>
-    </div>
-  <% end %>
-
-  <!-- Management/Production Planning Metrics -->
-  <% if Current.user.email_address.in?(['chris.bayliss@hardanodisingstl.com', 'phil@hardanodisingstl.com', 'tariq@hardanodisingstl.com', 'julia@hardanodisingstl.com', 'daniel@hardanodisingstl.com']) %>
-    <div class="mt-8">
-      <h2 class="text-2xl font-bold text-gray-900 mb-4">
-        <% if Current.user.email_address == 'julia@hardanodisingstl.com' %>
-          Production Planning & Business Metrics
-        <% elsif Current.user.email_address == 'daniel@hardanodisingstl.com' %>
-          Business Metrics
-        <% else %>
-          Management Overview
-        <% end %>
-      </h2>
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Business Metrics</h2>
       <% otd = @otd %>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <% if Current.user.sees_xero_integration? && @total_revenue_pending %>
+        <% if @total_revenue_pending %>
           <div class="bg-white rounded-lg shadow-md p-6">
             <h3 class="text-lg font-semibold text-gray-800 mb-2">Revenue Pending</h3>
             <div class="text-3xl font-bold text-green-600">£<%= sprintf("%.0f", @total_revenue_pending) %></div>
@@ -159,111 +74,82 @@
           <div class="text-3xl font-bold text-purple-600"><%= @completion_rate %>%</div>
           <div class="text-sm text-gray-600">Works orders completed</div>
         </div>
-
-        <div class="bg-white rounded-lg shadow-md p-6">
-          <h3 class="text-lg font-semibold text-gray-800 mb-2">OTD &mdash; Aerospace</h3>
-          <div class="text-3xl font-bold <%= otd_color_class(otd[:aerospace][:pct]) %>">
-            <%= otd[:aerospace][:pct] ? "#{otd[:aerospace][:pct]}%" : "&mdash;".html_safe %>
-          </div>
-          <div class="text-sm text-gray-600">
-            <%= otd[:aerospace][:met] %>/<%= otd[:aerospace][:total] %> on time &middot; &le;15 days &middot; last 30d
-          </div>
-        </div>
-
-        <div class="bg-white rounded-lg shadow-md p-6">
-          <h3 class="text-lg font-semibold text-gray-800 mb-2">OTD &mdash; Commercial</h3>
-          <div class="text-3xl font-bold <%= otd_color_class(otd[:commercial][:pct]) %>">
-            <%= otd[:commercial][:pct] ? "#{otd[:commercial][:pct]}%" : "&mdash;".html_safe %>
-          </div>
-          <div class="text-sm text-gray-600">
-            <%= otd[:commercial][:met] %>/<%= otd[:commercial][:total] %> on time &middot; &le;10 days &middot; last 30d
-          </div>
-        </div>
       </div>
 
-      <!-- Julia's Production Planning Specific Metrics -->
-    </div>
-  <% end %>
+      <!-- On-Time Delivery (last 30 days) - full width -->
+      <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-4">On-Time Delivery &middot; last 30 days</h3>
 
-  <!-- Released but Uninvoiced - management / invoicing -->
-  <% if Current.user.email_address.in?(['chris.bayliss@hardanodisingstl.com', 'phil@hardanodisingstl.com', 'tariq@hardanodisingstl.com', 'julia@hardanodisingstl.com', 'daniel@hardanodisingstl.com']) %>
-    <% uninvoiced_rows = @uninvoiced_rows %>
-    <div class="mt-8">
-      <div class="flex items-baseline justify-between mb-4">
-        <h2 class="text-2xl font-bold text-gray-900">Released but Uninvoiced</h2>
-        <% if uninvoiced_rows.any? %>
-          <p class="text-sm text-gray-600">
-            <%= pluralize(uninvoiced_rows.size, 'works order') %> &middot;
-            <strong>£<%= sprintf("%.2f", uninvoiced_rows.sum { |r| r[:value] }) %></strong> uninvoiced
-          </p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div class="border border-gray-100 rounded-lg p-4">
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-medium text-gray-600">Aerospace <span class="text-gray-400">(&le;15 wd)</span></span>
+              <span class="text-2xl font-bold <%= otd_color_class(otd[:aerospace][:pct]) %>">
+                <%= otd[:aerospace][:pct] ? "#{otd[:aerospace][:pct]}%" : "—" %>
+              </span>
+            </div>
+            <div class="text-sm text-gray-500 mt-1">
+              <%= otd[:aerospace][:met] %>/<%= otd[:aerospace][:total] %> on time &middot;
+              avg <%= otd[:aerospace][:avg] || "—" %> working days
+            </div>
+          </div>
+          <div class="border border-gray-100 rounded-lg p-4">
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-medium text-gray-600">Commercial <span class="text-gray-400">(&le;10 wd)</span></span>
+              <span class="text-2xl font-bold <%= otd_color_class(otd[:commercial][:pct]) %>">
+                <%= otd[:commercial][:pct] ? "#{otd[:commercial][:pct]}%" : "—" %>
+              </span>
+            </div>
+            <div class="text-sm text-gray-500 mt-1">
+              <%= otd[:commercial][:met] %>/<%= otd[:commercial][:total] %> on time &middot;
+              avg <%= otd[:commercial][:avg] || "—" %> working days
+            </div>
+          </div>
+        </div>
+
+        <% if otd[:laggards].any? %>
+          <h4 class="text-xs font-semibold text-gray-500 uppercase mb-2">Lagging orders (<%= otd[:laggards].size %>)</h4>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Order</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                  <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Working Days</th>
+                  <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Target</th>
+                  <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Over By</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <% otd[:laggards].each do |lag| %>
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium">
+                      <%= link_to lag[:order].number, customer_order_path(lag[:order]),
+                          class: "text-blue-600 hover:text-blue-800 hover:underline" %>
+                    </td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900"><%= lag[:customer_name] %></td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm">
+                      <span class="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full <%= lag[:aerospace] ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-100 text-gray-700' %>">
+                        <%= lag[:aerospace] ? 'Aero' : 'Comm' %>
+                      </span>
+                    </td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900 text-right"><%= lag[:duration] %></td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500 text-right"><%= lag[:target] %></td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-right text-red-600 font-semibold">+<%= lag[:over_by] %></td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        <% else %>
+          <p class="text-sm text-gray-500">✅ No orders over target in the last 30 days.</p>
         <% end %>
       </div>
 
-      <% if uninvoiced_rows.any? %>
-        <div class="bg-white rounded-lg shadow overflow-hidden">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer Order</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Works Order</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Part</th>
-                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Released Uninv.</th>
-                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Remaining</th>
-                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Value £</th>
-                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Days Since</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200">
-              <% uninvoiced_rows.each do |row| %>
-                <tr class="hover:bg-gray-50">
-                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <%= link_to row[:customer_order].number, customer_order_path(row[:customer_order]),
-                        class: "text-blue-600 hover:text-blue-800 hover:underline" %>
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <%= link_to row[:works_order].number, works_order_path(row[:works_order]),
-                        class: "text-blue-600 hover:text-blue-800 hover:underline" %>
-                  </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><%= row[:customer_name] %></td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><%= row[:part] %></td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right"><%= row[:qty_uninvoiced] %></td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right"><%= row[:remaining] %></td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">£<%= sprintf("%.2f", row[:value]) %></td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-right">
-                    <span class="<%= row[:days_since].to_i > 14 ? 'text-red-600 font-semibold' : 'text-gray-500' %>">
-                      <%= row[:days_since] || '—' %>
-                    </span>
-                  </td>
-                </tr>
-              <% end %>
-            </tbody>
-          </table>
-        </div>
-      <% else %>
-        <div class="bg-white rounded-lg shadow p-6 text-center">
-          <p class="text-gray-600">✅ Nothing released and waiting to be invoiced.</p>
-        </div>
-      <% end %>
     </div>
-  <% end %>
 
-  <!-- Developer System Metrics for Daniel -->
-  <% if Current.user.email_address == 'daniel@hardanodisingstl.com' %>
-    <div class="mt-8">
-      <h2 class="text-2xl font-bold text-gray-900 mb-4">System Metrics</h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div class="bg-white rounded-lg shadow-md p-6">
-          <h3 class="text-lg font-semibold text-gray-800 mb-2">Database Size</h3>
-          <div class="text-2xl font-bold text-purple-600"><%= @database_size %></div>
-          <div class="text-sm text-gray-600">PostgreSQL</div>
-        </div>
-      </div>
-    </div>
-  <% end %>
-
-  <!-- Invoice Management Section - Only for Xero users -->
-  <% if Current.user.sees_xero_integration? %>
+  <!-- Invoice Management Section (Xero gates access its own side) -->
     <% if @pending_invoices.any? %>
       <div class="mt-8">
         <h2 class="text-2xl font-bold text-gray-900 mb-4">Staged Invoices - Ready for Xero</h2>
@@ -370,7 +256,67 @@
         </div>
       </div>
     <% end %>
-  <% end %>
+
+  <!-- Released but Uninvoiced (shown to all) -->
+    <% uninvoiced_rows = @uninvoiced_rows %>
+    <div class="mt-8">
+      <div class="flex items-baseline justify-between mb-4">
+        <h2 class="text-2xl font-bold text-gray-900">Released but Uninvoiced</h2>
+        <% if uninvoiced_rows.any? %>
+          <p class="text-sm text-gray-600">
+            <%= pluralize(uninvoiced_rows.size, 'works order') %> &middot;
+            <strong>£<%= sprintf("%.2f", uninvoiced_rows.sum { |r| r[:value] }) %></strong> uninvoiced
+          </p>
+        <% end %>
+      </div>
+
+      <% if uninvoiced_rows.any? %>
+        <div class="bg-white rounded-lg shadow overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cust. Order</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Works Order</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Part</th>
+                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Rel. Uninv.</th>
+                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Rem.</th>
+                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Value £</th>
+                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Days</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+              <% uninvoiced_rows.each do |row| %>
+                <tr class="hover:bg-gray-50">
+                  <td class="px-3 py-2 whitespace-nowrap text-sm font-medium">
+                    <%= link_to row[:customer_order].number, customer_order_path(row[:customer_order]),
+                        class: "text-blue-600 hover:text-blue-800 hover:underline" %>
+                  </td>
+                  <td class="px-3 py-2 whitespace-nowrap text-sm font-medium">
+                    <%= link_to row[:works_order].number, works_order_path(row[:works_order]),
+                        class: "text-blue-600 hover:text-blue-800 hover:underline" %>
+                  </td>
+                  <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900"><%= row[:customer_name] %></td>
+                  <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500"><%= row[:part] %></td>
+                  <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900 text-right"><%= row[:qty_uninvoiced] %></td>
+                  <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500 text-right"><%= row[:remaining] %></td>
+                  <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900 text-right">£<%= sprintf("%.2f", row[:value]) %></td>
+                  <td class="px-3 py-2 whitespace-nowrap text-sm text-right">
+                    <span class="<%= row[:days_since].to_i > 14 ? 'text-red-600 font-semibold' : 'text-gray-500' %>">
+                      <%= row[:days_since] || '—' %>
+                    </span>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% else %>
+        <div class="bg-white rounded-lg shadow p-6 text-center">
+          <p class="text-gray-600">✅ Nothing released and waiting to be invoiced.</p>
+        </div>
+      <% end %>
+    </div>
 </div>
 
 <script>

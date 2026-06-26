@@ -3,40 +3,15 @@ class DashboardController < ApplicationController
   before_action :require_xero_access, only: [:push_selected_to_xero]
 
   def index
-    # Check Xero connection status - only for users who can see Xero integration
-    if Current.user.sees_xero_integration?
-      @xero_connected = xero_connected?
-      @pending_invoices = Invoice.draft.includes(:customer)
-    else
-      @xero_connected = false
-      @pending_invoices = Invoice.none # Empty collection for non-Xero users
-    end
+    # Xero connection/data loaded for everyone; Xero gates access on its own side
+    @xero_connected = xero_connected?
+    @pending_invoices = Invoice.draft.includes(:customer)
 
-    # General dashboard metrics available to all users
-    @total_organizations = Organization.count
-    @total_customers = Organization.customers.count
-    @total_suppliers = Organization.suppliers.count
-    @total_xero_contacts = XeroContact.count
-    @total_invoices = Invoice.count
-    @total_draft_invoices = Invoice.draft.count
-    @total_synced_invoices = Invoice.synced.count
+    # General dashboard metrics still surfaced in the view
     @active_customers = Organization.customers.enabled.count
 
-    # E-card specific metrics for users who can see e-cards
-    if Current.user.sees_ecards?
-      load_ecard_metrics
-    end
-
-    # Department-specific dashboard sections
-    case Current.user.email_address
-    when 'chris@hardanodisingstl.com', 'quality@hardanodisingstl.com'
-      load_quality_metrics
-    when 'chris.bayliss@hardanodisingstl.com', 'phil@hardanodisingstl.com', 'tariq@hardanodisingstl.com', 'julia@hardanodisingstl.com'
-      load_management_metrics
-    when 'daniel@hardanodisingstl.com'
-      load_developer_metrics
-      load_management_metrics # Developer sees both system metrics AND business metrics
-    end
+    # Same dashboard for everyone
+    load_management_metrics
   end
 
   def push_selected_to_xero
@@ -93,24 +68,9 @@ class DashboardController < ApplicationController
     session[:xero_token_set].present? && session[:xero_tenant_id].present?
   end
 
-  def load_ecard_metrics
-    @total_active_work_orders = WorksOrder.active.count
-    @my_pending_work_orders = WorksOrder.active.with_unreleased_quantity.count
-  end
-
-  def load_quality_metrics
-    # Metrics specific to quality staff (Chris Connon, Jim Ledger)
-    @ncrs_count = ExternalNcr.count
-    @pending_ncrs = ExternalNcr.where(status: 'draft').count
-    @aerospace_work_orders = WorksOrder.active.joins(:part)
-                                  .where("parts.customisation_data->'operation_selection'->>'aerospace_defense' = 'true'")
-                                  .count
-    @recent_quality_issues = ExternalNcr.where('created_at > ?', 7.days.ago).count
-  end
-
   def load_management_metrics
-    # Metrics for management and production planning (Chris Bayliss, Phil Bayliss, Tariq Anwar, Julia Chapman)
-    @total_revenue_pending = @pending_invoices.sum(:total_inc_tax) if Current.user.sees_xero_integration?
+    # Business metrics shown to all users
+    @total_revenue_pending = @pending_invoices.sum(:total_inc_tax)
     @completion_rate = calculate_completion_rate
 
     # On-time delivery (trailing 30 days) - aerospace vs commercial
@@ -120,25 +80,12 @@ class DashboardController < ApplicationController
     @uninvoiced_rows = released_uninvoiced_rows
   end
 
-  def load_developer_metrics
-    # Debug/development metrics (Daniel Bayliss)
-    @database_size = get_database_size
-  end
-
   def calculate_completion_rate
     total_works_orders = WorksOrder.active.count
     return 0 if total_works_orders.zero?
 
     completed_works_orders = WorksOrder.closed.count
     ((completed_works_orders.to_f / total_works_orders) * 100).round(1)
-  end
-
-  def get_database_size
-    # Get approximate database size (PostgreSQL specific)
-    result = ActiveRecord::Base.connection.execute(
-      "SELECT pg_size_pretty(pg_database_size(current_database()))"
-    )
-    result.first['pg_size_pretty'] rescue 'Unknown'
   end
 
   # --- On-Time Delivery over a trailing window ---------------------------------
@@ -163,26 +110,38 @@ class DashboardController < ApplicationController
       next unless last_release_date
 
       completed << {
-        aerospace: order.works_orders.any? { |wo| wo.part&.aerospace_defense? },
-        duration:  working_days_between(order.date_received, last_release_date)
+        order:         order,
+        customer_name: order.customer&.name,
+        aerospace:     order.works_orders.any? { |wo| wo.part&.aerospace_defense? },
+        duration:      working_days_between(order.date_received, last_release_date)
       }
     end
 
+    # Orders over their target, worst overage first.
+    laggards = completed.filter_map do |o|
+      target = o[:aerospace] ? 15 : 10
+      next if o[:duration] <= target
+      o.merge(target: target, over_by: o[:duration] - target)
+    end.sort_by { |o| -o[:over_by] }
+
     {
       aerospace:  otd_breakdown(completed.select { |o| o[:aerospace] }, target: 15),
-      commercial: otd_breakdown(completed.reject { |o| o[:aerospace] }, target: 10)
+      commercial: otd_breakdown(completed.reject { |o| o[:aerospace] }, target: 10),
+      laggards:   laggards
     }
   end
 
   def otd_breakdown(orders, target:)
-    total = orders.size
-    met   = orders.count { |o| o[:duration] <= target }
+    total     = orders.size
+    met       = orders.count { |o| o[:duration] <= target }
+    durations = orders.map { |o| o[:duration] }
     {
       total:  total,
       met:    met,
       missed: total - met,
       target: target,
-      pct:    total.zero? ? nil : (met.to_f / total * 100).round(1)
+      pct:    total.zero? ? nil : (met.to_f / total * 100).round(1),
+      avg:    durations.empty? ? nil : (durations.sum.to_f / durations.size).round(1)
     }
   end
 
