@@ -111,24 +111,18 @@ class DashboardController < ApplicationController
   def load_management_metrics
     # Metrics for management and production planning (Chris Bayliss, Phil Bayliss, Tariq Anwar, Julia Chapman)
     @total_revenue_pending = @pending_invoices.sum(:total_inc_tax) if Current.user.sees_xero_integration?
-    @works_orders_this_month = WorksOrder.where('created_at > ?', 1.month.ago).count
-    @customer_orders_this_month = CustomerOrder.where('created_at > ?', 1.month.ago).count
     @completion_rate = calculate_completion_rate
 
-    # Production planning specific metrics for Julia
-    if Current.user.email_address == 'julia@hardanodisingstl.com'
-      @open_customer_orders = CustomerOrder.active.count
-      @works_orders_pending_release = WorksOrder.with_unreleased_quantity.count
-      @overdue_works_orders = WorksOrder.active.where('created_at < ?', 2.weeks.ago).count
-    end
+    # On-time delivery (trailing 30 days) - aerospace vs commercial
+    @otd = on_time_delivery_stats(days: 30)
+
+    # Released but not yet invoiced worklist
+    @uninvoiced_rows = released_uninvoiced_rows
   end
 
   def load_developer_metrics
     # Debug/development metrics (Daniel Bayliss)
-    @total_parts = Part.count
-    @parts_with_operations = Part.joins("JOIN LATERAL (SELECT 1 FROM jsonb_array_elements(COALESCE(customisation_data->'operation_selection'->>'treatments', '[]')::jsonb) LIMIT 1) AS treatments ON true").count
     @database_size = get_database_size
-    @recent_errors = get_recent_error_count
   end
 
   def calculate_completion_rate
@@ -147,10 +141,85 @@ class DashboardController < ApplicationController
     result.first['pg_size_pretty'] rescue 'Unknown'
   end
 
-  def get_recent_error_count
-    # This would integrate with your logging system
-    # For now, return a placeholder
-    0
+  # --- On-Time Delivery over a trailing window ---------------------------------
+  # Cohort = customer orders RECEIVED in the last `days` days (mirrors the monthly
+  # report, which buckets by date_received). An order counts once it has at least
+  # one active release note; duration = received -> last release in working days.
+  # Targets: aerospace <=15, commercial <=10.
+  def on_time_delivery_stats(days: 30)
+    window_start = Date.current - days
+
+    orders = CustomerOrder
+             .includes(:customer, works_orders: [:part, :release_notes])
+             .where(voided: false)
+             .where(date_received: window_start..Date.current)
+
+    completed = []
+    orders.each do |order|
+      wo_ids = order.works_orders.map(&:id)
+      next if wo_ids.empty?
+
+      last_release_date = ReleaseNote.active.where(works_order_id: wo_ids).maximum(:date)
+      next unless last_release_date
+
+      completed << {
+        aerospace: order.works_orders.any? { |wo| wo.part&.aerospace_defense? },
+        duration:  working_days_between(order.date_received, last_release_date)
+      }
+    end
+
+    {
+      aerospace:  otd_breakdown(completed.select { |o| o[:aerospace] }, target: 15),
+      commercial: otd_breakdown(completed.reject { |o| o[:aerospace] }, target: 10)
+    }
+  end
+
+  def otd_breakdown(orders, target:)
+    total = orders.size
+    met   = orders.count { |o| o[:duration] <= target }
+    {
+      total:  total,
+      met:    met,
+      missed: total - met,
+      target: target,
+      pct:    total.zero? ? nil : (met.to_f / total * 100).round(1)
+    }
+  end
+
+  # Mon–Fri working days between two dates (inclusive). Weekends excluded.
+  def working_days_between(start_date, end_date)
+    return 0 if start_date.nil? || end_date.nil?
+    return 0 if end_date < start_date
+    (start_date..end_date).count { |d| d.wday.between?(1, 5) }
+  end
+
+  # --- Released but not yet invoiced -------------------------------------------
+  # Works orders with active release notes that are ready_for_invoice?.
+  # Mirrors the cheat-sheet one-liner. Stalest first (days-since-release desc).
+  def released_uninvoiced_rows
+    WorksOrder
+      .where("quantity_released > 0")
+      .where(voided: false)
+      .includes(:customer_order, :customer, :part, release_notes: :invoice_item)
+      .order("works_orders.number DESC")
+      .filter_map do |wo|
+        uninvoiced = wo.release_notes.active.select(&:ready_for_invoice?)
+        next if uninvoiced.empty?
+
+        last_release_date = wo.release_notes.active.maximum(:date)
+
+        {
+          works_order:    wo,
+          customer_order: wo.customer_order,
+          customer_name:  wo.customer_name,
+          part:           "#{wo.part_number}-#{wo.part_issue}",
+          qty_uninvoiced: uninvoiced.sum(&:quantity_accepted),
+          remaining:      wo.unreleased_quantity,
+          value:          uninvoiced.sum(&:invoice_value),
+          days_since:     last_release_date ? (Date.current - last_release_date).to_i : nil
+        }
+      end
+      .sort_by { |r| -(r[:days_since] || 0) }
   end
 
   def push_invoice_to_xero(invoice)
