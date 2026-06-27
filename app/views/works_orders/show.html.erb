@@ -21,31 +21,6 @@
       <%= link_to "New Release Note", new_works_order_release_note_path(@works_order),
           class: "bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" %>
 
-      <%
-        customer_order_uninvoiced = ReleaseNote.joins(:works_order)
-                                              .where(works_orders: { customer_order_id: @works_order.customer_order_id })
-                                              .requires_invoicing
-
-        uninvoiced_works_orders = @works_order.customer_order.works_orders
-                                            .joins(:release_notes)
-                                            .merge(ReleaseNote.requires_invoicing)
-                                            .distinct.count
-      %>
-
-      <% if customer_order_uninvoiced.any? %>
-        <% if uninvoiced_works_orders > 1 %>
-          <%= button_to "Invoice Customer Order", create_invoice_works_order_path(@works_order),
-              method: :patch,
-              class: "bg-orange-500 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded",
-              data: { confirm: "This will create one invoice for the entire customer order #{@works_order.customer_order.number} (#{uninvoiced_works_orders} works orders with uninvoiced items). Continue?" } %>
-        <% else %>
-          <%= button_to "Stage Invoice", create_invoice_works_order_path(@works_order),
-              method: :patch,
-              class: "bg-orange-500 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded",
-              data: { confirm: "Create invoice for this works order?" } %>
-        <% end %>
-      <% end %>
-
       <%= link_to "Back to Works Orders", works_orders_path,
           class: "bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" %>
     </div>

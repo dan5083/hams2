@@ -1,5 +1,6 @@
 class CustomerOrdersController < ApplicationController
-  before_action :set_customer_order, only: [:show, :edit, :update, :destroy, :void, :create_invoice,
+  before_action :set_customer_order, only: [:show, :edit, :update, :destroy, :void,
+                                            :invoice_to_date,
                                             :mark_contract_reviewed, :unmark_contract_reviewed]
 
   def index
@@ -112,70 +113,28 @@ class CustomerOrdersController < ApplicationController
     end
   end
 
-  def create_invoice
-    active_works_orders = @customer_order.works_orders.active
+  # Invoice everything released TO DATE on this customer order (partial orders
+  # are fine — no "all WOs fully released" gate, unlike create_invoice). Drives
+  # off requires_invoicing release notes via Invoice.stage_to_date, which bills
+  # courier per release note and is safe to call repeatedly. Triggered by the
+  # 🐓 button on the dashboard "Released but Uninvoiced" worklist.
+  def invoice_to_date
+    release_notes = ReleaseNote.joins(:works_order)
+                               .where(works_orders: { customer_order_id: @customer_order.id })
+                               .requires_invoicing
 
-    if active_works_orders.empty?
-      redirect_to customer_orders_path, alert: 'No active works orders found for this customer order.'
-      return
+    invoice = Invoice.stage_to_date(release_notes, Current.user)
+
+    if invoice
+      redirect_to root_path,
+                  notice: "✅ Invoice INV#{invoice.number} staged for order #{@customer_order.number} (released to date). Push to Xero from the dashboard."
+    else
+      redirect_to root_path,
+                  alert: "Nothing to invoice on order #{@customer_order.number} — it may already be invoiced to date."
     end
-
-    incomplete_works_orders = active_works_orders.select { |wo| wo.quantity_released < wo.quantity }
-
-    if incomplete_works_orders.any?
-      incomplete_list = incomplete_works_orders.map { |wo| "WO#{wo.number}" }.join(', ')
-      redirect_to customer_orders_path,
-                  alert: "Cannot create invoice - not all works orders are fully released. Incomplete: #{incomplete_list}. Please complete all releases first."
-      return
-    end
-
-    total_released = active_works_orders.sum(:quantity_released)
-
-    if total_released <= 0
-      redirect_to customer_orders_path, alert: 'No items available to invoice - no quantity has been released for this customer order yet.'
-      return
-    end
-
-    begin
-      uninvoiced_release_notes = ReleaseNote.joins(:works_order)
-                                            .where(works_orders: { customer_order_id: @customer_order.id })
-                                            .requires_invoicing
-
-      if uninvoiced_release_notes.empty?
-        redirect_to customer_orders_path, alert: 'No release notes available for invoicing. All items may already be invoiced.'
-        return
-      end
-
-      customer = @customer_order.customer
-      invoice = Invoice.create_from_release_notes(uninvoiced_release_notes, customer, Current.user)
-
-      if invoice.nil?
-        redirect_to customer_orders_path, alert: 'Failed to create invoice from release notes. Check logs for details.'
-        return
-      end
-
-      @customer_order.works_orders.active.each do |works_order|
-        if works_order.selected_charge_ids.present?
-          add_additional_charges_to_invoice(invoice, works_order.selected_charge_ids, works_order.custom_amounts || {})
-        end
-      end
-
-      invoice.calculate_totals!
-
-      works_order_count = uninvoiced_release_notes.joins(:works_order).select('works_orders.id').distinct.count
-      release_note_count = uninvoiced_release_notes.count
-      summary = "Invoice created for fully completed customer order #{@customer_order.number} (#{works_order_count} works orders, #{release_note_count} release notes)"
-
-      redirect_to customer_orders_path,
-                  notice: "✅ Invoice INV#{invoice.number} staged successfully! #{summary}. Go to dashboard to push to Xero."
-
-    rescue StandardError => e
-      Rails.logger.error "Failed to create invoice for customer order #{@customer_order.id}: #{e.message}"
-      Rails.logger.error "Backtrace: #{e.backtrace.first(5).join("\n")}"
-
-      redirect_to customer_orders_path,
-                  alert: "❌ Failed to stage invoice: #{e.message}. Please try again or contact support."
-    end
+  rescue StandardError => e
+    Rails.logger.error "invoice_to_date (CO #{@customer_order.id}) failed: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+    redirect_to root_path, alert: "❌ Failed to stage invoice: #{e.message}"
   end
 
   def edit
@@ -247,14 +206,6 @@ class CustomerOrdersController < ApplicationController
 
   def set_customer_order
     @customer_order = CustomerOrder.find(params[:id])
-  end
-
-  def add_additional_charges_to_invoice(invoice, charge_ids, custom_amounts)
-    charge_ids.reject(&:blank?).each do |charge_id|
-      charge = AdditionalChargePreset.find(charge_id)
-      custom_amount = custom_amounts[charge_id]
-      InvoiceItem.create_from_additional_charge(charge, invoice, custom_amount)
-    end
   end
 
   def customer_order_params

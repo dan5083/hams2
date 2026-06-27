@@ -108,6 +108,49 @@ class Invoice < ApplicationRecord
     end
   end
 
+  # ---------------------------------------------------------------------------
+  # Stage an invoice for whatever release notes still require invoicing in the
+  # given relation/array ("to date" semantics — partial orders are fine).
+  #
+  # Courier (additional) charges are billed ONE PER RELEASE NOTE — each release
+  # is a dispatch, so n releases on a WO produce n courier lines. Idempotency is
+  # structural: the batch is always requires_invoicing release notes (no main
+  # line item yet), and once invoiced they leave that scope permanently, so a
+  # release note's part line AND its courier line are each billed exactly once.
+  #
+  # The courier amount comes from the works order's custom_amounts entry, so
+  # every release on a WO bills the SAME (flat) carriage figure. If carriage
+  # ever needs to vary per dispatch, that amount has to move onto the release
+  # note itself.
+  #
+  # Returns the Invoice, or nil if there was nothing left to invoice.
+  # ---------------------------------------------------------------------------
+  def self.stage_to_date(release_notes, user = nil)
+    release_notes = release_notes.to_a
+    return nil if release_notes.empty? # caller shows "nothing to invoice"
+
+    transaction do
+      customer = release_notes.first.customer
+      invoice  = create_from_release_notes(release_notes, customer, user)
+      raise StandardError, "Invoice failed to save" if invoice.nil?
+
+      # One courier charge per release note in this batch.
+      release_notes.each do |rn|
+        wo = rn.works_order
+        next if wo.nil? || wo.selected_charge_ids.blank?
+
+        custom_amounts = wo.custom_amounts || {}
+        wo.selected_charge_ids.reject(&:blank?).each do |charge_id|
+          charge = AdditionalChargePreset.find(charge_id)
+          InvoiceItem.create_from_additional_charge(charge, invoice, custom_amounts[charge_id], rn)
+        end
+      end
+
+      invoice.calculate_totals!
+      invoice
+    end
+  end
+
   private
 
   def set_defaults

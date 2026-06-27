@@ -71,7 +71,11 @@ class InvoiceItem < ApplicationRecord
   end
 
   # Create invoice item from additional charge preset (no additional column needed)
-  def self.create_from_additional_charge(additional_charge_preset, invoice, custom_amount = nil)
+  #
+  # release_note is optional and used ONLY to label the line ("covers release
+  # note N") so per-dispatch courier charges are traceable to the dispatch they
+  # cover. The item itself stays release_note: nil on purpose — see note below.
+  def self.create_from_additional_charge(additional_charge_preset, invoice, custom_amount = nil, release_note = nil)
     # Use custom amount for variable charges, preset amount for fixed charges
     amount = if additional_charge_preset.is_variable?
                custom_amount&.to_f || additional_charge_preset.amount || 0.0
@@ -84,9 +88,16 @@ class InvoiceItem < ApplicationRecord
                    "#{additional_charge_preset.name} - #{additional_charge_preset.description}" :
                    additional_charge_preset.name
 
+    # Tag with the dispatch it covers, when known (courier per release note).
+    description += " (covers release note #{release_note.number})" if release_note
+
     item = new(
       invoice: invoice,
-      release_note: nil, # Additional charges don't have release notes
+      # Deliberately nil even when a release_note is passed: the show pages use
+      # release_note.invoice_item (singular). Attaching a courier item to the
+      # release note's FK would give that note two invoice items and make the
+      # "Invoiced" badge ambiguous. The reference lives in the description.
+      release_note: nil,
       kind: 'additional',
       quantity: 1,
       description: description,
