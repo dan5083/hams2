@@ -78,9 +78,23 @@ class DashboardController < ApplicationController
 
   # --- On-Time Delivery over a trailing window ---------------------------------
   # Cohort = customer orders RECEIVED in the last `days` days (mirrors the monthly
-  # report, which buckets by date_received). An order counts once it has at least
-  # one active release note; duration = received -> last release in working days.
-  # Targets: aerospace <=15, commercial <=10.
+  # report, which buckets by date_received). Targets: aerospace <=15, commercial
+  # <=10 working days.
+  #
+  # Two distinct populations, NOT to be conflated:
+  #
+  #   COMPLETED (order closed — open_works_orders_count == 0):
+  #     duration = received -> last release. A finished fact. These — and ONLY
+  #     these — feed the OTD % / breakdown, because an order that's still open
+  #     hasn't passed or failed yet, so counting it would distort the rate.
+  #     A completed order over target is "LAGGED by" (past tense, frozen).
+  #
+  #   IN PROGRESS (order still has an open WO):
+  #     elapsed = received -> TODAY. If that already exceeds target it's
+  #     "LAGGING by" (present tense) and the overage grows every day until the
+  #     order closes. These are the actionable ones. Excluded from the OTD %.
+  #
+  # On-target open orders appear in neither list.
   def on_time_delivery_stats(days: 30)
     window_start = Date.current - days
 
@@ -97,33 +111,57 @@ class DashboardController < ApplicationController
                                     .group(:works_order_id)
                                     .maximum(:date)
 
-    completed = []
+    completed   = []   # closed orders, judged on received -> last release
+    in_progress = []   # open orders, judged on received -> today
+
     orders.each do |order|
       wos = order.works_orders
       next if wos.empty?
 
-      last_release_date = wos.filter_map { |wo| last_release_by_wo[wo.id] }.max
-      next unless last_release_date
+      aerospace = wos.any? { |wo| wo.part&.aerospace_defense? }
+      target    = aerospace ? 15 : 10
 
-      completed << {
-        order:         order,
-        customer_name: order.customer&.name,
-        aerospace:     wos.any? { |wo| wo.part&.aerospace_defense? },
-        duration:      working_days_between(order.date_received, last_release_date)
-      }
+      if order.open_works_orders_count.to_i.zero?
+        # Closed order — needs a release date to have a duration at all.
+        last_release_date = wos.filter_map { |wo| last_release_by_wo[wo.id] }.max
+        next unless last_release_date
+
+        completed << {
+          order:         order,
+          customer_name: order.customer&.name,
+          aerospace:     aerospace,
+          target:        target,
+          duration:      working_days_between(order.date_received, last_release_date)
+        }
+      else
+        # Still open — measure elapsed time to today.
+        in_progress << {
+          order:         order,
+          customer_name: order.customer&.name,
+          aerospace:     aerospace,
+          target:        target,
+          elapsed:       working_days_between(order.date_received, Date.current)
+        }
+      end
     end
 
-    # Orders over their target, worst overage first.
-    laggards = completed.filter_map do |o|
-      target = o[:aerospace] ? 15 : 10
-      next if o[:duration] <= target
-      o.merge(target: target, over_by: o[:duration] - target)
+    # LAGGED: completed orders that finished over target. Frozen overage.
+    lagged = completed.filter_map do |o|
+      next if o[:duration] <= o[:target]
+      o.merge(over_by: o[:duration] - o[:target])
+    end.sort_by { |o| -o[:over_by] }
+
+    # LAGGING: open orders already over target as of today. Growing overage.
+    lagging = in_progress.filter_map do |o|
+      next if o[:elapsed] <= o[:target]
+      o.merge(over_by: o[:elapsed] - o[:target])
     end.sort_by { |o| -o[:over_by] }
 
     {
       aerospace:  otd_breakdown(completed.select { |o| o[:aerospace] }, target: 15),
       commercial: otd_breakdown(completed.reject { |o| o[:aerospace] }, target: 10),
-      laggards:   laggards
+      lagged:     lagged,
+      lagging:    lagging
     }
   end
 
