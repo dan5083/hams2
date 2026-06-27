@@ -1,6 +1,6 @@
 # app/controllers/works_orders_controller.rb - Fixed pricing parameter handling and route card operations with RBAC
 class WorksOrdersController < ApplicationController
-  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :ecard, :sign_off_operation, :save_batches, :create_invoice, :invoice_to_date, :void, :unvoid]
+  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :ecard, :sign_off_operation, :save_batches, :invoice_to_date, :void, :unvoid]
   before_action :require_ecard_access, only: [:ecard, :sign_off_operation, :save_batches, :save_operation_input]
 
  def index
@@ -177,56 +177,6 @@ class WorksOrdersController < ApplicationController
     end
   end
 
-  def create_invoice
-    # Check if any quantity has been released across the entire customer order
-    customer_order = @works_order.customer_order
-    total_released = customer_order.works_orders.active.sum(:quantity_released)
-
-    if total_released <= 0
-      redirect_to @works_order, alert: 'No items available to invoice - no quantity has been released for this customer order yet.'
-      return
-    end
-
-    begin
-      # Get all uninvoiced release notes for the ENTIRE customer order (not just this works order)
-      uninvoiced_release_notes = ReleaseNote.joins(:works_order)
-                                          .where(works_orders: { customer_order_id: customer_order.id })
-                                          .requires_invoicing
-
-      if uninvoiced_release_notes.empty?
-        redirect_to @works_order, alert: 'No release notes available for invoicing across this customer order.'
-        return
-      end
-
-      # Create invoice from all uninvoiced release notes for this customer order
-      customer = customer_order.customer
-
-      invoice = Invoice.create_from_release_notes(uninvoiced_release_notes, customer, Current.user)
-
-      if invoice.nil?
-        redirect_to @works_order, alert: 'Failed to create invoice from release notes. Check logs for details.'
-        return
-      end
-
-      # Add additional charges from ALL works orders in this customer order
-      customer_order.works_orders.active.each do |wo|
-        if wo.selected_charge_ids.present?
-          add_additional_charges_to_invoice(invoice, wo.selected_charge_ids, wo.custom_amounts || {})
-        end
-      end
-
-      # Recalculate totals after adding all charges
-      invoice.calculate_totals!
-
-      redirect_to @works_order,
-                  notice: "Invoice INV#{invoice.number} staged successfully! Go to dashboard to push to Xero."
-
-    rescue StandardError => e
-      Rails.logger.error "Invoice creation error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
-      redirect_to @works_order, alert: "Error creating invoice: #{e.message}"
-    end
-  end
-
   # Invoice everything released TO DATE on THIS works order only (partial is
   # fine). Drives off requires_invoicing release notes via Invoice.stage_to_date,
   # which bills courier per release note and is safe to call repeatedly.
@@ -370,19 +320,6 @@ class WorksOrdersController < ApplicationController
       load_form_data_for_errors
       render :new, status: :unprocessable_entity
     end
-  end
-
-  def add_additional_charges_to_invoice(invoice, charge_ids, custom_amounts)
-    charge_ids.reject(&:blank?).each do |charge_id|
-      charge = AdditionalChargePreset.find(charge_id)
-      custom_amount = custom_amounts[charge_id]
-
-      InvoiceItem.create_from_additional_charge(charge, invoice, custom_amount)
-    end
-  end
-
-  def build_invoice_summary(release_notes, additional_charge_ids)
-    "Invoice created successfully. Go to dashboard to push to Xero."
   end
 
   # Load additional charge presets for forms

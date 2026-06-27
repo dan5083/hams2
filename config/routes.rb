@@ -52,7 +52,6 @@ Rails.application.routes.draw do
   resources :customer_orders do
     member do
       patch :void
-      patch :create_invoice
       patch :invoice_to_date
       patch :mark_contract_reviewed
       patch :unmark_contract_reviewed
@@ -75,8 +74,6 @@ Rails.application.routes.draw do
       patch :save_batches
       patch :void
       patch :unvoid
-      patch :create_invoice
-      patch :create_invoice_with_charges
       patch :invoice_to_date
     end
 
