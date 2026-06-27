@@ -226,7 +226,12 @@
     <% uninvoiced_rows = @uninvoiced_rows %>
     <div class="mt-8">
       <div class="flex items-baseline justify-between mb-4">
-        <h2 class="text-2xl font-bold text-gray-900">Released but Uninvoiced</h2>
+        <div>
+          <h2 class="text-2xl font-bold text-gray-900">Released but Uninvoiced</h2>
+          <p class="text-xs text-gray-500 mt-1">
+            The invoice customer order to date button 🐓, the invoice WO to date button 🐤
+          </p>
+        </div>
         <% if uninvoiced_rows.any? %>
           <p class="text-sm text-gray-600">
             <%= pluralize(uninvoiced_rows.size, 'works order') %> &middot;
@@ -240,38 +245,64 @@
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
               <tr>
-                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cust. Order</th>
                 <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Works Order</th>
-                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
                 <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Part</th>
                 <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Rel. Uninv.</th>
                 <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Rem.</th>
                 <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Value £</th>
                 <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Days</th>
+                <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200">
-              <% uninvoiced_rows.each do |row| %>
-                <tr class="hover:bg-gray-50">
-                  <td class="px-3 py-2 whitespace-nowrap text-sm font-medium">
-                    <%= link_to row[:customer_order].number, customer_order_path(row[:customer_order]),
-                        class: "text-blue-600 hover:text-blue-800 hover:underline" %>
-                  </td>
-                  <td class="px-3 py-2 whitespace-nowrap text-sm font-medium">
-                    <%= link_to row[:works_order].number, works_order_path(row[:works_order]),
-                        class: "text-blue-600 hover:text-blue-800 hover:underline" %>
-                  </td>
-                  <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900"><%= row[:customer_name] %></td>
-                  <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500"><%= row[:part] %></td>
-                  <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900 text-right"><%= row[:qty_uninvoiced] %></td>
-                  <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500 text-right"><%= row[:remaining] %></td>
-                  <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900 text-right">£<%= sprintf("%.2f", row[:value]) %></td>
-                  <td class="px-3 py-2 whitespace-nowrap text-sm text-right">
-                    <span class="<%= row[:days_since].to_i > 14 ? 'text-red-600 font-semibold' : 'text-gray-500' %>">
-                      <%= row[:days_since] || '—' %>
+              <% uninvoiced_rows.group_by { |r| r[:customer_order] }.each do |customer_order, rows| %>
+                <% group_value = rows.sum { |r| r[:value] } %>
+                <tr class="bg-gray-100">
+                  <td colspan="6" class="px-3 py-2 text-sm">
+                    <span class="font-semibold text-gray-900">
+                      <%= link_to customer_order.number, customer_order_path(customer_order),
+                          class: "text-blue-700 hover:underline" %>
+                    </span>
+                    <span class="text-gray-600">
+                      &middot; <%= rows.first[:customer_name] %>
+                      &middot; <%= pluralize(rows.size, 'WO') %>
+                      &middot; <strong>£<%= sprintf("%.2f", group_value) %></strong>
                     </span>
                   </td>
+                  <td class="px-3 py-2 text-right">
+                    <%= button_to "🐓",
+                        invoice_to_date_customer_order_path(customer_order),
+                        method: :patch,
+                        class: "bg-orange-600 hover:bg-orange-700 text-white text-base font-semibold py-1 px-3 rounded",
+                        title: "Invoice customer order to date",
+                        data: { confirm: "Stage an invoice for everything released to date on order #{customer_order.number} (#{pluralize(rows.size, 'WO')}, £#{sprintf('%.2f', group_value)})?" } %>
+                  </td>
                 </tr>
+                <% rows.each do |row| %>
+                  <tr class="hover:bg-gray-50">
+                    <td class="px-3 py-2 whitespace-nowrap text-sm font-medium">
+                      <%= link_to row[:works_order].number, works_order_path(row[:works_order]),
+                          class: "text-blue-600 hover:text-blue-800 hover:underline" %>
+                    </td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500"><%= row[:part] %></td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900 text-right"><%= row[:qty_uninvoiced] %></td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500 text-right"><%= row[:remaining] %></td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900 text-right">£<%= sprintf("%.2f", row[:value]) %></td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-right">
+                      <span class="<%= row[:days_since].to_i > 14 ? 'text-red-600 font-semibold' : 'text-gray-500' %>">
+                        <%= row[:days_since] || '—' %>
+                      </span>
+                    </td>
+                    <td class="px-3 py-2 whitespace-nowrap text-right">
+                      <%= button_to "🐤",
+                          invoice_to_date_works_order_path(row[:works_order]),
+                          method: :patch,
+                          class: "bg-blue-600 hover:bg-blue-700 text-white text-base font-semibold py-1 px-3 rounded",
+                          title: "Invoice WO to date",
+                          data: { confirm: "Stage an invoice for WO#{row[:works_order].number} only — #{row[:qty_uninvoiced]} parts, £#{sprintf('%.2f', row[:value])}?" } %>
+                    </td>
+                  </tr>
+                <% end %>
               <% end %>
             </tbody>
           </table>

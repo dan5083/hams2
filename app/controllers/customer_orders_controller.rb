@@ -1,5 +1,6 @@
 class CustomerOrdersController < ApplicationController
   before_action :set_customer_order, only: [:show, :edit, :update, :destroy, :void, :create_invoice,
+                                            :invoice_to_date,
                                             :mark_contract_reviewed, :unmark_contract_reviewed]
 
   def index
@@ -176,6 +177,30 @@ class CustomerOrdersController < ApplicationController
       redirect_to customer_orders_path,
                   alert: "❌ Failed to stage invoice: #{e.message}. Please try again or contact support."
     end
+  end
+
+  # Invoice everything released TO DATE on this customer order (partial orders
+  # are fine — no "all WOs fully released" gate, unlike create_invoice). Drives
+  # off requires_invoicing release notes via Invoice.stage_to_date, which bills
+  # courier per release note and is safe to call repeatedly. Triggered by the
+  # 🐓 button on the dashboard "Released but Uninvoiced" worklist.
+  def invoice_to_date
+    release_notes = ReleaseNote.joins(:works_order)
+                               .where(works_orders: { customer_order_id: @customer_order.id })
+                               .requires_invoicing
+
+    invoice = Invoice.stage_to_date(release_notes, Current.user)
+
+    if invoice
+      redirect_to root_path,
+                  notice: "✅ Invoice INV#{invoice.number} staged for order #{@customer_order.number} (released to date). Push to Xero from the dashboard."
+    else
+      redirect_to root_path,
+                  alert: "Nothing to invoice on order #{@customer_order.number} — it may already be invoiced to date."
+    end
+  rescue StandardError => e
+    Rails.logger.error "invoice_to_date (CO #{@customer_order.id}) failed: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+    redirect_to root_path, alert: "❌ Failed to stage invoice: #{e.message}"
   end
 
   def edit

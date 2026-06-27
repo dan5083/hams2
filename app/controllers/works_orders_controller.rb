@@ -1,6 +1,6 @@
 # app/controllers/works_orders_controller.rb - Fixed pricing parameter handling and route card operations with RBAC
 class WorksOrdersController < ApplicationController
-  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :ecard, :sign_off_operation, :save_batches, :create_invoice, :void, :unvoid]
+  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :ecard, :sign_off_operation, :save_batches, :create_invoice, :invoice_to_date, :void, :unvoid]
   before_action :require_ecard_access, only: [:ecard, :sign_off_operation, :save_batches, :save_operation_input]
 
  def index
@@ -225,6 +225,30 @@ class WorksOrdersController < ApplicationController
       Rails.logger.error "Invoice creation error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
       redirect_to @works_order, alert: "Error creating invoice: #{e.message}"
     end
+  end
+
+  # Invoice everything released TO DATE on THIS works order only (partial is
+  # fine). Drives off requires_invoicing release notes via Invoice.stage_to_date,
+  # which bills courier per release note and is safe to call repeatedly.
+  # Triggered by the 🐤 button on the dashboard "Released but Uninvoiced"
+  # worklist.
+  def invoice_to_date
+    release_notes = ReleaseNote.joins(:works_order)
+                               .where(works_orders: { id: @works_order.id })
+                               .requires_invoicing
+
+    invoice = Invoice.stage_to_date(release_notes, Current.user)
+
+    if invoice
+      redirect_to root_path,
+                  notice: "✅ Invoice INV#{invoice.number} staged for WO#{@works_order.number} (released to date). Push to Xero from the dashboard."
+    else
+      redirect_to root_path,
+                  alert: "Nothing to invoice on WO#{@works_order.number} — it may already be invoiced to date."
+    end
+  rescue StandardError => e
+    Rails.logger.error "invoice_to_date (WO #{@works_order.id}) failed: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+    redirect_to root_path, alert: "❌ Failed to stage invoice: #{e.message}"
   end
 
   # E-card view for shop floor
