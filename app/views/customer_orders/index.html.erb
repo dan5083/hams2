@@ -87,7 +87,6 @@
                                                customer_order.fully_released_works_orders_count == customer_order.open_works_orders_count
             uninvoiced_count = customer_order.uninvoiced_accepted_quantity
             has_uninvoiced = uninvoiced_count > 0
-            show_create_invoice = all_works_orders_fully_released && has_uninvoiced
 
             works_orders = customer_order.works_orders.active
             fully_released_wo_count = customer_order.fully_released_works_orders_count
@@ -172,13 +171,6 @@
                 <% unless customer_order.voided %>
                   <%= link_to "Edit", edit_customer_order_path(customer_order), class: "text-yellow-600 hover:text-yellow-900" %>
                   <%= link_to "Add WO", new_customer_order_works_order_path(customer_order), class: "text-green-600 hover:text-green-900" %>
-
-                  <% if show_create_invoice %>
-                    <%= button_to "Create Invoice", create_invoice_customer_order_path(customer_order),
-                        method: :patch,
-                        class: "text-green-600 hover:text-green-900 bg-transparent border-0 underline cursor-pointer text-sm font-semibold",
-                        data: { confirm: "Create invoice for customer order #{customer_order.number} (all works orders complete, #{uninvoiced_count} parts ready)?" } %>
-                  <% end %>
 
                   <% if customer_order.can_be_voided? %>
                     <%= button_to "Void", void_customer_order_path(customer_order),
