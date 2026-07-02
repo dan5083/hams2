@@ -263,6 +263,9 @@ class AiAssistantJob < ApplicationJob
       part number — use it instead of the Part-No. column value.
       The "CS-Order: XXXXX  SerialNo.: XXXXX" text goes into the customer_reference
       field on the WorksOrder.
+      Before creating a Lufthansa customer order, check whether any line requires hard
+      anodising. Put those lines onto their own customer order, numbered as the PO with
+      a leading "_" (e.g. 45231 → _45231).
     PROMPT
   end
 
