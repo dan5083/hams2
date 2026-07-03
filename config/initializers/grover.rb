@@ -1,5 +1,4 @@
 # config/initializers/grover.rb
-
 Grover.configure do |config|
   config.options = {
     format: 'A4',
@@ -12,6 +11,7 @@ Grover.configure do |config|
     print_background: true,
     prefer_css_page_size: true,
     display_header_footer: false,
-    emulate_media: 'print'
+    emulate_media: 'print',
+    launch_args: ['--no-sandbox', '--disable-dev-shm-usage']
   }
 end
