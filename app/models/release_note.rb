@@ -53,7 +53,13 @@ class ReleaseNote < ApplicationRecord
 
   # ==========================================================================
   # NADCAP sample plan (MIL-PRF-8625F Type III hard anodise)
-  # parts_per_batch -> sample size; 8 readings per sampled part.
+  # parts_per_batch -> sample size. Total readings for the batch is
+  # max(8, sample_size), distributed as evenly as possible across the
+  # sampled parts:
+  #   - Lot 1  -> sample 1  -> 8 readings on the one part          (8 total)
+  #   - Lot 6  -> sample 6  -> 2 parts x 2 readings, 4 parts x 1   (8 total)
+  #   - Lot 32 -> sample 12 -> 1 reading per part                  (12 total)
+  # Once the sample size reaches 8, every sampled part takes one reading.
   # ==========================================================================
   def self.nadcap_sample_size(parts_per_batch)
     n = parts_per_batch.to_i
@@ -64,6 +70,22 @@ class ReleaseNote < ApplicationRecord
     return 20 if n <= 960
     return 24 if n <= 1632
     32
+  end
+
+  # Total readings required for a batch of the given lot size.
+  def self.nadcap_total_readings(parts_per_batch)
+    ss = nadcap_sample_size(parts_per_batch)
+    ss < 1 ? 0 : [8, ss].max
+  end
+
+  # Per-part reading allocation as an array (length = sample size), most
+  # heavily loaded parts first. e.g. lot 6 -> [2, 2, 1, 1, 1, 1].
+  def self.nadcap_readings_plan(parts_per_batch)
+    ss = nadcap_sample_size(parts_per_batch)
+    return [] if ss < 1
+    total = [8, ss].max
+    base, extra = total.divmod(ss)
+    Array.new(ss) { |i| base + (i < extra ? 1 : 0) }
   end
 
   def display_name
@@ -198,14 +220,16 @@ class ReleaseNote < ApplicationRecord
   #           { 'batch_number' => 1, 'readings' => [70.5, 70.7, ...] },
   #
   #           # NADCAP sample-plan batch (MIL-PRF-8625F Type III):
+  #           # Total readings = max(8, sample_size), spread across the parts
+  #           # (see nadcap_readings_plan). e.g. lot 300 -> 16 parts x 1 reading.
   #           { 'batch_number' => 2,
   #             'parts_per_batch' => 300,
   #             'parts' => [
-  #               { 'part_label' => 'B2p1', 'readings' => [70.5, 70.8, ...] },  # 8 readings
+  #               { 'part_label' => 'B2p1', 'readings' => [70.5] },  # per-part count from plan
   #               { 'part_label' => 'B2p2', 'readings' => [...] },
-  #               ...                                                            # sample_size parts total
+  #               ...                                                 # sample_size parts total
   #             ],
-  #             'readings' => [...flattened sample_size*8 readings...]
+  #             'readings' => [...flattened nadcap_total_readings readings...]
   #           }
   #         ]
   #       },
@@ -788,6 +812,8 @@ class ReleaseNote < ApplicationRecord
       end
 
       expected_sample_size = self.class.nadcap_sample_size(parts_per_batch)
+      expected_plan        = self.class.nadcap_readings_plan(parts_per_batch)
+      expected_total       = self.class.nadcap_total_readings(parts_per_batch)
 
       if parts.count != expected_sample_size
         errors.add(:measured_thicknesses,
@@ -796,15 +822,27 @@ class ReleaseNote < ApplicationRecord
         next
       end
 
+      # The plan defines a multiset of per-part reading counts (e.g. lot 6 ->
+      # two parts with 2 readings and four with 1). Any assignment of those
+      # counts to parts is acceptable, so compare sorted counts rather than
+      # position-by-position.
+      actual_counts = parts.map { |part| (part['readings'] || []).count }
+
+      if actual_counts.sort != expected_plan.sort
+        breakdown = expected_plan.tally
+                                 .sort_by { |count, _| -count }
+                                 .map { |count, parts_n| "#{parts_n} part(s) × #{count} reading(s)" }
+                                 .join(' + ')
+        errors.add(:measured_thicknesses,
+                   "#{batch_prefix}#{display_name} requires #{expected_total} readings for a lot " \
+                   "of #{parts_per_batch}, distributed as #{breakdown} " \
+                   "(got #{actual_counts.sum} readings across #{parts.count} part(s))")
+        next
+      end
+
       parts.each_with_index do |part, idx|
         part_label = part['part_label'].presence || "p#{idx + 1}"
         readings   = part['readings'] || []
-
-        unless readings.count == 8
-          errors.add(:measured_thicknesses,
-                     "#{batch_prefix}#{display_name} #{part_label} requires 8 readings (got #{readings.count})")
-          next
-        end
 
         readings.each_with_index do |r, ri|
           rf = r.to_f

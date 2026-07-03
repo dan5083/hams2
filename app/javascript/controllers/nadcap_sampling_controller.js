@@ -2,8 +2,16 @@
 //
 // Per-batch NADCAP sample-plan thickness measurements for MIL-PRF-8625F Type III.
 // One controller instance per batch container. Renders a dynamic grid of sampled
-// parts (B1p1, B1p2, ...), each with 8 reading inputs. Sample size derived from
-// parts-per-batch via the NADCAP plan table.
+// parts (B1p1, B1p2, ...). Sample size derived from parts-per-batch via the
+// NADCAP plan table.
+//
+// Reading plan: the TOTAL readings for the batch is max(8, sample_size),
+// distributed as evenly as possible across the sampled parts:
+//   - Lot 1  → sample 1  → 8 readings on the one part          (8 total)
+//   - Lot 6  → sample 6  → 2 parts × 2 readings, 4 parts × 1   (8 total)
+//   - Lot 32 → sample 12 → 1 reading per part                  (12 total)
+//   - Lot 300 → sample 16 → 1 reading per part                 (16 total)
+// i.e. once the sample size reaches 8, every sampled part takes one reading.
 //
 // This controller NO LONGER owns the serial port. It registers as a "sink" with
 // the shared elcometer-session controller, which owns the single Elcometer
@@ -14,7 +22,7 @@
 //   {
 //     "parts_per_batch": 300,
 //     "parts": [
-//       { "part_label": "B1p1", "readings": [70.5, 70.8, ...] },  // 8 readings
+//       { "part_label": "B1p1", "readings": [70.5, 70.8, ...] },  // per-part count from reading plan
 //       ...
 //     ]
 //   }
@@ -40,7 +48,6 @@ export default class extends Controller {
   }
 
   // NADCAP sample plan: parts_per_batch -> sample size (parts to test).
-  // 8 readings required per sampled part.
   sampleSizeFor(n) {
     if (n < 1) return 0
     if (n <= 12)   return n     // All parts tested
@@ -49,6 +56,24 @@ export default class extends Controller {
     if (n <= 960)  return 20
     if (n <= 1632) return 24
     return 32
+  }
+
+  // Total readings required for the batch: max(8, sample_size).
+  totalReadingsFor(n) {
+    const ss = this.sampleSizeFor(n)
+    return ss < 1 ? 0 : Math.max(8, ss)
+  }
+
+  // Reading plan: array of readings-per-part, length = sample size.
+  // The total is distributed as evenly as possible; the first (total % ss)
+  // parts take one extra reading. e.g. lot 6 → [2,2,1,1,1,1]; lot 32 → [1×12].
+  readingsPlanFor(n) {
+    const ss = this.sampleSizeFor(n)
+    if (ss < 1) return []
+    const total = Math.max(8, ss)
+    const base  = Math.floor(total / ss)
+    const extra = total % ss
+    return Array.from({ length: ss }, (_, i) => base + (i < extra ? 1 : 0))
   }
 
   connect() {
@@ -104,7 +129,7 @@ export default class extends Controller {
 
   progress() {
     if (!this.isActive()) return { done: 0, expected: 0 }
-    const expected = this.sampleSizeFor(this.partsPerBatch) * 8
+    const expected = this.totalReadingsFor(this.partsPerBatch)
     const done = this.parts.reduce(
       (a, p) => a + p.readings.filter((r) => r != null && r !== "" && !isNaN(r)).length, 0
     )
@@ -113,18 +138,19 @@ export default class extends Controller {
 
   nextSlotLabel() {
     for (let pi = 0; pi < this.parts.length; pi++) {
+      const slots  = this.parts[pi].readings.length
       const filled = this.parts[pi].readings.filter((r) => r != null).length
-      if (filled < 8) return `${this.parts[pi].label} · ${filled}/8`
+      if (filled < slots) return `${this.parts[pi].label} · ${filled}/${slots}`
     }
     return ""
   }
 
-  // Fill the first empty slot, scanning p1[0..7] -> p2[0..7] -> ...
-  // Returns true if the reading was placed.
+  // Fill the first empty slot, scanning p1's slots -> p2's slots -> ...
+  // Per-part slot count comes from the reading plan. Returns true if placed.
   acceptReading(value) {
     const rounded = Math.round(value * 10) / 10
     for (let pi = 0; pi < this.parts.length; pi++) {
-      for (let ri = 0; ri < 8; ri++) {
+      for (let ri = 0; ri < this.parts[pi].readings.length; ri++) {
         if (this.parts[pi].readings[ri] == null) {
           this.parts[pi].readings[ri] = rounded
 
@@ -165,13 +191,15 @@ export default class extends Controller {
       return
     }
 
-    const newSampleSize = this.sampleSizeFor(n)
+    const newPlan       = this.readingsPlanFor(n)
+    const newSampleSize = newPlan.length
     const oldSampleSize = this.parts.length
 
-    if (newSampleSize < oldSampleSize && this.hasAnyReadings(newSampleSize)) {
+    if (this.wouldDiscardReadings(newPlan)) {
       const ok = confirm(
-        `Reducing sample size from ${oldSampleSize} to ${newSampleSize} part(s) ` +
-        `will discard readings from ${oldSampleSize - newSampleSize} sampled part(s). Continue?`
+        `Changing the lot size to ${n} resizes the sample plan ` +
+        `(${oldSampleSize} → ${newSampleSize} sampled part(s)) and will discard ` +
+        `some existing readings. Continue?`
       )
       if (!ok) {
         this.partsPerBatchInputTarget.value = this.partsPerBatch || ""
@@ -180,7 +208,7 @@ export default class extends Controller {
     }
 
     this.partsPerBatch = n
-    this.resizeParts(newSampleSize)
+    this.resizeParts(newPlan)
     this.renderGrid()
     this.renderBatchStats()
     this.persist()
@@ -189,33 +217,58 @@ export default class extends Controller {
   }
 
   updateSampleSizeDisplay() {
-    const ss = this.sampleSizeFor(this.partsPerBatch)
-    if (ss <= 0) {
+    const plan = this.readingsPlanFor(this.partsPerBatch)
+    if (plan.length === 0) {
       this.sampleSizeDisplayTarget.textContent = "Enter parts in this batch"
       return
     }
+    const total = plan.reduce((a, b) => a + b, 0)
+    const max   = plan[0]
+    const min   = plan[plan.length - 1]
+
+    let breakdown
+    if (max === min) {
+      breakdown = `${plan.length} part(s) × ${max} reading(s)`
+    } else {
+      const extras = plan.filter((c) => c === max).length
+      breakdown = `${extras} part(s) × ${max} readings + ${plan.length - extras} part(s) × ${min} reading`
+    }
     this.sampleSizeDisplayTarget.textContent =
-      `Sample size: ${ss} part(s) × 8 readings = ${ss * 8} readings`
+      `Sample size: ${plan.length} part(s) — ${breakdown} = ${total} readings`
   }
 
-  hasAnyReadings(beyondIndex = 0) {
-    for (let pi = beyondIndex; pi < this.parts.length; pi++) {
-      if (this.parts[pi].readings.some((r) => r != null && r !== "")) return true
+  // True if applying newPlan (array of per-part reading counts) would drop
+  // any entered reading: either whole parts beyond the new sample size, or
+  // trailing reading slots on parts whose allocation shrinks.
+  wouldDiscardReadings(newPlan) {
+    for (let pi = 0; pi < this.parts.length; pi++) {
+      const keep = pi < newPlan.length ? newPlan[pi] : 0
+      const r    = this.parts[pi].readings
+      for (let ri = keep; ri < r.length; ri++) {
+        if (r[ri] != null && r[ri] !== "") return true
+      }
     }
     return false
   }
 
-  resizeParts(newCount) {
-    while (this.parts.length < newCount) {
+  // Resizes the parts array AND each part's readings array to match the plan.
+  resizeParts(plan) {
+    if (this.parts.length > plan.length) {
+      this.parts = this.parts.slice(0, plan.length)
+    }
+    while (this.parts.length < plan.length) {
       const idx = this.parts.length
       this.parts.push({
         label:    `${this.batchLabelValue}p${idx + 1}`,
-        readings: Array(8).fill(null)
+        readings: []
       })
     }
-    if (this.parts.length > newCount) {
-      this.parts = this.parts.slice(0, newCount)
-    }
+    this.parts.forEach((part, i) => {
+      const target = plan[i]
+      const r = part.readings.slice(0, target)
+      while (r.length < target) r.push(null)
+      part.readings = r
+    })
   }
 
   // ── Grid rendering ──────────────────────────────────────────────────────
@@ -235,13 +288,20 @@ export default class extends Controller {
                placeholder="${rIdx + 1}" />
       `).join("")
 
+      // Literal class strings (not interpolated) so Tailwind's content
+      // scanner keeps them in the build.
+      const gridCols = {
+        1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-3", 4: "grid-cols-4",
+        5: "grid-cols-5", 6: "grid-cols-6", 7: "grid-cols-7", 8: "grid-cols-8"
+      }[Math.min(Math.max(part.readings.length, 1), 8)]
+
       return `
         <div class="border-l-2 border-blue-200 pl-3 py-2 bg-white rounded">
           <div class="flex items-center justify-between mb-1">
             <span class="text-xs font-semibold text-gray-700">${part.label}</span>
             <span class="text-xs text-gray-500" data-part-stats="${partIdx}"></span>
           </div>
-          <div class="grid grid-cols-8 gap-1">${inputs}</div>
+          <div class="grid ${gridCols} gap-1">${inputs}</div>
         </div>
       `
     }).join("")
@@ -261,10 +321,11 @@ export default class extends Controller {
       el.textContent = ""
       return
     }
+    const slots = this.parts[partIdx].readings.length
     const mean = (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)
     const min = Math.min(...vals)
     const max = Math.max(...vals)
-    el.textContent = `${vals.length}/8 · mean ${mean} · min ${min} · max ${max}`
+    el.textContent = `${vals.length}/${slots} · mean ${mean} · min ${min} · max ${max}`
   }
 
   // ── Manual reading entry (blur on individual cell) ────────────────────────
@@ -300,7 +361,7 @@ export default class extends Controller {
 
   clearReadings() {
     if (!confirm(`Clear all readings for ${this.batchLabelValue}?`)) return
-    this.parts.forEach((p) => (p.readings = Array(8).fill(null)))
+    this.parts.forEach((p) => (p.readings = Array(p.readings.length).fill(null)))
     this.renderGrid()
     this.renderBatchStats()
     this.persist()
@@ -314,7 +375,7 @@ export default class extends Controller {
     const allReadings = this.parts.flatMap((p) =>
       p.readings.filter((r) => r != null && r !== "" && !isNaN(r))
     )
-    const expected = this.sampleSizeFor(this.partsPerBatch) * 8
+    const expected = this.totalReadingsFor(this.partsPerBatch)
 
     if (allReadings.length === 0) {
       this.statisticsTarget.innerHTML = expected > 0
@@ -382,14 +443,15 @@ export default class extends Controller {
         this.partsPerBatch = parseInt(parsed.parts_per_batch, 10)
         this.partsPerBatchInputTarget.value = this.partsPerBatch
 
-        const sampleSize = this.sampleSizeFor(this.partsPerBatch)
-        this.resizeParts(sampleSize)
+        const plan = this.readingsPlanFor(this.partsPerBatch)
+        this.resizeParts(plan)
 
         if (Array.isArray(parsed.parts)) {
           parsed.parts.forEach((p, idx) => {
             if (idx >= this.parts.length) return
-            const r = Array.isArray(p.readings) ? p.readings.slice(0, 8) : []
-            this.parts[idx].readings = [...r, ...Array(Math.max(0, 8 - r.length)).fill(null)]
+            const slots = plan[idx]
+            const r = Array.isArray(p.readings) ? p.readings.slice(0, slots) : []
+            this.parts[idx].readings = [...r, ...Array(Math.max(0, slots - r.length)).fill(null)]
             if (p.part_label) this.parts[idx].label = p.part_label
           })
         }

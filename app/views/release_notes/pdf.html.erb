@@ -716,10 +716,17 @@
                       batch_readings = parts.flat_map { |p| p['readings'] || [] }
                       next if batch_readings.empty?
                       bmean          = (batch_readings.sum / batch_readings.count.to_f).round(1)
+                      # Reading columns sized to the widest part in this batch
+                      # (per-part counts vary under the distributed plan:
+                      # e.g. lot 6 → 2/2/1/1/1/1, lot 300 → 1 each).
+                      max_part_readings = parts.map { |p| (p['readings'] || []).count }.max || 0
                     %>
 
                     <div class="nadcap-batch-label">
                       Batch <%= batch_number %> — <%= parts.count %> sampled part<%= parts.count == 1 ? '' : 's' %>
+                      <% if batch['parts_per_batch'].present? %>
+                        <span class="stat">Lot: <%= batch['parts_per_batch'] %></span>
+                      <% end %>
                       <span class="stat">Mean: <%= bmean %> µm</span>
                       <span class="stat">Min: <%= batch_readings.min %> µm</span>
                       <span class="stat">Max: <%= batch_readings.max %> µm</span>
@@ -732,7 +739,7 @@
                           <th class="stat-col">Mean</th>
                           <th class="stat-col">Min</th>
                           <th class="stat-col">Max</th>
-                          <% 8.times do |i| %>
+                          <% max_part_readings.times do |i| %>
                             <th class="reading-col">R<%= i + 1 %></th>
                           <% end %>
                         </tr>
@@ -750,10 +757,10 @@
                             <td class="stat-mean"><%= pmean %> µm</td>
                             <td><%= readings.min %> µm</td>
                             <td><%= readings.max %> µm</td>
-                            <% readings.first(8).each do |r| %>
+                            <% readings.first(max_part_readings).each do |r| %>
                               <td><%= r %> µm</td>
                             <% end %>
-                            <% (8 - [readings.count, 8].min).times do %><td></td><% end %>
+                            <% (max_part_readings - [readings.count, max_part_readings].min).times do %><td></td><% end %>
                           </tr>
                         <% end %>
                       </tbody>
@@ -997,6 +1004,8 @@
                   batch_readings = parts.flat_map { |p| p['readings'] || [] }
                   next if batch_readings.empty?
                   bmean          = (batch_readings.sum / batch_readings.count.to_f).round(1)
+                  # Reading columns sized to the widest part in this batch.
+                  max_part_readings = parts.map { |p| (p['readings'] || []).count }.max || 0
                 %>
 
                 <div class="batch-block">
@@ -1017,7 +1026,7 @@
                       <th class="stat-col">Mean</th>
                       <th class="stat-col">Min</th>
                       <th class="stat-col">Max</th>
-                      <% 8.times do |i| %>
+                      <% max_part_readings.times do |i| %>
                         <th class="reading-col">R<%= i + 1 %></th>
                       <% end %>
                     </tr>
@@ -1035,10 +1044,10 @@
                         <td class="stat-mean"><%= pmean %></td>
                         <td><%= readings.min %></td>
                         <td><%= readings.max %></td>
-                        <% readings.first(8).each do |r| %>
+                        <% readings.first(max_part_readings).each do |r| %>
                           <td><%= r %></td>
                         <% end %>
-                        <% (8 - [readings.count, 8].min).times do %><td></td><% end %>
+                        <% (max_part_readings - [readings.count, max_part_readings].min).times do %><td></td><% end %>
                       </tr>
                     <% end %>
                   </tbody>

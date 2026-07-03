@@ -193,13 +193,16 @@ class ReleaseNotesController < ApplicationController
   #           { "batch_number": 1, "readings": [70.5, 70.7, ...] },
   #
   #           # NADCAP sample-plan batch (MIL-PRF-8625F Type III):
+  #           # Total readings = max(8, sample_size) distributed across the
+  #           # sampled parts (ReleaseNote.nadcap_readings_plan), e.g.
+  #           # lot 1 -> 1 part x 8, lot 6 -> 2x2 + 4x1, lot 300 -> 16 x 1.
   #           { "batch_number": 2,
   #             "parts_per_batch": 300,
   #             "parts": [
-  #               { "part_label": "B2p1", "readings": [70.5, 70.8, ...] },
+  #               { "part_label": "B2p1", "readings": [70.5] },
   #               ...
   #             ],
-  #             "readings": [...flattened sample_size*8 readings...]
+  #             "readings": [...flattened nadcap_total_readings readings...]
   #           }
   #         ]
   #       },
