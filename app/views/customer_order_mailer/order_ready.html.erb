@@ -1,0 +1,65 @@
+<div style="font-family: sans-serif; font-size: 14px; color: #1a1a1a; max-width: 640px;">
+  <p>Dear <%= @customer.display_name %>,</p>
+
+  <% if @by_courier %>
+    <p>
+      Your order <strong><%= @customer_order.number %></strong> is now complete
+      and will be dispatched to you by courier shortly.
+    </p>
+  <% else %>
+    <p>
+      Your order <strong><%= @customer_order.number %></strong> is now complete
+      and is ready for collection from our works.
+    </p>
+  <% end %>
+
+  <p>
+    The Certificate<%= 's' if @customer_order.email_release_notes.size > 1 %> of
+    Conformity for this order <%= @customer_order.email_release_notes.size > 1 ? 'are' : 'is' %>
+    attached to this email.
+  </p>
+
+  <table style="border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 13px;">
+    <thead>
+      <tr>
+        <th style="border: 1px solid #ccc; padding: 6px 8px; text-align: left; background: #f4f4f4;">Works Order</th>
+        <th style="border: 1px solid #ccc; padding: 6px 8px; text-align: left; background: #f4f4f4;">Part Number</th>
+        <th style="border: 1px solid #ccc; padding: 6px 8px; text-align: left; background: #f4f4f4;">Issue</th>
+        <th style="border: 1px solid #ccc; padding: 6px 8px; text-align: left; background: #f4f4f4;">Description</th>
+        <th style="border: 1px solid #ccc; padding: 6px 8px; text-align: right; background: #f4f4f4;">Quantity</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @works_orders.each do |wo| %>
+        <tr>
+          <td style="border: 1px solid #ccc; padding: 6px 8px;">WO<%= wo.number %></td>
+          <td style="border: 1px solid #ccc; padding: 6px 8px;"><%= wo.part_number %></td>
+          <td style="border: 1px solid #ccc; padding: 6px 8px;"><%= wo.part_issue %></td>
+          <td style="border: 1px solid #ccc; padding: 6px 8px;"><%= wo.part_description %></td>
+          <td style="border: 1px solid #ccc; padding: 6px 8px; text-align: right;"><%= wo.quantity %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <% unless @by_courier %>
+    <p>
+      Collections can be made from:<br/>
+      <strong>Hard Anodising Surface Treatments Ltd</strong><br/>
+      Firs Industrial Estate, Rickets Close<br/>
+      Kidderminster DY11 7QN<br/>
+      Tel: 01562 747100
+    </p>
+  <% end %>
+
+  <p>
+    If you have any questions about this order, please call us on
+    01562 747100 quoting order <%= @customer_order.number %>.
+  </p>
+
+  <p>
+    Kind regards,<br/>
+    <strong>Hard Anodising Surface Treatments Ltd</strong><br/>
+    <a href="https://www.hard-anodising.co.uk/">www.hard-anodising.co.uk</a>
+  </p>
+</div>

@@ -12,6 +12,20 @@ class AdditionalChargePreset < ApplicationRecord
 
   after_initialize :set_defaults, if: :new_record?
 
+  # Charge presets whose names indicate carriage even when priced as 'fixed'
+  # (e.g. a flat "Courier - Next Day" preset).
+  CARRIAGE_NAME_PATTERN = /courier|carriage|shipping|postage|freight|dispatch|delivery/i
+
+  # Is this charge a carriage/courier charge (as opposed to e.g. rework or
+  # masking)? Used by the order-complete email to decide between "ready to
+  # collect" and "dispatching by courier". All weight_based* calculation
+  # types are carriage by definition; fixed/variable presets fall back to a
+  # name match.
+  def carriage?
+    calculation_type.to_s.start_with?('weight_based') ||
+      name.to_s.match?(CARRIAGE_NAME_PATTERN)
+  end
+
   def display_name
     if is_variable?
       "#{name} (Variable)"

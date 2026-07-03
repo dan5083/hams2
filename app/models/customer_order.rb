@@ -93,6 +93,43 @@ class CustomerOrder < ApplicationRecord
     delivery_release_notes.first
   end
 
+  # ---------------------------------------------------------------------------
+  # Order-complete notification (CustomerOrderMailer#order_ready)
+  # ---------------------------------------------------------------------------
+
+  # Every active works order fully released, and there's at least one.
+  # Queried fresh (not from counter caches) so the trigger in
+  # WorksOrder#update_is_fully_released_flag can't race the cache update.
+  def fully_released?
+    return false if voided?
+    active_wos = works_orders.active
+    active_wos.exists? && !active_wos.where(is_fully_released: false).exists?
+  end
+
+  # Does any active works order on this order carry a carriage/courier charge?
+  # Decides "ready to collect" vs "dispatching by courier" in the
+  # order-complete email. Non-carriage extras (rework etc.) don't count —
+  # see AdditionalChargePreset#carriage?.
+  def carriage_charge_present?
+    charge_ids = works_orders.active
+                             .flat_map { |wo| Array(wo.selected_charge_ids) }
+                             .uniq
+    return false if charge_ids.empty?
+
+    AdditionalChargePreset.where(id: charge_ids).any?(&:carriage?)
+  end
+
+  # Release notes whose CofC PDFs get attached to the order-complete email:
+  # active notes on active works orders (voided WOs can't have release notes
+  # anyway — can_be_voided? requires none — but belt and braces).
+  def email_release_notes
+    release_notes.active
+                 .joins(:works_order)
+                 .where(works_orders: { voided: false })
+                 .includes(works_order: :customer_order)
+                 .order(:number)
+  end
+
   # FIXED: Outstanding logic - should check for open works orders
   def outstanding?
     return false if voided?

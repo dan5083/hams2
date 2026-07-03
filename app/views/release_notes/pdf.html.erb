@@ -385,8 +385,14 @@
     <%
       customer_order = @release_note.works_order.customer_order
       is_advice_lead = customer_order.lead_release_note&.id == @release_note.id
+
+      # Emailed copies (order-complete notification attachments) carry ONLY the
+      # Certificate of Conformity: no Proof of Collection page (nothing for a
+      # driver to sign) and no NADCAP operator copy (internal document).
+      # Web/print renders don't pass this local, so nothing changes there.
+      for_email = local_assigns.fetch(:for_email, false)
     %>
-    <% if is_advice_lead %>
+    <% if is_advice_lead && !for_email %>
       <div class="advice-note">
         <div class="logo-header">
           <%= image_tag("logo-with-company-name.png", alt: "Hard Anodising Surface Treatments Ltd") %>
@@ -887,7 +893,7 @@
           []
         end
     %>
-    <% if nadcap_measurements.any? %>
+    <% if nadcap_measurements.any? && !for_email %>
       <div class="nadcap-operator-copy" id="nadcap-operator-copy">
         <div class="nadcap-operator-fit" id="nadcap-operator-fit">
 

@@ -521,7 +521,27 @@ class WorksOrder < ApplicationRecord
       update_column(:is_fully_released, new_value)
       # Trigger customer order count update if this changed
       update_customer_order_counts if saved_changes?
+      # This WO just became fully released — if it was the last one on the
+      # order, tell the buyer the order is ready. Deliberately NOT behind
+      # saved_changes? so the release-note path (calculate_quantity_released!
+      # -> update_column -> here) also fires.
+      notify_buyer_if_order_complete if new_value
     end
+  end
+
+  # Send the order-complete email when the whole customer order has just
+  # become fully released. CustomerOrder#fully_released? re-queries the WO
+  # flags directly, so this doesn't depend on counter caches being current.
+  # PDF generation happens inside the mailer, so deliver_later keeps Grover
+  # off the request path regardless of queue adapter.
+  def notify_buyer_if_order_complete
+    co = customer_order
+    return unless co&.fully_released?
+
+    CustomerOrderMailer.order_ready(co).deliver_later
+  rescue StandardError => e
+    # Never let a notification failure break a release.
+    Rails.logger.error "Order-complete email enqueue failed for CO #{co&.id}: #{e.message}"
   end
 
   def saved_change_to_quantity_released_or_voided_or_is_open?

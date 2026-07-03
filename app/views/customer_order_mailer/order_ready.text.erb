@@ -1,0 +1,27 @@
+Dear <%= @customer.display_name %>,
+
+<% if @by_courier -%>
+Your order <%= @customer_order.number %> is now complete and will be dispatched to you by courier shortly.
+<% else -%>
+Your order <%= @customer_order.number %> is now complete and is ready for collection from our works.
+<% end -%>
+
+The Certificate<%= 's' if @customer_order.email_release_notes.size > 1 %> of Conformity for this order <%= @customer_order.email_release_notes.size > 1 ? 'are' : 'is' %> attached to this email.
+
+<% @works_orders.each do |wo| -%>
+  WO<%= wo.number %> | <%= wo.part_number %>-<%= wo.part_issue %> | <%= wo.part_description %> | Qty <%= wo.quantity %>
+<% end -%>
+
+<% unless @by_courier -%>
+Collections can be made from:
+Hard Anodising Surface Treatments Ltd
+Firs Industrial Estate, Rickets Close
+Kidderminster DY11 7QN
+Tel: 01562 747100
+<% end -%>
+
+If you have any questions about this order, please call us on 01562 747100 quoting order <%= @customer_order.number %>.
+
+Kind regards,
+Hard Anodising Surface Treatments Ltd
+www.hard-anodising.co.uk
