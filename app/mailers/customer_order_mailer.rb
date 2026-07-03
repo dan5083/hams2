@@ -11,14 +11,19 @@
 # Collection page and the NADCAP operator copy page — the emailed document is
 # the CofC only.
 class CustomerOrderMailer < ApplicationMailer
+  # The order_ready templates are complete HTML/text documents (matching the
+  # order acknowledgement style), so skip the shared mailer layout.
+  layout false
+
   COMPANY_NAME    = "Hard Anodising Surface Treatments Ltd".freeze
   TRADING_ADDRESS = "Firs Industrial Estate, Rickets Close\nKidderminster, DY11 7QN".freeze
 
   def order_ready(customer_order)
-    @customer_order = customer_order
-    @customer       = customer_order.customer
-    @by_courier     = customer_order.carriage_charge_present?
-    @works_orders   = customer_order.works_orders.active.includes(:part).order(:number)
+    @customer_order     = customer_order
+    @customer           = customer_order.customer
+    @by_courier         = customer_order.carriage_charge_present?
+    @works_orders       = customer_order.works_orders.active.includes(:part).order(:number)
+    @release_note_count = customer_order.email_release_notes.size
 
     recipients = @customer.buyer_emails
     if recipients.empty?
@@ -28,6 +33,7 @@ class CustomerOrderMailer < ApplicationMailer
     end
 
     attach_certificates_of_conformity
+    attach_inline_logo
 
     mail(
       to: recipients,
@@ -36,6 +42,15 @@ class CustomerOrderMailer < ApplicationMailer
   end
 
   private
+
+  # Embedded as an inline (cid:) attachment because email clients block
+  # remote images by default; referenced in the view via attachments['logo.png'].url
+  def attach_inline_logo
+    logo_path = Rails.root.join('app', 'assets', 'images', 'logo-with-company-name.png')
+    attachments.inline['logo.png'] = File.read(logo_path) if File.exist?(logo_path)
+  rescue StandardError => e
+    Rails.logger.warn "order_ready: could not attach logo: #{e.message}"
+  end
 
   def subject_line
     if @by_courier

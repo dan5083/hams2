@@ -1,65 +1,184 @@
-<div style="font-family: sans-serif; font-size: 14px; color: #1a1a1a; max-width: 640px;">
-  <p>Dear <%= @customer.display_name %>,</p>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .header {
+      border-bottom: 3px solid #2563eb;
+      padding-bottom: 20px;
+      margin-bottom: 30px;
+    }
+    .header img {
+      max-width: 320px;
+      height: auto;
+      margin-bottom: 15px;
+    }
+    .header h1 {
+      color: #1e40af;
+      margin: 0 0 10px 0;
+      font-size: 28px;
+    }
+    .order-details {
+      background-color: #f3f4f6;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 30px;
+    }
+    .order-details table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .order-details td {
+      padding: 8px 0;
+    }
+    .order-details td:first-child {
+      font-weight: bold;
+      width: 180px;
+      color: #4b5563;
+    }
+    .cofc-note {
+      background-color: #eff6ff;
+      border-left: 4px solid #2563eb;
+      padding: 12px 16px;
+      margin-bottom: 30px;
+      color: #1e40af;
+    }
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 30px;
+    }
+    .items-table thead {
+      background-color: #2563eb;
+      color: white;
+    }
+    .items-table th {
+      padding: 12px;
+      text-align: left;
+      font-weight: 600;
+    }
+    .items-table td {
+      padding: 12px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .items-table .text-right {
+      text-align: right;
+    }
+    .collection-details {
+      background-color: #f3f4f6;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 30px;
+    }
+    .collection-details h2 {
+      color: #1e40af;
+      margin-top: 0;
+      font-size: 18px;
+    }
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 2px solid #e5e7eb;
+      font-size: 14px;
+      color: #6b7280;
+    }
+    .footer p {
+      margin: 5px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <% if attachments['logo.png'] %>
+      <img src="<%= attachments['logo.png'].url %>" alt="Hard Anodising Surface Treatments Ltd">
+    <% else %>
+      <h1 style="font-size: 24px; margin-bottom: 5px;">Hard Anodising Surface Treatments Ltd</h1>
+    <% end %>
+    <% if @by_courier %>
+      <h1>Your Order Is On Its Way</h1>
+      <p style="color: #6b7280; margin: 0;">Order <strong><%= @customer_order.number %></strong> is complete and will be dispatched to you by courier shortly.</p>
+    <% else %>
+      <h1>Your Order Is Ready for Collection</h1>
+      <p style="color: #6b7280; margin: 0;">Order <strong><%= @customer_order.number %></strong> is complete and ready to collect from our works.</p>
+    <% end %>
+  </div>
 
-  <% if @by_courier %>
-    <p>
-      Your order <strong><%= @customer_order.number %></strong> is now complete
-      and will be dispatched to you by courier shortly.
-    </p>
-  <% else %>
-    <p>
-      Your order <strong><%= @customer_order.number %></strong> is now complete
-      and is ready for collection from our works.
-    </p>
-  <% end %>
+  <div class="order-details">
+    <table>
+      <tr>
+        <td>Customer:</td>
+        <td><strong><%= @customer.display_name %></strong></td>
+      </tr>
+      <tr>
+        <td>Order Number:</td>
+        <td><strong><%= @customer_order.number %></strong></td>
+      </tr>
+      <tr>
+        <td>Status:</td>
+        <td><strong style="color: #1e40af;"><%= @by_courier ? 'Complete — dispatching by courier' : 'Complete — ready for collection' %></strong></td>
+      </tr>
+    </table>
+  </div>
 
-  <p>
-    The Certificate<%= 's' if @customer_order.email_release_notes.size > 1 %> of
-    Conformity for this order <%= @customer_order.email_release_notes.size > 1 ? 'are' : 'is' %>
-    attached to this email.
-  </p>
+  <div class="cofc-note">
+    <strong>Certificate<%= 's' if @release_note_count > 1 %> of Conformity attached</strong> —
+    the CofC<%= 's' if @release_note_count > 1 %> for this order
+    <%= @release_note_count > 1 ? 'are' : 'is' %> attached to this email as PDF for your records.
+  </div>
 
-  <table style="border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 13px;">
+  <h2 style="color: #1e40af; margin-bottom: 15px;">Order Items</h2>
+
+  <table class="items-table">
     <thead>
       <tr>
-        <th style="border: 1px solid #ccc; padding: 6px 8px; text-align: left; background: #f4f4f4;">Works Order</th>
-        <th style="border: 1px solid #ccc; padding: 6px 8px; text-align: left; background: #f4f4f4;">Part Number</th>
-        <th style="border: 1px solid #ccc; padding: 6px 8px; text-align: left; background: #f4f4f4;">Issue</th>
-        <th style="border: 1px solid #ccc; padding: 6px 8px; text-align: left; background: #f4f4f4;">Description</th>
-        <th style="border: 1px solid #ccc; padding: 6px 8px; text-align: right; background: #f4f4f4;">Quantity</th>
+        <th>Works Order</th>
+        <th>Part Number</th>
+        <th>Description</th>
+        <th class="text-right">Quantity</th>
       </tr>
     </thead>
     <tbody>
       <% @works_orders.each do |wo| %>
-        <tr>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;">WO<%= wo.number %></td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;"><%= wo.part_number %></td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;"><%= wo.part_issue %></td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px;"><%= wo.part_description %></td>
-          <td style="border: 1px solid #ccc; padding: 6px 8px; text-align: right;"><%= wo.quantity %></td>
-        </tr>
+      <tr>
+        <td><strong>WO<%= wo.number %></strong></td>
+        <td><%= wo.part_number %>-<%= wo.part_issue %></td>
+        <td><%= wo.part_description %></td>
+        <td class="text-right"><%= wo.quantity %></td>
+      </tr>
       <% end %>
     </tbody>
   </table>
 
   <% unless @by_courier %>
-    <p>
-      Collections can be made from:<br/>
-      <strong>Hard Anodising Surface Treatments Ltd</strong><br/>
-      Firs Industrial Estate, Rickets Close<br/>
-      Kidderminster DY11 7QN<br/>
-      Tel: 01562 747100
-    </p>
+    <div class="collection-details">
+      <h2>Collection Details</h2>
+      <p style="margin: 0;">
+        <strong>Hard Anodising Surface Treatments Ltd</strong><br>
+        Firs Industrial Estate, Rickets Close<br>
+        Kidderminster DY11 7QN<br>
+        Tel: 01562 747100
+      </p>
+    </div>
   <% end %>
 
-  <p>
-    If you have any questions about this order, please call us on
-    01562 747100 quoting order <%= @customer_order.number %>.
-  </p>
-
-  <p>
-    Kind regards,<br/>
-    <strong>Hard Anodising Surface Treatments Ltd</strong><br/>
-    <a href="https://www.hard-anodising.co.uk/">www.hard-anodising.co.uk</a>
-  </p>
-</div>
+  <div class="footer">
+    <p>• This is an automated notification that your order has been completed.</p>
+    <p>• If you have any questions about this order, please call us on 01562 747100 quoting order <%= @customer_order.number %>.</p>
+    <br>
+    <p>Thank you for your business.</p>
+    <br>
+    <p style="margin: 0; font-weight: bold; color: #1e40af;">Hard Anodising Surface Treatments Ltd</p>
+    <p style="margin: 5px 0;">Firs Industrial Estate, Rickets Close, Kidderminster DY11 7QN</p>
+    <p style="margin: 5px 0;">Tel: 01562 747100 | <a href="http://www.hard-anodising.co.uk" style="color: #2563eb; text-decoration: none;">www.hard-anodising.co.uk</a></p>
+  </div>
+</body>
+</html>

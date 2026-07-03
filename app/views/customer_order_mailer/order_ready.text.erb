@@ -1,27 +1,48 @@
-Dear <%= @customer.display_name %>,
+HARD ANODISING SURFACE TREATMENTS LTD
+<% if @by_courier -%>
+ORDER COMPLETE — DISPATCHING BY COURIER
+<% else -%>
+ORDER READY FOR COLLECTION
+<% end -%>
+================================================================================
 
 <% if @by_courier -%>
-Your order <%= @customer_order.number %> is now complete and will be dispatched to you by courier shortly.
+Your order <%= @customer_order.number %> is now complete and will be dispatched
+to you by courier shortly.
 <% else -%>
-Your order <%= @customer_order.number %> is now complete and is ready for collection from our works.
+Your order <%= @customer_order.number %> is now complete and is ready for
+collection from our works.
 <% end -%>
 
-The Certificate<%= 's' if @customer_order.email_release_notes.size > 1 %> of Conformity for this order <%= @customer_order.email_release_notes.size > 1 ? 'are' : 'is' %> attached to this email.
+The Certificate<%= 's' if @release_note_count > 1 %> of Conformity for this order
+<%= @release_note_count > 1 ? 'are' : 'is' %> attached to this email as PDF.
 
+ORDER ITEMS
+--------------------------------------------------------------------------------
 <% @works_orders.each do |wo| -%>
-  WO<%= wo.number %> | <%= wo.part_number %>-<%= wo.part_issue %> | <%= wo.part_description %> | Qty <%= wo.quantity %>
-<% end -%>
+Works Order:      WO<%= wo.number %>
+Part Number:      <%= wo.part_number %>-<%= wo.part_issue %>
+Description:      <%= wo.part_description %>
+Quantity:         <%= wo.quantity %>
 
+<% end -%>
 <% unless @by_courier -%>
-Collections can be made from:
+COLLECTION DETAILS
+--------------------------------------------------------------------------------
 Hard Anodising Surface Treatments Ltd
 Firs Industrial Estate, Rickets Close
 Kidderminster DY11 7QN
 Tel: 01562 747100
+
 <% end -%>
+================================================================================
 
-If you have any questions about this order, please call us on 01562 747100 quoting order <%= @customer_order.number %>.
+If you have any questions about this order, please call us on 01562 747100
+quoting order <%= @customer_order.number %>.
 
-Kind regards,
+Thank you for your business.
+
+--------------------------------------------------------------------------------
 Hard Anodising Surface Treatments Ltd
-www.hard-anodising.co.uk
+Firs Industrial Estate, Rickets Close, Kidderminster DY11 7QN
+Tel: 01562 747100 | www.hard-anodising.co.uk
