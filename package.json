@@ -8,6 +8,10 @@
   "dependencies": {
     "puppeteer": "^21.0.0"
   },
+  "cacheDirectories": [
+    "node_modules",
+    ".cache/puppeteer"
+  ],
   "scripts": {
     "postinstall": "node scripts/install_chrome.mjs"
   }

@@ -1,11 +1,17 @@
-// Installs puppeteer's Chromium into PUPPETEER_CACHE_DIR during the Heroku
-// build. Wraps puppeteer's own installer but forces the process to exit,
-// because the stock install script (install.mjs / `npx puppeteer browsers
-// install`) leaves a handle open on Heroku build dynos after the download
-// completes and hangs the build indefinitely. The "downloaded to" log lines
-// are emitted after extraction, so by the time downloadBrowser() resolves the
-// binaries are fully on disk and a hard exit is safe.
-// Idempotent: with the browser already present in the cache this is a no-op.
+// Installs puppeteer's Chromium during the Heroku build.
+//
+// Two Heroku quirks handled here:
+// 1. The stock installer (install.mjs / npx) leaves a handle open on build
+//    dynos and hangs the build forever -> we await it and force-exit.
+// 2. Builds run in /tmp/build_<hash>, not /app, and the slug is packed from
+//    the build dir. An absolute PUPPETEER_CACHE_DIR=/app/... lands OUTSIDE
+//    the build dir and gets discarded -> we override the cache dir to
+//    <build dir>/.cache/puppeteer (cwd-relative), which ships in the slug
+//    and appears at /app/.cache/puppeteer at runtime — matching the
+//    PUPPETEER_CACHE_DIR config var Grover/puppeteer use when launching.
+process.env.PUPPETEER_CACHE_DIR = `${process.cwd()}/.cache/puppeteer`;
+console.log(`Installing Chromium into ${process.env.PUPPETEER_CACHE_DIR}`);
+
 try {
   const { downloadBrowser } = await import('puppeteer/internal/node/install.js');
   await downloadBrowser();
