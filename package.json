@@ -9,7 +9,6 @@
     "puppeteer": "^21.0.0"
   },
   "scripts": {
-    "postinstall": "echo 'Node.js dependencies installed for PDF generation'",
-    "heroku-postbuild": "npx puppeteer browsers install chrome"
+    "postinstall": "node node_modules/puppeteer/install.mjs"
   }
 }
