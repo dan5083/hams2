@@ -17,6 +17,11 @@
       padding-bottom: 20px;
       margin-bottom: 30px;
     }
+    .header img {
+      max-width: 300px;
+      height: auto;
+      margin-bottom: 15px;
+    }
     .header h1 {
       color: #1e40af;
       margin: 0 0 10px 0;
@@ -111,7 +116,12 @@
 </head>
 <body>
   <div class="header">
-    <h1 style="font-size: 24px; margin-bottom: 5px;">Hard Anodising Surface Treatments Ltd</h1>
+    <% if attachments['logo.png'] %>
+      <img src="<%= attachments['logo.png'].url %>" alt="Hard Anodising Surface Treatments Ltd"
+           width="300" style="width: 300px; max-width: 100%; height: auto; display: block; margin-bottom: 15px;">
+    <% else %>
+      <h1 style="font-size: 24px; margin-bottom: 5px;">Hard Anodising Surface Treatments Ltd</h1>
+    <% end %>
     <h1>Order Acknowledgement</h1>
     <p style="color: #6b7280; margin: 0;">Thank you for your order. Please find the details below.</p>
   </div>
@@ -141,6 +151,11 @@
 
   <h2 style="color: #1e40af; margin-bottom: 15px;">Order Items</h2>
 
+  <%# Lufthansa nuance (mirrors the CofC PDF): S/N from the WO's customer
+      reference is appended to the part number for any customer; for Lufthansa
+      the part issue is suppressed and their CS-Order shown instead. %>
+  <% special_customer = @customer.name.include?('Lufthansa') %>
+
   <table class="items-table">
     <thead>
       <tr>
@@ -153,9 +168,17 @@
     </thead>
     <tbody>
       <% @works_orders.each do |wo| %>
+      <% ref = wo.parsed_customer_reference %>
       <tr>
         <td><strong>WO<%= wo.number %></strong></td>
-        <td><%= wo.part_number %>-<%= wo.part_issue %></td>
+        <td>
+          <% if special_customer %>
+            <%= wo.part_number %><% if ref[:serial_no].present? %> / S/N: <%= ref[:serial_no] %><% end %>
+            <% if ref[:cs_order].present? %><br><span style="color: #6b7280; font-size: 13px;">CS-Order: <%= ref[:cs_order] %></span><% end %>
+          <% else %>
+            <%= wo.part_number %>-<%= wo.part_issue %><% if ref[:serial_no].present? %> / S/N: <%= ref[:serial_no] %><% end %>
+          <% end %>
+        </td>
         <td><%= wo.part_description %></td>
         <td class="text-right"><%= wo.quantity %></td>
         <td class="text-right">£<%= number_with_precision(wo.lot_price, precision: 2, delimiter: ',') %></td>

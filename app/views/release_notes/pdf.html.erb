@@ -364,13 +364,9 @@
     <%
       is_special_customer = @release_note.works_order.customer_order.customer.name.include?('Lufthansa')
 
-      cs_order  = nil
-      serial_no = nil
-      if @release_note.works_order.customer_reference.present?
-        ref       = @release_note.works_order.customer_reference
-        cs_order  = ref.match(/CS-?Order[:\s]+([^\s\/]+)/i)&.captures&.first
-        serial_no = ref.match(/(?:S\/N|SerialNo\.)[:\s]+(.+)/i)&.captures&.first&.strip
-      end
+      parsed_ref = @release_note.works_order.parsed_customer_reference
+      cs_order   = parsed_ref[:cs_order]
+      serial_no  = parsed_ref[:serial_no]
     %>
 
     <!-- ================================================================

@@ -99,7 +99,8 @@
 <body>
   <div class="header">
     <% if attachments['logo.png'] %>
-      <img src="<%= attachments['logo.png'].url %>" alt="Hard Anodising Surface Treatments Ltd">
+      <img src="<%= attachments['logo.png'].url %>" alt="Hard Anodising Surface Treatments Ltd"
+           width="300" style="width: 300px; max-width: 100%; height: auto; display: block; margin-bottom: 15px;">
     <% else %>
       <h1 style="font-size: 24px; margin-bottom: 5px;">Hard Anodising Surface Treatments Ltd</h1>
     <% end %>
@@ -137,20 +138,28 @@
 
   <h2 style="color: #1e40af; margin-bottom: 15px;">Order Items</h2>
 
+  <%# Lufthansa nuance (mirrors the CofC PDF): S/N from the WO's customer
+      reference is appended to the part number for any customer; for Lufthansa
+      the Issue column is replaced by their CS-Order number. %>
+  <% special_customer = @customer.name.include?('Lufthansa') %>
+
   <table class="items-table">
     <thead>
       <tr>
         <th>Works Order</th>
         <th>Part Number</th>
+        <th><%= special_customer ? 'CS-Order' : 'Issue' %></th>
         <th>Description</th>
         <th class="text-right">Quantity</th>
       </tr>
     </thead>
     <tbody>
       <% @works_orders.each do |wo| %>
+      <% ref = wo.parsed_customer_reference %>
       <tr>
         <td><strong>WO<%= wo.number %></strong></td>
-        <td><%= wo.part_number %>-<%= wo.part_issue %></td>
+        <td><%= wo.part_number %><% if ref[:serial_no].present? %> / S/N: <%= ref[:serial_no] %><% end %></td>
+        <td><%= special_customer ? ref[:cs_order] : wo.part_issue %></td>
         <td><%= wo.part_description %></td>
         <td class="text-right"><%= wo.quantity %></td>
       </tr>

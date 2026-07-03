@@ -330,6 +330,22 @@ class WorksOrder < ApplicationRecord
     end
   end
 
+  # Parsed components of the customer's own reference string (Lufthansa-style),
+  # e.g. "CS-Order: 4711 / S/N: AB123". Single source for the regexes used on
+  # the CofC PDF (release_notes/pdf) and in customer emails — if the format
+  # ever changes, change it here only.
+  #   cs_order  -> shown alongside our customer order number
+  #   serial_no -> shown alongside our part number
+  def parsed_customer_reference
+    ref = customer_reference
+    return { cs_order: nil, serial_no: nil } if ref.blank?
+
+    {
+      cs_order:  ref.match(/CS-?Order[:\s]+([^\s\/]+)/i)&.captures&.first,
+      serial_no: ref.match(/(?:S\/N|SerialNo\.)[:\s]+(.+)/i)&.captures&.first&.strip
+    }
+  end
+
   # Invoice and delivery information for release notes
   def invoice_customer_name
     customer_name

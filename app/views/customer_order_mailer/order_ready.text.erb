@@ -19,9 +19,18 @@ The Certificate<%= 's' if @release_note_count > 1 %> of Conformity for this orde
 
 ORDER ITEMS
 --------------------------------------------------------------------------------
+<% special_customer = @customer.name.include?('Lufthansa') -%>
 <% @works_orders.each do |wo| -%>
+<% ref = wo.parsed_customer_reference -%>
 Works Order:      WO<%= wo.number %>
-Part Number:      <%= wo.part_number %>-<%= wo.part_issue %>
+Part Number:      <%= wo.part_number %><% if ref[:serial_no].present? %> / S/N: <%= ref[:serial_no] %><% end %>
+<% if special_customer -%>
+<% if ref[:cs_order].present? -%>
+CS-Order:         <%= ref[:cs_order] %>
+<% end -%>
+<% else -%>
+Issue:            <%= wo.part_issue %>
+<% end -%>
 Description:      <%= wo.part_description %>
 Quantity:         <%= wo.quantity %>
 
