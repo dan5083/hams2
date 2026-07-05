@@ -137,21 +137,32 @@ export default class extends Controller {
   }
 
   nextSlotLabel() {
-    for (let pi = 0; pi < this.parts.length; pi++) {
-      const slots  = this.parts[pi].readings.length
-      const filled = this.parts[pi].readings.filter((r) => r != null).length
-      if (filled < slots) return `${this.parts[pi].label} · ${filled}/${slots}`
+    // Breadth-first: complete reading-round ri across all parts before
+    // advancing to ri+1, matching the operator's whack-a-mole sweep.
+    const maxSlots = Math.max(0, ...this.parts.map((p) => p.readings.length))
+    for (let ri = 0; ri < maxSlots; ri++) {
+      for (let pi = 0; pi < this.parts.length; pi++) {
+        const r = this.parts[pi].readings
+        if (ri < r.length && r[ri] == null) {
+          const filled = r.filter((x) => x != null).length
+          return `${this.parts[pi].label} · ${filled}/${r.length}`
+        }
+      }
     }
     return ""
   }
 
-  // Fill the first empty slot, scanning p1's slots -> p2's slots -> ...
-  // Per-part slot count comes from the reading plan. Returns true if placed.
+  // Fill the first empty slot BREADTH-FIRST (Hund's rule): one reading on each
+  // part in a round, then loop back for the next round. Reading-round ri is the
+  // outer loop, parts the inner, so ri=0 fills every part's slot 0 before any
+  // part gets slot 1. Not every part has every slot (see reading plan), hence
+  // the `ri < readings.length` guard. Returns true if placed.
   acceptReading(value) {
     const rounded = Math.round(value * 10) / 10
-    for (let pi = 0; pi < this.parts.length; pi++) {
-      for (let ri = 0; ri < this.parts[pi].readings.length; ri++) {
-        if (this.parts[pi].readings[ri] == null) {
+    const maxSlots = Math.max(0, ...this.parts.map((p) => p.readings.length))
+    for (let ri = 0; ri < maxSlots; ri++) {
+      for (let pi = 0; pi < this.parts.length; pi++) {
+        if (ri < this.parts[pi].readings.length && this.parts[pi].readings[ri] == null) {
           this.parts[pi].readings[ri] = rounded
 
           const inp = this.hasPartsContainerTarget && this.partsContainerTarget.querySelector(
