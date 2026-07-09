@@ -176,6 +176,7 @@
                   <% if show_create_invoice %>
                     <%= button_to "Create Invoice", invoice_to_date_customer_order_path(customer_order),
                         method: :patch,
+                        params: { return_to: request.fullpath },
                         class: "text-green-600 hover:text-green-900 bg-transparent border-0 underline cursor-pointer text-sm font-semibold",
                         data: { confirm: "Stage an invoice for the whole of order #{customer_order.number} (all WOs complete, #{uninvoiced_count} parts ready)?" } %>
                   <% end %>

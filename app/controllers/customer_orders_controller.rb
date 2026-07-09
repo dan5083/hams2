@@ -117,8 +117,17 @@ class CustomerOrdersController < ApplicationController
   # are fine — no "all WOs fully released" gate, unlike create_invoice). Drives
   # off requires_invoicing release notes via Invoice.stage_to_date, which bills
   # courier per release note and is safe to call repeatedly. Triggered by the
-  # 🐓 button on the dashboard "Released but Uninvoiced" worklist.
+  # 🐓 button on the dashboard "Released but Uninvoiced" worklist AND by the
+  # "Create Invoice" button on the customer orders index.
+  #
+  # Redirect target: honours an optional return_to param (relative paths only,
+  # see safe_return_path) so the index button lands you back on the index — with
+  # search/customer/page filters intact — ready to press the next Create Invoice.
+  # When no return_to is supplied (e.g. the dashboard 🐓 button) it falls back to
+  # root_path, preserving the original dashboard behaviour.
   def invoice_to_date
+    return_path = safe_return_path(params[:return_to]) || root_path
+
     release_notes = ReleaseNote.joins(:works_order)
                                .where(works_orders: { customer_order_id: @customer_order.id })
                                .requires_invoicing
@@ -126,15 +135,15 @@ class CustomerOrdersController < ApplicationController
     invoice = Invoice.stage_to_date(release_notes, Current.user)
 
     if invoice
-      redirect_to root_path,
+      redirect_to return_path,
                   notice: "✅ Invoice INV#{invoice.number} staged for order #{@customer_order.number} (released to date). Push to Xero from the dashboard."
     else
-      redirect_to root_path,
+      redirect_to return_path,
                   alert: "Nothing to invoice on order #{@customer_order.number} — it may already be invoiced to date."
     end
   rescue StandardError => e
     Rails.logger.error "invoice_to_date (CO #{@customer_order.id}) failed: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
-    redirect_to root_path, alert: "❌ Failed to stage invoice: #{e.message}"
+    redirect_to return_path, alert: "❌ Failed to stage invoice: #{e.message}"
   end
 
   def edit
@@ -206,6 +215,15 @@ class CustomerOrdersController < ApplicationController
 
   def set_customer_order
     @customer_order = CustomerOrder.find(params[:id])
+  end
+
+  # Only allow local, relative return paths ("/customer_orders?page=2") so a
+  # crafted return_to can't turn this into an open redirect ("//evil.com" or
+  # "https://evil.com"). Returns nil for anything unsafe/blank so callers can
+  # fall back to their default.
+  def safe_return_path(path)
+    return if path.blank?
+    path if path.start_with?("/") && !path.start_with?("//")
   end
 
   def customer_order_params
