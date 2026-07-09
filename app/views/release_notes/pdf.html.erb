@@ -165,6 +165,10 @@
         white-space: nowrap;
       }
       .anodic-table td.stat-mean { font-weight: bold; color: #1d4ed8; }
+      /* Stat cell that is meaningless for the row (single reading: mean,
+         min and max would all just repeat R1). Rendered as a muted dash —
+         reads as "n/a" to an auditor, unlike an arrow/ditto mark. */
+      .anodic-table td.na { color: #94a3b8; }
 
       /* ----------------------------------------------------------------
          NADCAP sample-plan: batch sub-header above per-part table
@@ -734,39 +738,75 @@
                       <span class="stat">Max: <%= batch_readings.max %> µm</span>
                     </div>
 
-                    <table class="anodic-table">
-                      <thead>
-                        <tr>
-                          <th class="stat-col">Part</th>
-                          <th class="stat-col">Mean</th>
-                          <th class="stat-col">Min</th>
-                          <th class="stat-col">Max</th>
-                          <% max_part_readings.times do |i| %>
-                            <th class="reading-col">R<%= i + 1 %></th>
+                    <% if max_part_readings == 1 %>
+                      <%# Every sampled part took exactly one reading (the
+                          normal case once the sample size reaches 8), so
+                          per-part Mean/Min/Max would just repeat the reading
+                          three times. Transpose instead: part labels across
+                          the top, reading underneath, 16 parts per strip.
+                          Batch-level stats live in the label above. %>
+                      <%
+                        cells = parts.each_with_index.filter_map do |part, idx|
+                          r = (part['readings'] || []).first
+                          next if r.nil?
+                          [part['part_label'].presence || "B#{batch_number}p#{idx + 1}", r]
+                        end
+                      %>
+                      <table class="anodic-table">
+                        <tbody>
+                          <% cells.each_slice(16) do |strip| %>
+                            <tr>
+                              <% strip.each do |(label, _)| %><th class="reading-col"><%= label %></th><% end %>
+                            </tr>
+                            <tr>
+                              <% strip.each do |(_, r)| %><td><%= r %> µm</td><% end %>
+                            </tr>
                           <% end %>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <% parts.each_with_index do |part, idx| %>
-                          <%
-                            readings = part['readings'] || []
-                            next if readings.empty?
-                            pmean = (readings.sum / readings.count.to_f).round(1)
-                            label = part['part_label'].presence || "B#{batch_number}p#{idx + 1}"
-                          %>
+                        </tbody>
+                      </table>
+                    <% else %>
+                      <table class="anodic-table">
+                        <thead>
                           <tr>
-                            <td class="batch-label"><%= label %></td>
-                            <td class="stat-mean"><%= pmean %> µm</td>
-                            <td><%= readings.min %> µm</td>
-                            <td><%= readings.max %> µm</td>
-                            <% readings.first(max_part_readings).each do |r| %>
-                              <td><%= r %> µm</td>
+                            <th class="stat-col">Part</th>
+                            <th class="stat-col">Mean</th>
+                            <th class="stat-col">Min</th>
+                            <th class="stat-col">Max</th>
+                            <% max_part_readings.times do |i| %>
+                              <th class="reading-col">R<%= i + 1 %></th>
                             <% end %>
-                            <% (max_part_readings - [readings.count, max_part_readings].min).times do %><td></td><% end %>
                           </tr>
-                        <% end %>
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          <% parts.each_with_index do |part, idx| %>
+                            <%
+                              readings = part['readings'] || []
+                              next if readings.empty?
+                              label = part['part_label'].presence || "B#{batch_number}p#{idx + 1}"
+                            %>
+                            <tr>
+                              <td class="batch-label"><%= label %></td>
+                              <% if readings.count == 1 %>
+                                <%# Mean/Min/Max are meaningless for a single
+                                    reading — dash them so the value appears
+                                    exactly once, under R1. %>
+                                <td class="na">&mdash;</td>
+                                <td class="na">&mdash;</td>
+                                <td class="na">&mdash;</td>
+                              <% else %>
+                                <td class="stat-mean"><%= (readings.sum / readings.count.to_f).round(1) %> µm</td>
+                                <td><%= readings.min %> µm</td>
+                                <td><%= readings.max %> µm</td>
+                              <% end %>
+                              <% readings.first(max_part_readings).each do |r| %>
+                                <td><%= r %> µm</td>
+                              <% end %>
+                              <% (max_part_readings - [readings.count, max_part_readings].min).times do %><td></td><% end %>
+                            </tr>
+                          <% end %>
+                        </tbody>
+                      </table>
+                    <% end %>
                   <% end %>
 
                 <% else %>
@@ -798,9 +838,17 @@
                           <% if multi_batch %>
                             <td class="batch-label">B<%= batch_number %></td>
                           <% end %>
-                          <td class="stat-mean"><%= bmean %> µm</td>
-                          <td><%= readings.min %> µm</td>
-                          <td><%= readings.max %> µm</td>
+                          <% if readings.count == 1 %>
+                            <%# Stats are meaningless for one reading — dash
+                                them; the value shows once, under R1. %>
+                            <td class="na">&mdash;</td>
+                            <td class="na">&mdash;</td>
+                            <td class="na">&mdash;</td>
+                          <% else %>
+                            <td class="stat-mean"><%= bmean %> µm</td>
+                            <td><%= readings.min %> µm</td>
+                            <td><%= readings.max %> µm</td>
+                          <% end %>
                           <% readings.each do |r| %>
                             <td><%= r %> µm</td>
                           <% end %>
@@ -1021,39 +1069,70 @@
                   <span class="stat">Max: <%= batch_readings.max %></span>
                 </div>
 
-                <table class="anodic-table">
-                  <thead>
-                    <tr>
-                      <th class="stat-col">Part</th>
-                      <th class="stat-col">Mean</th>
-                      <th class="stat-col">Min</th>
-                      <th class="stat-col">Max</th>
-                      <% max_part_readings.times do |i| %>
-                        <th class="reading-col">R<%= i + 1 %></th>
+                <% if max_part_readings == 1 %>
+                  <%# All parts single-reading: transpose (labels over
+                      readings). Shorter strips in two-column mode so the
+                      fit script barely has to shrink anything. %>
+                  <%
+                    strip_size = use_two_columns ? 8 : 16
+                    cells = parts.each_with_index.filter_map do |part, idx|
+                      r = (part['readings'] || []).first
+                      next if r.nil?
+                      [part['part_label'].presence || "B#{batch_number}p#{idx + 1}", r]
+                    end
+                  %>
+                  <table class="anodic-table">
+                    <tbody>
+                      <% cells.each_slice(strip_size) do |strip| %>
+                        <tr>
+                          <% strip.each do |(label, _)| %><th class="reading-col"><%= label %></th><% end %>
+                        </tr>
+                        <tr>
+                          <% strip.each do |(_, r)| %><td><%= r %></td><% end %>
+                        </tr>
                       <% end %>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <% parts.each_with_index do |part, idx| %>
-                      <%
-                        readings = part['readings'] || []
-                        next if readings.empty?
-                        pmean = (readings.sum / readings.count.to_f).round(1)
-                        label = part['part_label'].presence || "B#{batch_number}p#{idx + 1}"
-                      %>
+                    </tbody>
+                  </table>
+                <% else %>
+                  <table class="anodic-table">
+                    <thead>
                       <tr>
-                        <td class="batch-label"><%= label %></td>
-                        <td class="stat-mean"><%= pmean %></td>
-                        <td><%= readings.min %></td>
-                        <td><%= readings.max %></td>
-                        <% readings.first(max_part_readings).each do |r| %>
-                          <td><%= r %></td>
+                        <th class="stat-col">Part</th>
+                        <th class="stat-col">Mean</th>
+                        <th class="stat-col">Min</th>
+                        <th class="stat-col">Max</th>
+                        <% max_part_readings.times do |i| %>
+                          <th class="reading-col">R<%= i + 1 %></th>
                         <% end %>
-                        <% (max_part_readings - [readings.count, max_part_readings].min).times do %><td></td><% end %>
                       </tr>
-                    <% end %>
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      <% parts.each_with_index do |part, idx| %>
+                        <%
+                          readings = part['readings'] || []
+                          next if readings.empty?
+                          label = part['part_label'].presence || "B#{batch_number}p#{idx + 1}"
+                        %>
+                        <tr>
+                          <td class="batch-label"><%= label %></td>
+                          <% if readings.count == 1 %>
+                            <td class="na">&mdash;</td>
+                            <td class="na">&mdash;</td>
+                            <td class="na">&mdash;</td>
+                          <% else %>
+                            <td class="stat-mean"><%= (readings.sum / readings.count.to_f).round(1) %></td>
+                            <td><%= readings.min %></td>
+                            <td><%= readings.max %></td>
+                          <% end %>
+                          <% readings.first(max_part_readings).each do |r| %>
+                            <td><%= r %></td>
+                          <% end %>
+                          <% (max_part_readings - [readings.count, max_part_readings].min).times do %><td></td><% end %>
+                        </tr>
+                      <% end %>
+                    </tbody>
+                  </table>
+                <% end %>
                 </div><!-- /batch-block -->
               <% end %>
               </div><!-- /batch-col -->

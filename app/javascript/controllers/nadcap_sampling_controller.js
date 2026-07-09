@@ -322,10 +322,20 @@ export default class extends Controller {
       return
     }
     const slots = this.parts[partIdx].readings.length
+
+    // Single-slot part: the value is already visible in the input beside
+    // this label; mean/min/max of one reading would repeat it three times.
+    if (slots === 1) {
+      el.textContent = `${vals.length}/1`
+      return
+    }
+
     const mean = (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)
-    const min = Math.min(...vals)
-    const max = Math.max(...vals)
-    el.textContent = `${vals.length}/${slots} · mean ${mean} · min ${min} · max ${max}`
+    let text = `${vals.length}/${slots} · mean ${mean}`
+    if (vals.length > 1) {
+      text += ` · min ${Math.min(...vals)} · max ${Math.max(...vals)}`
+    }
+    el.textContent = text
   }
 
   // ── Manual reading entry (blur on individual cell) ────────────────────────
