@@ -103,7 +103,8 @@ class User < ApplicationRecord
       'brian@hardanodisingstl.com',
       'chris@hardanodisingstl.com',
       'sophie@hardanodisingstl.com',
-      'julia@hardanodisingstl.com'
+      'julia@hardanodisingstl.com',
+      'nigel@hardanodisingstl.com'
     ])
   end
 
