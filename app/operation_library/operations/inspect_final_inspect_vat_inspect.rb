@@ -98,7 +98,7 @@ module OperationLibrary
     def self.final_inspect_text_aerospace_anodic
       '**Final inspection** Check 100% of qty for uniform film appearance. ' \
       'Check all operations have been stamped, and date, batch№, and quantity present.' \
-      'For every batch processed, record film thickness measurements as required by the system,' \
+      'For every batch processed, record film thickness measurements as required by the system in accordance with WI3206,' \
       'which will define the sampling and number of measurements required by the relevant specification and lot size.' \
       'It will not be possible to release the order without these readings. ' \
       'The CofC will render the minimum, maximum and mean of those readings.'
