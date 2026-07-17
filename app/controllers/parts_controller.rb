@@ -8,12 +8,17 @@ class PartsController < ApplicationController
     @parts = Part.includes(:customer)
                 .order(:part_number, :part_issue)
 
-    # Search by part number, issue, or customer name
+    # Search by part number, issue, customer name, specification, description or material
     if params[:search].present?
-      search_term = params[:search].upcase.strip
+      term = "%#{params[:search].strip}%"
       @parts = @parts.joins(:customer).where(
-        "UPPER(parts.part_number) ILIKE ? OR UPPER(parts.part_issue) ILIKE ? OR UPPER(organizations.name) ILIKE ?",
-        "%#{search_term}%", "%#{search_term}%", "%#{search_term}%"
+        "parts.part_number ILIKE :q OR " \
+        "parts.part_issue ILIKE :q OR " \
+        "organizations.name ILIKE :q OR " \
+        "parts.specification ILIKE :q OR " \
+        "parts.description ILIKE :q OR " \
+        "parts.material ILIKE :q",
+        q: term
       )
     end
 
