@@ -30,6 +30,13 @@ class PartsController < ApplicationController
     part_ids          = @parts.map(&:id)
     @total_wo_counts  = WorksOrder.where(part_id: part_ids).group(:part_id).count
     @active_wo_counts = WorksOrder.active.where(part_id: part_ids).group(:part_id).count
+
+    # Deletability, resolved in one extra query instead of two per row.
+    # Part#can_be_deleted? is (no works orders) AND (nothing replaces it).
+    # @total_wo_counts.keys already gives the parts that have works orders, so
+    # we only need the set of parts that are pointed at by some replaces_id.
+    replaced_ids        = Part.where(replaces_id: part_ids).distinct.pluck(:replaces_id)
+    @deletable_part_ids = (part_ids - @total_wo_counts.keys - replaced_ids).to_set
   end
 
   def show

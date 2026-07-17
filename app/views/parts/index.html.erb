@@ -249,7 +249,7 @@
                       data: { confirm: "Are you sure you want to #{part.enabled? ? 'disable' : 'enable'} this part?" }
                     },
                     class: part.enabled? ? "text-red-600 hover:text-red-900" : "text-green-600 hover:text-green-900" %>
-                <% if part.can_be_deleted? %>
+                <% if @deletable_part_ids.include?(part.id) %>
                   <%= button_to "Delete", part_path(part),
                       method: :delete,
                       form: {
