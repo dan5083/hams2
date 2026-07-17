@@ -517,8 +517,20 @@ class Part < ApplicationRecord
     sequence.compact
   end
 
-  # Get treatments from nested structure
+  # Get treatments from nested structure.
+  #
+  # Memoised: the parts index Process Details cell calls anodising_types,
+  # target_thicknesses and alloys, each of which routes through here, so without
+  # the memo this rebuilds (and re-runs Operation.all_operations) three times per
+  # row. Safe to cache on the instance because nothing mutates
+  # operation_selection["treatments"] on a live record after first read — the
+  # locked-operations editing paths write a different key. build_treatments
+  # always returns an Array (never nil/false), so ||= memoises the empty case.
   def get_treatments
+    @get_treatments ||= build_treatments
+  end
+
+  def build_treatments
     treatments_data = parse_treatments_data
     return [] if treatments_data.empty?
 
@@ -755,6 +767,36 @@ end
 
 def has_files?
   files.any?
+end
+
+# Picture/drawing present? file_cloudinary_ids is a first-class array column,
+# so this is a pure in-memory check on the already-loaded row (no jsonb dig,
+# no extra query).
+def has_image?
+  file_cloudinary_ids.present?
+end
+
+# True if any treatment on the part has dye enabled. Reads the raw treatments
+# jsonb via parse_treatments_data — deliberately NOT get_treatments — so it
+# never loads the Operation library. Handles both storage shapes: the nested
+# { "enabled" => ..., "color" => ... } hash from the JS preview path and the
+# flat "dye_color" string from form submission.
+def dyed?
+  parse_treatments_data.any? do |t|
+    dye = t["dye"]
+    (dye.is_a?(Hash) && (dye["enabled"] || dye["color"].present?)) ||
+      (t["dye_color"].present? && t["dye_color"] != "none")
+  end
+end
+
+# The distinct dye colours across the part's treatments, for display. Same
+# two-shape handling as dyed?.
+def dye_colours
+  parse_treatments_data.filter_map do |t|
+    dye = t["dye"]
+    (dye.is_a?(Hash) && dye["color"].presence) ||
+      (t["dye_color"].presence unless t["dye_color"] == "none")
+  end.uniq
 end
 
 def upload_file(uploaded_file)

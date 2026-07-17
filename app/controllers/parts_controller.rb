@@ -5,7 +5,7 @@ class PartsController < ApplicationController
                                   :upload_file, :delete_file, :download_file]
 
   def index
-    @parts = Part.includes(:customer, :works_orders)
+    @parts = Part.includes(:customer)
                 .order(:part_number, :part_issue)
 
     # Search by part number, issue, or customer name
@@ -19,6 +19,12 @@ class PartsController < ApplicationController
 
     # Add pagination (using kaminari gem)
     @parts = @parts.page(params[:page]).per(25) # 25 parts per page
+
+    # Works-order counts for just this page's parts — two flat queries, no N+1,
+    # no loading WO rows into memory. active == voided: false.
+    part_ids          = @parts.map(&:id)
+    @total_wo_counts  = WorksOrder.where(part_id: part_ids).group(:part_id).count
+    @active_wo_counts = WorksOrder.active.where(part_id: part_ids).group(:part_id).count
   end
 
   def show
