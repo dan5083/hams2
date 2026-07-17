@@ -120,7 +120,9 @@
               <% end %>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-              <%= release_note.customer.name %>
+              <div class="max-w-[180px] truncate" title="<%= release_note.customer.name %>">
+                <%= release_note.customer.name %>
+              </div>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
               <%= release_note.quantity_summary %>
