@@ -1,0 +1,404 @@
+<%#
+  app/views/vat_station/show.html.erb
+  Full-screen kiosk for the vat 2 panel touchscreen. Rendered with layout false,
+  no importmap, no Turbo — it has to come up on its own on a browser kiosk that
+  may be restarted by an operator with wet gloves.
+%>
+<% fmt = ->(v) { v.nil? ? "" : (v.to_f % 1 == 0 ? v.to_i.to_s : format("%.1f", v)) } %>
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Vat <%= @station_vat %> · hard anodise</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+    :root {
+      --live:    #a83279;
+      --live-dk: #6d1f4d;
+      --ink:     #141110;
+      --panel:   #1d1917;
+      --raised:  #262120;
+      --enamel:  #ece7df;
+      --steel:   #7d746d;
+      --lamp:    #d8a13a;
+      --rule:    #322b29;
+      --display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+      --data:    'IBM Plex Mono', ui-monospace, Menlo, monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0; height: 100%; overflow: hidden;
+      background: var(--ink); color: var(--enamel);
+      font-family: var(--data);
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    /* ---- frame ------------------------------------------------------- */
+    .station { display: grid; grid-template-rows: auto 1fr; height: 100%; }
+
+    .masthead {
+      display: flex; align-items: baseline; gap: 28px;
+      padding: 14px 28px; border-bottom: 2px solid var(--rule);
+      background: var(--panel);
+    }
+    .stencil {
+      font-family: var(--display); font-size: 40px; font-weight: 600;
+      letter-spacing: .16em; text-transform: uppercase; line-height: 1;
+    }
+    .stencil em { font-style: normal; color: var(--live); }
+    .masthead .role {
+      font-size: 13px; letter-spacing: .28em; text-transform: uppercase;
+      color: var(--steel);
+    }
+    .masthead .clock { margin-left: auto; font-size: 22px; color: var(--steel); }
+
+    .body { display: grid; grid-template-columns: 400px 1fr; min-height: 0; }
+
+    /* ---- entry rail -------------------------------------------------- */
+    .rail {
+      background: var(--panel); border-right: 2px solid var(--rule);
+      padding: 24px; display: flex; flex-direction: column; gap: 18px;
+    }
+    .rail label {
+      font-size: 12px; letter-spacing: .28em; text-transform: uppercase;
+      color: var(--steel);
+    }
+    .readout {
+      background: var(--ink); border: 2px solid var(--rule); border-radius: 3px;
+      padding: 10px 16px; font-family: var(--display); font-size: 62px;
+      font-weight: 500; letter-spacing: .06em; line-height: 1.1; min-height: 88px;
+      color: var(--enamel); word-break: break-all;
+    }
+    .readout:empty::before { content: '—'; color: var(--rule); }
+
+    .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .key {
+      appearance: none; border: 1px solid var(--rule); border-radius: 3px;
+      background: var(--raised); color: var(--enamel);
+      font-family: var(--display); font-size: 34px; font-weight: 500;
+      padding: 16px 0; cursor: pointer; transition: background .08s, transform .08s;
+    }
+    .key:active { background: var(--live-dk); transform: translateY(1px); }
+    .key:focus-visible { outline: 3px solid var(--live); outline-offset: 2px; }
+    .key--clear { font-size: 20px; letter-spacing: .12em; color: var(--steel); }
+    .key--go {
+      background: var(--live); border-color: var(--live); color: #fff;
+      font-size: 20px; letter-spacing: .16em; grid-column: span 1;
+    }
+    .rail .hint { font-size: 12px; line-height: 1.6; color: var(--steel); margin-top: auto; }
+
+    /* ---- results pane ------------------------------------------------ */
+    .pane { padding: 26px 32px; overflow-y: auto; min-height: 0; }
+
+    .waiting {
+      height: 100%; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 14px; text-align: center;
+    }
+    .waiting .big {
+      font-family: var(--display); font-size: 64px; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--rule);
+    }
+    .waiting p { color: var(--steel); font-size: 15px; max-width: 42ch; line-height: 1.7; }
+
+    .fault {
+      border-left: 5px solid var(--live); background: var(--raised);
+      padding: 22px 26px;
+      font-family: var(--display); font-size: 38px; letter-spacing: .04em;
+    }
+    .fault span { display: block; font-family: var(--data); font-size: 14px;
+      letter-spacing: .2em; text-transform: uppercase; color: var(--steel); margin-bottom: 8px; }
+
+    .wo-strip {
+      display: flex; flex-wrap: wrap; gap: 34px; align-items: baseline;
+      padding-bottom: 16px; border-bottom: 1px solid var(--rule); margin-bottom: 22px;
+    }
+    .wo-strip .wo {
+      font-family: var(--display); font-size: 52px; font-weight: 600;
+      letter-spacing: .04em; line-height: 1;
+    }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field b { font-weight: 400; font-size: 11px; letter-spacing: .24em;
+      text-transform: uppercase; color: var(--steel); }
+    .field span { font-size: 17px; }
+
+    .wrong-vat {
+      display: flex; gap: 14px; align-items: center;
+      border: 1px solid var(--lamp); color: var(--lamp);
+      padding: 12px 18px; margin-bottom: 22px; border-radius: 3px;
+      font-size: 15px; letter-spacing: .04em;
+    }
+    .wrong-vat strong { font-family: var(--display); font-size: 22px; letter-spacing: .1em; }
+
+    .cycle { margin-bottom: 34px; }
+    .cycle-head {
+      font-size: 12px; letter-spacing: .26em; text-transform: uppercase;
+      color: var(--steel); margin-bottom: 14px;
+    }
+
+    /* the three numbers that matter */
+    .recipe { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin-bottom: 2px; }
+    .cell { background: var(--panel); padding: 18px 22px; }
+    .cell b { display: block; font-weight: 400; font-size: 11px; letter-spacing: .26em;
+      text-transform: uppercase; color: var(--steel); margin-bottom: 6px; }
+    .cell .value {
+      font-family: var(--display); font-size: 84px; font-weight: 600; line-height: .95;
+      letter-spacing: .02em;
+    }
+    .cell .value u { text-decoration: none; font-size: 34px; color: var(--steel); margin-left: 4px; }
+    .cell--start .value { color: var(--enamel); }
+    .cell--finish .value { color: var(--live); }
+    .sub { background: var(--panel); padding: 12px 22px; font-size: 14px; color: var(--steel);
+      display: flex; gap: 30px; flex-wrap: wrap; }
+    .sub em { font-style: normal; color: var(--enamel); }
+
+    /* the trace */
+    .trace { background: var(--panel); padding: 18px 22px 8px; margin-top: 2px; }
+    .trace svg { width: 100%; height: auto; display: block; }
+
+    .setpoints { margin-top: 2px; background: var(--panel); padding: 16px 22px 20px; }
+    .setpoints table { width: 100%; border-collapse: collapse; }
+    .setpoints th {
+      text-align: left; font-weight: 400; font-size: 11px; letter-spacing: .24em;
+      text-transform: uppercase; color: var(--steel); padding-bottom: 8px;
+    }
+    .setpoints td { font-size: 26px; font-family: var(--display); letter-spacing: .04em;
+      padding: 6px 0; border-top: 1px solid var(--rule); }
+    .setpoints td.v { color: var(--live); }
+    .setpoints tr.hold td { color: var(--lamp); }
+    .setpoints tr.hold td.v { color: var(--lamp); }
+
+    .verbatim {
+      margin-top: 14px; font-size: 13px; line-height: 1.7; color: var(--steel);
+      border-left: 2px solid var(--rule); padding-left: 14px;
+    }
+
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body>
+  <div class="station">
+    <header class="masthead">
+      <div class="stencil">Vat N<em>o</em> <%= @station_vat %></div>
+      <div class="role">Hard anodise · set points</div>
+      <div class="clock" id="clock">&nbsp;</div>
+    </header>
+
+    <div class="body">
+      <!-- entry rail -->
+      <form class="rail" method="get" action="<%= vat_station_path %>" id="wo-form">
+        <label for="wo">Works order</label>
+        <div class="readout" id="readout"><%= @query %></div>
+        <input type="hidden" name="wo" id="wo" value="<%= @query %>">
+
+        <div class="keypad">
+          <% %w[1 2 3 4 5 6 7 8 9].each do |digit| %>
+            <button type="button" class="key" data-digit="<%= digit %>"><%= digit %></button>
+          <% end %>
+          <button type="button" class="key key--clear" data-action="clear">Clear</button>
+          <button type="button" class="key" data-digit="0">0</button>
+          <button type="submit" class="key key--go">Find</button>
+        </div>
+
+        <p class="hint">
+          Type the works order number from the route card, or scan it.
+          This screen reads the route only — sign off on the card as usual.
+        </p>
+      </form>
+
+      <!-- results -->
+      <main class="pane">
+        <% if @query.blank? %>
+          <div class="waiting">
+            <div class="big">Enter WO</div>
+            <p>The start voltage, finish voltage and ramp time for this vat will appear here.</p>
+          </div>
+
+        <% elsif @error.present? %>
+          <div class="fault"><span>Check the card</span><%= @error %></div>
+
+        <% else %>
+          <div class="wo-strip">
+            <div class="wo">WO<%= @works_order.number %></div>
+            <div class="field"><b>Part</b><span><%= @works_order.part_number %>-<%= @works_order.part_issue %></span></div>
+            <div class="field"><b>Customer</b><span><%= @works_order.customer_name %></span></div>
+            <div class="field"><b>Quantity</b><span><%= @works_order.quantity %></span></div>
+            <% if @works_order.material.present? %>
+              <div class="field"><b>Material</b><span><%= @works_order.material %></span></div>
+            <% end %>
+            <% if @works_order.specified_thicknesses.present? %>
+              <div class="field"><b>Thickness</b><span><%= @works_order.specified_thicknesses %></span></div>
+            <% end %>
+          </div>
+
+          <% @cycles.each do |cycle| %>
+            <% unless cycle.vat_numbers.empty? || cycle.runs_in_vat?(@station_vat) %>
+              <div class="wrong-vat">
+                <strong>Wrong vat</strong>
+                <span>This route calls for vat <%= cycle.vat_numbers.join(", ") %>, not vat <%= @station_vat %>.</span>
+              </div>
+            <% end %>
+
+            <section class="cycle">
+              <div class="cycle-head">
+                Operation <%= cycle.position %><%= " · #{cycle.display_name}" if cycle.display_name.present? %>
+              </div>
+
+              <div class="recipe">
+                <div class="cell cell--start">
+                  <b>Start at</b>
+                  <div class="value"><%= fmt.(cycle.initial_voltage) %><u>V</u></div>
+                </div>
+                <div class="cell cell--finish">
+                  <b>Finish at</b>
+                  <div class="value"><%= fmt.(cycle.final_voltage) %><u>V</u></div>
+                </div>
+                <div class="cell">
+                  <b>Ramp over</b>
+                  <div class="value"><%= cycle.duration_minutes %><u>min</u></div>
+                </div>
+              </div>
+
+              <div class="sub">
+                <div>Wind on <em><%= fmt.(cycle.ramp_rate) %> V/min</em></div>
+                <% if cycle.hold? %>
+                  <div>Then hold <em><%= fmt.(cycle.hold_voltage) %>V for <%= cycle.hold_minutes %> min</em></div>
+                  <div>Total in tank <em><%= cycle.total_minutes %> min</em></div>
+                <% end %>
+                <% if cycle.vat_numbers.any? %>
+                  <div>Route vat <em><%= cycle.vat_numbers.join(", ") %></em></div>
+                <% end %>
+              </div>
+
+              <%# ---- ramp trace ---- %>
+              <%
+                w, h = 1000, 300
+                pl, pr, pt, pb = 64, 28, 22, 44
+                vmax = [(cycle.peak_voltage.to_f / 10).ceil * 10, 10].max
+                tmax = [cycle.total_minutes, 1].max
+                x = ->(m) { pl + (m.to_f / tmax) * (w - pl - pr) }
+                y = ->(v) { h - pb - (v.to_f / vmax) * (h - pt - pb) }
+                ramp_end = cycle.duration_minutes
+              %>
+              <div class="trace">
+                <svg viewBox="0 0 <%= w %> <%= h %>" role="img"
+                     aria-label="Voltage ramp from <%= fmt.(cycle.initial_voltage) %> to <%= fmt.(cycle.final_voltage) %> volts over <%= cycle.duration_minutes %> minutes">
+                  <%# voltage gridlines %>
+                  <% (0..vmax).step(10).each do |v| %>
+                    <line x1="<%= pl %>" y1="<%= y.(v) %>" x2="<%= w - pr %>" y2="<%= y.(v) %>"
+                          stroke="#322b29" stroke-width="1"/>
+                    <text x="<%= pl - 12 %>" y="<%= y.(v) + 5 %>" text-anchor="end"
+                          fill="#7d746d" font-family="IBM Plex Mono, monospace" font-size="14"><%= v %></text>
+                  <% end %>
+
+                  <%# minute ticks %>
+                  <% (0..tmax).step(5).each do |m| %>
+                    <line x1="<%= x.(m) %>" y1="<%= pt %>" x2="<%= x.(m) %>" y2="<%= h - pb %>"
+                          stroke="#262120" stroke-width="1"/>
+                    <text x="<%= x.(m) %>" y="<%= h - pb + 24 %>" text-anchor="middle"
+                          fill="#7d746d" font-family="IBM Plex Mono, monospace" font-size="14"><%= m %></text>
+                  <% end %>
+                  <text x="<%= w - pr %>" y="<%= h - 8 %>" text-anchor="end"
+                        fill="#7d746d" font-family="IBM Plex Mono, monospace" font-size="12"
+                        letter-spacing="2">MINUTES</text>
+
+                  <%# ramp line, plus hold step if there is one %>
+                  <polyline
+                    points="<%= x.(0) %>,<%= y.(cycle.initial_voltage) %> <%= x.(ramp_end) %>,<%= y.(cycle.final_voltage) %><%= if cycle.hold? then " #{x.(ramp_end)},#{y.(cycle.hold_voltage)} #{x.(cycle.total_minutes)},#{y.(cycle.hold_voltage)}" end %>"
+                    fill="none" stroke="#a83279" stroke-width="4"
+                    stroke-linejoin="round" stroke-linecap="round"/>
+
+                  <%# set point dots at the 5 minute marks %>
+                  <% cycle.schedule.each do |mark| %>
+                    <circle cx="<%= x.(mark[:minute]) %>" cy="<%= y.(mark[:voltage]) %>" r="6"
+                            fill="<%= mark[:phase] == :hold ? "#d8a13a" : "#a83279" %>"
+                            stroke="#1d1917" stroke-width="3"/>
+                  <% end %>
+                </svg>
+              </div>
+
+              <%# ---- set point table, same 5 minute cadence as the OCV block ---- %>
+              <div class="setpoints">
+                <table>
+                  <thead>
+                    <tr><th>Elapsed</th><th>Set to</th><th>Reading</th></tr>
+                  </thead>
+                  <tbody>
+                    <% cycle.schedule.each do |mark| %>
+                      <tr class="<%= "hold" if mark[:phase] == :hold %>">
+                        <td><%= mark[:minute] %> min</td>
+                        <td class="v"><%= fmt.(mark[:voltage]) %> V</td>
+                        <td style="color:#4a4240">record on card</td>
+                      </tr>
+                    <% end %>
+                  </tbody>
+                </table>
+              </div>
+
+              <p class="verbatim"><%= cycle.recipe_line %></p>
+            </section>
+          <% end %>
+        <% end %>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var readout = document.getElementById('readout');
+      var field   = document.getElementById('wo');
+      var form    = document.getElementById('wo-form');
+      var buffer  = field.value || '';
+      var idle;
+
+      function paint() { readout.textContent = buffer; field.value = buffer; }
+
+      function push(ch) { if (buffer.length < 9) { buffer += ch; paint(); } resetIdle(); }
+      function clear()  { buffer = ''; paint(); resetIdle(); }
+
+      document.querySelectorAll('[data-digit]').forEach(function (btn) {
+        btn.addEventListener('click', function () { push(btn.dataset.digit); });
+      });
+      document.querySelector('[data-action="clear"]')
+        .addEventListener('click', clear);
+
+      form.addEventListener('submit', function (e) {
+        if (!buffer) { e.preventDefault(); }
+      });
+
+      // Physical keyboard and barcode scanners both work: digits accumulate,
+      // Enter submits, Backspace deletes.
+      document.addEventListener('keydown', function (e) {
+        if (e.key >= '0' && e.key <= '9') { push(e.key); e.preventDefault(); }
+        else if (e.key === 'Backspace') { buffer = buffer.slice(0, -1); paint(); e.preventDefault(); }
+        else if (e.key === 'Escape') { clear(); }
+        else if (e.key === 'Enter' && buffer) { form.submit(); }
+      });
+
+      // Clock
+      function tick() {
+        var d = new Date();
+        document.getElementById('clock').textContent =
+          String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+      }
+      tick(); setInterval(tick, 15000);
+
+      // Back to the entry screen if the panel is left alone for 15 minutes.
+      function resetIdle() {
+        clearTimeout(idle);
+        idle = setTimeout(function () { window.location = form.action; }, 900000);
+      }
+      ['click', 'keydown', 'touchstart'].forEach(function (evt) {
+        document.addEventListener(evt, resetIdle, { passive: true });
+      });
+      resetIdle();
+      paint();
+    })();
+  </script>
+</body>
+</html>

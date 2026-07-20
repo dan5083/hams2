@@ -223,6 +223,9 @@ Rails.application.routes.draw do
   # Root route - Dashboard for authenticated users, login for unauthenticated
   root "dashboard#index"
 
+  # Vat Stations
+  get "vat-station", to: "vat_station#show", as: :vat_station
+
   # Artifacts management
   get 'artifacts', to: 'artifacts#index'
 end
