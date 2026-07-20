@@ -346,13 +346,18 @@
     <!-- Aerospace/Defence Contract Review Checklist -->
     <% if @works_order&.aerospace_defense? %>
       <%
-        show_checklist = true
         customer_name = @works_order.customer&.name
 
-        if customer_name == "Lufthansa Technik Landing Gear Services UK"
-          all_wos_in_order = @works_order.customer_order.works_orders.active.order(:number)
-          first_wo = all_wos_in_order.first
-          show_checklist = (@works_order.id == first_wo&.id)
+        no_checklist_customers  = ["Hard Anodising Surface Treatments Ltd"]
+        one_per_order_customers = ["Lufthansa Technik Landing Gear Services UK"]
+
+        show_checklist = true
+
+        if no_checklist_customers.include?(customer_name)
+          show_checklist = false
+        elsif one_per_order_customers.include?(customer_name)
+          last_wo = @works_order.customer_order.works_orders.active.order(:number).last
+          show_checklist = (@works_order.id == last_wo&.id)
         end
       %>
 
@@ -361,7 +366,7 @@
         <header class="checklist-header">
           <h1>HARD ANODISING SURFACE TREATMENTS LTD</h1>
           <h2>CONTRACT REVIEW CHECKLIST</h2>
-          <h3>AEROSPACE/DEFENCE CONTRACT REVIEW CHECKLIST - WORKS ORDER NO: <%= @works_order.number %></h3>
+          <h3>AEROSPACE/DEFENCE CONTRACT REVIEW CHECKLIST</h3>
         </header>
 
         <table class="checklist-table">
