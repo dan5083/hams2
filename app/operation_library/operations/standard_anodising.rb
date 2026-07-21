@@ -65,124 +65,245 @@ module OperationLibrary
 
     def self.base_operations
       [
-        # 5083 Alloy - 8-13μm (= 10.5)
-        {
-          id: '5083_STANDARD_10_5',
-          alloys: ['5083'],
-          anodic_classes: ['class_1', 'class_2'],
-          target_thickness: 10.5,
-          vat_numbers: [6],
-          operation_text: "Standard anodise 19V over 15 minutes in vat 6"
-        },
-
-        # 5083 Alloy - 20μm
-        {
-          id: '5083_STANDARD_20',
-          alloys: ['5083'],
-          anodic_classes: ['class_1', 'class_2'],
-          target_thickness: 20,
-          vat_numbers: [12],
-          operation_text: "Standard anodise 20V over 20 minutes in vat 12"
-        },
-
-        # 6000 Series (excluding 6063) - 5μm
+        # ---------------------------------------------------------------
+        # 6000 Series (excluding 6063) - all vat 6, 16V
+        # 5μm process runs at 15V (the 6082 10-minute process)
+        # ---------------------------------------------------------------
         {
           id: '6000_STANDARD_5',
           alloys: ['6000_series_ex6063'],
           anodic_classes: ['class_1', 'class_2'],
           target_thickness: 5,
-          vat_numbers: [5],
-          operation_text: "Standard anodise 15V over 15 minutes in vat 5"
+          vat_numbers: [6],
+          operation_text: "Standard anodise 15V over 10 minutes in vat 6"
         },
-
-        # 6000 Series (excluding 6063) - 10μm
         {
           id: '6000_STANDARD_10',
           alloys: ['6000_series_ex6063'],
           anodic_classes: ['class_1', 'class_2'],
           target_thickness: 10,
           vat_numbers: [6],
-          operation_text: "Standard anodise 18V over 10 minutes in vat 6"
+          operation_text: "Standard anodise 16V over 15 minutes in vat 6"
         },
-
-        # 6000 Series (excluding 6063) - 15μm
         {
           id: '6000_STANDARD_15',
           alloys: ['6000_series_ex6063'],
           anodic_classes: ['class_1', 'class_2'],
           target_thickness: 15,
           vat_numbers: [6],
-          operation_text: "Standard anodise 18V over 35 minutes in vat 6"
+          operation_text: "Standard anodise 16V over 20 minutes in vat 6"
         },
-
-        # 6000 Series (excluding 6063) - 20μm
         {
           id: '6000_STANDARD_20',
           alloys: ['6000_series_ex6063'],
           anodic_classes: ['class_1', 'class_2'],
           target_thickness: 20,
           vat_numbers: [6],
-          operation_text: "Standard anodise 16V over 37 minutes in vat 6"
+          operation_text: "Standard anodise 16V over 25 minutes in vat 6"
         },
-
-        # 6000 Series (excluding 6063) - 22.5μm
-        {
-          id: '6000_STANDARD_22_5',
-          alloys: ['6000_series_ex6063'],
-          anodic_classes: ['class_1', 'class_2'],
-          target_thickness: 22.5,
-          vat_numbers: [6],
-          operation_text: "Standard anodise 18V over 30 minutes in vat 6"
-        },
-
-        # 6000 Series (excluding 6063) - 25μm
         {
           id: '6000_STANDARD_25',
           alloys: ['6000_series_ex6063'],
           anodic_classes: ['class_1', 'class_2'],
           target_thickness: 25,
           vat_numbers: [6],
+          operation_text: "Standard anodise 16V over 30 minutes in vat 6"
+        },
+        {
+          id: '6000_STANDARD_30',
+          alloys: ['6000_series_ex6063'],
+          anodic_classes: ['class_1', 'class_2'],
+          target_thickness: 30,
+          vat_numbers: [6],
+          operation_text: "Standard anodise 16V over 35 minutes in vat 6"
+        },
+        {
+          id: '6000_STANDARD_35',
+          alloys: ['6000_series_ex6063'],
+          anodic_classes: ['class_1', 'class_2'],
+          target_thickness: 35,
+          vat_numbers: [6],
           operation_text: "Standard anodise 16V over 40 minutes in vat 6"
         },
 
-        # 7075, 7050, 7021, 2099 - 25μm
+        # ---------------------------------------------------------------
+        # 7075 / 7050 / 7021 / 2099 - all vat 6, 16V
+        # ---------------------------------------------------------------
+        {
+          id: '7XXX_STANDARD_5',
+          alloys: ['7075', '7050', '7021', '2099'],
+          anodic_classes: ['class_1', 'class_2'],
+          target_thickness: 5,
+          vat_numbers: [6],
+          operation_text: "Standard anodise 16V over 10 minutes in vat 6"
+        },
+        {
+          id: '7XXX_STANDARD_10',
+          alloys: ['7075', '7050', '7021', '2099'],
+          anodic_classes: ['class_1', 'class_2'],
+          target_thickness: 10,
+          vat_numbers: [6],
+          operation_text: "Standard anodise 16V over 15 minutes in vat 6"
+        },
+        {
+          id: '7XXX_STANDARD_15',
+          alloys: ['7075', '7050', '7021', '2099'],
+          anodic_classes: ['class_1', 'class_2'],
+          target_thickness: 15,
+          vat_numbers: [6],
+          operation_text: "Standard anodise 16V over 20 minutes in vat 6"
+        },
+        {
+          id: '7XXX_STANDARD_20',
+          alloys: ['7075', '7050', '7021', '2099'],
+          anodic_classes: ['class_1', 'class_2'],
+          target_thickness: 20,
+          vat_numbers: [6],
+          operation_text: "Standard anodise 16V over 25 minutes in vat 6"
+        },
         {
           id: '7XXX_STANDARD_25',
           alloys: ['7075', '7050', '7021', '2099'],
           anodic_classes: ['class_1', 'class_2'],
           target_thickness: 25,
           vat_numbers: [6],
-          operation_text: "Standard anodise 14V over 40 minutes in vat 6"
+          operation_text: "Standard anodise 16V over 25 minutes in vat 6"
+        },
+        {
+          id: '7XXX_STANDARD_30',
+          alloys: ['7075', '7050', '7021', '2099'],
+          anodic_classes: ['class_1', 'class_2'],
+          target_thickness: 30,
+          vat_numbers: [6],
+          operation_text: "Standard anodise 16V over 30 minutes in vat 6"
+        },
+        {
+          id: '7XXX_STANDARD_35',
+          alloys: ['7075', '7050', '7021', '2099'],
+          anodic_classes: ['class_1', 'class_2'],
+          target_thickness: 35,
+          vat_numbers: [6],
+          operation_text: "Standard anodise 16V over 35 minutes in vat 6"
         },
 
-        # 2014, H15, LT68 - 25μm
+        # ---------------------------------------------------------------
+        # 2014 / H15 / LT68 - all vat 6, 16V
+        # ---------------------------------------------------------------
+        {
+          id: '2014_STANDARD_5',
+          alloys: ['2014', 'h15', 'lt68'],
+          anodic_classes: ['class_1', 'class_2'],
+          target_thickness: 5,
+          vat_numbers: [6],
+          operation_text: "Standard anodise 16V over 10 minutes in vat 6"
+        },
+        {
+          id: '2014_STANDARD_10',
+          alloys: ['2014', 'h15', 'lt68'],
+          anodic_classes: ['class_1', 'class_2'],
+          target_thickness: 10,
+          vat_numbers: [6],
+          operation_text: "Standard anodise 16V over 15 minutes in vat 6"
+        },
+        {
+          id: '2014_STANDARD_15',
+          alloys: ['2014', 'h15', 'lt68'],
+          anodic_classes: ['class_1', 'class_2'],
+          target_thickness: 15,
+          vat_numbers: [6],
+          operation_text: "Standard anodise 16V over 20 minutes in vat 6"
+        },
+        {
+          id: '2014_STANDARD_20',
+          alloys: ['2014', 'h15', 'lt68'],
+          anodic_classes: ['class_1', 'class_2'],
+          target_thickness: 20,
+          vat_numbers: [6],
+          operation_text: "Standard anodise 16V over 25 minutes in vat 6"
+        },
         {
           id: '2014_STANDARD_25',
           alloys: ['2014', 'h15', 'lt68'],
           anodic_classes: ['class_1', 'class_2'],
           target_thickness: 25,
           vat_numbers: [6],
-          operation_text: "Standard anodise 10V over 35 minutes in vat 6"
+          operation_text: "Standard anodise 16V over 35 minutes in vat 6"
+        },
+        {
+          id: '2014_STANDARD_30',
+          alloys: ['2014', 'h15', 'lt68'],
+          anodic_classes: ['class_1', 'class_2'],
+          target_thickness: 30,
+          vat_numbers: [6],
+          operation_text: "Standard anodise 16V over 40 minutes in vat 6"
+        },
+        {
+          id: '2014_STANDARD_35',
+          alloys: ['2014', 'h15', 'lt68'],
+          anodic_classes: ['class_1', 'class_2'],
+          target_thickness: 35,
+          vat_numbers: [6],
+          operation_text: "Standard anodise 16V over 45 minutes in vat 6"
         },
 
-        # LM6 - 20μm
+        # ---------------------------------------------------------------
+        # 5083 - all vat 6, 16V
+        # ---------------------------------------------------------------
         {
-          id: 'LM6_STANDARD_20',
-          alloys: ['lm6'],
+          id: '5083_STANDARD_5',
+          alloys: ['5083'],
+          anodic_classes: ['class_1', 'class_2'],
+          target_thickness: 5,
+          vat_numbers: [6],
+          operation_text: "Standard anodise 16V over 10 minutes in vat 6"
+        },
+        {
+          id: '5083_STANDARD_10',
+          alloys: ['5083'],
+          anodic_classes: ['class_1', 'class_2'],
+          target_thickness: 10,
+          vat_numbers: [6],
+          operation_text: "Standard anodise 16V over 15 minutes in vat 6"
+        },
+        {
+          id: '5083_STANDARD_15',
+          alloys: ['5083'],
+          anodic_classes: ['class_1', 'class_2'],
+          target_thickness: 15,
+          vat_numbers: [6],
+          operation_text: "Standard anodise 16V over 20 minutes in vat 6"
+        },
+        {
+          id: '5083_STANDARD_20',
+          alloys: ['5083'],
           anodic_classes: ['class_1', 'class_2'],
           target_thickness: 20,
           vat_numbers: [6],
-          operation_text: "Standard anodise 16V over 30 minutes in vat 6"
+          operation_text: "Standard anodise 16V over 25 minutes in vat 6"
         },
-
-        # All Alloys (excluding 6063) - General Process - 6-13μm (= 10.5)
         {
-          id: 'ALL_STANDARD_10_5',
-          alloys: ['all_alloys_excluding_6063'],
+          id: '5083_STANDARD_25',
+          alloys: ['5083'],
           anodic_classes: ['class_1', 'class_2'],
-          target_thickness: 10.5,
+          target_thickness: 25,
           vat_numbers: [6],
           operation_text: "Standard anodise 16V over 30 minutes in vat 6"
+        },
+        {
+          id: '5083_STANDARD_30',
+          alloys: ['5083'],
+          anodic_classes: ['class_1', 'class_2'],
+          target_thickness: 30,
+          vat_numbers: [6],
+          operation_text: "Standard anodise 16V over 35 minutes in vat 6"
+        },
+        {
+          id: '5083_STANDARD_35',
+          alloys: ['5083'],
+          anodic_classes: ['class_1', 'class_2'],
+          target_thickness: 35,
+          vat_numbers: [6],
+          operation_text: "Standard anodise 16V over 40 minutes in vat 6"
         }
       ]
     end
