@@ -1,7 +1,6 @@
 # app/controllers/works_orders_controller.rb - Fixed pricing parameter handling and route card operations with RBAC
 class WorksOrdersController < ApplicationController
-  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :ecard, :sign_off_operation, :save_batches, :invoice_to_date, :void, :unvoid]
-  before_action :require_ecard_access, only: [:ecard, :sign_off_operation, :save_batches, :save_operation_input]
+  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :invoice_to_date, :void, :unvoid]
 
  def index
     @works_orders = WorksOrder.includes(:customer_order, :part, customer: [])
@@ -201,50 +200,6 @@ class WorksOrdersController < ApplicationController
     redirect_to root_path, alert: "❌ Failed to stage invoice: #{e.message}"
   end
 
-  # E-card view for shop floor
-  def ecard
-    @operations = @works_order.operations_with_auto_ops || []
-    @batches = @works_order.batches.order(created_at: :desc)
-  end
-
-  def sign_off_operation
-    operation_index = params[:operation_index].to_i
-    batch_id = params[:batch_id]
-
-    batch = @works_order.batches.find(batch_id)
-    batch.sign_off_operation!(operation_index, Current.user)
-
-    redirect_to ecard_works_order_path(@works_order), notice: "Operation signed off successfully."
-  rescue => e
-    redirect_to ecard_works_order_path(@works_order), alert: "Error signing off operation: #{e.message}"
-  end
-
-  def save_batches
-    batch_params = params.require(:batches).permit!
-    @works_order.update_batches!(batch_params, Current.user)
-    redirect_to ecard_works_order_path(@works_order), notice: "Batches saved successfully."
-  rescue => e
-    redirect_to ecard_works_order_path(@works_order), alert: "Error saving batches: #{e.message}"
-  end
-
-  def save_operation_input
-    work_order = WorksOrder.find(params[:id])
-    operation_index = params[:operation_index].to_i
-    input_data = params[:input_data].permit!
-
-    work_order.save_operation_input!(operation_index, input_data, Current.user)
-
-    respond_to do |format|
-      format.json { render json: { success: true } }
-      format.html { redirect_to ecard_works_order_path(work_order), notice: "Input saved." }
-    end
-  rescue => e
-    respond_to do |format|
-      format.json { render json: { success: false, error: e.message }, status: :unprocessable_entity }
-      format.html { redirect_to ecard_works_order_path(work_order), alert: "Error: #{e.message}" }
-    end
-  end
-
   private
 
   def create_bulk
@@ -416,17 +371,6 @@ class WorksOrdersController < ApplicationController
     rescue => e
       works_order.errors.add(:base, "Error validating part: #{e.message}")
       return false
-    end
-  end
-
-  # ============================================================================
-  # ROLE-BASED ACCESS CONTROL METHODS
-  # ============================================================================
-
-  def require_ecard_access
-    unless Current.user&.sees_ecards?
-      Rails.logger.warn "Unauthorized e-card access attempt by #{Current.user&.email_address || 'unknown user'}"
-      redirect_to root_path, alert: "You don't have permission to access e-cards."
     end
   end
 end

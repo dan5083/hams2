@@ -82,19 +82,6 @@ class User < ApplicationRecord
     end
   end
 
-  def sees_ecards?
-    case email_address
-    when 'judy@hardanodisingstl.com'
-      false # Judy won't use the app
-    when 'chris.bayliss@hardanodisingstl.com',
-         'julia@hardanodisingstl.com',
-         'sophie@hardanodisingstl.com'
-      false # Office staff - no e-cards
-    else
-      true
-    end
-  end
-
   def can_use_ai_assistant?
     email_address.in?([
       'daniel@hardanodisingstl.com',

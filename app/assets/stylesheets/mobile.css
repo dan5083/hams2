@@ -77,33 +77,6 @@
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* E-Card mobile optimizations */
-@media (max-width: 768px) {
-  .ecard-operation {
-    padding: 16px 12px;
-    margin-bottom: 12px;
-  }
-
-  .ecard-operation-header {
-    font-size: 16px;
-    margin-bottom: 8px;
-  }
-
-  .batch-tracker-mobile {
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-    gap: 8px;
-  }
-
-  .operation-sign-off-button {
-    width: 100%;
-    padding: 16px;
-    font-size: 16px;
-    font-weight: bold;
-    border-radius: 8px;
-    margin-top: 12px;
-  }
-}
-
 /* Swipe indicators */
 .swipe-hint {
   position: relative;
