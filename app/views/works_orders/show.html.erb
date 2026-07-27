@@ -235,14 +235,19 @@
         <% batch_count = @works_order.process_batch_count %>
         <% if paperless && ops_for_display.any? %>
           <div class="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg flex flex-wrap items-center gap-4">
-            <%= form_with url: set_batch_count_works_order_path(@works_order), method: :patch, local: true, class: "flex items-center gap-2" do %>
+            <%= form_with url: set_batch_count_works_order_path(@works_order), method: :patch, local: true, class: "flex flex-wrap items-center gap-3" do %>
               <label class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Batches</label>
               <%= number_field_tag :batch_count, batch_count, min: 1, max: 20,
                   class: "border border-gray-300 rounded px-2 py-1 text-sm w-16" %>
+              <% (1..batch_count).each do |batch_n| %>
+                <% entry = @works_order.process_batches.find { |b| b["number"] == batch_n } || {} %>
+                <span class="flex items-center gap-1 text-xs text-gray-500">
+                  B<%= batch_n %><% if entry["date"] %> · <%= Date.parse(entry["date"]).strftime("%d/%m") rescue entry["date"] %><% end %>
+                  · Qty <%= number_field_tag "batch_qtys[#{batch_n}]", entry["qty"], min: 1,
+                      class: "border border-gray-300 rounded px-1 py-1 text-sm w-14" %>
+                </span>
+              <% end %>
               <%= submit_tag "Update", class: "bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium px-2 py-1.5 rounded" %>
-            <% end %>
-            <% @works_order.process_batches.sort_by { |b| b["number"] }.each do |b| %>
-              <span class="text-xs text-gray-500">Batch <%= b["number"] %> started <%= Date.parse(b["date"]).strftime("%d/%m/%Y") rescue b["date"] %></span>
             <% end %>
           </div>
         <% end %>
@@ -286,7 +291,7 @@
                                           options_for_select(["", "PASS", "FAIL"], row[field]),
                                           class: "border border-gray-300 rounded px-1 py-1 text-sm" %>
                                     <% else %>
-                                      <% sugg = ocv_suggestions(field, op["operation_text"]) %>
+                                      <% sugg = ocv_suggestions(field, op["operation_text"], thickness: op["target_thickness"]) %>
                                       <%= text_field_tag "readings[#{batch_n}][#{field}]", row[field],
                                           class: "border border-gray-300 rounded px-2 py-1 text-sm w-24",
                                           autocomplete: "off",

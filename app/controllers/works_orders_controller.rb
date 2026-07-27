@@ -232,7 +232,7 @@ class WorksOrdersController < ApplicationController
   # Paperless process record: how many batches this WO runs
   def set_batch_count
     return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
-    @works_order.set_batch_count!(params[:batch_count])
+    @works_order.set_batch_count!(params[:batch_count], params.fetch(:batch_qtys, {}).permit!.to_h)
     redirect_to works_order_path(@works_order), notice: "Batch count set to #{params[:batch_count]}."
   rescue => e
     redirect_to works_order_path(@works_order), alert: e.message

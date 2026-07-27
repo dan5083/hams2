@@ -207,9 +207,10 @@ class WorksOrder < ApplicationRecord
     end
 
     (customised_process_data_was&.dig("batches") || []).each do |old_b|
+      next if old_b["date"].blank?
       new_b = (customised_process_data&.dig("batches") || []).find { |b| b["number"] == old_b["number"] }
-      unless new_b == old_b
-        errors.add(:base, "Batch #{old_b['number']} is dated; batch records cannot be altered or removed")
+      unless new_b && new_b["date"] == old_b["date"]
+        errors.add(:base, "Batch #{old_b['number']} is dated; batch dates cannot be altered or removed")
         throw :abort
       end
     end
@@ -240,7 +241,9 @@ class WorksOrder < ApplicationRecord
     process_batches.find { |b| b["number"] == batch_number.to_i }&.dig("date")
   end
 
-  def set_batch_count!(count)
+  # qtys: { "1" => "20", "2" => "13" } - parts per batch, recorded like the
+  # route card's Qty column. Editable; the sign-offs are the immutable record.
+  def set_batch_count!(count, qtys = {})
     count = count.to_i
     raise "Batch count must be between 1 and 20" unless (1..20).cover?(count)
 
@@ -249,6 +252,13 @@ class WorksOrder < ApplicationRecord
 
     freeze_operations!
     customised_process_data["batch_count"] = count
+    batches = customised_process_data["batches"] ||= []
+    (qtys || {}).each do |number, qty|
+      n = number.to_i
+      next unless (1..count).cover?(n)
+      entry = batches.find { |b| b["number"] == n } || (batches << { "number" => n }).last
+      qty.to_s.strip.empty? ? entry.delete("qty") : entry["qty"] = qty.to_s.strip
+    end
     customised_process_data_will_change!
     save!
   end
@@ -326,6 +336,7 @@ class WorksOrder < ApplicationRecord
       "id" => op.id,
       "display_name" => (op.respond_to?(:display_name) ? op.display_name : op.id),
       "operation_text" => op.operation_text,
+      "target_thickness" => (op.respond_to?(:target_thickness) ? op.target_thickness : nil),
       "ocv" => (ocv.respond_to?(:deep_stringify_keys) ? ocv.deep_stringify_keys : ocv),
       "sign_offs" => {},
       "ocv_readings" => {}
@@ -349,8 +360,8 @@ class WorksOrder < ApplicationRecord
 
   def stamp_batch_date(batch_number)
     batches = customised_process_data["batches"] ||= []
-    return if batches.any? { |b| b["number"] == batch_number }
-    batches << { "number" => batch_number, "date" => Date.current.iso8601 }
+    entry = batches.find { |b| b["number"] == batch_number } || (batches << { "number" => batch_number }).last
+    entry["date"] ||= Date.current.iso8601
   end
 
   public
