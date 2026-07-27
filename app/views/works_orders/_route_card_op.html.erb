@@ -119,6 +119,37 @@
 
   # Reconstruct main content HTML
   main_html = main_content.join("\n")
+
+  # Spec-driven OCV (new format): op[:ocv] is a spec hash, not baked text.
+  # Symbol keys when coming from a live Operation, string keys from locked jsonb.
+  spec_ocv_rows = []
+  spec_ocv_header = nil
+  if op[:ocv].present?
+    spec = op[:ocv]
+    fields   = (spec[:fields] || spec["fields"] || []).map(&:to_sym)
+    basis    = (spec[:basis] || spec["basis"] || :general).to_sym
+    batching = (spec[:batching] || spec["batching"])&.to_sym
+
+    field_blank = ->(f) {
+      case f
+      when :time then "Time ___"
+      when :temp then "Temp ___°C"
+      when :volts then "Voltage ___V"
+      when :pass_fail then "PASS/FAIL ___"
+      when :material_cofc_no then "Material CofC No: ______"
+      else
+        f.to_s =~ /\Atp(\d+)_pass_fail\z/ ? "Test piece #{$1} ___" : "#{f.to_s.humanize}: ___"
+      end
+    }
+
+    fields_line = fields.map(&field_blank).join("    ")
+    spec_ocv_rows = if batching == :single
+      ["Batch 1: #{fields_line}"]
+    else
+      Array.new(3) { "Batch ___: #{fields_line}" }
+    end
+    spec_ocv_header = basis == :nadcap ? "OCV Monitoring:" : "Record:"
+  end
 %>
 
 <tr class="op op-<%= op[:number] %>">
@@ -145,6 +176,17 @@
         <% ocv_batches.each do |batch| %>
           <div class="ocv-batch-card">
             <%= batch.html_safe %>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+
+    <% if spec_ocv_rows.any? %>
+      <div class="ocv-section">
+        <div class="ocv-header"><%= spec_ocv_header %></div>
+        <% spec_ocv_rows.each do |row| %>
+          <div class="ocv-batch-card">
+            <%= row %>
           </div>
         <% end %>
       </div>

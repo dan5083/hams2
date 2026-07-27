@@ -148,7 +148,8 @@ class WorksOrdersController < ApplicationController
             as_html: operation.operation_text || operation.display_name || "Operation #{index}"
           }
         ],
-        all_variables: []
+        all_variables: [],
+        ocv: operation.try(:ocv)
       }
     end.compact
 

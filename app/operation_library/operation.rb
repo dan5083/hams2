@@ -2,11 +2,12 @@
 class Operation
   attr_accessor :id, :alloys, :process_type, :anodic_classes, :target_thickness, :vat_numbers,
                 :operation_text, :specifications, :enp_type, :deposition_rate_range, :time,
-                :is_cleaning_step
+                :is_cleaning_step, :ocv
 
   def initialize(id:, process_type:, operation_text:, specifications: nil, alloys: [],
                  anodic_classes: [], target_thickness: 0, vat_numbers: [],
-                 enp_type: nil, deposition_rate_range: nil, time: nil, is_cleaning_step: false)
+                 enp_type: nil, deposition_rate_range: nil, time: nil, is_cleaning_step: false,
+                 ocv: nil)
     @id = id
     @alloys = alloys
     @process_type = process_type
@@ -19,6 +20,7 @@ class Operation
     @deposition_rate_range = deposition_rate_range
     @time = time
     @is_cleaning_step = is_cleaning_step
+    @ocv = ocv
   end
 
   # Class methods to get all operations from all files
@@ -495,7 +497,8 @@ class Operation
       specifications: specifications,
       enp_type: enp_type,
       deposition_rate_range: deposition_rate_range,
-      time: time
+      time: time,
+      ocv: ocv
     }
   end
 

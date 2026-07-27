@@ -7,7 +7,8 @@ module OperationLibrary
         Operation.new(
           id: 'WATER_BREAK_TEST',
           process_type: 'water_break_test',
-          operation_text: '**Water-break test** - Check all areas (including holes and jigging locations) for signs of water-breaking after 30 seconds. If fail: repeat degrease once and retest. If 1 failure occurs please record here ____ If fail twice: put works on hold in clean swill and inform company director.'
+          operation_text: '**Water-break test** - Check all areas (including holes and jigging locations) for signs of water-breaking after 30 seconds. If fail: repeat degrease once and retest. If fail twice: put works on hold in clean swill and inform company director.',
+          ocv: OcvSpecs.fields(:pass_fail, :first_failure_detail, basis: :nadcap)
         )
       ]
     end

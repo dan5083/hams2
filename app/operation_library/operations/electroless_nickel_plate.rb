@@ -83,11 +83,8 @@ module OperationLibrary
           operation_data[:operation_text].gsub('. Time for {THICKNESS}μm: {TIME_RANGE}', '')
         end
 
-        # Append OCV monitoring for aerospace/defense
-        if aerospace_defense
-          ocv_text = build_time_temp_monitoring_text
-          operation_text += "\n\n**OCV Monitoring:**\n#{ocv_text}"
-        end
+        # Attach OCV monitoring spec for aerospace/defense
+        ocv_spec = OcvSpecs.time_temp if aerospace_defense
 
         Operation.new(
           id: operation_data[:id],
@@ -97,7 +94,8 @@ module OperationLibrary
           target_thickness: operation_data[:target_thickness],
           deposition_rate_range: operation_data[:deposition_rate_range],
           vat_numbers: operation_data[:vat_numbers],
-          operation_text: operation_text
+          operation_text: operation_text,
+          ocv: ocv_spec
         )
       end
     end
@@ -133,21 +131,13 @@ module OperationLibrary
       }
     end
 
-    # Build time/temp monitoring text (no voltage for ENP)
-    def self.build_time_temp_monitoring_text
-      text_lines = []
-      (1..3).each do |batch|
-        text_lines << "Batch ___: Time ___    Temp ___°C"
-      end
-      text_lines.join("\n")
-    end
-
     # Test piece operation - inserted after INCOMING_INSPECT for qualifying alloys
     def self.test_piece_operation
       Operation.new(
         id: 'TEST_PIECE',
         process_type: 'test_piece',
-        operation_text: "Include 4 test pieces of the same generic material (25mm x 100mm 0.6mm thick minimum) with batch. Keep these test pieces to batch until they have been tested. Record material CofC No: ______"
+        operation_text: 'Include 4 test pieces of the same generic material (25mm x 100mm, 0.6mm thick minimum) with batch. Keep these test pieces to batch until they have been tested.',
+        ocv: OcvSpecs.fields(:material_cofc_no)
       )
     end
 
@@ -156,13 +146,12 @@ module OperationLibrary
       Operation.new(
         id: 'ADHESION_BEND',
         process_type: 'adhesion_bend',
-        operation_text: <<~TEXT.strip
+        operation_text: <<~TEXT.strip,
           Bend test pieces through an angle of 180°, or until fracture, over a mandrel having a radius equal to four times the thickness of the sample (minimum radius 1.5 mm)
 
           The portion of the specimen that is bent shall not show any separation or peeling of the plate when examined at low magnification, such as 4X. Except at the very edges of the test specimens at the point of bending, the plate shall not detach from the base metal using a sharp instrument.
-
-          Record PASS/FAIL Test piece 1 _____ Test piece 2 _____ Test piece 3 _____ Test piece 4 _____
         TEXT
+        ocv: OcvSpecs.fields(:tp1_pass_fail, :tp2_pass_fail, :tp3_pass_fail, :tp4_pass_fail)
       )
     end
 

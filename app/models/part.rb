@@ -128,7 +128,8 @@ class Part < ApplicationRecord
         "vat_numbers" => op.respond_to?(:vat_numbers) ? (op.vat_numbers || []) : [],
         "process_type" => op.respond_to?(:process_type) ? (op.process_type || 'manual') : 'manual',
         "target_thickness" => op.respond_to?(:target_thickness) ? (op.target_thickness || 0) : 0,
-        "auto_inserted" => op.respond_to?(:auto_inserted?) ? op.auto_inserted? : false
+        "auto_inserted" => op.respond_to?(:auto_inserted?) ? op.auto_inserted? : false,
+        "ocv" => op.respond_to?(:ocv) ? op.ocv : nil
       }
     end
 
@@ -152,7 +153,8 @@ class Part < ApplicationRecord
         "vat_numbers" => op.vat_numbers,
         "process_type" => op.process_type,
         "target_thickness" => op.target_thickness,
-        "auto_inserted" => op.respond_to?(:auto_inserted?) ? op.auto_inserted? : false
+        "auto_inserted" => op.respond_to?(:auto_inserted?) ? op.auto_inserted? : false,
+        "ocv" => op.respond_to?(:ocv) ? op.ocv : nil
       }
     end
     save!
@@ -457,7 +459,8 @@ class Part < ApplicationRecord
           vat_numbers: op_data["vat_numbers"] || [],
           process_type: op_data["process_type"],
           target_thickness: op_data["target_thickness"] || 0,
-          auto_inserted?: op_data["auto_inserted"] || false
+          auto_inserted?: op_data["auto_inserted"] || false,
+          ocv: op_data["ocv"]
         )
       end
     end

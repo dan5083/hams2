@@ -7,19 +7,12 @@ module OperationLibrary
 
     # Simple pretreatments for anodising processes
     def self.simple_pretreatments(aerospace_defense: false)
-      operation_text = '**DeOx:** in *Oxidite D-30,* at 21 to 43°C, for 30-50 seconds OR in *Microetch 66* at 18-25°C for 1-2 mins'
-
-      # Append OCV monitoring for aerospace/defense
-      if aerospace_defense
-        ocv_text = build_time_temp_monitoring_text
-        operation_text += "\n\n**OCV Monitoring:**\n#{ocv_text}"
-      end
-
       [
         Operation.new(
           id: 'DEOX_OXIDITE_D30',
           process_type: 'pretreatment',
-          operation_text: operation_text
+          operation_text: '**DeOx:** in *Oxidite D-30,* at 21 to 43°C, for 30-50 seconds OR in *Microetch 66* at 18-25°C for 1-2 mins',
+          ocv: (OcvSpecs.time_temp if aerospace_defense)
         )
       ]
     end
@@ -164,34 +157,20 @@ module OperationLibrary
         }
       ]
 
-      # Append OCV monitoring for aerospace/defense (with voltage for electrolytic processes)
+      # Attach OCV spec for aerospace/defense (with voltage for electrolytic processes)
       base_operations.map do |op_data|
-        operation_text = op_data[:operation_text]
-
-        if aerospace_defense
-          is_electrolytic = op_data[:is_electrolytic] || false
-          ocv_text = build_time_temp_monitoring_text(electrolytic: is_electrolytic)
-          operation_text += "\n\n**OCV Monitoring:**\n#{ocv_text}"
+        ocv_spec = if aerospace_defense
+          op_data[:is_electrolytic] ? OcvSpecs.time_temp_volts : OcvSpecs.time_temp
         end
 
         Operation.new(
           id: op_data[:id],
           process_type: op_data[:process_type],
-          operation_text: operation_text,
-          is_cleaning_step: op_data[:is_cleaning_step] || false
+          operation_text: op_data[:operation_text],
+          is_cleaning_step: op_data[:is_cleaning_step] || false,
+          ocv: ocv_spec
         )
       end
-    end
-
-    # Build time/temp monitoring text (voltage included for electrolytic processes)
-    def self.build_time_temp_monitoring_text(electrolytic: false)
-      text_lines = []
-      (1..3).each do |batch|
-        line = "Batch ___: Time ___    Temp ___°C"
-        line += "    Voltage ___V" if electrolytic
-        text_lines << line
-      end
-      text_lines.join("\n")
     end
 
     # Check if pretreatment is required

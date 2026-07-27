@@ -111,18 +111,11 @@ module OperationLibrary
 
       # Map to Operation objects with conditional OCV
       base_operations.map do |op_data|
-        operation_text = op_data[:operation_text]
-
-        # Append OCV monitoring for aerospace/defense
-        if aerospace_defense
-          ocv_text = build_time_temp_monitoring_text
-          operation_text += "\n\n**OCV Monitoring:**\n#{ocv_text}"
-        end
-
         Operation.new(
           id: op_data[:id],
           process_type: op_data[:process_type],
-          operation_text: operation_text
+          operation_text: op_data[:operation_text],
+          ocv: (OcvSpecs.time_temp if aerospace_defense)
         )
       end
     end
@@ -170,15 +163,6 @@ module OperationLibrary
       return false unless treatments_data.present?
 
       treatments_data.any? { |treatment| treatment["type"] == "electroless_nickel_plating" }
-    end
-
-    # Build time/temp monitoring text (no voltage for heat treatments)
-    def self.build_time_temp_monitoring_text
-      text_lines = []
-      (1..3).each do |batch|
-        text_lines << "Batch ___: Time ___    Temp ___°C"
-      end
-      text_lines.join("\n")
     end
   end
 end
