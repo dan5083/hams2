@@ -148,6 +148,107 @@ class WorksOrder < ApplicationRecord
     []
   end
 
+  # ============================================================================
+  # PAPERLESS PROCESS RECORD (frozen operations, sign-offs, OCV readings)
+  # ============================================================================
+  #
+  # The WO's process record lives in customised_process_data["operations"].
+  # Until the first sign-off or OCV save, operations render live from the part
+  # (so pre-work corrections flow through). The first write freezes a full
+  # snapshot - verbatim operation text plus OCV specs - and all rendering and
+  # recording happens against the frozen copy from then on. The part can change;
+  # this WO's record cannot.
+
+  def frozen_operations
+    ops = customised_process_data&.dig("operations")
+    ops.present? ? ops : nil
+  end
+
+  # Pilot gate: the interactive process record (sign-offs, OCV inputs) is live
+  # for electroless nickel work only. Widen per process family as each area
+  # goes paperless; delete once everything has.
+  def paperless_record?
+    return true if operations_frozen? # a WO with digital records always shows them
+    operations_with_auto_ops.any? { |op| op.process_type == 'electroless_nickel_plating' }
+  end
+
+  def operations_frozen?
+    frozen_operations.present?
+  end
+
+  # Uniform hash shape for the show page, frozen or live.
+  def operations_for_display
+    frozen_operations || operations_with_auto_ops.map.with_index(1) do |op, i|
+      {
+        "position" => i,
+        "id" => op.id,
+        "display_name" => (op.respond_to?(:display_name) ? op.display_name : op.id),
+        "operation_text" => op.operation_text,
+        "ocv" => op.try(:ocv),
+        "signed_off_by" => nil,
+        "ocv_readings" => nil
+      }
+    end
+  end
+
+  def freeze_operations!
+    return frozen_operations if operations_frozen?
+
+    ops = operations_with_auto_ops.map.with_index(1) do |op, i|
+      {
+        "position" => i,
+        "id" => op.id,
+        "display_name" => (op.respond_to?(:display_name) ? op.display_name : op.id),
+        "operation_text" => op.operation_text,
+        "ocv" => op.try(:ocv),
+        "signed_off_by" => nil,
+        "ocv_readings" => nil
+      }
+    end
+    raise "Cannot freeze: no operations available for WO#{number}" if ops.empty?
+
+    self.customised_process_data = (customised_process_data || {}).merge("operations" => ops)
+    save!
+    frozen_operations
+  end
+
+  def sign_off_operation!(position, user)
+    freeze_operations!
+    op = find_frozen_operation!(position)
+    raise "Operation #{position} already signed off" if op["signed_off_by"].present?
+
+    op["signed_off_by"] = { "id" => user.id, "name" => user.display_name }
+    customised_process_data_will_change!
+    save!
+  end
+
+  # readings: array of {field => value} hashes, one per batch row.
+  # Values are sliced against the op's OCV spec fields; fully blank rows dropped.
+  def save_ocv_readings!(position, readings, user)
+    freeze_operations!
+    op = find_frozen_operation!(position)
+    spec = op["ocv"]
+    raise "Operation #{position} has no OCV spec" if spec.blank?
+
+    allowed = (spec["fields"] || []).map(&:to_s)
+    batches = Array(readings).map { |row| row.to_h.slice(*allowed).transform_values { |v| v.to_s.strip } }
+                             .reject { |row| row.values.all?(&:blank?) }
+
+    if spec["batching"].to_s == "single" && batches.length > 1
+      raise "Operation #{position} is single-batch; got #{batches.length} rows"
+    end
+
+    op["ocv_readings"] = { "batches" => batches, "recorded_by" => { "id" => user.id, "name" => user.display_name } }
+    customised_process_data_will_change!
+    save!
+  end
+
+  def find_frozen_operation!(position)
+    op = frozen_operations&.find { |o| o["position"] == position.to_i }
+    raise "No operation at position #{position} on WO#{number}" unless op
+    op
+  end
+
   # For backwards compatibility - delegate to operations_with_auto_ops
   def operations_text
     operations_with_auto_ops.map.with_index(1) do |operation, index|

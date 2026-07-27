@@ -976,7 +976,8 @@ end
       alloys: [],
       anodic_classes: [],
       target_thickness: 0,
-      vat_numbers: []
+      vat_numbers: [],
+      ocv: stripping_operation.ocv
     )
   end
 
@@ -1032,7 +1033,8 @@ end
         id: "PRE_#{pre_heat_treatment.id}",
         process_type: 'enp_pre_heat_treatment',
         operation_text: "**Pre-Heat:** #{pre_heat_treatment.operation_text}",
-        specifications: pre_heat_treatment.specifications
+        specifications: pre_heat_treatment.specifications,
+        ocv: pre_heat_treatment.ocv
       )
       safe_add_to_sequence(sequence, pre_heat_op, "ENP Pre-Heat Treatment")
     else
@@ -1051,7 +1053,8 @@ end
         id: "POST_#{heat_treatment.id}",
         process_type: 'enp_post_heat_treatment',
         operation_text: "**Post-Heat:** #{heat_treatment.operation_text}",
-        specifications: heat_treatment.specifications
+        specifications: heat_treatment.specifications,
+        ocv: heat_treatment.ocv
       )
       safe_add_to_sequence(sequence, post_heat_op, "ENP Post-Heat Treatment")
     else
