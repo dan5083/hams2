@@ -286,8 +286,16 @@
                                           options_for_select(["", "PASS", "FAIL"], row[field]),
                                           class: "border border-gray-300 rounded px-1 py-1 text-sm" %>
                                     <% else %>
+                                      <% sugg = ocv_suggestions(field, op["operation_text"]) %>
                                       <%= text_field_tag "readings[#{batch_n}][#{field}]", row[field],
-                                          class: "border border-gray-300 rounded px-2 py-1 text-sm w-24" %>
+                                          class: "border border-gray-300 rounded px-2 py-1 text-sm w-24",
+                                          autocomplete: "off",
+                                          list: (sugg.any? ? "dl-#{position}-#{batch_n}-#{field}" : nil) %>
+                                      <% if sugg.any? %>
+                                        <datalist id="dl-<%= position %>-<%= batch_n %>-<%= field %>">
+                                          <% sugg.each do |s| %><option value="<%= s %>"></option><% end %>
+                                        </datalist>
+                                      <% end %>
                                     <% end %>
                                   </label>
                                 <% end %>
@@ -299,8 +307,7 @@
                             <% (1..batch_count).each do |batch_n| %>
                               <% next if (op["sign_offs"] || {})[batch_n.to_s].present? %>
                               <button type="submit" name="sign_off_batch" value="<%= batch_n %>"
-                                      class="bg-gray-700 hover:bg-gray-900 text-white text-xs font-medium px-3 py-1.5 rounded"
-                                      onclick="return confirm('Save readings and sign off operation <%= position %><%= " batch #{batch_n}" if batch_count > 1 %> as <%= Current.user.display_name %>?')">
+                                      class="bg-gray-700 hover:bg-gray-900 text-white text-xs font-medium px-3 py-1.5 rounded">
                                 Sign off<%= " B#{batch_n}" if batch_count > 1 %>
                               </button>
                             <% end %>
@@ -335,8 +342,7 @@
                           <%= button_to (batch_count > 1 ? "Sign off B#{batch_n}" : "Sign off"),
                               sign_off_operation_works_order_path(@works_order, position: position, batch: batch_n),
                               method: :patch,
-                              class: "bg-gray-700 hover:bg-gray-900 text-white text-xs font-medium px-2 py-1 rounded",
-                              data: { confirm: "Sign off operation #{position} batch #{batch_n} as #{Current.user.display_name}?" } %>
+                              class: "bg-gray-700 hover:bg-gray-900 text-white text-xs font-medium px-2 py-1 rounded" %>
                         <% end %>
                       <% end %>
                     </div>

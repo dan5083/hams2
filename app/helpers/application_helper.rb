@@ -1,5 +1,68 @@
 # app/helpers/application_helper.rb
 module ApplicationHelper
+  # Suggested values for OCV inputs, parsed from the operation's stated ranges.
+  # Purely advisory: rendered as a datalist, so operators can always type any
+  # value - readings outside the stated range are the ones that matter most.
+  def ocv_suggestions(field, operation_text)
+    text = operation_text.to_s
+    case field.to_s
+    when "temp"
+      if (m = text.match(/(\d+)\s*(?:-|to)\s*(\d+)\s*°C/))
+        lo, hi = m[1].to_i, m[2].to_i
+      elsif (m = text.match(/(\d+)\s*\+\/-\s*(\d+)\s*°C/))
+        lo, hi = m[1].to_i - m[2].to_i, m[1].to_i + m[2].to_i
+      else
+        return []
+      end
+      numeric_suggestions(lo, hi)
+    when "time"
+      if (m = text.match(/(\d+)\s*(?:-|to)\s*(\d+)\s*sec/i))
+        unit_suggestions(m[1].to_i, m[2].to_i, "secs")
+      elsif (m = text.match(/(\d+)\s*sec/i))
+        ["#{m[1]} secs"]
+      elsif (m = text.match(/(\d+)\s*(?:-|to)\s*(\d+)\s*min/i))
+        unit_suggestions(m[1].to_i, m[2].to_i, "mins")
+      elsif (m = text.match(/(\d+)\s*min/i))
+        ["#{m[1]} mins"]
+      elsif (m = text.match(/(\d+)\s*(?:-|to)\s*(\d+)\s*hour/i))
+        hour_suggestions(m[1].to_i, m[2].to_i)
+      elsif (m = text.match(/(\d+)\s*hour/i))
+        hour_suggestions(m[1].to_i, m[1].to_i)
+      else
+        []
+      end
+    when "volts"
+      if (m = text.match(/(\d+)\s*(?:-|to)\s*(\d+)\s*V\b/))
+        numeric_suggestions(m[1].to_i, m[2].to_i).map { |v| "#{v} V" }
+      else
+        []
+      end
+    else
+      []
+    end
+  end
+
+  def numeric_suggestions(lo, hi)
+    return [] if hi < lo
+    step = [1, ((hi - lo) / 11.0).ceil].max
+    vals = (lo..hi).step(step).to_a
+    vals << hi unless vals.last == hi
+    vals.map(&:to_s)
+  end
+
+  def unit_suggestions(lo, hi, unit)
+    numeric_suggestions(lo, hi).map { |v| "#{v} #{unit}" }
+  end
+
+  def hour_suggestions(lo, hi)
+    out = []
+    (lo..hi).each do |h|
+      out << "#{h} h"
+      out << "#{h} h 30 m" if h < hi || lo == hi
+    end
+    out.first(12)
+  end
+
   # Flash message helpers
   def flash_class(type)
     case type.to_sym
