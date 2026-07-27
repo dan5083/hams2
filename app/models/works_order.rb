@@ -337,6 +337,15 @@ class WorksOrder < ApplicationRecord
     n
   end
 
+  # Highest batch number carrying any record (sign-off, reading, or date) -
+  # batch count cannot be reduced below this.
+  def highest_recorded_batch
+    ops = frozen_operations || []
+    numbers = ops.flat_map { |o| (o["sign_offs"] || {}).keys + (o["ocv_readings"] || {}).keys }.map(&:to_i)
+    numbers += process_batches.map { |b| b["number"].to_i }
+    numbers.max || 0
+  end
+
   def stamp_batch_date(batch_number)
     batches = customised_process_data["batches"] ||= []
     return if batches.any? { |b| b["number"] == batch_number }
