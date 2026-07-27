@@ -70,10 +70,12 @@ Rails.application.routes.draw do
       get :route_card
       patch :sign_off_operation
       patch :save_ocv
+      patch :set_batch_count
       patch :void
       patch :unvoid
       patch :invoice_to_date
     end
+
 
     # 5. Release Notes nested under works orders
     resources :release_notes, except: [:index] do
