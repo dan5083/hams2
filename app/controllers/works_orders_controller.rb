@@ -1,6 +1,6 @@
 # app/controllers/works_orders_controller.rb - Fixed pricing parameter handling and route card operations with RBAC
 class WorksOrdersController < ApplicationController
-  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :invoice_to_date, :void, :unvoid, :sign_off_operation, :save_ocv]
+  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :invoice_to_date, :void, :unvoid, :sign_off_operation, :save_ocv, :set_batch_count]
 
  def index
     @works_orders = WorksOrder.includes(:customer_order, :part, customer: [])
@@ -201,27 +201,36 @@ class WorksOrdersController < ApplicationController
     redirect_to root_path, alert: "❌ Failed to stage invoice: #{e.message}"
   end
 
-  # Paperless process record: operator sign-off per operation
+  # Paperless process record: operator sign-off per operation per batch
   def sign_off_operation
     return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
-    @works_order.sign_off_operation!(params[:position], Current.user)
+    @works_order.sign_off_operation!(params[:position], params[:batch], Current.user)
     redirect_to works_order_path(@works_order, anchor: "op-#{params[:position]}"),
-                notice: "Operation #{params[:position]} signed off."
+                notice: "Operation #{params[:position]} batch #{params[:batch]} signed off."
   rescue => e
     redirect_to works_order_path(@works_order, anchor: "op-#{params[:position]}"),
                 alert: e.message
   end
 
-  # Paperless process record: OCV readings per operation (one row per batch)
+  # Paperless process record: OCV readings per operation, keyed by batch number
   def save_ocv
     return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
-    readings = params.fetch(:readings, []).map { |r| r.permit!.to_h }
+    readings = params.fetch(:readings, {}).permit!.to_h
     @works_order.save_ocv_readings!(params[:position], readings, Current.user)
     redirect_to works_order_path(@works_order, anchor: "op-#{params[:position]}"),
                 notice: "OCV readings saved for operation #{params[:position]}."
   rescue => e
     redirect_to works_order_path(@works_order, anchor: "op-#{params[:position]}"),
                 alert: e.message
+  end
+
+  # Paperless process record: how many batches this WO runs
+  def set_batch_count
+    return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
+    @works_order.set_batch_count!(params[:batch_count])
+    redirect_to works_order_path(@works_order), notice: "Batch count set to #{params[:batch_count]}."
+  rescue => e
+    redirect_to works_order_path(@works_order), alert: e.message
   end
 
   private

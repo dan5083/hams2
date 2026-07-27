@@ -149,80 +149,102 @@ class WorksOrder < ApplicationRecord
   end
 
   # ============================================================================
-  # PAPERLESS PROCESS RECORD (frozen operations, sign-offs, OCV readings)
+  # PAPERLESS PROCESS RECORD (frozen operations, batches, sign-offs, OCV)
   # ============================================================================
   #
-  # The WO's process record lives in customised_process_data["operations"].
-  # Until the first sign-off or OCV save, operations render live from the part
-  # (so pre-work corrections flow through). The first write freezes a full
-  # snapshot - verbatim operation text plus OCV specs - and all rendering and
-  # recording happens against the frozen copy from then on. The part can change;
-  # this WO's record cannot.
+  # The WO's process record lives in customised_process_data:
+  #   "batch_count" - how many batches this WO runs (operator-set, default 1)
+  #   "batches"     - [{"number" => 1, "date" => "2026-07-27"}] date set at
+  #                   that batch's first sign-off
+  #   "operations"  - frozen snapshot; per op:
+  #       "sign_offs"    => { "1" => {"id","name"}, ... }  (keyed by batch)
+  #       "ocv_readings" => { "1" => {field => value}, ... } (keyed by batch)
+  #
+  # Until the first write, operations render live from the part (pre-work
+  # corrections flow through). The first write freezes the full snapshot -
+  # verbatim text plus OCV specs - and everything happens against the frozen
+  # copy from then on. The part can change; this WO's record cannot.
 
   def frozen_operations
     ops = customised_process_data&.dig("operations")
     ops.present? ? ops : nil
   end
 
-  # Pilot gate: the interactive process record (sign-offs, OCV inputs) is live
-  # for electroless nickel work only. Widen per process family as each area
-  # goes paperless; delete once everything has.
+  def operations_frozen?
+    frozen_operations.present?
+  end
+
+  # Pilot gate: the interactive process record is live for open WOs with
+  # electroless nickel work only. Widen per process family as each area goes
+  # paperless; delete once everything has.
   def paperless_record?
-    return true if operations_frozen? # a WO with digital records always shows them
+    return false unless is_open
+    return true if operations_frozen?
     operations_with_auto_ops.any? { |op| op.process_type == 'electroless_nickel_plating' }
   end
 
-  def operations_frozen?
-    frozen_operations.present?
+  def process_batch_count
+    (customised_process_data&.dig("batch_count") || 1).to_i.clamp(1, 20)
+  end
+
+  def process_batches
+    customised_process_data&.dig("batches") || []
+  end
+
+  def process_batch_date(batch_number)
+    process_batches.find { |b| b["number"] == batch_number.to_i }&.dig("date")
+  end
+
+  def set_batch_count!(count)
+    count = count.to_i
+    raise "Batch count must be between 1 and 20" unless (1..20).cover?(count)
+
+    highest_used = highest_recorded_batch
+    raise "Batch #{highest_used} already has records; cannot reduce below it" if count < highest_used
+
+    freeze_operations!
+    customised_process_data["batch_count"] = count
+    customised_process_data_will_change!
+    save!
   end
 
   # Uniform hash shape for the show page, frozen or live.
   def operations_for_display
     frozen_operations || operations_with_auto_ops.map.with_index(1) do |op, i|
-      {
-        "position" => i,
-        "id" => op.id,
-        "display_name" => (op.respond_to?(:display_name) ? op.display_name : op.id),
-        "operation_text" => op.operation_text,
-        "ocv" => op.try(:ocv),
-        "signed_off_by" => nil,
-        "ocv_readings" => nil
-      }
+      operation_snapshot(op, i)
     end
   end
 
   def freeze_operations!
     return frozen_operations if operations_frozen?
 
-    ops = operations_with_auto_ops.map.with_index(1) do |op, i|
-      {
-        "position" => i,
-        "id" => op.id,
-        "display_name" => (op.respond_to?(:display_name) ? op.display_name : op.id),
-        "operation_text" => op.operation_text,
-        "ocv" => op.try(:ocv),
-        "signed_off_by" => nil,
-        "ocv_readings" => nil
-      }
-    end
+    ops = operations_with_auto_ops.map.with_index(1) { |op, i| operation_snapshot(op, i) }
     raise "Cannot freeze: no operations available for WO#{number}" if ops.empty?
 
-    self.customised_process_data = (customised_process_data || {}).merge("operations" => ops)
+    data = customised_process_data || {}
+    self.customised_process_data = data.merge(
+      "operations" => ops,
+      "batch_count" => (data["batch_count"] || 1),
+      "batches" => (data["batches"] || [])
+    )
     save!
     frozen_operations
   end
 
-  def sign_off_operation!(position, user)
+  def sign_off_operation!(position, batch_number, user)
+    batch_number = normalise_batch!(batch_number)
     freeze_operations!
     op = find_frozen_operation!(position)
-    raise "Operation #{position} already signed off" if op["signed_off_by"].present?
+    op["sign_offs"] ||= {}
+    raise "Operation #{position} batch #{batch_number} already signed off" if op["sign_offs"][batch_number.to_s].present?
 
-    op["signed_off_by"] = { "id" => user.id, "name" => user.display_name }
+    op["sign_offs"][batch_number.to_s] = { "id" => user.id, "name" => user.display_name }
+    stamp_batch_date(batch_number)
     customised_process_data_will_change!
     save!
   end
 
-  # readings: array of {field => value} hashes, one per batch row.
+  # readings: { "1" => {field => value}, "2" => ... } keyed by batch number.
   # Values are sliced against the op's OCV spec fields; fully blank rows dropped.
   def save_ocv_readings!(position, readings, user)
     freeze_operations!
@@ -231,14 +253,15 @@ class WorksOrder < ApplicationRecord
     raise "Operation #{position} has no OCV spec" if spec.blank?
 
     allowed = (spec["fields"] || []).map(&:to_s)
-    batches = Array(readings).map { |row| row.to_h.slice(*allowed).transform_values { |v| v.to_s.strip } }
-                             .reject { |row| row.values.all?(&:blank?) }
-
-    if spec["batching"].to_s == "single" && batches.length > 1
-      raise "Operation #{position} is single-batch; got #{batches.length} rows"
+    cleaned = {}
+    (readings || {}).each do |batch_key, row|
+      next unless (1..process_batch_count).cover?(batch_key.to_i)
+      values = row.to_h.slice(*allowed).transform_values { |v| v.to_s.strip }
+      cleaned[batch_key.to_i.to_s] = values unless values.values.all?(&:blank?)
     end
 
-    op["ocv_readings"] = { "batches" => batches, "recorded_by" => { "id" => user.id, "name" => user.display_name } }
+    op["ocv_readings"] = cleaned
+    op["ocv_recorded_by"] = { "id" => user.id, "name" => user.display_name }
     customised_process_data_will_change!
     save!
   end
@@ -248,6 +271,35 @@ class WorksOrder < ApplicationRecord
     raise "No operation at position #{position} on WO#{number}" unless op
     op
   end
+
+  private
+
+  def operation_snapshot(op, position)
+    {
+      "position" => position,
+      "id" => op.id,
+      "display_name" => (op.respond_to?(:display_name) ? op.display_name : op.id),
+      "operation_text" => op.operation_text,
+      "ocv" => op.try(:ocv),
+      "sign_offs" => {},
+      "ocv_readings" => {}
+    }
+  end
+
+  def normalise_batch!(batch_number)
+    n = batch_number.to_i
+    raise "Batch #{batch_number} is outside this WO's batch count (#{process_batch_count})" unless (1..process_batch_count).cover?(n)
+    n
+  end
+
+  def stamp_batch_date(batch_number)
+    batches = customised_process_data["batches"] ||= []
+    return if batches.any? { |b| b["number"] == batch_number }
+    batches << { "number" => batch_number, "date" => Date.current.iso8601 }
+  end
+
+  public
+
 
   # For backwards compatibility - delegate to operations_with_auto_ops
   def operations_text
