@@ -320,12 +320,13 @@ class WorksOrder < ApplicationRecord
   private
 
   def operation_snapshot(op, position)
+    ocv = op.try(:ocv)
     {
       "position" => position,
       "id" => op.id,
       "display_name" => (op.respond_to?(:display_name) ? op.display_name : op.id),
       "operation_text" => op.operation_text,
-      "ocv" => op.try(:ocv),
+      "ocv" => (ocv.respond_to?(:deep_stringify_keys) ? ocv.deep_stringify_keys : ocv),
       "sign_offs" => {},
       "ocv_readings" => {}
     }
