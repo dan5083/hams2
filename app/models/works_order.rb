@@ -241,6 +241,10 @@ class WorksOrder < ApplicationRecord
     process_batches.find { |b| b["number"] == batch_number.to_i }&.dig("date")
   end
 
+  def process_batch_qty(batch_number)
+    process_batches.find { |b| b["number"] == batch_number.to_i }&.dig("qty")
+  end
+
   # qtys: { "1" => "20", "2" => "13" } - parts per batch, recorded like the
   # route card's Qty column. Editable; the sign-offs are the immutable record.
   def set_batch_count!(count, qtys = {})
@@ -292,6 +296,19 @@ class WorksOrder < ApplicationRecord
     op = find_frozen_operation!(position)
     op["sign_offs"] ||= {}
     raise "Operation #{position} batch #{batch_number} already signed off" if op["sign_offs"][batch_number.to_s].present?
+
+    # A sign-off certifies a complete record: the batch must have a quantity,
+    # and an OCV operation must have every field recorded for this batch.
+    if process_batch_qty(batch_number).blank?
+      raise "Enter a quantity for batch #{batch_number} (top of the operations list) before signing off"
+    end
+    if op["ocv"].present?
+      row = op.dig("ocv_readings", batch_number.to_s) || {}
+      missing = (op["ocv"]["fields"] || []).map(&:to_s).select { |f| row[f].to_s.strip.empty? }
+      if missing.any?
+        raise "Record #{missing.map(&:humanize).join(', ')} for batch #{batch_number} before signing off operation #{position}"
+      end
+    end
 
     op["sign_offs"][batch_number.to_s] = { "id" => user.id, "name" => user.display_name }
     stamp_batch_date(batch_number)
