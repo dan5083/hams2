@@ -68,6 +68,8 @@ Rails.application.routes.draw do
   resources :works_orders, except: [:new, :create] do
     member do
       get :route_card
+      patch :sign_off_operation
+      patch :save_ocv
       patch :void
       patch :unvoid
       patch :invoice_to_date
