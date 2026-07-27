@@ -90,10 +90,8 @@ module OperationLibrary
 
     def self.final_inspect_text_standard
       '**Final inspection** Check 100% of qty for uniform film appearance and film thickness, ' \
-      'if qty wrong pls detail here ___ and inform an A stampholder, print out to be attached ' \
-      'to release notes. **Check for Foreign Object Debris (FOD).**'
+      'if qty wrong pls detail on release form. **Check for Foreign Object Debris (FOD).**'
     end
-
 
     def self.final_inspect_text_aerospace_anodic
       '**Final inspection** Check 100% of qty for uniform film appearance. ' \
