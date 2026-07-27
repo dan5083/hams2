@@ -294,8 +294,16 @@
                               </div>
                             <% end %>
                           </div>
-                          <div class="mt-2 flex items-center gap-3">
+                          <div class="mt-2 flex flex-wrap items-center gap-2">
                             <%= f.submit "Save readings", class: "bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-1.5 rounded" %>
+                            <% (1..batch_count).each do |batch_n| %>
+                              <% next if (op["sign_offs"] || {})[batch_n.to_s].present? %>
+                              <button type="submit" name="sign_off_batch" value="<%= batch_n %>"
+                                      class="bg-gray-700 hover:bg-gray-900 text-white text-xs font-medium px-3 py-1.5 rounded"
+                                      onclick="return confirm('Save readings and sign off operation <%= position %><%= " batch #{batch_n}" if batch_count > 1 %> as <%= Current.user.display_name %>?')">
+                                Sign off<%= " B#{batch_n}" if batch_count > 1 %>
+                              </button>
+                            <% end %>
                             <% recorder = op.dig("ocv_recorded_by", "name") %>
                             <% if recorder %>
                               <span class="text-xs text-gray-400">Recorded by <%= recorder %></span>
@@ -323,7 +331,7 @@
                         <% so = sign_offs[batch_n.to_s] %>
                         <% if so %>
                           <span class="text-xs text-green-700 font-semibold text-center">✓<%= " B#{batch_n}" if batch_count > 1 %> <%= so["name"] %></span>
-                        <% else %>
+                        <% elsif spec.blank? %>
                           <%= button_to (batch_count > 1 ? "Sign off B#{batch_n}" : "Sign off"),
                               sign_off_operation_works_order_path(@works_order, position: position, batch: batch_n),
                               method: :patch,

@@ -217,8 +217,13 @@ class WorksOrdersController < ApplicationController
     return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
     readings = params.fetch(:readings, {}).permit!.to_h
     @works_order.save_ocv_readings!(params[:position], readings, Current.user)
-    redirect_to works_order_path(@works_order, anchor: "op-#{params[:position]}"),
-                notice: "OCV readings saved for operation #{params[:position]}."
+    if params[:sign_off_batch].present?
+      @works_order.sign_off_operation!(params[:position], params[:sign_off_batch], Current.user)
+      notice = "Readings saved; operation #{params[:position]} batch #{params[:sign_off_batch]} signed off."
+    else
+      notice = "OCV readings saved for operation #{params[:position]}."
+    end
+    redirect_to works_order_path(@works_order, anchor: "op-#{params[:position]}"), notice: notice
   rescue => e
     redirect_to works_order_path(@works_order, anchor: "op-#{params[:position]}"),
                 alert: e.message
