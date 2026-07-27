@@ -3,7 +3,7 @@ module ApplicationHelper
   # Suggested values for OCV inputs, parsed from the operation's stated ranges.
   # Purely advisory: rendered as a datalist, so operators can always type any
   # value - readings outside the stated range are the ones that matter most.
-  def ocv_suggestions(field, operation_text, thickness: nil)
+  def ocv_suggestions(field, operation_text)
     text = operation_text.to_s
     case field.to_s
     when "temp"
@@ -16,8 +16,8 @@ module ApplicationHelper
       end
       numeric_suggestions(lo, hi).map { |v| "#{v}°C" }
     when "time"
-      if (plate = plate_time_suggestions(text, thickness))
-        plate
+      if (m = text.match(/(\d+)\s*min(?:s)?\s*(?:-|to)\s*(\d+)\s*h(?:ours?)?\b/i))
+        unit_suggestions(m[1].to_i, m[2].to_i * 60, "mins")
       elsif (m = text.match(/(\d+)\s*(?:-|to)\s*(\d+)\s*sec/i))
         unit_suggestions(m[1].to_i, m[2].to_i, "secs")
       elsif (m = text.match(/(\d+)\s*sec/i))
@@ -42,27 +42,6 @@ module ApplicationHelper
     else
       []
     end
-  end
-
-  # ENP plate ops state a deposition rate, not a duration; combined with the
-  # operation's numeric target thickness the plate time is derivable. No prose
-  # parsing: a part set up without a target thickness gets no suggestion.
-  def plate_time_suggestions(text, thickness)
-    rate = text.match(/Deposition rate:?\s*(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*(?:μ|u)m\/hour/i)
-    t = thickness.to_f
-    return nil unless rate && t > 0
-
-    r_lo, r_hi = rate[1].to_f, rate[2].to_f
-    return nil if r_lo <= 0
-
-    mins_lo = ((t * 60 / r_hi) / 5.0).floor * 5
-    mins_hi = ((t * 60 / r_lo) / 5.0).ceil * 5
-    return nil if mins_hi <= 0 || mins_hi > 24 * 60
-
-    step = [5, (((mins_hi - mins_lo) / 11.0) / 5.0).ceil * 5].max
-    vals = (mins_lo..mins_hi).step(step).to_a
-    vals << mins_hi unless vals.last == mins_hi
-    vals.map { |v| "#{v} mins" }
   end
 
   def numeric_suggestions(lo, hi)
