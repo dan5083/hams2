@@ -170,6 +170,51 @@ class WorksOrder < ApplicationRecord
     ops.present? ? ops : nil
   end
 
+  # Once an operation carries sign-offs, its text, OCV spec, existing
+  # sign-offs, recorded readings, and batch dates are immutable through every
+  # ActiveRecord path - console sessions and AI tooling included. New records
+  # may be added via the mutators; history cannot be rewritten.
+  before_save :protect_frozen_process_record, if: :customised_process_data_changed?
+
+  def protect_frozen_process_record
+    old_ops = customised_process_data_was&.dig("operations")
+    return if old_ops.blank?
+    new_ops = customised_process_data&.dig("operations") || []
+
+    old_ops.each do |old_op|
+      pos = old_op["position"]
+      signed = old_op["sign_offs"].presence || {}
+      readings = old_op["ocv_readings"].presence || {}
+      next if signed.empty? && readings.empty?
+
+      new_op = new_ops.find { |o| o["position"] == pos }
+      if new_op.nil?
+        errors.add(:base, "Operation #{pos} has process records and cannot be removed")
+        throw :abort
+      end
+
+      if signed.any? && (new_op["operation_text"] != old_op["operation_text"] || new_op["ocv"] != old_op["ocv"])
+        errors.add(:base, "Operation #{pos} has signed batches; its text and OCV spec are immutable")
+        throw :abort
+      end
+
+      signed.each do |batch, so|
+        unless new_op.dig("sign_offs", batch) == so
+          errors.add(:base, "Operation #{pos} batch #{batch}: sign-offs cannot be altered or removed")
+          throw :abort
+        end
+      end
+    end
+
+    (customised_process_data_was&.dig("batches") || []).each do |old_b|
+      new_b = (customised_process_data&.dig("batches") || []).find { |b| b["number"] == old_b["number"] }
+      unless new_b == old_b
+        errors.add(:base, "Batch #{old_b['number']} is dated; batch records cannot be altered or removed")
+        throw :abort
+      end
+    end
+  end
+
   def operations_frozen?
     frozen_operations.present?
   end
