@@ -10,17 +10,11 @@
               title="ENP process records are kept in HAMS only - no route card">
           📱 Paperless
         </span>
-      <% elsif WorksOrder.where(part_id: @works_order.part_id).count > 1 ||
-            @works_order.customer_order.contract_reviewed? %>
+      <% else %>
         <%= link_to "Route Card",
             "javascript:void(0)",
             onclick: "printRouteCard('#{route_card_works_order_path(@works_order)}')",
             class: "bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded" %>
-      <% else %>
-        <span class="bg-gray-300 text-gray-500 font-bold py-2 px-4 rounded cursor-not-allowed"
-              title="Contract review required before route cards can be printed">
-          Route Card
-        </span>
       <% end %>
 
       <%= link_to "New Release Note", new_works_order_release_note_path(@works_order),
@@ -270,14 +264,47 @@
                     <% if paperless && spec.present? %>
                       <% fields = (spec["fields"] || []).map(&:to_s) %>
                       <% readings = op["ocv_readings"] || {} %>
+                      <% checklist_items = spec["checklist"] || [] %>
                       <div class="mt-3 pt-3 border-t border-gray-100">
                         <p class="text-xs font-semibold <%= spec["basis"].to_s == "nadcap" ? "text-amber-700" : "text-gray-600" %> uppercase tracking-wide mb-2">
-                          <%= spec["basis"].to_s == "nadcap" ? "OCV Monitoring" : "Record" %>
+                          <%= checklist_items.any? ? "Contract Review Checklist" : (spec["basis"].to_s == "nadcap" ? "OCV Monitoring" : "Record") %>
                         </p>
                         <%= form_with url: save_ocv_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, id: "ocv-form-#{position}" do |f| %>
                           <%= hidden_field_tag :position, position %>
+                          <% if checklist_items.any? %>
+                            <% prefill = @works_order.checklist_prefill(op) %>
+                            <% answered = checklist_items.count { |i| prefill.dig(i["id"], "answer").present? } %>
+                            <% remembered = checklist_items.count { |i| prefill.dig(i["id"], "from_memory") } %>
+                            <details class="mb-2 border border-gray-200 rounded" <%= "open" if answered < checklist_items.length %>>
+                              <summary class="cursor-pointer select-none px-3 py-2 text-xs font-medium <%= answered == checklist_items.length ? "text-green-700 bg-green-50" : "text-gray-700 bg-gray-50" %>">
+                                <%= answered == checklist_items.length ? "✓" : "▸" %>
+                                Checklist: <%= answered %>/<%= checklist_items.length %> answered<%= " (#{remembered} remembered from previous review)" if remembered > 0 %>
+                              </summary>
+                              <div class="p-3 space-y-2">
+                              <% checklist_items.each_with_index do |item, idx| %>
+                                <% r = prefill[item["id"]] || {} %>
+                                <div class="flex flex-wrap items-start gap-2 <%= r["from_memory"] ? "opacity-80" : "" %>">
+                                  <span class="text-xs text-gray-400 w-5 flex-none pt-1"><%= idx + 1 %></span>
+                                  <span class="text-xs text-gray-700 flex-1 min-w-48 pt-1"><%= item["text"] %>
+                                    <% if r["from_memory"] %><span class="text-xs text-blue-500">· remembered from WO<%= @works_order.part&.customisation_data&.dig("contract_review_memory", item["id"], "source_wo") %></span><% end %>
+                                  </span>
+                                  <%= select_tag "checklist[#{item["id"]}][answer]",
+                                      options_for_select(["", "YES", "NO"], r["answer"]),
+                                      class: "border border-gray-300 rounded px-1 py-1 text-sm flex-none" %>
+                                  <%= text_field_tag "checklist[#{item["id"]}][comment]", r["comment"],
+                                      placeholder: "Action taken / comment",
+                                      class: "border border-gray-300 rounded px-2 py-1 text-sm w-44 flex-none" %>
+                                </div>
+                              <% end %>
+                              </div>
+                            </details>
+                            <% completed = op.dig("checklist_completed_by", "name") %>
+                            <% if completed %>
+                              <p class="mt-1 text-xs text-gray-400">Checklist completed by <%= completed %></p>
+                            <% end %>
+                          <% end %>
                           <div class="space-y-1">
-                            <% (1..batch_count).each do |batch_n| %>
+                            <% (fields.any? ? (1..batch_count) : []).each do |batch_n| %>
                               <% row = readings[batch_n.to_s] || {} %>
                               <div class="flex flex-wrap items-center gap-2">
                                 <% if batch_count > 1 %>
@@ -315,17 +342,8 @@
                       </div>
                     <% end %>
                   </div>
-                  <!-- Sign-off / contract review column -->
-                  <% if position == 1 %>
-                    <div class="flex-none w-32 border-l border-gray-200 flex flex-col items-center justify-center p-2 bg-gray-50">
-                      <% if @works_order.customer_order.contract_reviewed? %>
-                        <span class="text-xs text-green-700 font-semibold text-center">✓ Reviewed</span>
-                        <span class="text-xs text-gray-500 text-center mt-1"><%= @works_order.customer_order.contract_reviewed_by.display_name %></span>
-                      <% else %>
-                        <span class="text-xs text-yellow-700 font-semibold text-center">⚠ Not reviewed</span>
-                      <% end %>
-                    </div>
-                  <% elsif paperless %>
+                  <!-- Sign-off column -->
+                  <% if paperless %>
                     <% sign_offs = op["sign_offs"] || {} %>
                     <% all_signed = (1..batch_count).all? { |b| sign_offs[b.to_s].present? } %>
                     <div class="flex-none w-32 border-l border-gray-200 flex flex-col items-center justify-center gap-1 p-2 <%= all_signed ? 'bg-green-50' : 'bg-gray-50' %>">

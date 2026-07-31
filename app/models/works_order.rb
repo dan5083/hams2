@@ -308,12 +308,60 @@ class WorksOrder < ApplicationRecord
       if missing.any?
         raise "Record #{missing.map(&:humanize).join(', ')} for batch #{batch_number} before signing off operation #{position}"
       end
+
+      items = op["ocv"]["checklist"] || []
+      if items.any?
+        answered = op["checklist_responses"] || {}
+        unanswered = items.reject { |i| answered.dig(i["id"], "answer").present? }
+        if unanswered.any?
+          raise "Answer all checklist items before signing off contract review (#{unanswered.length} remaining)"
+        end
+      end
     end
 
     op["sign_offs"][batch_number.to_s] = { "id" => user.id, "name" => user.display_name }
     stamp_batch_date(batch_number)
     customised_process_data_will_change!
     save!
+    remember_part_checklist_answers(op)
+  end
+
+  # responses: { item_id => {"answer" => "YES"/"NO", "comment" => "..."} }.
+  # Sliced against the op's checklist item ids; blank answers dropped.
+  def save_checklist_responses!(position, responses, user)
+    freeze_operations!
+    op = find_frozen_operation!(position)
+    items = op.dig("ocv", "checklist")
+    raise "Operation #{position} has no checklist" if items.blank?
+
+    ids = items.map { |i| i["id"] }
+    cleaned = {}
+    (responses || {}).each do |item_id, r|
+      next unless ids.include?(item_id.to_s)
+      answer = r["answer"].to_s.strip.upcase
+      next unless %w[YES NO].include?(answer)
+      cleaned[item_id.to_s] = { "answer" => answer, "comment" => r["comment"].to_s.strip }
+    end
+
+    op["checklist_responses"] = cleaned
+    op["checklist_completed_by"] = { "id" => user.id, "name" => user.display_name }
+    customised_process_data_will_change!
+    save!
+  end
+
+  # Checklist values for display: explicit responses on this WO, falling back
+  # to the part's remembered answers for part-scoped items.
+  def checklist_prefill(op)
+    responses = op["checklist_responses"] || {}
+    memory = part&.customisation_data&.dig("contract_review_memory") || {}
+    (op.dig("ocv", "checklist") || []).each_with_object({}) do |item, out|
+      id = item["id"]
+      if responses[id].present?
+        out[id] = responses[id].merge("from_memory" => false)
+      elsif item["scope"] == "part" && memory[id].present?
+        out[id] = { "answer" => memory[id]["answer"], "comment" => memory[id]["comment"], "from_memory" => true }
+      end
+    end
   end
 
   # readings: { "1" => {field => value}, "2" => ... } keyed by batch number.
@@ -373,6 +421,28 @@ class WorksOrder < ApplicationRecord
     numbers = ops.flat_map { |o| (o["sign_offs"] || {}).keys + (o["ocv_readings"] || {}).keys }.map(&:to_i)
     numbers += process_batches.map { |b| b["number"].to_i }
     numbers.max || 0
+  end
+
+  # On signing off a checklist op, part-scoped answers are remembered on the
+  # part and pre-filled on future WOs. Convenience, not record: failure here
+  # never unwinds the sign-off.
+  def remember_part_checklist_answers(op)
+    items = op.dig("ocv", "checklist") || []
+    responses = op["checklist_responses"] || {}
+    return if items.empty? || responses.empty? || part.nil?
+
+    part_ids = items.select { |i| i["scope"] == "part" }.map { |i| i["id"] }
+    to_remember = responses.slice(*part_ids)
+    return if to_remember.empty?
+
+    data = part.customisation_data || {}
+    memory = data["contract_review_memory"] || {}
+    to_remember.each do |id, r|
+      memory[id] = { "answer" => r["answer"], "comment" => r["comment"], "source_wo" => number, "on" => Date.current.iso8601 }
+    end
+    part.update!(customisation_data: data.merge("contract_review_memory" => memory))
+  rescue => e
+    Rails.logger.error "Part checklist memory writeback failed for WO#{number}: #{e.message}"
   end
 
   def stamp_batch_date(batch_number)

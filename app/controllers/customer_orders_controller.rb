@@ -1,7 +1,6 @@
 class CustomerOrdersController < ApplicationController
   before_action :set_customer_order, only: [:show, :edit, :update, :destroy, :void,
-                                            :invoice_to_date,
-                                            :mark_contract_reviewed, :unmark_contract_reviewed]
+                                            :invoice_to_date]
 
   def index
     @customer_orders = CustomerOrder.includes(:customer, :works_orders)
@@ -32,20 +31,12 @@ class CustomerOrdersController < ApplicationController
 
     # Priority ordering for the list. Lower number = higher up the page.
     #   0  Green  - all WOs fully released and there's uninvoiced qty -> "Create invoice"
-    #   1  Purple - contract not yet reviewed AND has a new-part WO    -> "Review needed"
     #   2  Partial release in progress
     #   3  Everything else (default)
     #   4  Open but nothing left to invoice
     #   5  Voided
-    #
-    # Green is tested before Purple so an order that is BOTH ready-to-invoice and
-    # review-needed still sorts (and renders) green, matching the view's
-    # "green takes precedence" rule.
-    #
-    # The Purple/"needs review" test here mirrors EXACTLY the definition used to
-    # build @cos_with_new_parts below (and in the view): contract not reviewed,
-    # plus a non-voided WO whose part has only ever appeared on one WO (<= 1).
-    # If that definition ever changes, change it in BOTH places.
+    # (Contract review now lives on the works order's contract review operation;
+    #  the old CO-level "Review needed" purple tier is gone.)
     @customer_orders = @customer_orders.order(
       Arel.sql("
         CASE
@@ -53,13 +44,6 @@ class CustomerOrdersController < ApplicationController
           WHEN customer_orders.fully_released_works_orders_count = customer_orders.open_works_orders_count
                AND customer_orders.open_works_orders_count > 0
                AND customer_orders.uninvoiced_accepted_quantity > 0 THEN 0
-          WHEN customer_orders.contract_reviewed_by_user_id IS NULL
-               AND EXISTS (
-                 SELECT 1 FROM works_orders w
-                 WHERE w.customer_order_id = customer_orders.id
-                   AND w.voided = false
-                   AND (SELECT COUNT(*) FROM works_orders w2 WHERE w2.part_id = w.part_id) <= 1
-               ) THEN 1
           WHEN customer_orders.open_works_orders_count > 0
                AND customer_orders.fully_released_works_orders_count > 0
                AND customer_orders.fully_released_works_orders_count < customer_orders.open_works_orders_count THEN 2
@@ -70,19 +54,6 @@ class CustomerOrdersController < ApplicationController
       "),
       date_received: :desc
     ).page(params[:page]).per(20)
-
-    # Build set of customer order IDs that have at least one new-part WO —
-    # used to highlight orders needing contract review before route cards can print.
-    # Two queries regardless of page size; no per-row lookups.
-    co_ids = @customer_orders.map(&:id)
-    wo_part_data = WorksOrder.where(customer_order_id: co_ids, voided: false)
-                             .pluck(:customer_order_id, :part_id)
-    part_ids = wo_part_data.map(&:last).uniq
-    part_wo_counts = WorksOrder.where(part_id: part_ids).group(:part_id).count
-    @cos_with_new_parts = Set.new
-    wo_part_data.each do |co_id, part_id|
-      @cos_with_new_parts << co_id if (part_wo_counts[part_id] || 0) <= 1
-    end
   end
 
   def show
@@ -175,16 +146,6 @@ class CustomerOrdersController < ApplicationController
     rescue StandardError => e
       redirect_to @customer_order, alert: e.message
     end
-  end
-
-  def mark_contract_reviewed
-    @customer_order.mark_contract_reviewed!(Current.user)
-    redirect_to @customer_order, notice: "Contract marked as reviewed by #{Current.user.display_name}."
-  end
-
-  def unmark_contract_reviewed
-    @customer_order.unmark_contract_reviewed!
-    redirect_to @customer_order, notice: 'Contract review cleared.'
   end
 
   def search_customers

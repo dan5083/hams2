@@ -241,7 +241,7 @@ class Part < ApplicationRecord
 
     sources = []
     if defined?(OperationLibrary::ContractReviewOperations)
-      sources << -> { OperationLibrary::ContractReviewOperations.get_contract_review_operation }
+      sources << -> { OperationLibrary::ContractReviewOperations.get_contract_review_operation(aerospace_defense: ad) }
     end
     if defined?(OperationLibrary::InspectFinalInspectVatInspect)
       sources << -> { OperationLibrary::InspectFinalInspectVatInspect.get_incoming_inspection_operation }
@@ -475,7 +475,7 @@ class Part < ApplicationRecord
     has_strip_only = treatments.any? { |t| t[:operation].process_type == 'stripping_only' }
 
     # Beginning ops (always first)
-    safe_add_to_sequence(sequence, OperationLibrary::ContractReviewOperations.get_contract_review_operation, "Contract Review")
+    safe_add_to_sequence(sequence, OperationLibrary::ContractReviewOperations.get_contract_review_operation(aerospace_defense: aerospace_defense?), "Contract Review")
 
     safe_add_to_sequence(sequence, OperationLibrary::InspectFinalInspectVatInspect.get_incoming_inspection_operation, "Incoming Inspection")
 
@@ -976,8 +976,7 @@ end
       alloys: [],
       anodic_classes: [],
       target_thickness: 0,
-      vat_numbers: [],
-      ocv: stripping_operation.ocv
+      vat_numbers: []
     )
   end
 
@@ -1033,8 +1032,7 @@ end
         id: "PRE_#{pre_heat_treatment.id}",
         process_type: 'enp_pre_heat_treatment',
         operation_text: "**Pre-Heat:** #{pre_heat_treatment.operation_text}",
-        specifications: pre_heat_treatment.specifications,
-        ocv: pre_heat_treatment.ocv
+        specifications: pre_heat_treatment.specifications
       )
       safe_add_to_sequence(sequence, pre_heat_op, "ENP Pre-Heat Treatment")
     else
@@ -1053,8 +1051,7 @@ end
         id: "POST_#{heat_treatment.id}",
         process_type: 'enp_post_heat_treatment',
         operation_text: "**Post-Heat:** #{heat_treatment.operation_text}",
-        specifications: heat_treatment.specifications,
-        ocv: heat_treatment.ocv
+        specifications: heat_treatment.specifications
       )
       safe_add_to_sequence(sequence, post_heat_op, "ENP Post-Heat Treatment")
     else
