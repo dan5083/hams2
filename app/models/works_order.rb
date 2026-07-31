@@ -294,23 +294,40 @@ class WorksOrder < ApplicationRecord
     frozen_operations
   end
 
+  # Each operation has a batch DOMAIN: today either the whole works order
+  # (contract review certifies the WO, not a batch) or every batch (default).
+  # EXTENSION POINT: when treatment cycles gain their own batch structures
+  # (different part/batch qtys per cycle), this method becomes the mapping
+  # from an operation to its set of sign-off keys - nothing else changes.
+  def sign_off_keys_for(op)
+    wo_scoped_operation?(op) ? ["wo"] : (1..process_batch_count).map(&:to_s)
+  end
+
+  def wo_scoped_operation?(op)
+    op["process_type"] == "contract_review" || op["id"] == "CONTRACT_REVIEW"
+  end
+
   def sign_off_operation!(position, batch_number, user)
-    batch_number = normalise_batch!(batch_number)
     freeze_operations!
     op = find_frozen_operation!(position)
     op["sign_offs"] ||= {}
-    raise "Operation #{position} batch #{batch_number} already signed off" if op["sign_offs"][batch_number.to_s].present?
 
-    # A sign-off certifies a complete record: the batch must have a quantity,
-    # and an OCV operation must have every field recorded for this batch.
-    if process_batch_qty(batch_number).blank?
-      raise "Enter a quantity for batch #{batch_number} (top of the operations list) before signing off"
+    wo_scoped = wo_scoped_operation?(op)
+    key = wo_scoped ? "wo" : normalise_batch!(batch_number).to_s
+    label = wo_scoped ? "" : " batch #{key}"
+    raise "Operation #{position}#{label} already signed off" if op["sign_offs"][key].present?
+
+    # A sign-off certifies a complete record. Batch-scoped ops need the batch
+    # quantity set; WO-scoped ops (contract review at booking) don't - batches
+    # may not physically exist yet.
+    if !wo_scoped && process_batch_qty(key).blank?
+      raise "Enter a quantity for batch #{key} (top of the operations list) before signing off"
     end
     if op["ocv"].present?
-      row = op.dig("ocv_readings", batch_number.to_s) || {}
+      row = op.dig("ocv_readings", key) || {}
       missing = (op["ocv"]["fields"] || []).map(&:to_s).select { |f| row[f].to_s.strip.empty? }
       if missing.any?
-        raise "Record #{missing.map(&:humanize).join(', ')} for batch #{batch_number} before signing off operation #{position}"
+        raise "Record #{missing.map(&:humanize).join(', ')}#{wo_scoped ? '' : " for batch #{key}"} before signing off operation #{position}"
       end
 
       items = OperationLibrary::ContractReviewOperations.resolve_checklist(op["ocv"]["checklist"])
@@ -323,8 +340,8 @@ class WorksOrder < ApplicationRecord
       end
     end
 
-    op["sign_offs"][batch_number.to_s] = { "id" => user.id, "name" => user.display_name }
-    stamp_batch_date(batch_number)
+    op["sign_offs"][key] = { "id" => user.id, "name" => user.display_name }
+    stamp_batch_date(key.to_i) unless wo_scoped
     customised_process_data_will_change!
     save!
     remember_part_checklist_answers(op)
@@ -378,11 +395,12 @@ class WorksOrder < ApplicationRecord
     raise "Operation #{position} has no OCV spec" if spec.blank?
 
     allowed = (spec["fields"] || []).map(&:to_s)
+    valid_keys = sign_off_keys_for(op)
     cleaned = {}
     (readings || {}).each do |batch_key, row|
-      next unless (1..process_batch_count).cover?(batch_key.to_i)
+      next unless valid_keys.include?(batch_key.to_s)
       values = row.to_h.slice(*allowed).transform_values { |v| v.to_s.strip }
-      cleaned[batch_key.to_i.to_s] = values unless values.values.all?(&:blank?)
+      cleaned[batch_key.to_s] = values unless values.values.all?(&:blank?)
     end
 
     op["ocv_readings"] = cleaned
@@ -406,6 +424,7 @@ class WorksOrder < ApplicationRecord
       "id" => op.id,
       "display_name" => (op.respond_to?(:display_name) ? op.display_name : op.id),
       "operation_text" => op.operation_text,
+      "process_type" => (op.respond_to?(:process_type) ? op.process_type : nil),
       "target_thickness" => (op.respond_to?(:target_thickness) ? op.target_thickness : nil),
       "ocv" => (ocv.respond_to?(:deep_stringify_keys) ? ocv.deep_stringify_keys : ocv),
       "sign_offs" => {},

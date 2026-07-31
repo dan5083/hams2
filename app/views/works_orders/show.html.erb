@@ -276,7 +276,8 @@
             <% ops_for_display.each do |op| %>
               <% position = op["position"] %>
               <% spec = op["ocv"] %>
-              <% op_signed = (op["sign_offs"] || {}).length >= batch_count && (op["sign_offs"] || {}).any? %>
+              <% op_keys = @works_order.sign_off_keys_for(op) %>
+              <% op_signed = op_keys.all? { |k| (op["sign_offs"] || {})[k].present? } %>
               <div class="border border-gray-200 rounded-lg overflow-hidden" id="op-<%= position %>">
                 <div class="flex items-stretch">
                   <!-- Op number -->
@@ -339,10 +340,10 @@
                             <% end %>
                           <% end %>
                           <div class="space-y-1">
-                            <% (fields.any? ? (1..batch_count) : []).each do |batch_n| %>
+                            <% (fields.any? ? op_keys : []).each do |batch_n| %>
                               <% row = readings[batch_n.to_s] || {} %>
                               <div class="flex flex-wrap items-center gap-2">
-                                <% if batch_count > 1 %>
+                                <% if batch_n != "wo" && batch_count > 1 %>
                                   <span class="text-xs text-gray-500 w-14 flex-none">Batch <%= batch_n %></span>
                                 <% end %>
                                 <% fields.each do |field| %>
@@ -380,20 +381,20 @@
                   <!-- Sign-off column -->
                   <% if paperless %>
                     <% sign_offs = op["sign_offs"] || {} %>
-                    <% all_signed = (1..batch_count).all? { |b| sign_offs[b.to_s].present? } %>
-                    <div class="flex-none w-32 border-l border-gray-200 flex flex-col items-center justify-center gap-1 p-2 <%= all_signed ? 'bg-green-50' : 'bg-gray-50' %>">
-                      <% (1..batch_count).each do |batch_n| %>
-                        <% so = sign_offs[batch_n.to_s] %>
+                    <% multi = op_keys.length > 1 %>
+                    <div class="flex-none w-32 border-l border-gray-200 flex flex-col items-center justify-center gap-1 p-2 <%= op_signed ? 'bg-green-50' : 'bg-gray-50' %>">
+                      <% op_keys.each do |k| %>
+                        <% so = sign_offs[k] %>
                         <% if so %>
-                          <span class="text-xs text-green-700 font-semibold text-center">✓<%= " B#{batch_n}" if batch_count > 1 %> <%= so["name"] %></span>
+                          <span class="text-xs text-green-700 font-semibold text-center">✓<%= " B#{k}" if multi %> <%= so["name"] %></span>
                         <% elsif spec.present? %>
-                          <button type="submit" form="ocv-form-<%= position %>" name="sign_off_batch" value="<%= batch_n %>"
+                          <button type="submit" form="ocv-form-<%= position %>" name="sign_off_batch" value="<%= k %>"
                                   class="bg-gray-700 hover:bg-gray-900 text-white text-xs font-medium px-2 py-1 rounded">
-                            Sign off<%= " B#{batch_n}" if batch_count > 1 %>
+                            Sign off<%= " B#{k}" if multi %>
                           </button>
                         <% else %>
-                          <%= button_to (batch_count > 1 ? "Sign off B#{batch_n}" : "Sign off"),
-                              sign_off_operation_works_order_path(@works_order, position: position, batch: batch_n),
+                          <%= button_to (multi ? "Sign off B#{k}" : "Sign off"),
+                              sign_off_operation_works_order_path(@works_order, position: position, batch: k),
                               method: :patch,
                               form: { data: { turbo: false } },
                               class: "bg-gray-700 hover:bg-gray-900 text-white text-xs font-medium px-2 py-1 rounded" %>
