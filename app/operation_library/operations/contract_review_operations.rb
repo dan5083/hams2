@@ -1,6 +1,10 @@
 # app/operation_library/operations/contract_review_operations.rb
 module OperationLibrary
   class ContractReviewOperations
+    FORM = "2002/1"
+    ISSUE = "14"  # bump when the checklist below changes; the show page flags
+                  # WOs whose answers were recorded against an older issue
+
     # Form 2002/1 Iss.14 - Aerospace/Defence Contract Review Checklist.
     # Digitised: each item is answered YES/NO with an optional action/comment.
     # scope decides part memory:
@@ -28,8 +32,13 @@ module OperationLibrary
     ].freeze
 
     def self.operations(aerospace_defense: false)
+      # The spec carries a MARKER, not the items. Parts (locked or live)
+      # reference the form; the current CHECKLIST is resolved at render time,
+      # so a new form issue reaches every part on deploy. The full items are
+      # embedded only into the works order's frozen record at first sign-off -
+      # the one place a verbatim copy is the point.
       ocv_spec = if aerospace_defense
-        { "checklist" => CHECKLIST.map(&:dup), "basis" => "nadcap" }
+        { "checklist" => true, "basis" => "nadcap" }
       end
 
       [
@@ -41,6 +50,12 @@ module OperationLibrary
           ocv: ocv_spec
         )
       ]
+    end
+
+    # Resolve checklist content: the current form for a marker (true), or the
+    # embedded array from an older lock / frozen WO record verbatim.
+    def self.resolve_checklist(spec_value)
+      spec_value == true ? CHECKLIST.map(&:dup) : Array(spec_value)
     end
 
     # Contract review is required for all PPIs (always first operation)

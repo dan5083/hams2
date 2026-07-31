@@ -279,6 +279,10 @@ class WorksOrder < ApplicationRecord
 
     ops = operations_with_auto_ops.map.with_index(1) { |op, i| operation_snapshot(op, i) }
     raise "Cannot freeze: no operations available for WO#{number}" if ops.empty?
+    # Checklist items are NOT embedded: the marker resolves to the current form
+    # issue at render time, keeping reviews correctable and current. The issue
+    # answered against is recorded with the responses; git history holds what
+    # each issue said.
 
     data = customised_process_data || {}
     self.customised_process_data = data.merge(
@@ -309,7 +313,7 @@ class WorksOrder < ApplicationRecord
         raise "Record #{missing.map(&:humanize).join(', ')} for batch #{batch_number} before signing off operation #{position}"
       end
 
-      items = op["ocv"]["checklist"] || []
+      items = OperationLibrary::ContractReviewOperations.resolve_checklist(op["ocv"]["checklist"])
       if items.any?
         answered = op["checklist_responses"] || {}
         unanswered = items.reject { |i| answered.dig(i["id"], "answer").present? }
@@ -331,7 +335,7 @@ class WorksOrder < ApplicationRecord
   def save_checklist_responses!(position, responses, user)
     freeze_operations!
     op = find_frozen_operation!(position)
-    items = op.dig("ocv", "checklist")
+    items = OperationLibrary::ContractReviewOperations.resolve_checklist(op.dig("ocv", "checklist"))
     raise "Operation #{position} has no checklist" if items.blank?
 
     ids = items.map { |i| i["id"] }
@@ -344,6 +348,7 @@ class WorksOrder < ApplicationRecord
     end
 
     op["checklist_responses"] = cleaned
+    op["checklist_issue"] = OperationLibrary::ContractReviewOperations::ISSUE
     op["checklist_completed_by"] = { "id" => user.id, "name" => user.display_name }
     customised_process_data_will_change!
     save!
@@ -354,7 +359,7 @@ class WorksOrder < ApplicationRecord
   def checklist_prefill(op)
     responses = op["checklist_responses"] || {}
     memory = part&.customisation_data&.dig("contract_review_memory") || {}
-    (op.dig("ocv", "checklist") || []).each_with_object({}) do |item, out|
+    OperationLibrary::ContractReviewOperations.resolve_checklist(op.dig("ocv", "checklist")).each_with_object({}) do |item, out|
       id = item["id"]
       if responses[id].present?
         out[id] = responses[id].merge("from_memory" => false)
@@ -427,7 +432,7 @@ class WorksOrder < ApplicationRecord
   # part and pre-filled on future WOs. Convenience, not record: failure here
   # never unwinds the sign-off.
   def remember_part_checklist_answers(op)
-    items = op.dig("ocv", "checklist") || []
+    items = OperationLibrary::ContractReviewOperations.resolve_checklist(op.dig("ocv", "checklist"))
     responses = op["checklist_responses"] || {}
     return if items.empty? || responses.empty? || part.nil?
 

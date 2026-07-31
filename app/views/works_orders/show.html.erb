@@ -264,7 +264,7 @@
                     <% if paperless && spec.present? %>
                       <% fields = (spec["fields"] || []).map(&:to_s) %>
                       <% readings = op["ocv_readings"] || {} %>
-                      <% checklist_items = spec["checklist"] || [] %>
+                      <% checklist_items = OperationLibrary::ContractReviewOperations.resolve_checklist(spec["checklist"]) %>
                       <div class="mt-3 pt-3 border-t border-gray-100">
                         <p class="text-xs font-semibold <%= spec["basis"].to_s == "nadcap" ? "text-amber-700" : "text-gray-600" %> uppercase tracking-wide mb-2">
                           <%= checklist_items.any? ? "Contract Review Checklist" : (spec["basis"].to_s == "nadcap" ? "OCV Monitoring" : "Record") %>
@@ -275,10 +275,16 @@
                             <% prefill = @works_order.checklist_prefill(op) %>
                             <% answered = checklist_items.count { |i| prefill.dig(i["id"], "answer").present? } %>
                             <% remembered = checklist_items.count { |i| prefill.dig(i["id"], "from_memory") } %>
-                            <details class="mb-2 border border-gray-200 rounded" <%= "open" if answered < checklist_items.length %>>
-                              <summary class="cursor-pointer select-none px-3 py-2 text-xs font-medium <%= answered == checklist_items.length ? "text-green-700 bg-green-50" : "text-gray-700 bg-gray-50" %>">
-                                <%= answered == checklist_items.length ? "✓" : "▸" %>
-                                Checklist: <%= answered %>/<%= checklist_items.length %> answered<%= " (#{remembered} remembered from previous review)" if remembered > 0 %>
+                            <% current_issue = OperationLibrary::ContractReviewOperations::ISSUE %>
+                            <% answered_issue = op["checklist_issue"] %>
+                            <% stale_issue = answered_issue.present? && answered_issue != current_issue %>
+                            <details class="mb-2 border <%= stale_issue ? "border-amber-400" : "border-gray-200" %> rounded" <%= "open" if answered < checklist_items.length || stale_issue %>>
+                              <summary class="cursor-pointer select-none px-3 py-2 text-xs font-medium <%= stale_issue ? "text-amber-800 bg-amber-50" : (answered == checklist_items.length ? "text-green-700 bg-green-50" : "text-gray-700 bg-gray-50") %>">
+                                <%= stale_issue ? "⚠" : (answered == checklist_items.length ? "✓" : "▸") %>
+                                Checklist (Form <%= OperationLibrary::ContractReviewOperations::FORM %> Iss.<%= current_issue %>): <%= answered %>/<%= checklist_items.length %> answered<%= " (#{remembered} remembered from previous review)" if remembered > 0 %>
+                                <% if stale_issue %>
+                                  <span class="font-semibold">— answered against Iss.<%= answered_issue %>; re-review against Iss.<%= current_issue %> and save</span>
+                                <% end %>
                               </summary>
                               <div class="p-3 space-y-2">
                               <% checklist_items.each_with_index do |item, idx| %>
