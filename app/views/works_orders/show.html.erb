@@ -293,6 +293,9 @@
                                   <span class="text-xs text-gray-400 w-5 flex-none pt-1"><%= idx + 1 %></span>
                                   <span class="text-xs text-gray-700 flex-1 min-w-48 pt-1"><%= item["text"] %>
                                     <% if r["from_memory"] %><span class="text-xs text-blue-500">· remembered from WO<%= @works_order.part&.customisation_data&.dig("contract_review_memory", item["id"], "source_wo") %></span><% end %>
+                                    <% if item["guidance"].present? %>
+                                      <span class="block text-xs italic text-gray-400 mt-0.5"><%= item["guidance"] %></span>
+                                    <% end %>
                                   </span>
                                   <%= select_tag "checklist[#{item["id"]}][answer]",
                                       options_for_select(["", "YES", "NO"], r["answer"]),
