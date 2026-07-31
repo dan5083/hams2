@@ -101,8 +101,7 @@
       <tbody class="bg-white divide-y divide-gray-200">
         <% @works_orders.each do |works_order| %>
           <%
-            show_route_card = works_order.customer_order.contract_reviewed? ||
-                              (@part_wo_counts[works_order.part_id] || 0) > 1
+            show_route_card = !works_order.paperless_record?
           %>
           <tr class="hover:bg-gray-50 cursor-pointer <%= 'bg-red-50' if works_order.voided %>"
               onclick="if(!event.target.closest('a, button, form')) window.location='<%= works_order_path(works_order) %>'">
@@ -225,8 +224,7 @@
     <% else %>
       <% @works_orders.each do |works_order| %>
         <%
-          show_route_card = works_order.customer_order.contract_reviewed? ||
-                            (@part_wo_counts[works_order.part_id] || 0) > 1
+          show_route_card = !works_order.paperless_record?
         %>
         <div class="bg-white rounded-lg shadow-sm border-l-4 <%= works_order.voided ? 'border-red-500 bg-red-50' : (works_order.is_open? ? 'border-green-500' : 'border-gray-400') %>">
 
