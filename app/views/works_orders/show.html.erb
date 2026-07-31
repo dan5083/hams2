@@ -65,6 +65,32 @@
             </dd>
           </div>
           <div>
+            <dt class="text-sm font-medium text-gray-500">Processing History</dt>
+            <dd class="text-sm text-gray-900">
+              <% wo_count = @works_order.part&.works_orders&.active&.count.to_i %>
+              <% if wo_count <= 1 %>
+                <span class="px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-800 font-semibold">NEW PART</span>
+              <% else %>
+                <% prev_wos = @works_order.part.works_orders.active.where.not(id: @works_order.id)
+                                          .order(created_at: :desc).limit(5) %>
+                Processed <%= wo_count %> times
+                <ul class="mt-1 space-y-0.5">
+                  <% prev_wos.each do |prev| %>
+                    <li class="text-xs text-gray-500">
+                      <%= link_to "WO#{prev.number}", works_order_path(prev), class: "text-blue-600 hover:text-blue-900" %>
+                      · <%= prev.created_at.strftime("%d/%m/%y") %>
+                      · qty <%= prev.quantity %><%= " (#{prev.quantity_released} released)" if prev.quantity_released != prev.quantity %>
+                      <% if prev.is_open %><span class="text-green-600">· open</span><% end %>
+                    </li>
+                  <% end %>
+                  <% if wo_count - 1 > prev_wos.length %>
+                    <li class="text-xs text-gray-400">… and <%= wo_count - 1 - prev_wos.length %> more</li>
+                  <% end %>
+                </ul>
+              <% end %>
+            </dd>
+          </div>
+          <div>
             <dt class="text-sm font-medium text-gray-500">Description</dt>
             <dd class="text-sm text-gray-900"><%= @works_order.part_description %></dd>
           </div>
