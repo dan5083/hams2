@@ -10,9 +10,12 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_05_06_090005) do
+ActiveRecord::Schema[8.0].define(version: 2026_07_31_081014) do
+  create_schema "heroku_ext"
+
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+  enable_extension "pg_stat_statements"
   enable_extension "pgcrypto"
 
   create_table "active_storage_attachments", force: :cascade do |t|
