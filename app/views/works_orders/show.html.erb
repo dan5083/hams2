@@ -1,3 +1,12 @@
+<% content_for :head do %>
+  <%# Signing off redirects back to this exact URL. Turbo treats a redirect to
+      the page you are already on as a refresh, so with these two it morphs the
+      DOM in place and keeps the scroll position: the operator watches the row
+      they just signed turn green instead of being thrown back up the card. %>
+  <meta name="turbo-refresh-method" content="morph">
+  <meta name="turbo-refresh-scroll" content="preserve">
+<% end %>
+
 <div class="container mx-auto px-4 py-6">
   <div class="flex justify-between items-center mb-6">
     <h1 class="text-3xl font-bold text-gray-900">Works Order WO<%= @works_order.number %></h1>
@@ -409,7 +418,7 @@
                         <p class="text-xs font-semibold <%= spec["basis"].to_s == "nadcap" ? "text-amber-700" : "text-gray-600" %> uppercase tracking-wide mb-2">
                           <%= checklist_items.any? ? "Contract Review Checklist" : (spec["basis"].to_s == "nadcap" ? "OCV Monitoring" : "Record") %>
                         </p>
-                        <%= form_with url: save_ocv_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, id: "ocv-form-#{position}" do |f| %>
+                        <%= form_with url: save_ocv_works_order_path(@works_order), method: :patch, local: true, id: "ocv-form-#{position}" do |f| %>
                           <%= hidden_field_tag :position, position %>
                           <%= hidden_field_tag :batch, active_batch %>
                           <% if checklist_items.any? %>
@@ -531,7 +540,6 @@
                         <%= button_to (multi ? "Sign off B#{active_batch}" : "Sign off"),
                             sign_off_operation_works_order_path(@works_order, position: position, batch: active_key),
                             method: :patch,
-                            form: { data: { turbo: false } },
                             class: "bg-gray-700 hover:bg-gray-900 text-white text-xs font-medium px-2 py-1 rounded" %>
                       <% end %>
                       <% if multi %>

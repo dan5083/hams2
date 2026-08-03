@@ -63,8 +63,14 @@ class WorksOrdersController < ApplicationController
     return unless @works_order.paperless_record?
 
     requested = params[:batch].to_i
-    valid = (1..@works_order.process_batch_count).cover?(requested)
-    @active_batch = valid ? requested : @works_order.first_incomplete_batch
+    if (1..@works_order.process_batch_count).cover?(requested)
+      @active_batch = requested
+    else
+      # Canonicalise: the batch always rides in the URL. Turbo only morphs (and
+      # only then keeps the scroll position) when a redirect lands on the URL
+      # the page is already showing, so every visit here needs the same shape.
+      redirect_to works_order_path(@works_order, batch: @works_order.first_incomplete_batch)
+    end
   end
 
   def new
@@ -214,9 +220,10 @@ class WorksOrdersController < ApplicationController
     return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
     @works_order.sign_off_operation!(params[:position], params[:batch], Current.user)
     redirect_to process_record_path(params[:position], advance_from: params[:batch]),
-                notice: "Operation #{params[:position]} batch #{params[:batch]} signed off."
+                notice: "Operation #{params[:position]} batch #{params[:batch]} signed off.",
+                status: :see_other
   rescue => e
-    redirect_to process_record_path(params[:position]), alert: e.message
+    redirect_to process_record_path(params[:position]), alert: e.message, status: :see_other
   end
 
   # Paperless process record: OCV readings for the ACTIVE batch of an operation
@@ -234,9 +241,9 @@ class WorksOrdersController < ApplicationController
       notice = "OCV readings saved for operation #{params[:position]}."
       target = process_record_path(params[:position])
     end
-    redirect_to target, notice: notice
+    redirect_to target, notice: notice, status: :see_other
   rescue => e
-    redirect_to process_record_path(params[:position]), alert: e.message
+    redirect_to process_record_path(params[:position]), alert: e.message, status: :see_other
   end
 
   # Bin the frozen process record and go back to rendering live from the part.
@@ -284,33 +291,29 @@ class WorksOrdersController < ApplicationController
 
   private
 
-  # Where to land after acting on an operation. Without advance_from the active
-  # batch and operation are held. With it, the page walks down the operations of
-  # the batch just signed - an operator takes a batch through its route in one
-  # rhythm - and only when that batch is finished does it drop onto the first
-  # outstanding operation of the next incomplete batch.
-  def process_record_path(position, advance_from: nil)
+  # Where to land after acting on an operation: the URL the page is already
+  # showing. Turbo reads a redirect to the current URL as a page refresh, morphs
+  # the DOM and keeps the scroll position, so the operator watches the row they
+  # just signed turn green rather than being thrown up the card. Deliberately no
+  # anchor - an anchor scrolls the page, which is the thing being avoided. Only
+  # when the batch has nothing outstanding does the URL change, moving to the
+  # next incomplete batch; that one is a real navigation and renders normally.
+  def process_record_path(_position, advance_from: nil)
     batch = params[:batch].presence || params[:sign_off_batch].presence
-    anchor_position = position
 
     if advance_from.present?
       batch = advance_from
 
-      if (nxt_op = @works_order.next_unsigned_operation_in(advance_from, after: position))
-        anchor_position = nxt_op
-      else
+      if @works_order.next_unsigned_operation_in(advance_from).nil?
         statuses = @works_order.batch_statuses
         nxt_batch = statuses.find { |n, s| n > advance_from.to_i && s != :complete }&.first ||
                     statuses.find { |_n, s| s != :complete }&.first
 
-        if nxt_batch && nxt_batch.to_i != advance_from.to_i
-          batch = nxt_batch
-          anchor_position = @works_order.next_unsigned_operation_in(nxt_batch) || position
-        end
+        batch = nxt_batch if nxt_batch
       end
     end
 
-    works_order_path(@works_order, batch: batch, anchor: "op-#{anchor_position}")
+    works_order_path(@works_order, batch: batch)
   end
 
   def create_bulk
