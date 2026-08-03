@@ -9,6 +9,14 @@
 #
 # Keys:
 #   fields:   ordered symbols naming the values captured per batch
+#   optional: fields that never block a sign-off (recorded if the operator has
+#             something to record, absent otherwise)
+#   required_if: { field => { other_field => value_or_values } } - the field is
+#             required only when the row reads that way. Comparison is
+#             case-insensitive on the stripped value.
+#   blank_as: { field => "..." } - a field left empty is stamped with this
+#             value at sign-off, so the frozen record states the absence
+#             instead of carrying an empty box that reads as unfinished
 #   basis:    :nadcap  - operation-sequential capture required for
 #                        aerospace/defense work (per IP2007)
 #             :general - spec/customer quality requirement on any WO
@@ -17,23 +25,26 @@
 module OperationLibrary
   module OcvSpecs
     # The standard time/temp shape (was copy-pasted into 8 library files)
-    def self.time_temp(batching: nil, basis: :nadcap)
-      build([:time, :temp], batching: batching, basis: basis)
+    def self.time_temp(batching: nil, basis: :nadcap, **rules)
+      build([:time, :temp], batching: batching, basis: basis, **rules)
     end
 
     # Time/temp/voltage for electrolytic processes (pretreatments electroclean etc.)
-    def self.time_temp_volts(batching: nil, basis: :nadcap)
-      build([:time, :temp, :volts], batching: batching, basis: basis)
+    def self.time_temp_volts(batching: nil, basis: :nadcap, **rules)
+      build([:time, :temp, :volts], batching: batching, basis: basis, **rules)
     end
 
     # One-off field lists (foil verification, test pieces, water break, ...)
-    def self.fields(*names, batching: nil, basis: :general)
-      build(names, batching: batching, basis: basis)
+    def self.fields(*names, batching: nil, basis: :general, **rules)
+      build(names, batching: batching, basis: basis, **rules)
     end
 
-    def self.build(fields, batching:, basis:)
+    def self.build(fields, batching:, basis:, optional: nil, required_if: nil, blank_as: nil)
       spec = { fields: fields, basis: basis }
       spec[:batching] = batching if batching
+      spec[:optional] = Array(optional) if optional.present?
+      spec[:required_if] = required_if if required_if.present?
+      spec[:blank_as] = blank_as if blank_as.present?
       spec
     end
     private_class_method :build

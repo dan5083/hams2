@@ -137,7 +137,8 @@ module OperationLibrary
         id: 'TEST_PIECE',
         process_type: 'test_piece',
         operation_text: 'Include 4 test pieces of the same generic material (25mm x 100mm, 0.6mm thick minimum) with batch. Keep these test pieces to batch until they have been tested.',
-        ocv: OcvSpecs.fields(:material_cofc_no)
+        ocv: OcvSpecs.fields(:material_cofc_no,
+                             blank_as: { material_cofc_no: "Not recorded" })
       )
     end
 

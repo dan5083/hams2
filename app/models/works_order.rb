@@ -512,6 +512,28 @@ class WorksOrder < ApplicationRecord
       WO_SCOPED_OPERATION_IDS.include?(op["id"])
   end
 
+  # Which of an operation's OCV fields must carry a value before this row can
+  # be signed off. `optional` fields never block; a field with a `required_if`
+  # rule blocks only when the rest of the row reads the way the rule names -
+  # first failure detail matters once the water-break test says FAIL, and is
+  # noise on a pass. Everything else is required, as before.
+  def required_ocv_fields(spec, row)
+    optional = (spec["optional"] || []).map(&:to_s)
+    conditions = spec["required_if"] || {}
+
+    (spec["fields"] || []).map(&:to_s).reject do |field|
+      next true if optional.include?(field)
+
+      rule = conditions[field]
+      next false if rule.blank?
+
+      rule.none? do |other, wanted|
+        actual = row[other.to_s].to_s.strip.upcase
+        Array(wanted).map { |w| w.to_s.strip.upcase }.include?(actual)
+      end
+    end
+  end
+
   def sign_off_operation!(position, batch_number, user)
     freeze_operations!
     op = find_frozen_operation!(position)
@@ -529,10 +551,24 @@ class WorksOrder < ApplicationRecord
       raise "Enter a quantity for batch #{key} (top of the operations list) before signing off"
     end
     if op["ocv"].present?
-      row = op.dig("ocv_readings", key) || {}
-      missing = (op["ocv"]["fields"] || []).map(&:to_s).select { |f| row[f].to_s.strip.empty? }
+      spec = op["ocv"]
+      row = (op.dig("ocv_readings", key) || {}).dup
+
+      # A field with a declared stand-in is recorded as absent rather than
+      # blocking the sign-off: "Not recorded" is a statement about the batch,
+      # an empty box only says nobody has got to it yet.
+      (spec["blank_as"] || {}).each do |field, value|
+        row[field.to_s] = value if row[field.to_s].to_s.strip.empty?
+      end
+
+      missing = required_ocv_fields(spec, row).select { |f| row[f].to_s.strip.empty? }
       if missing.any?
         raise "Record #{missing.map(&:humanize).join(', ')}#{wo_scoped ? '' : " for batch #{key}"} before signing off operation #{position}"
+      end
+
+      if row != (op.dig("ocv_readings", key) || {})
+        (op["ocv_readings"] ||= {})[key] = row
+        op["ocv_recorded_by"] ||= { "id" => user.id, "name" => user.display_name }
       end
 
       items = OperationLibrary::ContractReviewOperations.resolve_checklist(op["ocv"]["checklist"])
