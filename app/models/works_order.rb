@@ -492,7 +492,8 @@ class WorksOrder < ApplicationRecord
   end
 
   # Each operation has a batch DOMAIN: today either the whole works order
-  # (contract review certifies the WO, not a batch) or every batch (default).
+  # (contract review and incoming inspection precede batching) or every batch
+  # (default).
   # EXTENSION POINT: when treatment cycles gain their own batch structures
   # (different part/batch qtys per cycle), this method becomes the mapping
   # from an operation to its set of sign-off keys - nothing else changes.
@@ -500,8 +501,15 @@ class WorksOrder < ApplicationRecord
     wo_scoped_operation?(op) ? ["wo"] : (1..process_batch_count).map(&:to_s)
   end
 
+  # Operations whose sign-off certifies the works order rather than a batch.
+  # Contract review happens at booking; incoming inspection counts and examines
+  # the delivery as it arrives. Both land before the work is split into batches,
+  # so neither has a batch to be signed against.
+  WO_SCOPED_OPERATION_IDS = %w[CONTRACT_REVIEW INCOMING_INSPECT].freeze
+
   def wo_scoped_operation?(op)
-    op["process_type"] == "contract_review" || op["id"] == "CONTRACT_REVIEW"
+    op["process_type"] == "contract_review" ||
+      WO_SCOPED_OPERATION_IDS.include?(op["id"])
   end
 
   def sign_off_operation!(position, batch_number, user)
@@ -515,8 +523,8 @@ class WorksOrder < ApplicationRecord
     raise "Operation #{position}#{label} already signed off" if op["sign_offs"][key].present?
 
     # A sign-off certifies a complete record. Batch-scoped ops need the batch
-    # quantity set; WO-scoped ops (contract review at booking) don't - batches
-    # may not physically exist yet.
+    # quantity set; WO-scoped ops (contract review, incoming inspection) don't -
+    # batches may not physically exist yet.
     if !wo_scoped && process_batch_qty(key).blank?
       raise "Enter a quantity for batch #{key} (top of the operations list) before signing off"
     end
