@@ -182,7 +182,51 @@ class WorksOrder < ApplicationRecord
   # may be added via the mutators; history cannot be rewritten.
   before_save :protect_frozen_process_record, if: :customised_process_data_changed?
 
+  # Discarding a process record is the digital equivalent of binning a route
+  # card and reprinting it: allowed only while nothing has been released
+  # against it, so nothing here has left the building. The superseded record
+  # is NOT kept - pre-release it's a draft, not a record.
+  #
+  # What is kept is a one-line breadcrumb per discard. Not for auditors: for
+  # you. A works order discarded once was a typo; discarded four times means
+  # the part setup is wrong and every WO for it will do the same thing.
+  # Sets the flag the immutability guard yields to; nothing else may.
+  def discard_process_record!(user, reason = nil)
+    raise "Nothing to discard - this works order has no frozen process record" unless operations_frozen?
+    raise "This works order has release notes; its process record cannot be discarded" unless release_notes.empty?
+    raise "This works order is closed" unless is_open
+
+    data = customised_process_data || {}
+    entry = { "at" => Time.current.iso8601, "by" => user.display_name }
+    entry["reason"] = reason.to_s.strip if reason.present?
+
+    # Batch structure is a property of THIS works order, not of the part, so it
+    # survives - only the part-derived snapshot and everything recorded against
+    # it goes. Batch dates were stamped at sign-off, so they go with it.
+    self.customised_process_data = {
+      "discards" => (data["discards"] || []) + [entry],
+      "batch_count" => data["batch_count"],
+      "parts_per_batch" => data["parts_per_batch"],
+      "batches" => (data["batches"] || []).map { |b| b.slice("number", "qty") }
+    }.compact
+
+    @discarding_process_record = true
+    save!
+  ensure
+    @discarding_process_record = false
+  end
+
+  def discards
+    customised_process_data&.dig("discards") || []
+  end
+
+  def can_discard_process_record?
+    operations_frozen? && is_open && release_notes.empty?
+  end
+
   def protect_frozen_process_record
+    return if @discarding_process_record
+
     old_ops = customised_process_data_was&.dig("operations")
     return if old_ops.blank?
     new_ops = customised_process_data&.dig("operations") || []

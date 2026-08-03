@@ -250,6 +250,14 @@
           </div>
         <% end %>
 
+        <% if @works_order.discards.any? %>
+          <p class="mb-3 text-xs text-gray-400">
+            Record restarted <%= @works_order.discards.length %> time<%= 's' unless @works_order.discards.length == 1 %>
+            (last <%= Time.parse(@works_order.discards.last["at"]).strftime("%d/%m %H:%M") rescue @works_order.discards.last["at"] %>
+            by <%= @works_order.discards.last["by"] %>)
+          </p>
+        <% end %>
+
         <% ops_for_display = operations %>
         <% paperless = @works_order.paperless_record? %>
         <% batch_count = @works_order.process_batch_count %>
@@ -350,6 +358,27 @@
               <% end %>
             </details>
           </div>
+
+          <% if @works_order.can_discard_process_record? %>
+            <details class="mb-4 text-xs">
+              <summary class="cursor-pointer select-none text-red-600 hover:text-red-800">
+                Discard this process record and start again
+              </summary>
+              <div class="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p class="text-xs text-red-900 mb-2">
+                  Clears every sign-off, OCV reading and batch date on this works order and goes back to
+                  rendering operations live from the part — the equivalent of binning a route card and
+                  reprinting it. Batch numbers and quantities are kept. Only available because nothing
+                  has been released against this works order.
+                </p>
+                <%= form_with url: discard_process_record_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex flex-wrap items-center gap-2" do %>
+                  <%= submit_tag "Discard record",
+                      data: { confirm: "Discard all sign-offs and readings on WO#{@works_order.number}? The discarded record is kept, but the operators will have to sign off again." },
+                      class: "bg-red-600 hover:bg-red-700 text-white text-xs font-medium px-3 py-1.5 rounded" %>
+                <% end %>
+              </div>
+            </details>
+          <% end %>
         <% end %>
         <% if ops_for_display.any? %>
           <div class="space-y-3">

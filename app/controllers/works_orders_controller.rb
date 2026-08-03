@@ -1,6 +1,6 @@
 # app/controllers/works_orders_controller.rb - Fixed pricing parameter handling and route card operations with RBAC
 class WorksOrdersController < ApplicationController
-  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :invoice_to_date, :void, :unvoid, :sign_off_operation, :save_ocv, :set_batch_count, :set_parts_per_batch, :set_batch_qty]
+  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :invoice_to_date, :void, :unvoid, :sign_off_operation, :save_ocv, :set_batch_count, :set_parts_per_batch, :set_batch_qty, :discard_process_record]
 
  def index
     @works_orders = WorksOrder.includes(:customer_order, :part, customer: [])
@@ -237,6 +237,16 @@ class WorksOrdersController < ApplicationController
     redirect_to target, notice: notice
   rescue => e
     redirect_to process_record_path(params[:position]), alert: e.message
+  end
+
+  # Bin the frozen process record and go back to rendering live from the part.
+  # Gated on no release notes - the same test that gates voiding.
+  def discard_process_record
+    @works_order.discard_process_record!(Current.user, params[:reason])
+    redirect_to works_order_path(@works_order),
+                notice: "Process record discarded. Operations now render live from the part - check them before signing anything."
+  rescue => e
+    redirect_to works_order_path(@works_order), alert: e.message
   end
 
   # Paperless process record: the normal way to batch a WO - state the load
