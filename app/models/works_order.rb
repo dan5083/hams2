@@ -2,6 +2,12 @@
 class WorksOrder < ApplicationRecord
   include CustomerOrderCounterCache
 
+  # Upper bound on batches per works order. The practical driver is the process
+  # record UI, which renders one batch at a time - this is a sanity ceiling on
+  # derived batch counts (e.g. 1 part per batch on a 3,000 part order), not a
+  # process limit.
+  MAX_BATCHES = 120
+
   belongs_to :customer_order
   belongs_to :part
   belongs_to :issued_by, class_name: 'User', optional: true
@@ -203,14 +209,35 @@ class WorksOrder < ApplicationRecord
           errors.add(:base, "Operation #{pos} batch #{batch}: sign-offs cannot be altered or removed")
           throw :abort
         end
+
+        # A sign-off certifies the readings that were on screen when it was
+        # made. Those readings are part of the record from that moment.
+        old_row = readings[batch]
+        next if old_row.blank?
+        unless new_op.dig("ocv_readings", batch) == old_row
+          errors.add(:base, "Operation #{pos} batch #{batch}: readings are locked by sign-off")
+          throw :abort
+        end
       end
     end
 
+    # Batch numbers carrying any sign-off, across all operations.
+    signed_batches = old_ops.flat_map { |o| (o["sign_offs"] || {}).keys }
+                            .reject { |k| k == "wo" }.map(&:to_i).uniq
+
     (customised_process_data_was&.dig("batches") || []).each do |old_b|
-      next if old_b["date"].blank?
       new_b = (customised_process_data&.dig("batches") || []).find { |b| b["number"] == old_b["number"] }
-      unless new_b && new_b["date"] == old_b["date"]
+
+      if old_b["date"].present? && !(new_b && new_b["date"] == old_b["date"])
         errors.add(:base, "Batch #{old_b['number']} is dated; batch dates cannot be altered or removed")
+        throw :abort
+      end
+
+      # Sign-off validates against the batch quantity, so re-batching must not
+      # rewrite the quantity of a batch that has already been signed for.
+      if signed_batches.include?(old_b["number"].to_i) && old_b["qty"].present? &&
+         !(new_b && new_b["qty"] == old_b["qty"])
+        errors.add(:base, "Batch #{old_b['number']} is signed off at qty #{old_b['qty']}; its quantity cannot be changed")
         throw :abort
       end
     end
@@ -230,7 +257,109 @@ class WorksOrder < ApplicationRecord
   end
 
   def process_batch_count
-    (customised_process_data&.dig("batch_count") || 1).to_i.clamp(1, 20)
+    (customised_process_data&.dig("batch_count") || 1).to_i.clamp(1, MAX_BATCHES)
+  end
+
+  # Set when the batch structure was derived from a parts-per-batch figure;
+  # nil when the count was set by hand. Drives the redisplayed input only -
+  # "batches" remains the record.
+  def parts_per_batch
+    customised_process_data&.dig("parts_per_batch")
+  end
+
+  # The normal way to batch a works order: state how many parts go through
+  # together and let the count fall out. Batches 1..n-1 take the full load;
+  # the last takes the remainder. 48 parts at 1 => 48 x 1. 100 at 30 =>
+  # 3 x 30 + 1 x 10. Individual quantities stay editable afterwards for the
+  # cases where physical reality diverges.
+  def derive_batch_quantities(per_batch, total = quantity)
+    per_batch = per_batch.to_i
+    total = total.to_i
+    return {} if per_batch < 1 || total < 1
+
+    count = (total.to_f / per_batch).ceil
+    (1..count).index_with { |n| n < count ? per_batch : total - (per_batch * (count - 1)) }
+  end
+
+  def set_parts_per_batch!(per_batch)
+    per_batch = per_batch.to_i
+    raise "Parts per batch must be at least 1" if per_batch < 1
+    raise "Parts per batch cannot exceed the order quantity (#{quantity})" if per_batch > quantity.to_i
+
+    derived = derive_batch_quantities(per_batch)
+    count = derived.length
+    if count > MAX_BATCHES
+      raise "#{per_batch} per batch on #{quantity} parts gives #{count} batches (max #{MAX_BATCHES})"
+    end
+
+    highest_used = highest_recorded_batch
+    raise "Batch #{highest_used} already has records; cannot reduce to #{count} batches" if count < highest_used
+
+    # Refuse rather than reconcile: a signed batch's quantity is part of what
+    # the sign-off certified.
+    clashes = signed_batch_numbers.select { |n| derived[n].to_s != process_batch_qty(n).to_s }
+    if clashes.any?
+      raise "Batch #{clashes.join(', ')} already signed off at a different quantity; " \
+            "re-batching would rewrite the record"
+    end
+
+    freeze_operations!
+    batches = customised_process_data["batches"] ||= []
+    derived.each do |n, qty|
+      entry = batches.find { |b| b["number"] == n } || (batches << { "number" => n }).last
+      entry["qty"] = qty.to_s
+    end
+    batches.reject! { |b| b["number"].to_i > count }
+    customised_process_data["batch_count"] = count
+    customised_process_data["parts_per_batch"] = per_batch
+    customised_process_data_will_change!
+    save!
+  end
+
+  # Batch numbers carrying a sign-off on any operation.
+  def signed_batch_numbers
+    (frozen_operations || []).flat_map { |o| (o["sign_offs"] || {}).keys }
+                             .reject { |k| k == "wo" }.map(&:to_i).uniq.sort
+  end
+
+  # :complete when every batch-scoped operation is signed for that batch,
+  # :in_progress once anything is recorded against it, :not_started otherwise.
+  def batch_statuses
+    ops = operations_for_display.reject { |o| wo_scoped_operation?(o) }
+    (1..process_batch_count).index_with do |n|
+      key = n.to_s
+      signed = ops.count { |o| (o["sign_offs"] || {})[key].present? }
+      if ops.any? && signed == ops.length
+        :complete
+      elsif signed > 0 || ops.any? { |o| (o["ocv_readings"] || {})[key].present? }
+        :in_progress
+      else
+        :not_started
+      end
+    end
+  end
+
+  # Lowest batch that still has work outstanding - the sensible landing batch
+  # when the page is opened without an explicit one.
+  def first_incomplete_batch
+    batch_statuses.find { |_n, status| status != :complete }&.first || process_batch_count
+  end
+
+  # Next batch of THIS operation still needing a sign-off, searching forward
+  # from `after` and wrapping. nil when the operation is complete or WO-scoped.
+  def next_unsigned_batch_for(op, after: 0)
+    keys = sign_off_keys_for(op)
+    return nil if keys == ["wo"]
+
+    signed = op["sign_offs"] || {}
+    numbers = keys.map(&:to_i)
+    numbers.find { |n| n > after.to_i && signed[n.to_s].blank? } ||
+      numbers.find { |n| signed[n.to_s].blank? }
+  end
+
+  def signed_count_for(op)
+    keys = sign_off_keys_for(op)
+    (op["sign_offs"] || {}).count { |k, v| keys.include?(k) && v.present? }
   end
 
   def process_batches
@@ -249,13 +378,15 @@ class WorksOrder < ApplicationRecord
   # route card's Qty column. Editable; the sign-offs are the immutable record.
   def set_batch_count!(count, qtys = {})
     count = count.to_i
-    raise "Batch count must be between 1 and 20" unless (1..20).cover?(count)
+    raise "Batch count must be between 1 and #{MAX_BATCHES}" unless (1..MAX_BATCHES).cover?(count)
 
     highest_used = highest_recorded_batch
     raise "Batch #{highest_used} already has records; cannot reduce below it" if count < highest_used
 
     freeze_operations!
     customised_process_data["batch_count"] = count
+    # A hand-set count no longer follows from a parts-per-batch figure.
+    customised_process_data.delete("parts_per_batch")
     batches = customised_process_data["batches"] ||= []
     (qtys || {}).each do |number, qty|
       n = number.to_i
@@ -265,6 +396,26 @@ class WorksOrder < ApplicationRecord
     end
     customised_process_data_will_change!
     save!
+  end
+
+  # Correct one batch's quantity without disturbing the rest of the structure -
+  # short loads, scrapped parts, a batch split across two racks.
+  def set_batch_qty!(batch_number, qty)
+    n = normalise_batch!(batch_number)
+    raise "Batch #{n} is signed off; its quantity cannot be changed" if signed_batch_numbers.include?(n)
+
+    freeze_operations!
+    batches = customised_process_data["batches"] ||= []
+    entry = batches.find { |b| b["number"] == n } || (batches << { "number" => n }).last
+    qty.to_s.strip.empty? ? entry.delete("qty") : entry["qty"] = qty.to_s.strip
+    customised_process_data_will_change!
+    save!
+  end
+
+  # Sum of recorded batch quantities. Compared against `quantity` on screen as
+  # a display-only check - a typo in one of 120 boxes is otherwise invisible.
+  def batched_quantity_total
+    (1..process_batch_count).sum { |n| process_batch_qty(n).to_i }
   end
 
   # Uniform hash shape for the show page, frozen or live.
@@ -403,7 +554,15 @@ class WorksOrder < ApplicationRecord
       cleaned[batch_key.to_s] = values unless values.values.all?(&:blank?)
     end
 
-    op["ocv_readings"] = cleaned
+    # MERGE, never replace. The page posts only the batch being worked on, so
+    # a wholesale assignment would delete every batch absent from the form.
+    existing = op["ocv_readings"] || {}
+    locked = (op["sign_offs"] || {}).keys.select { |k| cleaned.key?(k) && cleaned[k] != existing[k] }
+    if locked.any?
+      raise "Batch #{locked.join(', ')} is signed off; its readings cannot be changed"
+    end
+
+    op["ocv_readings"] = existing.merge(cleaned)
     op["ocv_recorded_by"] = { "id" => user.id, "name" => user.display_name }
     customised_process_data_will_change!
     save!
@@ -443,7 +602,10 @@ class WorksOrder < ApplicationRecord
   def highest_recorded_batch
     ops = frozen_operations || []
     numbers = ops.flat_map { |o| (o["sign_offs"] || {}).keys + (o["ocv_readings"] || {}).keys }.map(&:to_i)
-    numbers += process_batches.map { |b| b["number"].to_i }
+    # Only DATED batches count as records. A batch that merely has a planned
+    # quantity carries nothing, and treating it as a record would make any
+    # re-batching downward impossible after the first structure was set.
+    numbers += process_batches.select { |b| b["date"].present? }.map { |b| b["number"].to_i }
     numbers.max || 0
   end
 

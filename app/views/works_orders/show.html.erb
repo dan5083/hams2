@@ -253,22 +253,102 @@
         <% ops_for_display = operations %>
         <% paperless = @works_order.paperless_record? %>
         <% batch_count = @works_order.process_batch_count %>
+        <% active_batch = (@active_batch || 1).to_i %>
         <% if paperless && ops_for_display.any? %>
-          <div class="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg flex flex-wrap items-center gap-4">
-            <%= form_with url: set_batch_count_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex flex-wrap items-center gap-3" do %>
-              <label class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Batches</label>
-              <%= number_field_tag :batch_count, batch_count, min: 1, max: 20,
-                  class: "border border-gray-300 rounded px-2 py-1 text-sm w-16" %>
-              <% (1..batch_count).each do |batch_n| %>
-                <% entry = @works_order.process_batches.find { |b| b["number"] == batch_n } || {} %>
-                <span class="flex items-center gap-1 text-xs text-gray-500">
-                  B<%= batch_n %><% if entry["date"] %> · <%= Date.parse(entry["date"]).strftime("%d/%m") rescue entry["date"] %><% end %>
-                  · Qty <%= number_field_tag "batch_qtys[#{batch_n}]", entry["qty"], min: 1,
-                      class: "border border-gray-300 rounded px-1 py-1 text-sm w-14" %>
-                </span>
+          <% statuses = @works_order.batch_statuses %>
+          <% complete = statuses.count { |_n, s| s == :complete } %>
+          <% in_progress = statuses.count { |_n, s| s == :in_progress } %>
+          <% not_started = batch_count - complete - in_progress %>
+          <% qty_total = @works_order.batched_quantity_total %>
+          <% active_entry = @works_order.process_batches.find { |b| b["number"] == active_batch } || {} %>
+          <% signed_batches = @works_order.signed_batch_numbers %>
+
+          <div class="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-3">
+
+            <!-- Batching: parts per batch derives the count and the remainder -->
+            <div class="flex flex-wrap items-center gap-3">
+              <%= form_with url: set_parts_per_batch_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex flex-wrap items-center gap-2" do %>
+                <label class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Parts per batch</label>
+                <%= number_field_tag :parts_per_batch, @works_order.parts_per_batch, min: 1, max: @works_order.quantity,
+                    id: "parts-per-batch",
+                    data: { quantity: @works_order.quantity, max_batches: WorksOrder::MAX_BATCHES },
+                    class: "border border-gray-300 rounded px-2 py-1 text-sm w-20" %>
+                <%= submit_tag "Apply", class: "bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium px-2 py-1.5 rounded" %>
+                <span id="batch-preview" class="text-xs text-gray-500"></span>
               <% end %>
-              <%= submit_tag "Update", class: "bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium px-2 py-1.5 rounded" %>
-            <% end %>
+
+              <span class="text-xs <%= qty_total == @works_order.quantity ? 'text-gray-400' : 'text-orange-600 font-medium' %>">
+                <% if qty_total == @works_order.quantity %>
+                  <%= batch_count %> batch<%= 'es' unless batch_count == 1 %> · <%= qty_total %> parts
+                <% else %>
+                  ⚠️ Batch quantities total <%= qty_total %>, order is <%= @works_order.quantity %>
+                <% end %>
+              </span>
+            </div>
+
+            <!-- Active batch: the page renders one batch at a time -->
+            <div class="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-200">
+              <label class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Batch</label>
+              <%= form_with url: works_order_path(@works_order), method: :get, local: true, data: { turbo: false }, class: "flex items-center gap-2" do %>
+                <%= select_tag :batch,
+                    options_for_select(
+                      (1..batch_count).map { |n|
+                        entry = @works_order.process_batches.find { |b| b["number"] == n } || {}
+                        mark = { complete: "✓", in_progress: "▸" }[statuses[n]] || "·"
+                        date = entry["date"] ? " #{Date.parse(entry['date']).strftime('%d/%m')}" : ""
+                        ["#{mark} B#{n}#{date} (qty #{entry['qty'].presence || '—'})", n]
+                      }, active_batch),
+                    onchange: "this.form.requestSubmit()",
+                    class: "border border-gray-300 rounded px-2 py-1 text-sm" %>
+              <% end %>
+
+              <% if signed_batches.include?(active_batch) %>
+                <span class="text-xs text-gray-400">Qty <%= active_entry["qty"] %> · locked by sign-off</span>
+              <% else %>
+                <%= form_with url: set_batch_qty_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex items-center gap-1" do %>
+                  <%= hidden_field_tag :batch, active_batch %>
+                  <span class="text-xs text-gray-500">Qty</span>
+                  <%= number_field_tag :qty, active_entry["qty"], min: 1,
+                      class: "border border-gray-300 rounded px-1 py-1 text-sm w-16" %>
+                  <%= submit_tag "Set", class: "bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium px-2 py-1 rounded" %>
+                <% end %>
+              <% end %>
+
+              <div class="ml-auto flex items-center gap-1">
+                <% if active_batch > 1 %>
+                  <%= link_to "‹ B#{active_batch - 1}", works_order_path(@works_order, batch: active_batch - 1),
+                      class: "text-xs text-blue-600 hover:text-blue-900 px-2 py-1" %>
+                <% end %>
+                <% if active_batch < batch_count %>
+                  <%= link_to "B#{active_batch + 1} ›", works_order_path(@works_order, batch: active_batch + 1),
+                      class: "text-xs text-blue-600 hover:text-blue-900 px-2 py-1" %>
+                <% end %>
+              </div>
+            </div>
+
+            <!-- Whole-WO progress -->
+            <div>
+              <div class="flex gap-px h-2 rounded overflow-hidden">
+                <% if complete > 0 %><div class="bg-green-500" style="flex: <%= complete %>"></div><% end %>
+                <% if in_progress > 0 %><div class="bg-amber-500" style="flex: <%= in_progress %>"></div><% end %>
+                <% if not_started > 0 %><div class="bg-gray-300" style="flex: <%= not_started %>"></div><% end %>
+              </div>
+              <p class="mt-1 text-xs text-gray-500">
+                <%= complete %> complete<% if in_progress > 0 %> · <%= in_progress %> in progress<% end %> · <%= not_started %> not started
+              </p>
+            </div>
+
+            <!-- Manual escape hatch: physical reality diverges from arithmetic -->
+            <details class="text-xs">
+              <summary class="cursor-pointer select-none text-gray-500 hover:text-gray-700">Set batch count manually</summary>
+              <%= form_with url: set_batch_count_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex items-center gap-2 mt-2" do %>
+                <span class="text-gray-500">Batches</span>
+                <%= number_field_tag :batch_count, batch_count, min: 1, max: WorksOrder::MAX_BATCHES,
+                    class: "border border-gray-300 rounded px-2 py-1 text-sm w-20" %>
+                <%= submit_tag "Update", class: "bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium px-2 py-1 rounded" %>
+                <span class="text-gray-400">Quantities are then set per batch above.</span>
+              <% end %>
+            </details>
           </div>
         <% end %>
         <% if ops_for_display.any? %>
@@ -277,12 +357,16 @@
               <% position = op["position"] %>
               <% spec = op["ocv"] %>
               <% op_keys = @works_order.sign_off_keys_for(op) %>
-              <% op_signed = op_keys.all? { |k| (op["sign_offs"] || {})[k].present? } %>
+              <% wo_scoped = (op_keys == ["wo"]) %>
+              <% active_key = wo_scoped ? "wo" : active_batch.to_s %>
+              <% signed_here = (op["sign_offs"] || {})[active_key].present? %>
+              <% signed_count = @works_order.signed_count_for(op) %>
+              <% op_signed = signed_count == op_keys.length %>
               <div class="border border-gray-200 rounded-lg overflow-hidden" id="op-<%= position %>">
                 <div class="flex items-stretch">
-                  <!-- Op number -->
-                  <div class="flex-none w-12 <%= op_signed ? 'bg-green-100 border-green-200' : 'bg-gray-100 border-gray-200' %> border-r flex items-center justify-center">
-                    <span class="text-sm font-bold <%= op_signed ? 'text-green-700' : 'text-gray-700' %>"><%= position %></span>
+                  <!-- Op number: state shown is for the ACTIVE batch -->
+                  <div class="flex-none w-12 <%= signed_here ? 'bg-green-100 border-green-200' : (signed_count > 0 ? 'bg-amber-50 border-amber-200' : 'bg-gray-100 border-gray-200') %> border-r flex items-center justify-center">
+                    <span class="text-sm font-bold <%= signed_here ? 'text-green-700' : (signed_count > 0 ? 'text-amber-700' : 'text-gray-700') %>"><%= position %></span>
                   </div>
                   <!-- Op content -->
                   <div class="flex-1 px-4 py-3 text-sm text-gray-900 leading-relaxed">
@@ -298,6 +382,7 @@
                         </p>
                         <%= form_with url: save_ocv_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, id: "ocv-form-#{position}" do |f| %>
                           <%= hidden_field_tag :position, position %>
+                          <%= hidden_field_tag :batch, active_batch %>
                           <% if checklist_items.any? %>
                             <% prefill = @works_order.checklist_prefill(op) %>
                             <% answered = checklist_items.count { |i| prefill.dig(i["id"], "answer").present? } %>
@@ -339,28 +424,36 @@
                               <p class="mt-1 text-xs text-gray-400">Checklist completed by <%= completed %></p>
                             <% end %>
                           <% end %>
+                          <%
+                            # Suggestions depend on field + operation text only, never on
+                            # the batch - compute once per field, not once per batch.
+                            suggestions = fields.index_with { |f| ocv_suggestions(f, op["operation_text"]) }
+                          %>
                           <div class="space-y-1">
-                            <% (fields.any? ? op_keys : []).each do |batch_n| %>
-                              <% row = readings[batch_n.to_s] || {} %>
+                            <% if fields.any? %>
+                              <% row = readings[active_key] || {} %>
+                              <% locked = signed_here %>
                               <div class="flex flex-wrap items-center gap-2">
-                                <% if batch_n != "wo" && batch_count > 1 %>
-                                  <span class="text-xs text-gray-500 w-14 flex-none">Batch <%= batch_n %></span>
+                                <% unless wo_scoped %>
+                                  <span class="text-xs text-gray-500 w-14 flex-none">Batch <%= active_batch %></span>
                                 <% end %>
                                 <% fields.each do |field| %>
                                   <label class="flex items-center gap-1 text-xs text-gray-600">
                                     <%= field.humanize %>
                                     <% if field.include?("pass_fail") %>
-                                      <%= select_tag "readings[#{batch_n}][#{field}]",
+                                      <%= select_tag "readings[#{active_key}][#{field}]",
                                           options_for_select(["", "PASS", "FAIL"], row[field]),
-                                          class: "border border-gray-300 rounded px-1 py-1 text-sm" %>
+                                          disabled: locked,
+                                          class: "border border-gray-300 rounded px-1 py-1 text-sm #{'bg-gray-100 text-gray-500' if locked}" %>
                                     <% else %>
-                                      <% sugg = ocv_suggestions(field, op["operation_text"]) %>
-                                      <%= text_field_tag "readings[#{batch_n}][#{field}]", row[field],
-                                          class: "border border-gray-300 rounded px-2 py-1 text-sm w-24",
+                                      <% sugg = suggestions[field] %>
+                                      <%= text_field_tag "readings[#{active_key}][#{field}]", row[field],
+                                          disabled: locked,
+                                          class: "border border-gray-300 rounded px-2 py-1 text-sm w-24 #{'bg-gray-100 text-gray-500' if locked}",
                                           autocomplete: "off",
-                                          list: (sugg.any? ? "dl-#{position}-#{batch_n}-#{field}" : nil) %>
+                                          list: (sugg.any? ? "dl-#{position}-#{field}" : nil) %>
                                       <% if sugg.any? %>
-                                        <datalist id="dl-<%= position %>-<%= batch_n %>-<%= field %>">
+                                        <datalist id="dl-<%= position %>-<%= field %>">
                                           <% sugg.each do |s| %><option value="<%= s %>"></option><% end %>
                                         </datalist>
                                       <% end %>
@@ -368,6 +461,21 @@
                                   </label>
                                 <% end %>
                               </div>
+
+                              <%
+                                # Drift context: what the last two recorded batches read.
+                                # A paper card gives this by being physically adjacent to
+                                # the previous sheet; this is the digital equivalent.
+                                recent = readings.reject { |k, _v| k == active_key || k == "wo" }
+                                                 .sort_by { |k, _v| -k.to_i }.first(2)
+                              %>
+                              <% if recent.any? %>
+                                <p class="text-xs text-gray-400">
+                                  <% recent.each_with_index do |(batch_key, values), i| %>
+                                    <%= " · " if i > 0 %>B<%= batch_key %>: <%= fields.map { |f| values[f].presence || "—" }.join(" / ") %>
+                                  <% end %>
+                                </p>
+                              <% end %>
                             <% end %>
                           </div>
                           <% recorder = op.dig("ocv_recorded_by", "name") %>
@@ -380,25 +488,27 @@
                   </div>
                   <!-- Sign-off column -->
                   <% if paperless %>
-                    <% sign_offs = op["sign_offs"] || {} %>
-                    <% multi = op_keys.length > 1 %>
-                    <div class="flex-none w-32 border-l border-gray-200 flex flex-col items-center justify-center gap-1 p-2 <%= op_signed ? 'bg-green-50' : 'bg-gray-50' %>">
-                      <% op_keys.each do |k| %>
-                        <% so = sign_offs[k] %>
-                        <% if so %>
-                          <span class="text-xs text-green-700 font-semibold text-center">✓<%= " B#{k}" if multi %> <%= so["name"] %></span>
-                        <% elsif spec.present? %>
-                          <button type="submit" form="ocv-form-<%= position %>" name="sign_off_batch" value="<%= k %>"
-                                  class="bg-gray-700 hover:bg-gray-900 text-white text-xs font-medium px-2 py-1 rounded">
-                            Sign off<%= " B#{k}" if multi %>
-                          </button>
-                        <% else %>
-                          <%= button_to (multi ? "Sign off B#{k}" : "Sign off"),
-                              sign_off_operation_works_order_path(@works_order, position: position, batch: k),
-                              method: :patch,
-                              form: { data: { turbo: false } },
-                              class: "bg-gray-700 hover:bg-gray-900 text-white text-xs font-medium px-2 py-1 rounded" %>
-                        <% end %>
+                    <% so = (op["sign_offs"] || {})[active_key] %>
+                    <% multi = !wo_scoped && batch_count > 1 %>
+                    <div class="flex-none w-32 border-l border-gray-200 flex flex-col items-center justify-center gap-1 p-2 <%= signed_here ? 'bg-green-50' : 'bg-gray-50' %>">
+                      <% if so %>
+                        <span class="text-xs text-green-700 font-semibold text-center">✓<%= " B#{active_batch}" if multi %> <%= so["name"] %></span>
+                      <% elsif spec.present? %>
+                        <button type="submit" form="ocv-form-<%= position %>" name="sign_off_batch" value="<%= active_key %>"
+                                class="bg-gray-700 hover:bg-gray-900 text-white text-xs font-medium px-2 py-1 rounded">
+                          Sign off<%= " B#{active_batch}" if multi %>
+                        </button>
+                      <% else %>
+                        <%= button_to (multi ? "Sign off B#{active_batch}" : "Sign off"),
+                            sign_off_operation_works_order_path(@works_order, position: position, batch: active_key),
+                            method: :patch,
+                            form: { data: { turbo: false } },
+                            class: "bg-gray-700 hover:bg-gray-900 text-white text-xs font-medium px-2 py-1 rounded" %>
+                      <% end %>
+                      <% if multi %>
+                        <span class="text-xs <%= op_signed ? 'text-green-600' : 'text-gray-500' %>">
+                          <%= signed_count %>/<%= op_keys.length %> signed
+                        </span>
                       <% end %>
                     </div>
                   <% end %>
@@ -542,6 +652,37 @@
 </div>
 
 <script>
+// Live preview of the batch structure. The point is that the operator sees
+// "3000 batches" BEFORE submitting, not after the page tries to render it.
+(function () {
+  var input = document.getElementById('parts-per-batch');
+  var out = document.getElementById('batch-preview');
+  if (!input || !out) return;
+
+  function preview() {
+    var per = parseInt(input.value, 10);
+    var total = parseInt(input.dataset.quantity, 10);
+    var max = parseInt(input.dataset.maxBatches, 10);
+    if (!per || per < 1 || !total) { out.textContent = ''; out.className = 'text-xs text-gray-500'; return; }
+    if (per > total) { out.textContent = 'More than the order quantity (' + total + ')'; out.className = 'text-xs text-orange-600'; return; }
+
+    var count = Math.ceil(total / per);
+    var remainder = total - per * (count - 1);
+    if (count > max) {
+      out.textContent = count + ' batches — over the limit of ' + max;
+      out.className = 'text-xs text-orange-600 font-medium';
+      return;
+    }
+    out.textContent = remainder === per
+      ? count + ' × ' + per
+      : (count - 1) + ' × ' + per + ' + 1 × ' + remainder;
+    out.className = 'text-xs text-gray-500';
+  }
+
+  input.addEventListener('input', preview);
+  preview();
+})();
+
 function printRouteCard(url) {
   const printWindow = window.open(url, '_blank', 'width=800,height=600');
   printWindow.onload = function() {

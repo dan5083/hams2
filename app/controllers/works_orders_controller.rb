@@ -1,6 +1,6 @@
 # app/controllers/works_orders_controller.rb - Fixed pricing parameter handling and route card operations with RBAC
 class WorksOrdersController < ApplicationController
-  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :invoice_to_date, :void, :unvoid, :sign_off_operation, :save_ocv, :set_batch_count]
+  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :invoice_to_date, :void, :unvoid, :sign_off_operation, :save_ocv, :set_batch_count, :set_parts_per_batch, :set_batch_qty]
 
  def index
     @works_orders = WorksOrder.includes(:customer_order, :part, customer: [])
@@ -56,7 +56,15 @@ class WorksOrdersController < ApplicationController
     @part_wo_counts = WorksOrder.where(part_id: part_ids).group(:part_id).count
   end
 
+  # The process record is scoped to ONE batch at a time. Rendering every batch
+  # of every operation is what made 20 a practical ceiling; with the page
+  # pinned to a single batch the cost no longer scales with batch count.
   def show
+    return unless @works_order.paperless_record?
+
+    requested = params[:batch].to_i
+    valid = (1..@works_order.process_batch_count).cover?(requested)
+    @active_batch = valid ? requested : @works_order.first_incomplete_batch
   end
 
   def new
@@ -205,14 +213,13 @@ class WorksOrdersController < ApplicationController
   def sign_off_operation
     return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
     @works_order.sign_off_operation!(params[:position], params[:batch], Current.user)
-    redirect_to works_order_path(@works_order, anchor: "op-#{params[:position]}"),
+    redirect_to process_record_path(params[:position], advance_from: params[:batch]),
                 notice: "Operation #{params[:position]} batch #{params[:batch]} signed off."
   rescue => e
-    redirect_to works_order_path(@works_order, anchor: "op-#{params[:position]}"),
-                alert: e.message
+    redirect_to process_record_path(params[:position]), alert: e.message
   end
 
-  # Paperless process record: OCV readings per operation, keyed by batch number
+  # Paperless process record: OCV readings for the ACTIVE batch of an operation
   def save_ocv
     return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
     readings = params.fetch(:readings, {}).permit!.to_h
@@ -222,16 +229,41 @@ class WorksOrdersController < ApplicationController
     if params[:sign_off_batch].present?
       @works_order.sign_off_operation!(params[:position], params[:sign_off_batch], Current.user)
       notice = "Readings saved; operation #{params[:position]} batch #{params[:sign_off_batch]} signed off."
+      target = process_record_path(params[:position], advance_from: params[:sign_off_batch])
     else
       notice = "OCV readings saved for operation #{params[:position]}."
+      target = process_record_path(params[:position])
     end
-    redirect_to works_order_path(@works_order, anchor: "op-#{params[:position]}"), notice: notice
+    redirect_to target, notice: notice
   rescue => e
-    redirect_to works_order_path(@works_order, anchor: "op-#{params[:position]}"),
-                alert: e.message
+    redirect_to process_record_path(params[:position]), alert: e.message
   end
 
-  # Paperless process record: how many batches this WO runs
+  # Paperless process record: the normal way to batch a WO - state the load
+  # size and let the count and the remainder batch fall out.
+  def set_parts_per_batch
+    return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
+    @works_order.set_parts_per_batch!(params[:parts_per_batch])
+    count = @works_order.process_batch_count
+    redirect_to works_order_path(@works_order),
+                notice: "Batched at #{params[:parts_per_batch]} per batch: #{count} batch#{'es' unless count == 1}."
+  rescue => e
+    redirect_to works_order_path(@works_order), alert: e.message
+  end
+
+  # Paperless process record: correct a single batch's quantity (short load,
+  # scrapped part) without re-deriving the whole structure.
+  def set_batch_qty
+    return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
+    @works_order.set_batch_qty!(params[:batch], params[:qty])
+    redirect_to works_order_path(@works_order, batch: params[:batch]),
+                notice: "Batch #{params[:batch]} quantity updated."
+  rescue => e
+    redirect_to works_order_path(@works_order, batch: params[:batch]), alert: e.message
+  end
+
+  # Paperless process record: how many batches this WO runs. Manual escape
+  # hatch; set_parts_per_batch is the everyday path.
   def set_batch_count
     return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
     @works_order.set_batch_count!(params[:batch_count], params.fetch(:batch_qtys, {}).permit!.to_h)
@@ -241,6 +273,23 @@ class WorksOrdersController < ApplicationController
   end
 
   private
+
+  # Where to land after acting on an operation. Without advance_from the
+  # active batch is held; with it, the page moves to the next batch of that
+  # same operation still needing a sign-off, so an operator running 48 batches
+  # works in a rhythm instead of re-selecting each time. Falls back to holding
+  # position when the operation is complete or WO-scoped.
+  def process_record_path(position, advance_from: nil)
+    batch = params[:batch].presence || params[:sign_off_batch].presence
+
+    if advance_from.present?
+      op = @works_order.find_frozen_operation!(position) rescue nil
+      nxt = op && @works_order.next_unsigned_batch_for(op, after: advance_from)
+      batch = nxt if nxt
+    end
+
+    works_order_path(@works_order, batch: batch, anchor: "op-#{position}")
+  end
 
   def create_bulk
     works_orders_params = params[:works_orders]
