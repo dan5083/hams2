@@ -249,6 +249,10 @@ class Part < ApplicationRecord
       sources << -> { OperationLibrary::InspectFinalInspectVatInspect.get_vat_inspection_operation }
       sources << -> { OperationLibrary::InspectFinalInspectVatInspect.get_final_inspection_operation(operations_sequence: [], aerospace: ad) }
     end
+    if defined?(OperationLibrary::ElectrolessNickelPlate)
+      sources << -> { OperationLibrary::ElectrolessNickelPlate.test_piece_operation }
+      sources << -> { OperationLibrary::ElectrolessNickelPlate.adhesion_bend_operation }
+    end
     if defined?(OperationLibrary::DegreaseOperations)
       sources << -> { OperationLibrary::DegreaseOperations.get_degrease_operation(aerospace_defense: ad) }
     end
