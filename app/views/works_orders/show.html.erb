@@ -720,6 +720,41 @@
   preview();
 })();
 
+// Keep the operation you acted on under your finger. Turbo preserves the pixel
+// scroll offset across a morph, which is not the same thing: signing off
+// contract review collapses a 17-item checklist, the page above the viewport
+// gets shorter, and everything slides up. So record where the row sat before
+// submitting and put it back there afterwards. Only applies when the URL is
+// unchanged - moving to the next batch is a real navigation and should land at
+// the top of the card.
+(function () {
+  if (window.__hamsOpScrollPin) return;
+  window.__hamsOpScrollPin = true;
+
+  var pin = null;
+
+  document.addEventListener('turbo:submit-start', function (event) {
+    var form = event.target;
+    var row = form && form.closest ? form.closest("[id^='op-']") : null;
+    pin = row ? { id: row.id, top: row.getBoundingClientRect().top, url: window.location.href } : null;
+  });
+
+  function restore() {
+    var target = pin;
+    pin = null;
+    if (!target || window.location.href !== target.url) return;
+
+    // After Turbo's own scroll restoration, not before it.
+    requestAnimationFrame(function () {
+      var row = document.getElementById(target.id);
+      if (row) window.scrollBy(0, row.getBoundingClientRect().top - target.top);
+    });
+  }
+
+  document.addEventListener('turbo:morph', restore);
+  document.addEventListener('turbo:load', restore);
+})();
+
 function printRouteCard(url) {
   const printWindow = window.open(url, '_blank', 'width=800,height=600');
   printWindow.onload = function() {
