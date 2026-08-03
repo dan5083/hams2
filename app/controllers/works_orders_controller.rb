@@ -284,21 +284,33 @@ class WorksOrdersController < ApplicationController
 
   private
 
-  # Where to land after acting on an operation. Without advance_from the
-  # active batch is held; with it, the page moves to the next batch of that
-  # same operation still needing a sign-off, so an operator running 48 batches
-  # works in a rhythm instead of re-selecting each time. Falls back to holding
-  # position when the operation is complete or WO-scoped.
+  # Where to land after acting on an operation. Without advance_from the active
+  # batch and operation are held. With it, the page walks down the operations of
+  # the batch just signed - an operator takes a batch through its route in one
+  # rhythm - and only when that batch is finished does it drop onto the first
+  # outstanding operation of the next incomplete batch.
   def process_record_path(position, advance_from: nil)
     batch = params[:batch].presence || params[:sign_off_batch].presence
+    anchor_position = position
 
     if advance_from.present?
-      op = @works_order.find_frozen_operation!(position) rescue nil
-      nxt = op && @works_order.next_unsigned_batch_for(op, after: advance_from)
-      batch = nxt if nxt
+      batch = advance_from
+
+      if (nxt_op = @works_order.next_unsigned_operation_in(advance_from, after: position))
+        anchor_position = nxt_op
+      else
+        statuses = @works_order.batch_statuses
+        nxt_batch = statuses.find { |n, s| n > advance_from.to_i && s != :complete }&.first ||
+                    statuses.find { |_n, s| s != :complete }&.first
+
+        if nxt_batch && nxt_batch.to_i != advance_from.to_i
+          batch = nxt_batch
+          anchor_position = @works_order.next_unsigned_operation_in(nxt_batch) || position
+        end
+      end
     end
 
-    works_order_path(@works_order, batch: batch, anchor: "op-#{position}")
+    works_order_path(@works_order, batch: batch, anchor: "op-#{anchor_position}")
   end
 
   def create_bulk

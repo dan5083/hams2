@@ -389,16 +389,18 @@ class WorksOrder < ApplicationRecord
     batch_statuses.find { |_n, status| status != :complete }&.first || process_batch_count
   end
 
-  # Next batch of THIS operation still needing a sign-off, searching forward
-  # from `after` and wrapping. nil when the operation is complete or WO-scoped.
-  def next_unsigned_batch_for(op, after: 0)
-    keys = sign_off_keys_for(op)
-    return nil if keys == ["wo"]
+  # Next operation in THIS batch still needing a sign-off, searching forward
+  # from `after` and wrapping. nil when the batch has no outstanding work.
+  # WO-scoped operations are skipped - they certify the order, not a batch.
+  def next_unsigned_operation_in(batch, after: 0)
+    key = batch.to_i.to_s
+    positions = operations_for_display
+                  .reject { |o| wo_scoped_operation?(o) }
+                  .select { |o| (o["sign_offs"] || {})[key].blank? }
+                  .map { |o| o["position"].to_i }
+                  .sort
 
-    signed = op["sign_offs"] || {}
-    numbers = keys.map(&:to_i)
-    numbers.find { |n| n > after.to_i && signed[n.to_s].blank? } ||
-      numbers.find { |n| signed[n.to_s].blank? }
+    positions.find { |p| p > after.to_i } || positions.first
   end
 
   def signed_count_for(op)
