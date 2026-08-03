@@ -208,7 +208,8 @@ class Part < ApplicationRecord
       "vat_numbers" => op.respond_to?(:vat_numbers) ? (op.vat_numbers || []) : [],
       "process_type" => op.respond_to?(:process_type) ? (op.process_type || "manual") : "manual",
       "target_thickness" => op.respond_to?(:target_thickness) ? (op.target_thickness || 0) : 0,
-      "auto_inserted" => false
+      "auto_inserted" => false,
+      "ocv" => op.respond_to?(:ocv) ? op.ocv&.deep_stringify_keys : nil
     })
   end
 
