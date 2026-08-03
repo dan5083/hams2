@@ -71,6 +71,7 @@ Rails.application.routes.draw do
       patch :set_batch_count
       patch :set_parts_per_batch
       patch :set_batch_qty
+      patch :discard_process_record
       patch :void
       patch :unvoid
       patch :invoice_to_date
