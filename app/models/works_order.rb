@@ -207,7 +207,11 @@ class WorksOrder < ApplicationRecord
       "discards" => (data["discards"] || []) + [entry],
       "batch_count" => data["batch_count"],
       "parts_per_batch" => data["parts_per_batch"],
-      "batches" => (data["batches"] || []).map { |b| b.slice("number", "qty") }
+      "batches" => (data["batches"] || []).map { |b| b.slice("number", "qty") },
+      "forks" => data["forks"].presence&.map { |f|
+        f.slice("from_position", "parts_per_batch", "batch_count")
+         .merge("batches" => (f["batches"] || []).map { |b| b.slice("number", "qty") })
+      }
     }.compact
 
     @discarding_process_record = true
@@ -360,17 +364,98 @@ class WorksOrder < ApplicationRecord
     save!
   end
 
-  # Batch numbers carrying a sign-off on any operation.
-  def signed_batch_numbers
-    (frozen_operations || []).flat_map { |o| (o["sign_offs"] || {}).keys }
-                             .reject { |k| k == "wo" }.map(&:to_i).uniq.sort
+  # ==========================================================================
+  # Batch forking. A works order's parts can be regrouped part-way down the
+  # process: 48 x 1 through anodising, then 6 x 8 through a later cycle. Each
+  # regroup point is a FORK in customised_process_data["forks"]:
+  #   { "from_position" => 14, "parts_per_batch" => 8, "batch_count" => 6,
+  #     "batches" => [{ "number" => 1, "qty" => "8", "date" => ... }, ...] }
+  # The stretch of operations from one fork (or the top of the card) to the
+  # next is a SECTION. The base section is the WO's original top-level
+  # batch_count / parts_per_batch / batches keys - no forks means exactly the
+  # pre-fork behaviour, and no migration is needed.
+  # Per-op sign_offs / ocv_readings are keyed by batch number WITHIN the op's
+  # own section, so "3" on an anodising op and "3" on a later ENP op are
+  # different physical loads and never collide - each op already stores its
+  # own keys.
+  # ==========================================================================
+
+  def forks
+    customised_process_data&.dig("forks") || []
   end
 
-  # :complete when every batch-scoped operation is signed for that batch,
-  # :in_progress once anything is recorded against it, :not_started otherwise.
-  def batch_statuses
-    ops = operations_for_display.reject { |o| wo_scoped_operation?(o) }
-    (1..process_batch_count).index_with do |n|
+  # Ordered sections. Each is a plain hash:
+  #   "key"  - "base" or the fork's from_position as a string; stable identity
+  #            for params and the UI
+  #   "from" - first operation position the section covers
+  #   "data" - the hash holding batch_count / parts_per_batch / batches
+  #            (customised_process_data itself for the base section)
+  def sections
+    base = { "key" => "base", "from" => 1, "data" => (customised_process_data || {}) }
+    [base] + forks.sort_by { |f| f["from_position"].to_i }.map do |f|
+      { "key" => f["from_position"].to_s, "from" => f["from_position"].to_i, "data" => f }
+    end
+  end
+
+  def find_section!(key)
+    key = key.presence || "base"
+    sections.find { |s| s["key"] == key.to_s } ||
+      raise("No batch section #{key} on WO#{number}")
+  end
+
+  def section_for_position(position)
+    sections.reverse.find { |s| s["from"] <= position.to_i } || sections.first
+  end
+
+  def section_for_op(op)
+    section_for_position(op["position"])
+  end
+
+  def section_batch_count(section)
+    (section["data"]["batch_count"] || 1).to_i.clamp(1, MAX_BATCHES)
+  end
+
+  def section_parts_per_batch(section)
+    section["data"]["parts_per_batch"]
+  end
+
+  def section_batches(section)
+    section["data"]["batches"] || []
+  end
+
+  def section_batch_qty(section, batch_number)
+    section_batches(section).find { |b| b["number"] == batch_number.to_i }&.dig("qty")
+  end
+
+  def section_batch_date(section, batch_number)
+    section_batches(section).find { |b| b["number"] == batch_number.to_i }&.dig("date")
+  end
+
+  # Operation positions a section covers: from its fork point up to the next
+  # fork (exclusive), or the end of the card.
+  def section_position_range(section)
+    secs = sections
+    idx = secs.index { |s| s["key"] == section["key"] } || 0
+    upper = secs[idx + 1] ? secs[idx + 1]["from"] - 1 : Float::INFINITY
+    (section["from"]..upper)
+  end
+
+  # Batch-scoped operations belonging to a section.
+  def section_ops(section)
+    range = section_position_range(section)
+    (operations_for_display || []).select do |o|
+      range.cover?(o["position"].to_i) && !wo_scoped_operation?(o)
+    end
+  end
+
+  def section_signed_batch_numbers(section)
+    section_ops(section).flat_map { |o| (o["sign_offs"] || {}).keys }
+                        .reject { |k| k == "wo" }.map(&:to_i).uniq.sort
+  end
+
+  def section_batch_statuses(section)
+    ops = section_ops(section)
+    (1..section_batch_count(section)).index_with do |n|
       key = n.to_s
       signed = ops.count { |o| (o["sign_offs"] || {})[key].present? }
       if ops.any? && signed == ops.length
@@ -383,19 +468,117 @@ class WorksOrder < ApplicationRecord
     end
   end
 
+  def section_first_incomplete_batch(section)
+    section_batch_statuses(section).find { |_n, s| s != :complete }&.first ||
+      section_batch_count(section)
+  end
+
+  # Highest batch number in this section carrying any record (sign-off,
+  # reading, or stamped date) - the section cannot be restructured below it.
+  def section_highest_recorded_batch(section)
+    numbers = section_ops(section)
+              .flat_map { |o| (o["sign_offs"] || {}).keys + (o["ocv_readings"] || {}).keys }
+              .reject { |k| k == "wo" }.map(&:to_i)
+    numbers += section_batches(section).select { |b| b["date"].present? }.map { |b| b["number"].to_i }
+    numbers.max || 0
+  end
+
+  def section_batched_quantity_total(section)
+    (1..section_batch_count(section)).sum { |n| section_batch_qty(section, n).to_i }
+  end
+
+  # Add a fork: from this operation onward the parts run in a new batch
+  # structure derived from per_batch, exactly as set_parts_per_batch! derives
+  # the base one. Refused while any operation in the affected stretch carries
+  # a record - a fork renumbers the batches those records were keyed against.
+  def add_fork!(from_position, per_batch)
+    freeze_operations!
+    from = from_position.to_i
+    per_batch = per_batch.to_i
+    ops = frozen_operations
+
+    raise "Parts per batch must be at least 1" if per_batch < 1
+    raise "Parts per batch cannot exceed the order quantity (#{quantity})" if per_batch > quantity.to_i
+
+    target = ops.find { |o| o["position"] == from }
+    raise "No operation at position #{from}" unless target
+    raise "Cannot fork at operation #{from}: it certifies the whole works order, not a batch" if wo_scoped_operation?(target)
+    raise "A fork already starts at operation #{from}" if forks.any? { |f| f["from_position"].to_i == from }
+
+    first_batchable = ops.reject { |o| wo_scoped_operation?(o) }.map { |o| o["position"].to_i }.min
+    if first_batchable.nil? || from <= first_batchable
+      raise "Cannot fork at operation #{from} - that is what the works order's own batching is for"
+    end
+
+    next_from = forks.map { |f| f["from_position"].to_i }.select { |p| p > from }.min
+    affected = ops.select do |o|
+      pos = o["position"].to_i
+      pos >= from && (next_from.nil? || pos < next_from) && !wo_scoped_operation?(o)
+    end
+    recorded = affected.select { |o| (o["sign_offs"] || {}).any? || (o["ocv_readings"] || {}).any? }
+                       .map { |o| o["position"] }
+    if recorded.any?
+      raise "Operation #{recorded.join(', ')} already carries records; a fork at op #{from} " \
+            "would renumber the batches they were recorded against"
+    end
+
+    derived = derive_batch_quantities(per_batch)
+    count = derived.length
+    raise "#{per_batch} per batch on #{quantity} parts gives #{count} batches (max #{MAX_BATCHES})" if count > MAX_BATCHES
+
+    fork = {
+      "from_position" => from,
+      "parts_per_batch" => per_batch,
+      "batch_count" => count,
+      "batches" => derived.map { |n, q| { "number" => n, "qty" => q.to_s } }
+    }
+    customised_process_data["forks"] = (forks + [fork]).sort_by { |f| f["from_position"].to_i }
+    customised_process_data_will_change!
+    save!
+    fork
+  end
+
+  # Remove a fork; its operations fall back into the preceding section.
+  # Refused once anything in the fork's stretch carries a record.
+  def remove_fork!(from_position)
+    from = from_position.to_i
+    raise "No fork at operation #{from}" unless forks.any? { |f| f["from_position"].to_i == from }
+
+    section = find_section!(from.to_s)
+    if section_highest_recorded_batch(section) > 0
+      raise "This fork's operations already carry records; it cannot be removed"
+    end
+
+    remaining = forks.reject { |f| f["from_position"].to_i == from }
+    remaining.empty? ? customised_process_data.delete("forks") : customised_process_data["forks"] = remaining
+    customised_process_data_will_change!
+    save!
+  end
+
+  # Batch numbers carrying a sign-off on any operation.
+  def signed_batch_numbers
+    section_signed_batch_numbers(sections.first)
+  end
+
+  # :complete when every batch-scoped operation is signed for that batch,
+  # :in_progress once anything is recorded against it, :not_started otherwise.
+  def batch_statuses
+    section_batch_statuses(sections.first)
+  end
+
   # Lowest batch that still has work outstanding - the sensible landing batch
   # when the page is opened without an explicit one.
   def first_incomplete_batch
-    batch_statuses.find { |_n, status| status != :complete }&.first || process_batch_count
+    section_first_incomplete_batch(sections.first)
   end
 
   # Next operation in THIS batch still needing a sign-off, searching forward
   # from `after` and wrapping. nil when the batch has no outstanding work.
   # WO-scoped operations are skipped - they certify the order, not a batch.
-  def next_unsigned_operation_in(batch, after: 0)
+  def next_unsigned_operation_in(batch, after: 0, section: nil)
+    section ||= sections.first
     key = batch.to_i.to_s
-    positions = operations_for_display
-                  .reject { |o| wo_scoped_operation?(o) }
+    positions = section_ops(section)
                   .select { |o| (o["sign_offs"] || {})[key].blank? }
                   .map { |o| o["position"].to_i }
                   .sort
@@ -446,12 +629,13 @@ class WorksOrder < ApplicationRecord
 
   # Correct one batch's quantity without disturbing the rest of the structure -
   # short loads, scrapped parts, a batch split across two racks.
-  def set_batch_qty!(batch_number, qty)
-    n = normalise_batch!(batch_number)
-    raise "Batch #{n} is signed off; its quantity cannot be changed" if signed_batch_numbers.include?(n)
-
+  def set_batch_qty!(batch_number, qty, section_key: "base")
     freeze_operations!
-    batches = customised_process_data["batches"] ||= []
+    section = find_section!(section_key)
+    n = normalise_batch!(batch_number, section: section)
+    raise "Batch #{n} is signed off; its quantity cannot be changed" if section_signed_batch_numbers(section).include?(n)
+
+    batches = (section["data"]["batches"] ||= [])
     entry = batches.find { |b| b["number"] == n } || (batches << { "number" => n }).last
     qty.to_s.strip.empty? ? entry.delete("qty") : entry["qty"] = qty.to_s.strip
     customised_process_data_will_change!
@@ -461,7 +645,7 @@ class WorksOrder < ApplicationRecord
   # Sum of recorded batch quantities. Compared against `quantity` on screen as
   # a display-only check - a typo in one of 120 boxes is otherwise invisible.
   def batched_quantity_total
-    (1..process_batch_count).sum { |n| process_batch_qty(n).to_i }
+    section_batched_quantity_total(sections.first)
   end
 
   # Uniform hash shape for the show page, frozen or live.
@@ -491,14 +675,13 @@ class WorksOrder < ApplicationRecord
     frozen_operations
   end
 
-  # Each operation has a batch DOMAIN: today either the whole works order
-  # (contract review and incoming inspection precede batching) or every batch
-  # (default).
-  # EXTENSION POINT: when treatment cycles gain their own batch structures
-  # (different part/batch qtys per cycle), this method becomes the mapping
-  # from an operation to its set of sign-off keys - nothing else changes.
+  # Each operation has a batch DOMAIN: the whole works order (contract review
+  # and incoming inspection precede batching), or every batch of the SECTION
+  # the operation sits in. This is the extension point the original comment
+  # promised: an op maps to its set of sign-off keys, nothing else changes.
   def sign_off_keys_for(op)
-    wo_scoped_operation?(op) ? ["wo"] : (1..process_batch_count).map(&:to_s)
+    return ["wo"] if wo_scoped_operation?(op)
+    (1..section_batch_count(section_for_op(op))).map(&:to_s)
   end
 
   # Operations whose sign-off certifies the works order rather than a batch.
@@ -540,15 +723,17 @@ class WorksOrder < ApplicationRecord
     op["sign_offs"] ||= {}
 
     wo_scoped = wo_scoped_operation?(op)
-    key = wo_scoped ? "wo" : normalise_batch!(batch_number).to_s
+    section = wo_scoped ? nil : section_for_op(op)
+    key = wo_scoped ? "wo" : normalise_batch!(batch_number, section: section).to_s
     label = wo_scoped ? "" : " batch #{key}"
     raise "Operation #{position}#{label} already signed off" if op["sign_offs"][key].present?
 
-    # A sign-off certifies a complete record. Batch-scoped ops need the batch
-    # quantity set; WO-scoped ops (contract review, incoming inspection) don't -
-    # batches may not physically exist yet.
-    if !wo_scoped && process_batch_qty(key).blank?
-      raise "Enter a quantity for batch #{key} (top of the operations list) before signing off"
+    # A sign-off certifies a complete record. Batch-scoped ops need their
+    # SECTION's batch quantity set; WO-scoped ops (contract review, incoming
+    # inspection) don't - batches may not physically exist yet.
+    if !wo_scoped && section_batch_qty(section, key).blank?
+      where = section["key"] == "base" ? "top of the operations list" : "fork header at op #{section['from']}"
+      raise "Enter a quantity for batch #{key} (#{where}) before signing off"
     end
     if op["ocv"].present?
       spec = op["ocv"]
@@ -582,7 +767,7 @@ class WorksOrder < ApplicationRecord
     end
 
     op["sign_offs"][key] = { "id" => user.id, "name" => user.display_name }
-    stamp_batch_date(key.to_i) unless wo_scoped
+    stamp_batch_date(key.to_i, section: section) unless wo_scoped
     customised_process_data_will_change!
     save!
     remember_part_checklist_answers(op)
@@ -687,22 +872,21 @@ class WorksOrder < ApplicationRecord
     }
   end
 
-  def normalise_batch!(batch_number)
+  def normalise_batch!(batch_number, section: nil)
     n = batch_number.to_i
-    raise "Batch #{batch_number} is outside this WO's batch count (#{process_batch_count})" unless (1..process_batch_count).cover?(n)
+    count = section ? section_batch_count(section) : process_batch_count
+    where = (section && section["key"] != "base") ? "this section's batch count" : "this WO's batch count"
+    raise "Batch #{batch_number} is outside #{where} (#{count})" unless (1..count).cover?(n)
     n
   end
 
   # Highest batch number carrying any record (sign-off, reading, or date) -
   # batch count cannot be reduced below this.
+  # Only DATED batches count as records here: a batch that merely has a
+  # planned quantity carries nothing. Base section only - each fork guards its
+  # own restructuring through section_highest_recorded_batch.
   def highest_recorded_batch
-    ops = frozen_operations || []
-    numbers = ops.flat_map { |o| (o["sign_offs"] || {}).keys + (o["ocv_readings"] || {}).keys }.map(&:to_i)
-    # Only DATED batches count as records. A batch that merely has a planned
-    # quantity carries nothing, and treating it as a record would make any
-    # re-batching downward impossible after the first structure was set.
-    numbers += process_batches.select { |b| b["date"].present? }.map { |b| b["number"].to_i }
-    numbers.max || 0
+    section_highest_recorded_batch(sections.first)
   end
 
   # On signing off a checklist op, part-scoped answers are remembered on the
@@ -727,8 +911,9 @@ class WorksOrder < ApplicationRecord
     Rails.logger.error "Part checklist memory writeback failed for WO#{number}: #{e.message}"
   end
 
-  def stamp_batch_date(batch_number)
-    batches = customised_process_data["batches"] ||= []
+  def stamp_batch_date(batch_number, section: nil)
+    section ||= sections.first
+    batches = (section["data"]["batches"] ||= [])
     entry = batches.find { |b| b["number"] == batch_number } || (batches << { "number" => batch_number }).last
     entry["date"] ||= Date.current.iso8601
   end
