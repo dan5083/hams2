@@ -668,6 +668,12 @@ class WorksOrder < ApplicationRecord
 
   def operation_snapshot(op, position)
     ocv = op.try(:ocv)
+    # Pattern fallback: an aero/defence op with no explicit spec (renamed
+    # library id, custom static op) still captures time/temp rather than
+    # freezing record-less. Never overrides an explicit spec.
+    if ocv.nil? && defined?(OperationLibrary::OcvSpecs)
+      ocv = OperationLibrary::OcvSpecs.fallback_for(op.id, op.operation_text, aerospace_defense: aerospace_defense?)
+    end
     {
       "position" => position,
       "id" => op.id,

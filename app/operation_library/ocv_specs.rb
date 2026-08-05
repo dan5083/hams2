@@ -39,6 +39,24 @@ module OperationLibrary
       build(names, batching: batching, basis: basis, **rules)
     end
 
+    # Pattern fallback for aero/defence ops that carry no explicit spec, so
+    # renamed library ids and custom static ops still capture OCV rather than
+    # silently going record-less. Matched against the op's id and wording.
+    # Only ever consulted when the op has no spec of its own - an explicit
+    # spec (including a deliberate nil-field one) always wins upstream.
+    FALLBACK_PATTERNS = [
+      [/heat[\s_-]?treat|bake/i, -> { time_temp }]
+    ].freeze
+
+    def self.fallback_for(id, text = nil, aerospace_defense: false)
+      return nil unless aerospace_defense
+      haystack = "#{id} #{text}"
+      FALLBACK_PATTERNS.each do |pattern, spec|
+        return spec.call if haystack.match?(pattern)
+      end
+      nil
+    end
+
     def self.build(fields, batching:, basis:, optional: nil, required_if: nil, blank_as: nil)
       spec = { fields: fields, basis: basis }
       spec[:batching] = batching if batching

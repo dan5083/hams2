@@ -32,27 +32,42 @@ class Operation
     end
   end
 
- def self.load_all_operations(target_thickness = nil, aerospace_defense = nil)
-      Rails.logger.info "🔍 Operation.load_all_operations called with aerospace_defense: #{aerospace_defense.inspect}"
+ # Calls klass.operations, passing aerospace_defense: only when the library's
+  # signature accepts it. This is what stops the "registry silently drops the
+  # flag" bug (Pretreatments shipped aerospace-aware specs that never reached
+  # here because this file still called .operations bare): any library that
+  # gains the keyword is picked up automatically, and libraries without it are
+  # called exactly as before.
+  def self.library_operations(klass, aerospace_defense)
+    params = klass.method(:operations).parameters
+    if params.any? { |type, name| name == :aerospace_defense && %i[key keyreq].include?(type) }
+      klass.operations(aerospace_defense: aerospace_defense)
+    else
+      klass.operations
+    end
+  end
+
+  def self.load_all_operations(target_thickness = nil, aerospace_defense = nil)
+    Rails.logger.info "🔍 Operation.load_all_operations called with aerospace_defense: #{aerospace_defense.inspect}"
 
     operations = []
-    operations += OperationLibrary::ContractReviewOperations.operations if defined?(OperationLibrary::ContractReviewOperations)
-    operations += OperationLibrary::InspectFinalInspectVatInspect.operations if defined?(OperationLibrary::InspectFinalInspectVatInspect)
+    operations += library_operations(OperationLibrary::ContractReviewOperations, aerospace_defense) if defined?(OperationLibrary::ContractReviewOperations)
+    operations += library_operations(OperationLibrary::InspectFinalInspectVatInspect, aerospace_defense) if defined?(OperationLibrary::InspectFinalInspectVatInspect)
 
     # Add foil verification operations
-    operations += OperationLibrary::FoilVerification.operations if defined?(OperationLibrary::FoilVerification)
+    operations += library_operations(OperationLibrary::FoilVerification, aerospace_defense) if defined?(OperationLibrary::FoilVerification)
 
-    # Add pretreatments
-    operations += OperationLibrary::Pretreatments.operations if defined?(OperationLibrary::Pretreatments)
+    # Add pretreatments (aerospace flag attaches time/temp[/volts] OCV specs)
+    operations += library_operations(OperationLibrary::Pretreatments, aerospace_defense) if defined?(OperationLibrary::Pretreatments)
 
-    operations += OperationLibrary::JigUnjig.operations if defined?(OperationLibrary::JigUnjig)
-    operations += OperationLibrary::DegreaseOperations.operations if defined?(OperationLibrary::DegreaseOperations)
+    operations += library_operations(OperationLibrary::JigUnjig, aerospace_defense) if defined?(OperationLibrary::JigUnjig)
+    operations += library_operations(OperationLibrary::DegreaseOperations, aerospace_defense) if defined?(OperationLibrary::DegreaseOperations)
 
     # Add water break test operations
-    operations += OperationLibrary::WaterBreakOperations.operations if defined?(OperationLibrary::WaterBreakOperations)
+    operations += library_operations(OperationLibrary::WaterBreakOperations, aerospace_defense) if defined?(OperationLibrary::WaterBreakOperations)
 
     # Add OCV operations
-    operations += OperationLibrary::Ocv.operations if defined?(OperationLibrary::Ocv)
+    operations += library_operations(OperationLibrary::Ocv, aerospace_defense) if defined?(OperationLibrary::Ocv)
 
     operations += OperationLibrary::AnodisingStandard.operations(aerospace_defense) if defined?(OperationLibrary::AnodisingStandard)
     operations += OperationLibrary::AnodisingHard.operations(aerospace_defense) if defined?(OperationLibrary::AnodisingHard)
