@@ -373,20 +373,34 @@
             </details>
 
             <!-- 🌵 Fork: from a given operation onward the parts regroup into a
-                 new batch structure. Renders as a divider in the ops list. -->
-            <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-200">
-              <%= form_with url: add_fork_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex flex-wrap items-center gap-2" do %>
-                <label class="text-xs font-semibold text-gray-600 uppercase tracking-wide">🌵 Fork at op №</label>
-                <%= number_field_tag :from_position, nil, min: 2, max: ops_for_display.length,
-                    class: "border border-gray-300 rounded px-2 py-1 text-sm w-16" %>
+                 new batch structure. Renders as a divider in the ops list.
+                 Collapsed by default - only needed on the harder parts. -->
+            <details class="text-xs pt-2 border-t border-gray-200">
+              <summary class="cursor-pointer select-none text-gray-500 hover:text-gray-700">🌵 Fork batches part-way down the process</summary>
+              <%
+                # Eligible fork points: batch-scoped ops after the first one,
+                # skipping any op that already starts a fork.
+                batchable = ops_for_display.reject { |o| @works_order.wo_scoped_operation?(o) }
+                first_batchable = batchable.first&.dig("position").to_i
+                existing_forks = @works_order.forks.map { |f| f["from_position"].to_i }
+                fork_choices = batchable.select { |o| o["position"].to_i > first_batchable }
+                                        .reject { |o| existing_forks.include?(o["position"].to_i) }
+                                        .map { |o| ["#{o['position']} — #{o['operation_text'].to_s.gsub(/\*+/, '').truncate(48)}", o["position"]] }
+              %>
+              <%= form_with url: add_fork_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex flex-wrap items-center gap-2 mt-2" do %>
+                <span class="text-gray-500">From op</span>
+                <%= select_tag :from_position, options_for_select([["choose…", ""]] + fork_choices),
+                    class: "border border-gray-300 rounded px-2 py-1 text-sm max-w-96" %>
+                <span class="text-gray-500">at</span>
                 <%= number_field_tag :parts_per_batch, nil, min: 1, max: @works_order.quantity, placeholder: "per batch",
                     class: "border border-gray-300 rounded px-2 py-1 text-sm w-24" %>
+                <span class="text-gray-500">per batch</span>
                 <%= hidden_field_tag :base_batch, active_batch %>
                 <% active_fb.each do |k, v| %><%= hidden_field_tag "fb[#{k}]", v %><% end %>
                 <%= submit_tag "Add fork", class: "bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium px-2 py-1.5 rounded" %>
-                <span class="text-xs text-gray-400">parts regroup from that op onward</span>
+                <span class="text-gray-400">parts regroup from that op onward</span>
               <% end %>
-            </div>
+            </details>
           </div>
 
           <% if @works_order.can_discard_process_record? %>

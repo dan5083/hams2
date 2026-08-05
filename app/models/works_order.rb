@@ -492,11 +492,15 @@ class WorksOrder < ApplicationRecord
   # the base one. Refused while any operation in the affected stretch carries
   # a record - a fork renumbers the batches those records were keyed against.
   def add_fork!(from_position, per_batch)
-    freeze_operations!
     from = from_position.to_i
     per_batch = per_batch.to_i
-    ops = frozen_operations
+    # Validate against the display ops BEFORE any write: a rejected fork must
+    # leave the works order exactly as it found it - in particular it must not
+    # freeze the record (a save can have side effects, e.g. a fully-released
+    # WO closes itself on its next save).
+    ops = operations_for_display
 
+    raise "Choose the operation to fork at" if from < 1
     raise "Parts per batch must be at least 1" if per_batch < 1
     raise "Parts per batch cannot exceed the order quantity (#{quantity})" if per_batch > quantity.to_i
 
@@ -532,6 +536,7 @@ class WorksOrder < ApplicationRecord
       "batch_count" => count,
       "batches" => derived.map { |n, q| { "number" => n, "qty" => q.to_s } }
     }
+    freeze_operations!
     customised_process_data["forks"] = (forks + [fork]).sort_by { |f| f["from_position"].to_i }
     customised_process_data_will_change!
     save!
