@@ -1,6 +1,6 @@
 # app/controllers/works_orders_controller.rb - Fixed pricing parameter handling and route card operations with RBAC
 class WorksOrdersController < ApplicationController
-  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :invoice_to_date, :void, :unvoid, :sign_off_operation, :save_ocv, :set_batch_count, :set_parts_per_batch, :set_batch_qty, :discard_process_record]
+  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :invoice_to_date, :void, :unvoid, :sign_off_operation, :save_ocv, :set_batch_count, :set_parts_per_batch, :set_batch_qty, :add_fork, :remove_fork, :discard_process_record]
 
  def index
     @works_orders = WorksOrder.includes(:customer_order, :part, customer: [])
@@ -65,11 +65,16 @@ class WorksOrdersController < ApplicationController
     requested = params[:batch].to_i
     if (1..@works_order.process_batch_count).cover?(requested)
       @active_batch = requested
+      # Fork sections resolve softly: an out-of-range or absent fb value just
+      # lands on that section's first incomplete batch, no redirect needed -
+      # only the base batch is canonicalised in the URL (Turbo morph contract).
+      @active_fork_batches = resolved_fork_batches
     else
       # Canonicalise: the batch always rides in the URL. Turbo only morphs (and
       # only then keeps the scroll position) when a redirect lands on the URL
       # the page is already showing, so every visit here needs the same shape.
-      redirect_to works_order_path(@works_order, batch: @works_order.first_incomplete_batch)
+      redirect_to works_order_path(@works_order, batch: @works_order.first_incomplete_batch,
+                                                 fb: fork_batch_params.presence)
     end
   end
 
@@ -219,7 +224,7 @@ class WorksOrdersController < ApplicationController
   def sign_off_operation
     return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
     @works_order.sign_off_operation!(params[:position], params[:batch], Current.user)
-    redirect_to process_record_path(params[:position], advance_from: params[:batch]),
+    redirect_to process_record_path(params[:position].to_i, advance_from: params[:batch]),
                 notice: "Operation #{params[:position]} batch #{params[:batch]} signed off.",
                 status: :see_other
   rescue => e
@@ -236,10 +241,10 @@ class WorksOrdersController < ApplicationController
     if params[:sign_off_batch].present?
       @works_order.sign_off_operation!(params[:position], params[:sign_off_batch], Current.user)
       notice = "Readings saved; operation #{params[:position]} batch #{params[:sign_off_batch]} signed off."
-      target = process_record_path(params[:position], advance_from: params[:sign_off_batch])
+      target = process_record_path(params[:position].to_i, advance_from: params[:sign_off_batch])
     else
       notice = "OCV readings saved for operation #{params[:position]}."
-      target = process_record_path(params[:position])
+      target = process_record_path(params[:position].to_i)
     end
     redirect_to target, notice: notice, status: :see_other
   rescue => e
@@ -272,15 +277,33 @@ class WorksOrdersController < ApplicationController
   # scrapped part) without re-deriving the whole structure.
   def set_batch_qty
     return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
-    @works_order.set_batch_qty!(params[:batch], params[:qty])
-    redirect_to works_order_path(@works_order, batch: params[:batch]),
+    @works_order.set_batch_qty!(params[:batch], params[:qty], section_key: params[:section].presence || "base")
+    redirect_to works_order_path(@works_order, batch: return_base_batch, fb: fork_batch_params.presence),
                 notice: "Batch #{params[:batch]} quantity updated."
   rescue => e
-    redirect_to works_order_path(@works_order, batch: params[:batch]), alert: e.message
+    redirect_to works_order_path(@works_order, batch: return_base_batch, fb: fork_batch_params.presence), alert: e.message
   end
 
   # Paperless process record: how many batches this WO runs. Manual escape
   # hatch; set_parts_per_batch is the everyday path.
+  def add_fork
+    fork = @works_order.add_fork!(params[:from_position], params[:parts_per_batch])
+    redirect_to works_order_path(@works_order, batch: return_base_batch, fb: fork_batch_params.presence),
+                notice: "\u{1F335} Forked at op #{fork['from_position']}: #{fork['batch_count']} \u00d7 #{fork['parts_per_batch']} per batch."
+  rescue => e
+    redirect_to works_order_path(@works_order, batch: return_base_batch, fb: fork_batch_params.presence),
+                alert: e.message
+  end
+
+  def remove_fork
+    @works_order.remove_fork!(params[:from_position])
+    redirect_to works_order_path(@works_order, batch: return_base_batch),
+                notice: "Fork at op #{params[:from_position]} removed."
+  rescue => e
+    redirect_to works_order_path(@works_order, batch: return_base_batch, fb: fork_batch_params.presence),
+                alert: e.message
+  end
+
   def set_batch_count
     return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
     @works_order.set_batch_count!(params[:batch_count], params.fetch(:batch_qtys, {}).permit!.to_h)
@@ -298,22 +321,55 @@ class WorksOrdersController < ApplicationController
   # anchor - an anchor scrolls the page, which is the thing being avoided. Only
   # when the batch has nothing outstanding does the URL change, moving to the
   # next incomplete batch; that one is a real navigation and renders normally.
-  def process_record_path(_position, advance_from: nil)
-    batch = params[:batch].presence || params[:sign_off_batch].presence
+  def process_record_path(position, advance_from: nil)
+    fb = fork_batch_params
+    base = params[:base_batch].presence || params[:batch].presence || params[:sign_off_batch].presence
+    section = @works_order.section_for_position(position)
+    in_fork = section["key"] != "base"
 
     if advance_from.present?
-      batch = advance_from
+      if in_fork
+        fb = fb.merge(section["key"] => advance_from)
+      else
+        base = advance_from
+      end
 
-      if @works_order.next_unsigned_operation_in(advance_from).nil?
-        statuses = @works_order.batch_statuses
+      # Only advance once the batch has nothing left outstanding IN ITS OWN
+      # SECTION - a fork's batches progress independently of the base's.
+      if @works_order.next_unsigned_operation_in(advance_from, section: section).nil?
+        statuses = @works_order.section_batch_statuses(section)
         nxt_batch = statuses.find { |n, s| n > advance_from.to_i && s != :complete }&.first ||
                     statuses.find { |_n, s| s != :complete }&.first
 
-        batch = nxt_batch if nxt_batch
+        if nxt_batch
+          in_fork ? fb = fb.merge(section["key"] => nxt_batch) : base = nxt_batch
+        end
       end
     end
 
-    works_order_path(@works_order, batch: batch)
+    works_order_path(@works_order, batch: base, fb: fb.presence)
+  end
+
+  # fb params ride every navigation so each fork section keeps its place.
+  # Turbo's morph contract only needs the BASE batch canonical in the URL;
+  # fork values are passengers.
+  def fork_batch_params
+    fb = params[:fb]
+    h = fb.respond_to?(:to_unsafe_h) ? fb.to_unsafe_h : (fb || {})
+    h.transform_values(&:to_s)
+  end
+
+  def return_base_batch
+    params[:base_batch].presence || params[:batch].presence
+  end
+
+  # Each fork lands on its requested batch when valid, else its first
+  # incomplete - soft resolution, no redirect loop.
+  def resolved_fork_batches
+    @works_order.sections.drop(1).each_with_object({}) do |sec, out|
+      req = fork_batch_params[sec["key"]].to_i
+      out[sec["key"]] = (1..@works_order.section_batch_count(sec)).cover?(req) ? req : @works_order.section_first_incomplete_batch(sec)
+    end
   end
 
   def create_bulk
