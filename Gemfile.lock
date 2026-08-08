@@ -156,7 +156,7 @@ GEM
       aes_key_wrap
       bindata
       httpclient
-    jwt (2.10.2)
+    jwt (3.1.2)
       base64
     kamal (2.7.0)
       activesupport (>= 7.0)
