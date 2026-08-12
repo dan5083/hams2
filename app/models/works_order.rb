@@ -298,10 +298,29 @@ class WorksOrder < ApplicationRecord
   # Pilot gate: the interactive process record is live for open WOs with
   # electroless nickel work only. Widen per process family as each area goes
   # paperless; delete once everything has.
+  PAPERLESS_PROCESS_TYPES = %w[electroless_nickel_plating].freeze
+
   def paperless_record?
     return false unless is_open
     return true if operations_frozen?
-    operations_with_auto_ops.any? { |op| op.process_type == 'electroless_nickel_plating' }
+    operations_with_auto_ops.any? { |op| PAPERLESS_PROCESS_TYPES.include?(op.process_type) }
+  end
+
+  # Same gate as #paperless_record?, for a loaded collection. Memoises the part
+  # lookup so a list page doesn't run get_operations_with_auto_ops per row.
+  def self.paperless_ids(works_orders)
+    by_part = {}
+    works_orders.select { |wo|
+      next false unless wo.is_open
+      next true  if wo.operations_frozen?
+      next false if wo.part_id.blank?
+
+      by_part.fetch(wo.part_id) do
+        by_part[wo.part_id] = wo.operations_with_auto_ops.any? { |op|
+          PAPERLESS_PROCESS_TYPES.include?(op.process_type)
+        }
+      end
+    }.map(&:id).to_set
   end
 
   def process_batch_count

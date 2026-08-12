@@ -66,6 +66,9 @@ class CustomerOrdersController < ApplicationController
     @part_wo_counts = WorksOrder.where(part_id: part_ids)
                                 .group(:part_id)
                                 .count
+
+    # Route card vs 📱 Paperless per row
+    @paperless_wo_ids = WorksOrder.paperless_ids(@works_orders)
   end
 
   def new
