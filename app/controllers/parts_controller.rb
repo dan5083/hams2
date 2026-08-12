@@ -84,18 +84,41 @@ class PartsController < ApplicationController
         locked_operations_hash = params[:locked_operations].to_unsafe_h
         display_names_hash = params[:locked_operations_display_names]&.to_unsafe_h || {}
 
+        # Rebuild the copied operations SERVER-SIDE from the source part. The
+        # form only round-trips operation_text + display_name (which the user
+        # may have edited in the modal); everything else - real library id,
+        # process_type, OCV spec, vat numbers - is taken from the source part's
+        # operations. Previously this branch invented "COPIED_OP_n" / "manual" /
+        # no ocv, which broke the paperless gate and dropped OCV capture on
+        # every copied ENP part.
+        source_part = params[:source_part_id].present? ? Part.find_by(id: params[:source_part_id]) : nil
+        source_ops  = source_part ? source_part.get_operations_with_auto_ops : []
+
+        # Text lookup for source ops whose (normalised) text is unique, so an
+        # op still matches even if the modal ever posts positions that don't
+        # line up with source order. Ambiguous texts fall back to position.
+        normalise = ->(t) { t.to_s.downcase.gsub(/\s+/, " ").strip }
+        by_text = source_ops.group_by { |op| normalise.call(op.operation_text) }
+
         locked_ops = locked_operations_hash.map do |position, operation_text|
-          display_name = display_names_hash[position] || "Operation #{position}"
+          pos = position.to_i
+          text_matches = by_text[normalise.call(operation_text)] || []
+          src = (text_matches.length == 1 ? text_matches.first : nil) || source_ops[pos - 1]
+
+          display_name = display_names_hash[position].presence ||
+                         (src.respond_to?(:display_name) ? src.display_name : nil) ||
+                         "Operation #{position}"
           {
-            "id" => "COPIED_OP_#{position}",
+            "id" => (src&.id.presence || "COPIED_OP_#{pos}"),
             "display_name" => display_name,
             "operation_text" => operation_text.to_s,
-            "position" => position.to_i,
-            "specifications" => "",
-            "vat_numbers" => [],
-            "process_type" => "manual",
-            "target_thickness" => 0,
-            "auto_inserted" => false
+            "position" => pos,
+            "specifications" => (src.respond_to?(:specifications) ? (src.specifications || "") : ""),
+            "vat_numbers" => (src.respond_to?(:vat_numbers) ? (src.vat_numbers || []) : []),
+            "process_type" => ((src.respond_to?(:process_type) && src.process_type.presence) || "manual"),
+            "target_thickness" => (src.respond_to?(:target_thickness) ? (src.target_thickness || 0) : 0),
+            "auto_inserted" => (src.respond_to?(:auto_inserted?) ? src.auto_inserted? : false),
+            "ocv" => (src.respond_to?(:ocv) ? src.ocv&.deep_stringify_keys : nil)
           }
         end.sort_by { |op| op["position"] }
 
@@ -120,7 +143,8 @@ class PartsController < ApplicationController
             "vat_numbers" => op.respond_to?(:vat_numbers) ? (op.vat_numbers || []) : [],
             "process_type" => op.respond_to?(:process_type) ? op.process_type : 'manual',
             "target_thickness" => op.respond_to?(:target_thickness) ? (op.target_thickness || 0) : 0,
-            "auto_inserted" => op.respond_to?(:auto_inserted?) ? op.auto_inserted? : false
+            "auto_inserted" => op.respond_to?(:auto_inserted?) ? op.auto_inserted? : false,
+            "ocv" => op.respond_to?(:ocv) ? op.ocv&.deep_stringify_keys : nil
           }
         end
       end

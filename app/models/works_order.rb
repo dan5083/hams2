@@ -298,11 +298,22 @@ class WorksOrder < ApplicationRecord
   # Pilot gate: the interactive process record is live for open WOs with
   # electroless nickel work only. Widen per process family as each area goes
   # paperless; delete once everything has.
+  #
+  # A frozen record is viewable FOREVER - closing (or voiding) a works order
+  # must never hide its completed process record. Mutation is a separate
+  # question: every record mutator calls assert_record_open!, so a closed
+  # WO's record is read-only.
+  #
+  # For never-frozen WOs, ones with nothing left to release predate the
+  # paperless rollout (or are effectively finished) and complete on their
+  # printed paper record - only jobs with parts still to process get the
+  # live record.
   PAPERLESS_PROCESS_TYPES = %w[electroless_nickel_plating].freeze
 
   def paperless_record?
-    return false unless is_open
     return true if operations_frozen?
+    return false unless is_open
+    return false unless unreleased_quantity > 0
     operations_with_auto_ops.any? { |op| PAPERLESS_PROCESS_TYPES.include?(op.process_type) }
   end
 
@@ -311,8 +322,9 @@ class WorksOrder < ApplicationRecord
   def self.paperless_ids(works_orders)
     by_part = {}
     works_orders.select { |wo|
-      next false unless wo.is_open
       next true  if wo.operations_frozen?
+      next false unless wo.is_open
+      next false unless wo.unreleased_quantity > 0
       next false if wo.part_id.blank?
 
       by_part.fetch(wo.part_id) do
@@ -349,6 +361,7 @@ class WorksOrder < ApplicationRecord
   end
 
   def set_parts_per_batch!(per_batch)
+    assert_record_open!
     per_batch = per_batch.to_i
     raise "Parts per batch must be at least 1" if per_batch < 1
     raise "Parts per batch cannot exceed the order quantity (#{quantity})" if per_batch > quantity.to_i
@@ -511,6 +524,7 @@ class WorksOrder < ApplicationRecord
   # the base one. Refused while any operation in the affected stretch carries
   # a record - a fork renumbers the batches those records were keyed against.
   def add_fork!(from_position, per_batch)
+    assert_record_open!
     from = from_position.to_i
     per_batch = per_batch.to_i
     # Validate against the display ops BEFORE any write: a rejected fork must
@@ -565,6 +579,7 @@ class WorksOrder < ApplicationRecord
   # Remove a fork; its operations fall back into the preceding section.
   # Refused once anything in the fork's stretch carries a record.
   def remove_fork!(from_position)
+    assert_record_open!
     from = from_position.to_i
     raise "No fork at operation #{from}" unless forks.any? { |f| f["from_position"].to_i == from }
 
@@ -630,6 +645,7 @@ class WorksOrder < ApplicationRecord
   # qtys: { "1" => "20", "2" => "13" } - parts per batch, recorded like the
   # route card's Qty column. Editable; the sign-offs are the immutable record.
   def set_batch_count!(count, qtys = {})
+    assert_record_open!
     count = count.to_i
     raise "Batch count must be between 1 and #{MAX_BATCHES}" unless (1..MAX_BATCHES).cover?(count)
 
@@ -654,6 +670,7 @@ class WorksOrder < ApplicationRecord
   # Correct one batch's quantity without disturbing the rest of the structure -
   # short loads, scrapped parts, a batch split across two racks.
   def set_batch_qty!(batch_number, qty, section_key: "base")
+    assert_record_open!
     freeze_operations!
     section = find_section!(section_key)
     n = normalise_batch!(batch_number, section: section)
@@ -742,6 +759,7 @@ class WorksOrder < ApplicationRecord
   end
 
   def sign_off_operation!(position, batch_number, user)
+    assert_record_open!
     freeze_operations!
     op = find_frozen_operation!(position)
     op["sign_offs"] ||= {}
@@ -800,6 +818,7 @@ class WorksOrder < ApplicationRecord
   # responses: { item_id => {"answer" => "YES"/"NO", "comment" => "..."} }.
   # Sliced against the op's checklist item ids; blank answers dropped.
   def save_checklist_responses!(position, responses, user)
+    assert_record_open!
     freeze_operations!
     op = find_frozen_operation!(position)
     items = OperationLibrary::ContractReviewOperations.resolve_checklist(op.dig("ocv", "checklist"))
@@ -839,6 +858,7 @@ class WorksOrder < ApplicationRecord
   # readings: { "1" => {field => value}, "2" => ... } keyed by batch number.
   # Values are sliced against the op's OCV spec fields; fully blank rows dropped.
   def save_ocv_readings!(position, readings, user)
+    assert_record_open!
     freeze_operations!
     op = find_frozen_operation!(position)
     spec = op["ocv"]
@@ -865,6 +885,15 @@ class WorksOrder < ApplicationRecord
     op["ocv_recorded_by"] = { "id" => user.id, "name" => user.display_name }
     customised_process_data_will_change!
     save!
+  end
+
+  # Every process-record mutator calls this first: a closed (or voided) works
+  # order's record is complete and read-only. Viewing stays open forever via
+  # paperless_record?; this is the write-side half of that split. Controller
+  # endpoints rescue the raise into a redirect alert.
+  def assert_record_open!
+    raise "WO#{number} is closed; its process record is read-only" unless is_open
+    raise "WO#{number} is voided; its process record is read-only" if voided?
   end
 
   def find_frozen_operation!(position)
@@ -1054,6 +1083,14 @@ class WorksOrder < ApplicationRecord
 
     # IMPORTANT: Manually trigger flag update since update_column bypasses callbacks
     update_is_fully_released_flag
+
+    # update_column also bypasses the after_update auto-close, which is why
+    # fully-released WOs sat open forever with stale customer-order counts.
+    # Close here and refresh the order's counter cache directly.
+    if fully_released? && is_open? && !voided?
+      update_column(:is_open, false)
+      update_customer_order_counts
+    end
   end
 
   # Route card information for shop floor
