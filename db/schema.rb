@@ -10,12 +10,9 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_07_31_081014) do
-  create_schema "heroku_ext"
-
+ActiveRecord::Schema[8.0].define(version: 2026_08_13_120217) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
-  enable_extension "pg_stat_statements"
   enable_extension "pgcrypto"
 
   create_table "active_storage_attachments", force: :cascade do |t|
@@ -99,6 +96,25 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_31_081014) do
     t.index ["number"], name: "index_customer_orders_on_number"
     t.index ["open_works_orders_count", "fully_released_works_orders_count", "uninvoiced_accepted_quantity"], name: "index_customer_orders_on_cached_invoice_status"
     t.index ["voided"], name: "index_customer_orders_on_voided"
+  end
+
+  create_table "external_ncr_documents", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "external_ncr_id", null: false
+    t.uuid "uploaded_by_id", null: false
+    t.string "document_type", default: "incoming_ncr", null: false
+    t.string "cloudinary_public_id", null: false
+    t.string "cloudinary_url"
+    t.string "original_filename"
+    t.bigint "file_size_bytes"
+    t.string "content_type"
+    t.text "note"
+    t.datetime "uploaded_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["cloudinary_public_id"], name: "index_external_ncr_documents_on_cloudinary_public_id", unique: true
+    t.index ["external_ncr_id", "document_type"], name: "idx_on_external_ncr_id_document_type_b9c553b5e5"
+    t.index ["external_ncr_id"], name: "index_external_ncr_documents_on_external_ncr_id"
+    t.index ["uploaded_by_id"], name: "index_external_ncr_documents_on_uploaded_by_id"
   end
 
   create_table "external_ncr_release_notes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -388,6 +404,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_07_31_081014) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "buyers", "organizations"
   add_foreign_key "customer_orders", "organizations", column: "customer_id"
+  add_foreign_key "external_ncr_documents", "external_ncrs"
+  add_foreign_key "external_ncr_documents", "users", column: "uploaded_by_id"
   add_foreign_key "external_ncr_release_notes", "external_ncrs"
   add_foreign_key "external_ncr_release_notes", "release_notes"
   add_foreign_key "external_ncrs", "release_notes"
