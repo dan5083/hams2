@@ -108,8 +108,11 @@ Rails.application.routes.draw do
       get :response_pdf
     end
     collection do
-      get :search_release_notes  # NEW - for autocomplete search
-      get :release_note_details  # Already existed
+      get :search_release_notes
+      get :release_note_details
+    end
+    resources :documents, only: [:create, :destroy], controller: 'external_ncr_documents' do
+      member { get :download }
     end
   end
 

@@ -1,10 +1,11 @@
 # app/controllers/external_ncrs_controller.rb
 class ExternalNcrsController < ApplicationController
-  before_action :require_ncr_manage_access, only: [:edit, :update, :destroy, :advance_status, :reassign_respondent]
   before_action :set_external_ncr, only: [:show, :edit, :update, :destroy, :advance_status, :download_document, :reassign_respondent, :response_pdf]
+  before_action :require_ncr_manage_access, only: [:edit, :update, :advance_status, :reassign_respondent]
+  before_action :require_delete_access, only: [:destroy]
 
   def index
-    @external_ncrs = ExternalNcr.includes(:release_notes, :created_by, :respondent)
+    @external_ncrs = ExternalNcr.includes(:release_notes, :created_by, :respondent, :documents)
                                 .recent
 
     if params[:search].present?
@@ -43,6 +44,7 @@ class ExternalNcrsController < ApplicationController
 
     uploaded_file = params[:external_ncr][:temp_document]
     date_for_path = @external_ncr.date.presence || Date.current
+    upload_result = nil
 
     if uploaded_file.present?
       begin
@@ -50,7 +52,9 @@ class ExternalNcrsController < ApplicationController
         filename_prefix = @simple_mode ? "NCR_upload" : "NCR#{@external_ncr.hal_ncr_number || 'TEMP'}"
 
         upload_result = CloudinaryService.upload_file(uploaded_file, folder_path, filename_prefix: filename_prefix)
-        @external_ncr.store_document_metadata(upload_result)
+
+        # Saved with the parent via the documents association
+        @external_ncr.build_document(upload_result, user: Current.user, document_type: 'incoming_ncr')
 
         Rails.logger.info "Successfully uploaded document for NCR: #{upload_result[:public_id]}"
 
@@ -72,9 +76,9 @@ class ExternalNcrsController < ApplicationController
       NcrMailer.draft_created(@external_ncr).deliver_later
       redirect_to @external_ncr, notice: "External NCR #{@external_ncr.display_name} was successfully created."
     else
-      if @external_ncr.cloudinary_public_id.present?
+      if upload_result.present?
         begin
-          CloudinaryService.delete_file(@external_ncr.cloudinary_public_id)
+          CloudinaryService.delete_file(upload_result[:public_id])
         rescue => e
           Rails.logger.error "Failed to cleanup uploaded file: #{e.message}"
         end
@@ -92,18 +96,19 @@ class ExternalNcrsController < ApplicationController
   end
 
   def update
-    # Handle document replacement for draft NCRs
+    # Handle replacement of the incoming NCR document (draft NCRs only).
+    # Additional documents and emails are added from the show page instead.
     uploaded_file = params[:external_ncr][:temp_document]
 
     if uploaded_file.present? && @external_ncr.can_replace_document?
       begin
         folder_path = "NCRs/#{@external_ncr.date.year}/#{@external_ncr.date.strftime('%m')}"
-        filename_prefix = "NCR#{@external_ncr.hal_ncr_number}"
+        filename_prefix = "NCR#{@external_ncr.hal_ncr_number || 'DRAFT'}"
 
         upload_result = CloudinaryService.upload_file(uploaded_file, folder_path, filename_prefix: filename_prefix)
-        @external_ncr.replace_document!(upload_result)
+        @external_ncr.replace_incoming_document!(upload_result, user: Current.user)
 
-        Rails.logger.info "Successfully replaced document for NCR #{@external_ncr.hal_ncr_number}"
+        Rails.logger.info "Successfully replaced incoming document for NCR #{@external_ncr.display_name}"
 
       rescue CloudinaryService::CloudinaryError => e
         Rails.logger.error "Failed to replace document: #{e.message}"
@@ -127,11 +132,14 @@ class ExternalNcrsController < ApplicationController
 
   def destroy
     if @external_ncr.status == 'draft'
+      # Attached documents are removed from Cloudinary by ExternalNcrDocument's
+      # before_destroy hook, via dependent: :destroy. Only the legacy jsonb
+      # blob needs handling here.
       if @external_ncr.cloudinary_public_id.present?
         begin
           CloudinaryService.delete_file(@external_ncr.cloudinary_public_id)
         rescue => e
-          Rails.logger.error "Failed to delete Cloudinary document for NCR #{@external_ncr.hal_ncr_number}: #{e.message}"
+          Rails.logger.error "Failed to delete legacy Cloudinary document for NCR #{@external_ncr.hal_ncr_number}: #{e.message}"
         end
       end
 
@@ -224,21 +232,25 @@ class ExternalNcrsController < ApplicationController
     render json: { error: 'Release note not found' }, status: :not_found
   end
 
+  # Kept for backward compatibility (old links, index icon). Sends the primary
+  # document if there is one, otherwise falls back to the legacy jsonb blob.
   def download_document
-    if @external_ncr.has_document?
-      begin
-        Rails.logger.info "Starting download for NCR #{@external_ncr.hal_ncr_number}"
+    document = @external_ncr.primary_document
 
-        download_url = CloudinaryService.generate_download_url(@external_ncr.cloudinary_public_id)
+    if document.present?
+      redirect_to download_external_ncr_document_path(@external_ncr, document)
+      return
+    end
+
+    if @external_ncr.cloudinary_public_id.present?
+      begin
+        download_url = @external_ncr.generate_cloudinary_download_url
 
         if download_url
-          Rails.logger.info "Generated download URL, redirecting to Cloudinary"
           redirect_to download_url, allow_other_host: true
         else
-          Rails.logger.error "Failed to generate download URL"
           redirect_to @external_ncr, alert: 'Unable to generate download link. Please try again.'
         end
-
       rescue => e
         Rails.logger.error "Download error: #{e.class} - #{e.message}"
         redirect_to @external_ncr, alert: "Download failed: #{e.message}"
@@ -270,6 +282,14 @@ class ExternalNcrsController < ApplicationController
 
   def set_external_ncr
     @external_ncr = ExternalNcr.find(params[:id])
+  end
+
+  # NCR managers can bin any draft; anyone else can bin a draft they created.
+  def require_delete_access
+    return if Current.user.can_manage_ncrs?
+    return if @external_ncr.status == 'draft' && @external_ncr.created_by_id == Current.user.id
+
+    redirect_to @external_ncr, alert: 'You do not have permission to delete this NCR.'
   end
 
   def external_ncr_params

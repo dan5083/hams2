@@ -4,6 +4,11 @@ class ExternalNcr < ApplicationRecord
   has_many :external_ncr_release_notes, dependent: :destroy, inverse_of: :external_ncr, validate: false
   has_many :release_notes, through: :external_ncr_release_notes
 
+  has_many :documents, -> { chronological },
+           class_name: 'ExternalNcrDocument',
+           dependent: :destroy,
+           inverse_of: :external_ncr
+
   belongs_to :created_by, class_name: 'User'
   belongs_to :respondent, class_name: 'User', foreign_key: 'assigned_to_id', optional: true
 
@@ -31,7 +36,9 @@ class ExternalNcr < ApplicationRecord
     :preventive_action,
     :completed_by_user_id,
 
-    # Cloudinary document storage
+    # LEGACY single-document storage — superseded by the external_ncr_documents
+    # table. Retained so pre-migration records keep working; do not write to
+    # these on new records.
     :cloudinary_public_id,
     :cloudinary_url,
     :original_filename,
@@ -59,8 +66,11 @@ class ExternalNcr < ApplicationRecord
       .distinct
   }
   scope :recent, -> { order(created_at: :desc) }
-  scope :with_documents, -> { where.not(ncr_data: { cloudinary_public_id: [nil, ''] }) }
-  scope :missing_documents, -> { where(ncr_data: { cloudinary_public_id: [nil, ''] }) }
+  scope :with_documents, -> { where(id: ExternalNcrDocument.select(:external_ncr_id)) }
+  scope :missing_documents, -> {
+    where.not(id: ExternalNcrDocument.select(:external_ncr_id))
+         .where("COALESCE(ncr_data->>'cloudinary_public_id', '') = ''")
+  }
 
   # --- Callbacks ---
   before_validation :set_defaults, if: :new_record?
@@ -183,11 +193,62 @@ class ExternalNcr < ApplicationRecord
     release_note_numbers
   end
 
-  # --- Document management methods ---
+  # --- Document management ---
 
+  # True if there is anything attached at all — new-style record or legacy blob.
   def has_document?
-    cloudinary_public_id.present?
+    documents.any? || cloudinary_public_id.present?
   end
+
+  # The incoming customer NCR paperwork, falling back to whatever was attached first.
+  def primary_document
+    documents.incoming.first || documents.first
+  end
+
+  def has_legacy_document?
+    documents.empty? && cloudinary_public_id.present?
+  end
+
+  # Attach to a persisted NCR.
+  def attach_document!(upload_result, user:, document_type: 'other', note: nil)
+    documents.create!(
+      document_attributes(upload_result).merge(
+        uploaded_by: user,
+        document_type: document_type,
+        note: note.presence
+      )
+    )
+  end
+
+  # Attach to an unsaved NCR (used by ExternalNcrsController#create, where the
+  # file is uploaded before the record is saved). Persisted with the parent.
+  def build_document(upload_result, user:, document_type: 'incoming_ncr', note: nil)
+    documents.build(
+      document_attributes(upload_result).merge(
+        uploaded_by: user,
+        document_type: document_type,
+        note: note.presence
+      )
+    )
+  end
+
+  # Swap out the incoming NCR paperwork (draft only). Old file is removed from
+  # Cloudinary by ExternalNcrDocument's before_destroy hook.
+  def replace_incoming_document!(upload_result, user:)
+    raise "Cannot replace document for non-draft NCR" unless can_replace_document?
+
+    transaction do
+      purge_legacy_document!
+      documents.incoming.each(&:destroy)
+      attach_document!(upload_result, user: user, document_type: 'incoming_ncr')
+    end
+  end
+
+  def can_replace_document?
+    status == 'draft'
+  end
+
+  # --- Legacy document helpers (pre-migration records only) ---
 
   def document_filename
     original_filename.presence || "NCR#{hal_ncr_number}_incoming_document"
@@ -214,7 +275,7 @@ class ExternalNcr < ApplicationRecord
   end
 
   def generate_cloudinary_download_url
-    return nil unless has_document?
+    return nil unless cloudinary_public_id.present?
 
     begin
       CloudinaryService.generate_download_url(cloudinary_public_id)
@@ -224,18 +285,23 @@ class ExternalNcr < ApplicationRecord
     end
   end
 
-  def can_replace_document?
-    status == 'draft'
-  end
+  # Deletes the legacy Cloudinary file and clears the jsonb keys.
+  def purge_legacy_document!
+    return if cloudinary_public_id.blank?
 
-  # Store document metadata after successful upload
-  def store_document_metadata(upload_result)
-    self.cloudinary_public_id = upload_result[:public_id]
-    self.cloudinary_url = upload_result[:secure_url]
-    self.original_filename = upload_result[:filename]
-    self.file_size_bytes = upload_result[:size]
-    self.content_type = upload_result[:content_type]
-    self.document_uploaded_at = Time.current.iso8601
+    begin
+      CloudinaryService.delete_file(cloudinary_public_id)
+    rescue => e
+      Rails.logger.error "Failed to delete legacy Cloudinary document: #{e.message}"
+    end
+
+    self.cloudinary_public_id  = nil
+    self.cloudinary_url        = nil
+    self.original_filename     = nil
+    self.file_size_bytes       = nil
+    self.content_type          = nil
+    self.document_uploaded_at  = nil
+    save!(validate: false)
   end
 
   # --- Status management ---
@@ -302,39 +368,32 @@ class ExternalNcr < ApplicationRecord
       return where(hal_ncr_number: ncr_number)
     end
 
-    # General search across associated release notes
+    # General search across associated release notes and attached documents
     joins(release_notes: { works_order: :customer_order })
       .joins("LEFT JOIN organizations ON customer_orders.customer_id = organizations.id")
+      .joins("LEFT JOIN external_ncr_documents ON external_ncr_documents.external_ncr_id = external_ncrs.id")
       .where(
         "CAST(hal_ncr_number AS TEXT) ILIKE ? OR " \
         "organizations.name ILIKE ? OR " \
         "works_orders.part_number ILIKE ? OR " \
+        "external_ncr_documents.original_filename ILIKE ? OR " \
         "(ncr_data->>'original_filename') ILIKE ?",
-        "%#{term}%", "%#{term}%", "%#{term}%", "%#{term}%"
+        "%#{term}%", "%#{term}%", "%#{term}%", "%#{term}%", "%#{term}%"
       )
       .distinct
   end
 
-  # --- Replace document (for draft NCRs only) ---
-
-  def replace_document!(new_upload_result)
-    raise "Cannot replace document for non-draft NCR" unless can_replace_document?
-
-    # Delete old document from Cloudinary if it exists
-    if cloudinary_public_id.present?
-      begin
-        CloudinaryService.delete_file(cloudinary_public_id)
-      rescue => e
-        Rails.logger.error "Failed to delete old Cloudinary document: #{e.message}"
-      end
-    end
-
-    # Store new document metadata and save
-    store_document_metadata(new_upload_result)
-    save!
-  end
-
   private
+
+  def document_attributes(upload_result)
+    {
+      cloudinary_public_id: upload_result[:public_id],
+      cloudinary_url:       upload_result[:secure_url],
+      original_filename:    upload_result[:filename],
+      file_size_bytes:      upload_result[:size],
+      content_type:         upload_result[:content_type]
+    }
+  end
 
   def at_least_one_release_note
     return if simple_upload
