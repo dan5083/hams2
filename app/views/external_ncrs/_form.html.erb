@@ -32,13 +32,14 @@
       </div>
     <% end %>
 
-    <!-- Document Upload Section -->
+    <!-- Incoming NCR Document -->
     <div class="bg-white shadow sm:rounded-lg">
       <div class="px-4 py-5 sm:p-6">
         <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Incoming NCR Document</h3>
 
-        <% if @external_ncr.persisted? && @external_ncr.has_document? %>
-          <!-- Existing Document Display -->
+        <% incoming = @external_ncr.persisted? ? @external_ncr.primary_document : nil %>
+        <% if incoming.present? || (@external_ncr.persisted? && @external_ncr.has_legacy_document?) %>
+          <!-- Existing incoming document -->
           <div class="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
             <div class="flex items-center justify-between">
               <div class="flex items-center">
@@ -46,11 +47,19 @@
                   <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd" />
                 </svg>
                 <div class="ml-3">
-                  <p class="text-sm font-medium text-gray-900"><%= @external_ncr.document_filename %></p>
+                  <p class="text-sm font-medium text-gray-900">
+                    <%= incoming&.filename || @external_ncr.document_filename %>
+                  </p>
                   <p class="text-xs text-gray-500">
-                    <%= @external_ncr.document_size_formatted %>
-                    <% if @external_ncr.document_uploaded_date %>
-                      • Uploaded <%= @external_ncr.document_uploaded_date.strftime("%d %b %Y at %H:%M") %>
+                    <% if incoming.present? %>
+                      <%= incoming.size_formatted %>
+                      • Uploaded <%= incoming.uploaded_at.strftime("%d %b %Y at %H:%M") %>
+                    <% else %>
+                      <%= @external_ncr.document_size_formatted %>
+                      <% if @external_ncr.document_uploaded_date %>
+                        • Uploaded <%= @external_ncr.document_uploaded_date.strftime("%d %b %Y at %H:%M") %>
+                      <% end %>
+                      • <span class="text-yellow-700">legacy record</span>
                     <% end %>
                   </p>
                 </div>
@@ -78,7 +87,7 @@
                   accept: ".pdf,.jpg,.jpeg,.png,.tiff,.tif,.doc,.docx",
                   class: "block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" %>
               <p class="mt-1 text-xs text-gray-500">
-                Upload a new document to replace the existing one. Accepted formats: PDF, JPG, PNG, TIFF, DOC, DOCX (max 10MB)
+                Replaces the incoming customer document only. Emails and other attachments are unaffected.
               </p>
             </div>
           <% end %>
@@ -96,6 +105,11 @@
             <p class="mt-1 text-xs text-gray-500">
               Required. Upload the NCR document received from the customer. Accepted formats: PDF, JPG, PNG, TIFF, DOC, DOCX (max 10MB)
             </p>
+            <% unless @external_ncr.persisted? %>
+              <p class="mt-1 text-xs text-gray-500">
+                Emails and further attachments can be added once the NCR has been created.
+              </p>
+            <% end %>
           </div>
         <% end %>
       </div>
@@ -358,6 +372,97 @@
           class: "py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" %>
     </div>
   <% end %>
+
+  <%# --------------------------------------------------------------------
+      Additional documents & correspondence.
+      This is a SEPARATE form posting to a different controller, so it MUST
+      sit outside the form_with block above — HTML forms cannot be nested.
+  --------------------------------------------------------------------- %>
+  <% if @external_ncr.persisted? %>
+    <% incoming = @external_ncr.primary_document %>
+    <% other_documents = @external_ncr.documents.includes(:uploaded_by).to_a - [incoming].compact %>
+
+    <div class="bg-white shadow sm:rounded-lg mt-6">
+      <div class="px-4 py-5 sm:p-6">
+        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+          Additional Documents &amp; Correspondence
+        </h3>
+
+        <% if other_documents.any? %>
+          <div class="space-y-2 mb-4">
+            <% other_documents.each do |doc| %>
+              <div class="flex items-center justify-between p-3 bg-gray-50 rounded-md border border-gray-200">
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-gray-900 truncate"><%= doc.filename %></p>
+                  <p class="text-xs text-gray-500 mt-0.5">
+                    <span class="inline-flex px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-medium">
+                      <%= doc.type_label %>
+                    </span>
+                    <% if doc.size_formatted %>• <%= doc.size_formatted %><% end %>
+                    • <%= doc.uploaded_at.strftime("%d %b %Y at %H:%M") %>
+                    by <%= doc.uploaded_by&.full_name || "Unknown" %>
+                  </p>
+                  <% if doc.note.present? %>
+                    <p class="text-xs text-gray-600 mt-1 italic"><%= doc.note %></p>
+                  <% end %>
+                </div>
+                <div class="flex items-center space-x-3 flex-shrink-0 ml-4">
+                  <%= link_to "Download", download_external_ncr_document_path(@external_ncr, doc),
+                      target: "_blank",
+                      class: "inline-flex items-center px-3 py-1 border border-gray-300 rounded-md text-xs font-medium text-gray-700 bg-white hover:bg-gray-50" %>
+                  <%= button_to "Remove", external_ncr_document_path(@external_ncr, doc),
+                      method: :delete,
+                      form: { data: { turbo_confirm: "Remove #{doc.filename}? This deletes the stored file." } },
+                      class: "text-red-600 hover:text-red-800 text-xs font-medium bg-transparent border-0 p-0 cursor-pointer" %>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="text-sm text-gray-500 mb-4">
+            Nothing attached yet beyond the incoming document.
+          </p>
+        <% end %>
+
+        <%= form_with url: external_ncr_documents_path(@external_ncr),
+                      method: :post,
+                      multipart: true,
+                      class: "pt-4 border-t border-gray-200" do |df| %>
+          <p class="text-sm font-medium text-gray-700 mb-3">Add a document or email</p>
+          <div class="flex flex-wrap items-end gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">Type</label>
+              <%= select_tag "external_ncr_document[document_type]",
+                  options_for_select(
+                    ExternalNcrDocument::DOCUMENT_TYPES.map { |k, v| [v, k] },
+                    'email'
+                  ),
+                  class: "text-sm border-gray-300 rounded-md shadow-sm" %>
+            </div>
+            <div class="flex-1 min-w-[220px]">
+              <label class="block text-xs font-medium text-gray-700 mb-1">File</label>
+              <%= file_field_tag "external_ncr_document[file]",
+                  accept: ".pdf,.jpg,.jpeg,.png,.tiff,.tif,.doc,.docx,.msg,.eml",
+                  required: true,
+                  class: "block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" %>
+            </div>
+            <div class="flex-1 min-w-[220px]">
+              <label class="block text-xs font-medium text-gray-700 mb-1">Note (optional)</label>
+              <%= text_field_tag "external_ncr_document[note]", nil,
+                  placeholder: "e.g. Reply from customer 12/08",
+                  class: "block w-full text-sm border-gray-300 rounded-md shadow-sm" %>
+            </div>
+            <%= df.submit "Add", class: "py-2 px-5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 cursor-pointer" %>
+          </div>
+          <p class="mt-2 text-xs text-gray-500">
+            PDF, JPG, PNG, TIFF, DOC, DOCX, MSG, EML (max 10MB). Emails can be dragged out of
+            Outlook as .msg, or printed to PDF. Adding a file here saves it immediately —
+            it does not need the Update NCR button.
+          </p>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
 </div>
 
 <script>
@@ -555,6 +660,8 @@
 })();
 
 // Handle file input changes (validation)
+// Extension-based rather than MIME-based: Outlook .msg files report
+// inconsistent or empty MIME types across browsers.
 document.addEventListener('change', function(e) {
   if (e.target && e.target.type === 'file') {
     const file = e.target.files[0];
@@ -565,19 +672,14 @@ document.addEventListener('change', function(e) {
         return;
       }
 
-      const allowedTypes = [
-        'application/pdf',
-        'image/jpeg',
-        'image/jpg',
-        'image/png',
-        'image/tiff',
-        'image/tif',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      const allowedExtensions = [
+        'pdf', 'jpg', 'jpeg', 'png', 'tiff', 'tif', 'doc', 'docx', 'msg', 'eml'
       ];
 
-      if (!allowedTypes.includes(file.type)) {
-        alert('Please upload a valid file type: PDF, JPG, PNG, TIFF, DOC, or DOCX');
+      const extension = (file.name.split('.').pop() || '').toLowerCase();
+
+      if (!allowedExtensions.includes(extension)) {
+        alert('Please upload a valid file type: PDF, JPG, PNG, TIFF, DOC, DOCX, MSG or EML');
         e.target.value = '';
         return;
       }
