@@ -38,7 +38,7 @@
   <!-- Results Summary -->
   <div class="mb-4">
     <p class="text-sm text-gray-600">
-      Showing <%= @customer_orders.count %> of <%= @customer_orders.total_count %> customer orders
+      Showing <%= @customer_orders.size %> of <%= @customer_orders.total_count %> customer orders
       <% if params[:search].present? %>
         matching "<%= params[:search] %>"
       <% end %>
@@ -82,25 +82,47 @@
       <tbody class="bg-white divide-y divide-gray-200">
         <% @customer_orders.each do |customer_order| %>
           <%
-            # OPTIMIZED: Use cached columns instead of queries
-            all_works_orders_fully_released = customer_order.open_works_orders_count > 0 &&
-                                               customer_order.fully_released_works_orders_count == customer_order.open_works_orders_count
+            # ---------------------------------------------------------------
+            # Works orders are eager-loaded by the controller. Filter them in
+            # Ruby rather than chaining .active / .count / .sum, which would
+            # bypass the loaded association and fire a fresh query per row
+            # (~6 queries a row, ~120 a page).
+            # ---------------------------------------------------------------
+            works_orders = customer_order.works_orders.to_a
+            active_wos   = works_orders.reject(&:voided)
+
+            # Completion is computed from the loaded rows, NOT from the cached
+            # counter columns. open_works_orders_count and
+            # fully_released_works_orders_count both filter is_open: true (see
+            # app/models/concerns/customer_order_counter_cache.rb), so they go
+            # to zero the moment a works order completes and closes — they can
+            # never express "everything is done".
+            fully_released_count = active_wos.count(&:is_fully_released)
+            all_complete         = active_wos.any? && fully_released_count == active_wos.size
+
+            total_value   = active_wos.sum { |wo| wo.lot_price || 0 }
+            released_qty  = active_wos.sum { |wo| wo.quantity_released || 0 }
+            can_be_voided = active_wos.empty?
+
+            # This one IS reliable — it isn't gated on is_open.
             uninvoiced_count = customer_order.uninvoiced_accepted_quantity
-            has_uninvoiced = uninvoiced_count > 0
-            show_create_invoice = all_works_orders_fully_released && has_uninvoiced
+            has_uninvoiced   = uninvoiced_count > 0
 
-            works_orders = customer_order.works_orders.active
-            fully_released_wo_count = customer_order.fully_released_works_orders_count
-
-            row_class = all_works_orders_fully_released ? 'bg-green-50' :
+            row_class = if customer_order.voided
+                          'bg-red-50'
+                        elsif has_uninvoiced
+                          'bg-green-50'
+                        else
+                          ''
+                        end
           %>
           <tr class="hover:bg-gray-50 cursor-pointer <%= row_class %>"
               onclick="if(!event.target.closest('a, button, form')) window.location='<%= customer_order_path(customer_order) %>'">
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
               <%= link_to customer_order.number, customer_order, class: "text-blue-600 hover:text-blue-900" %>
-              <% if all_works_orders_fully_released %>
+              <% if all_complete %>
                 <span class="ml-2 inline-flex items-center px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                  Ready
+                  Complete
                 </span>
               <% end %>
             </td>
@@ -111,39 +133,40 @@
               <%= customer_order.date_received.strftime("%d/%m/%Y") %>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-              <%= customer_order.works_orders.count %>
-              <% if customer_order.works_orders.active.count != customer_order.works_orders.count %>
-                (<%= customer_order.works_orders.active.count %> active)
+              <%= works_orders.size %>
+              <% if active_wos.size != works_orders.size %>
+                (<%= active_wos.size %> active)
               <% end %>
-              <% if all_works_orders_fully_released %>
+              <% if all_complete %>
                 <br><span class="text-xs text-green-600">All WOs complete</span>
-              <% elsif fully_released_wo_count > 0 %>
-                <br><span class="text-xs text-orange-600"><%= fully_released_wo_count %>/<%= works_orders.count %> complete</span>
+              <% elsif fully_released_count > 0 %>
+                <br><span class="text-xs text-orange-600"><%= fully_released_count %>/<%= active_wos.size %> complete</span>
               <% end %>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-              £<%= sprintf("%.2f", customer_order.total_value) %>
+              £<%= sprintf("%.2f", total_value) %>
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
+              <%
+                # Invoicing is triggered from the dashboard "Released but
+                # Uninvoiced" worklist (the 🐓 button), which drives off
+                # requires_invoicing release notes. This column is a read-only
+                # signal, so it only needs to answer "is there money on the
+                # table" — deliberately NOT "are all works orders finished",
+                # which is what the old Ready to Invoice / Partial Release
+                # wording tried and failed to say.
+              %>
               <% if customer_order.voided %>
                 <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
                   Voided
                 </span>
-              <% elsif all_works_orders_fully_released && has_uninvoiced %>
-                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                  Ready to Invoice (<%= uninvoiced_count %> parts)
-                </span>
-              <% elsif all_works_orders_fully_released && !has_uninvoiced %>
-                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
-                  Fully invoiced
-                </span>
               <% elsif has_uninvoiced %>
-                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
-                  Partial Release (<%= uninvoiced_count %> parts)
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                  Uninvoiced (<%= pluralize(uninvoiced_count, "part") %>)
                 </span>
-              <% elsif customer_order.works_orders.active.sum(:quantity_released) > 0 %>
+              <% elsif released_qty > 0 %>
                 <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                  In Progress - Invoiced to Date
+                  Invoiced to date
                 </span>
               <% else %>
                 <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
@@ -158,15 +181,7 @@
                   <%= link_to "Edit", edit_customer_order_path(customer_order), class: "text-yellow-600 hover:text-yellow-900" %>
                   <%= link_to "Add WO", new_customer_order_works_order_path(customer_order), class: "text-green-600 hover:text-green-900" %>
 
-                  <% if show_create_invoice %>
-                    <%= button_to "Create Invoice", invoice_to_date_customer_order_path(customer_order),
-                        method: :patch,
-                        params: { return_to: request.fullpath },
-                        class: "text-green-600 hover:text-green-900 bg-transparent border-0 underline cursor-pointer text-sm font-semibold",
-                        data: { confirm: "Stage an invoice for the whole of order #{customer_order.number} (all WOs complete, #{uninvoiced_count} parts ready)?" } %>
-                  <% end %>
-
-                  <% if customer_order.can_be_voided? %>
+                  <% if can_be_voided %>
                     <%= button_to "Void", void_customer_order_path(customer_order),
                         method: :patch,
                         class: "text-red-600 hover:text-red-900 bg-transparent border-0 underline cursor-pointer text-sm font-medium",

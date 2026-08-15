@@ -30,25 +30,27 @@ class CustomerOrdersController < ApplicationController
     @customers = Organization.enabled.order(:name)
 
     # Priority ordering for the list. Lower number = higher up the page.
-    #   0  Green  - all WOs fully released and there's uninvoiced qty -> "Create invoice"
-    #   2  Partial release in progress
+    #   0  Green  - money on the table: released work not yet invoiced
     #   3  Everything else (default)
-    #   4  Open but nothing left to invoice
     #   5  Voided
-    # (Contract review now lives on the works order's contract review operation;
+    #
+    # This deliberately sorts on uninvoiced_accepted_quantity ALONE. The older
+    # tiers keyed off open_works_orders_count / fully_released_works_orders_count
+    # were dead code: both counters filter is_open: true (see
+    # app/models/concerns/customer_order_counter_cache.rb), so once a works order
+    # closes on full release they drop to zero and no order could ever satisfy
+    # "fully released count == open count AND open count > 0". Every row fell
+    # through to tier 3. Don't reintroduce them here without fixing the concern
+    # first — CustomerOrder#fully_released? is the trustworthy check, but it's a
+    # per-record query and can't be used for SQL ordering.
+    #
+    # (Contract review lives on the works order's contract review operation;
     #  the old CO-level "Review needed" purple tier is gone.)
     @customer_orders = @customer_orders.order(
       Arel.sql("
         CASE
           WHEN customer_orders.voided = true THEN 5
-          WHEN customer_orders.fully_released_works_orders_count = customer_orders.open_works_orders_count
-               AND customer_orders.open_works_orders_count > 0
-               AND customer_orders.uninvoiced_accepted_quantity > 0 THEN 0
-          WHEN customer_orders.open_works_orders_count > 0
-               AND customer_orders.fully_released_works_orders_count > 0
-               AND customer_orders.fully_released_works_orders_count < customer_orders.open_works_orders_count THEN 2
-          WHEN customer_orders.open_works_orders_count > 0
-               AND customer_orders.uninvoiced_accepted_quantity = 0 THEN 4
+          WHEN customer_orders.uninvoiced_accepted_quantity > 0 THEN 0
           ELSE 3
         END
       "),
@@ -88,17 +90,20 @@ class CustomerOrdersController < ApplicationController
   end
 
   # Invoice everything released TO DATE on this customer order (partial orders
-  # are fine — no "all WOs fully released" gate, unlike create_invoice). Drives
-  # off requires_invoicing release notes via Invoice.stage_to_date, which bills
-  # courier per release note and is safe to call repeatedly. Triggered by the
-  # 🐓 button on the dashboard "Released but Uninvoiced" worklist AND by the
-  # "Create Invoice" button on the customer orders index.
+  # are fine — no "all WOs fully released" gate). Drives off requires_invoicing
+  # release notes via Invoice.stage_to_date, which bills courier per release note
+  # and is safe to call repeatedly. Triggered by the 🐓 button on the dashboard
+  # "Released but Uninvoiced" worklist.
+  #
+  # NOTE: the customer orders index used to carry a "Create Invoice" button that
+  # also hit this action. That button was gated on the broken counter columns, so
+  # it had silently stopped rendering; it's been removed rather than repaired
+  # because the dashboard worklist is where invoicing actually gets triggered.
+  # The action keeps its return_to handling so it can be called from anywhere.
   #
   # Redirect target: honours an optional return_to param (relative paths only,
-  # see safe_return_path) so the index button lands you back on the index — with
-  # search/customer/page filters intact — ready to press the next Create Invoice.
-  # When no return_to is supplied (e.g. the dashboard 🐓 button) it falls back to
-  # root_path, preserving the original dashboard behaviour.
+  # see safe_return_path). When no return_to is supplied (e.g. the dashboard 🐓
+  # button) it falls back to root_path, preserving the dashboard behaviour.
   def invoice_to_date
     return_path = safe_return_path(params[:return_to]) || root_path
 
