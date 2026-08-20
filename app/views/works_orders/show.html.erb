@@ -19,6 +19,12 @@
               title="ENP process records are kept in HAMS only - no route card">
           📱 Paperless
         </span>
+      <% elsif @works_order.grouped_member? %>
+        <%# The record lives on the group's lead WO - never print a paper
+            card for a member, the digital record covers it. %>
+        <%= link_to "📱 Process Record → WO#{@works_order.process_record_owner.number}",
+            works_order_path(@works_order.process_record_owner),
+            class: "bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded" %>
       <% else %>
         <%= link_to "Route Card",
             "javascript:void(0)",
@@ -33,6 +39,41 @@
           class: "bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" %>
     </div>
   </div>
+
+  <% if @works_order.grouped? %>
+    <div class="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
+      <% group = @works_order.process_group %>
+      <% if @works_order.process_lead? %>
+        <div class="text-sm font-semibold text-indigo-900">
+          <%= group.display_name %> — this process record covers the whole tank load
+          (<%= group.total_quantity %> parts across <%= group.members.count %> works orders)
+        </div>
+        <div class="mt-1 text-sm text-indigo-800">
+          <% group.members.each do |m| %>
+            <span class="inline-block mr-3">
+              <% if m.id == @works_order.id %>
+                <span class="font-semibold"><%= m.display_name %></span>
+              <% else %>
+                <%= link_to m.display_name, works_order_path(m), class: "underline" %>
+              <% end %>
+              <span class="text-indigo-600"><%= m.part_number %> ×<%= m.quantity %></span>
+            </span>
+          <% end %>
+        </div>
+      <% else %>
+        <div class="text-sm text-indigo-900">
+          <span class="font-semibold"><%= group.display_name %>:</span>
+          this works order is processed as one tank load with
+          <%= group.members.count - 1 %> other<%= 's' unless group.members.count == 2 %> —
+          the shared process record is on
+          <%= link_to "WO#{@works_order.process_record_owner.number}",
+              works_order_path(@works_order.process_record_owner),
+              class: "font-semibold underline" %>.
+          Release notes, certificates and invoicing stay on this WO as normal.
+        </div>
+      <% end %>
+    </div>
+  <% end %>
 
   <% if @works_order.customer_reference.present? %>
     <div class="mb-4">

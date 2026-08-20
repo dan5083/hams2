@@ -11,6 +11,7 @@ class WorksOrder < ApplicationRecord
   belongs_to :customer_order
   belongs_to :part
   belongs_to :issued_by, class_name: 'User', optional: true
+  belongs_to :process_group, optional: true
 
   has_many :release_notes, dependent: :restrict_with_error
   has_one :customer, through: :customer_order
@@ -46,6 +47,10 @@ class WorksOrder < ApplicationRecord
   after_create :update_part_pricing, if: :should_update_part_pricing_on_create?
   after_update :update_part_pricing, if: :should_update_part_pricing?
 
+  # A grouped WO cannot quietly disappear: pre-freeze this is bookkeeping,
+  # post-freeze remove_works_order! raises and blocks the destroy.
+  before_destroy :leave_process_group, if: :grouped?
+
   # NEW: Counter cache callbacks
   after_save :update_is_fully_released_flag
   after_save :update_customer_order_counts, if: :saved_change_to_quantity_released_or_voided_or_is_open?
@@ -80,12 +85,50 @@ class WorksOrder < ApplicationRecord
   end
 
   def can_be_voided?
+    return false if grouped? && process_group.frozen?
     release_notes.empty?
   end
 
   def void!
     return false unless can_be_voided?
+    # Pre-freeze, leaving the group is just bookkeeping. Post-freeze,
+    # can_be_voided? already said no - the group's manifest names this WO.
+    process_group.remove_works_order!(self) if grouped?
     update!(voided: true, is_open: false)
+  end
+
+  # ==========================================================================
+  # PROCESS GROUPS - one shared process record across several works orders
+  # whose parts run the identical route (same ops text, same OCV specs), so
+  # one tank load = one sign-off session. The record physically lives on the
+  # group's LEAD works order in customised_process_data, exactly as a solo
+  # WO's record does - the engine below runs unchanged; only quantity and
+  # open/closed semantics widen to the whole group. Members carry no record
+  # of their own: their pages link to the lead.
+  # ==========================================================================
+
+  def grouped?
+    process_group_id.present?
+  end
+
+  # The lead holds the record. First member by WO number at creation;
+  # reassigned only pre-freeze.
+  def process_lead?
+    grouped? && process_group.lead_works_order_id == id
+  end
+
+  def grouped_member?
+    grouped? && !process_lead?
+  end
+
+  def process_record_owner
+    grouped? ? process_group.lead_works_order : self
+  end
+
+  # What batch validations measure against: a lead answers for the whole
+  # tank load, everything else for itself.
+  def record_quantity
+    process_lead? ? process_group.total_quantity : quantity.to_i
   end
 
   def unvoid!
@@ -192,9 +235,19 @@ class WorksOrder < ApplicationRecord
   # the part setup is wrong and every WO for it will do the same thing.
   # Sets the flag the immutability guard yields to; nothing else may.
   def discard_process_record!(user, reason = nil)
+    if grouped_member?
+      raise "This works order's process record is held on WO#{process_record_owner.number} (#{process_group.display_name})"
+    end
     raise "Nothing to discard - this works order has no frozen process record" unless operations_frozen?
-    raise "This works order has release notes; its process record cannot be discarded" unless release_notes.empty?
-    raise "This works order is closed" unless is_open
+    if process_lead?
+      unless process_group.works_orders.all? { |wo| wo.release_notes.empty? }
+        raise "#{process_group.display_name} has release notes; its process record cannot be discarded"
+      end
+      raise "#{process_group.display_name} is complete; its record is read-only" unless process_group.record_open?
+    else
+      raise "This works order has release notes; its process record cannot be discarded" unless release_notes.empty?
+      raise "This works order is closed" unless is_open
+    end
 
     data = customised_process_data || {}
     entry = { "at" => Time.current.iso8601, "by" => user.display_name }
@@ -225,7 +278,13 @@ class WorksOrder < ApplicationRecord
   end
 
   def can_discard_process_record?
-    operations_frozen? && is_open && release_notes.empty?
+    return false if grouped_member?
+    if process_lead?
+      operations_frozen? && process_group.record_open? &&
+        process_group.works_orders.all? { |wo| wo.release_notes.empty? }
+    else
+      operations_frozen? && is_open && release_notes.empty?
+    end
   end
 
   def protect_frozen_process_record
@@ -310,9 +369,17 @@ class WorksOrder < ApplicationRecord
   # printed paper record - only jobs with parts still to process get the
   # live record.
   def paperless_record?
+    # A member's record IS the lead's - its own page renders no record UI,
+    # just a link to the lead (the view gates every record card on this).
+    return false if grouped_member?
     return true if operations_frozen?
-    return false unless is_open
-    return false unless unreleased_quantity > 0
+    if process_lead?
+      return false unless process_group.record_open?
+      return false unless process_group.unreleased_quantity > 0
+    else
+      return false unless is_open
+      return false unless unreleased_quantity > 0
+    end
     part.present? && part.paperless?
   end
 
@@ -321,6 +388,8 @@ class WorksOrder < ApplicationRecord
   def self.paperless_ids(works_orders)
     by_part = {}
     works_orders.select { |wo|
+      # Grouped WOs are rare; take the slow path so lead/member semantics hold.
+      next wo.paperless_record? if wo.process_group_id.present?
       next true  if wo.operations_frozen?
       next false unless wo.is_open
       next false unless wo.unreleased_quantity > 0
@@ -347,7 +416,7 @@ class WorksOrder < ApplicationRecord
   # the last takes the remainder. 48 parts at 1 => 48 x 1. 100 at 30 =>
   # 3 x 30 + 1 x 10. Individual quantities stay editable afterwards for the
   # cases where physical reality diverges.
-  def derive_batch_quantities(per_batch, total = quantity)
+  def derive_batch_quantities(per_batch, total = record_quantity)
     per_batch = per_batch.to_i
     total = total.to_i
     return {} if per_batch < 1 || total < 1
@@ -360,12 +429,12 @@ class WorksOrder < ApplicationRecord
     assert_record_open!
     per_batch = per_batch.to_i
     raise "Parts per batch must be at least 1" if per_batch < 1
-    raise "Parts per batch cannot exceed the order quantity (#{quantity})" if per_batch > quantity.to_i
+    raise "Parts per batch cannot exceed the order quantity (#{record_quantity})" if per_batch > record_quantity
 
     derived = derive_batch_quantities(per_batch)
     count = derived.length
     if count > MAX_BATCHES
-      raise "#{per_batch} per batch on #{quantity} parts gives #{count} batches (max #{MAX_BATCHES})"
+      raise "#{per_batch} per batch on #{record_quantity} parts gives #{count} batches (max #{MAX_BATCHES})"
     end
 
     highest_used = highest_recorded_batch
@@ -531,7 +600,7 @@ class WorksOrder < ApplicationRecord
 
     raise "Choose the operation to fork at" if from < 1
     raise "Parts per batch must be at least 1" if per_batch < 1
-    raise "Parts per batch cannot exceed the order quantity (#{quantity})" if per_batch > quantity.to_i
+    raise "Parts per batch cannot exceed the order quantity (#{record_quantity})" if per_batch > record_quantity
 
     target = ops.find { |o| o["position"] == from }
     raise "No operation at position #{from}" unless target
@@ -557,7 +626,7 @@ class WorksOrder < ApplicationRecord
 
     derived = derive_batch_quantities(per_batch)
     count = derived.length
-    raise "#{per_batch} per batch on #{quantity} parts gives #{count} batches (max #{MAX_BATCHES})" if count > MAX_BATCHES
+    raise "#{per_batch} per batch on #{record_quantity} parts gives #{count} batches (max #{MAX_BATCHES})" if count > MAX_BATCHES
 
     fork = {
       "from_position" => from,
@@ -703,11 +772,19 @@ class WorksOrder < ApplicationRecord
     # each issue said.
 
     data = customised_process_data || {}
-    self.customised_process_data = data.merge(
+    merged = data.merge(
       "operations" => ops,
       "batch_count" => (data["batch_count"] || 1),
       "batches" => (data["batches"] || [])
     )
+    # A group lead's record certifies the whole tank load, so the record
+    # itself states what was on the bar. Freezing also locks membership -
+    # ProcessGroup#frozen? reads this snapshot's existence off the lead.
+    merged["group"] = {
+      "number" => process_group.display_name,
+      "members" => process_group.manifest
+    } if process_lead?
+    self.customised_process_data = merged
     save!
     frozen_operations
   end
@@ -903,6 +980,20 @@ class WorksOrder < ApplicationRecord
   # paperless_record?; this is the write-side half of that split. Controller
   # endpoints rescue the raise into a redirect alert.
   def assert_record_open!
+    if grouped_member?
+      raise "WO#{number} shares its process record with #{process_group.display_name}; " \
+            "record against WO#{process_record_owner.number}"
+    end
+    if process_lead?
+      # The lead may close itself (its own part released and invoiced) while
+      # the rest of the bar is still being processed - the RECORD stays open
+      # until every member is done.
+      unless process_group.record_open?
+        raise "#{process_group.display_name} is complete; its process record is read-only"
+      end
+      raise "WO#{number} is voided; its process record is read-only" if voided?
+      return
+    end
     raise "WO#{number} is closed; its process record is read-only" unless is_open
     raise "WO#{number} is voided; its process record is read-only" if voided?
   end
@@ -1299,6 +1390,13 @@ class WorksOrder < ApplicationRecord
     if fully_released? && is_open?
       update_column(:is_open, false)
     end
+  end
+
+  def leave_process_group
+    process_group.remove_works_order!(self)
+  rescue => e
+    errors.add(:base, e.message)
+    throw :abort
   end
 
   def next_release_note_number

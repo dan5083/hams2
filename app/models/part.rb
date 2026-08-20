@@ -176,6 +176,25 @@ class Part < ApplicationRecord
     end
   end
 
+  # Correct a locked operation's process_type in place, keeping its text
+  # verbatim. Exists for exactly one job: manual ops that ARE a real process
+  # family but were typed in as free text ("manual"), which blocks the
+  # paperless? gate. Retyping e.g. a hand-entered chromic op as
+  # 'chromic_anodising' lets the part go paperless without touching the
+  # wording (so process fingerprints across sibling parts are unaffected).
+  def set_locked_operation_process_type!(position, new_type)
+    return false unless locked_for_editing?
+
+    locked_ops = customisation_data.dig('operation_selection', 'locked_operations') || []
+    operation = locked_ops.find { |op| op['position'] == position }
+    return false unless operation
+
+    operation['process_type'] = new_type.to_s
+    self.customisation_data = customisation_data.dup
+    save!
+    true
+  end
+
   def insert_operation_at(position, operation_text, display_name = nil)
     return false if operation_text.blank?
 
@@ -482,6 +501,42 @@ class Part < ApplicationRecord
     types = get_operations_with_auto_ops.filter_map { |op| op.try(:process_type) }.uniq
     return false if types.any? { |t| NON_PAPERLESS_PROCESS_TYPES.include?(t) }
     types.any? { |t| PAPERLESS_PROCESS_TYPES.include?(t) }
+  end
+
+  # Identity of the physical route, for process-group eligibility: two parts
+  # may share a tank load (one process record) iff their fingerprints match.
+  # Hashes what freezing snapshots - verbatim text and the RESOLVED OCV spec
+  # (explicit or pattern fallback), in order - plus the aero flag (it steers
+  # auto-op insertion and fallbacks).
+  #
+  # Deliberately NOT hashed:
+  #   * op ids - custom ops carry CUSTOM_OP_<timestamp>_<rand> ids, unique per
+  #     part, so identically-worded manual ops on two parts would never match.
+  #     The operation TEXT is the canonical identity (OPERATION_FORMAT.md);
+  #     two ops that read the same and record the same OCV are the same
+  #     physical instruction.
+  #   * the specification field - customer spec references differ between
+  #     parts that run the same physical process, and spec stays per-WO on
+  #     the release note and certificate.
+  #
+  # Computed live, never persisted - ops are generated dynamically, and a
+  # stored hash would go stale the moment a treatment was edited. It is only
+  # read at group create/join time, so the cost lands where it belongs.
+  def process_fingerprint
+    ops = get_operations_with_auto_ops.map do |op|
+      ocv = op.try(:ocv)
+      # Mirror WorksOrder#operation_snapshot: the fallback-resolved spec is
+      # what the frozen record will demand, so it is what must be identical.
+      if ocv.nil? && defined?(OperationLibrary::OcvSpecs)
+        ocv = OperationLibrary::OcvSpecs.fallback_for(op.id, op.operation_text, aerospace_defense: aerospace_defense?)
+      end
+      {
+        "text" => op.operation_text,
+        "ocv" => (ocv.respond_to?(:deep_stringify_keys) ? ocv.deep_stringify_keys : ocv)
+      }
+    end
+    return nil if ops.empty?
+    Digest::SHA256.hexdigest({ "aero" => aerospace_defense?, "ops" => ops }.to_json)
   end
 
   # Main method - get operations with correct ordering including water break test, foil verification, and ENP heat treatments
