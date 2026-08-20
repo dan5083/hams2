@@ -34,6 +34,20 @@ module OperationLibrary
       build([:time, :temp, :volts], batching: batching, basis: basis, **rules)
     end
 
+    # Chromic acid anodise voltage ramp (Bengough-Stuart style cycle): bath
+    # temp, voltage held at the checkpoints the op text names, and the
+    # measured film thickness against spec. Film thickness never blocks the
+    # vat sign-off - it is measured after unjig, and an out-of-range reading
+    # routes through an A-stampholder, not through refusing the vat op.
+    def self.chromic_ramp(batching: nil, basis: :nadcap, **rules)
+      build(
+        [:temp, :v_5min, :v_10min, :v_15min, :v_30min, :v_35min, :film_thickness],
+        batching: batching, basis: basis,
+        optional: [:film_thickness],
+        **rules
+      )
+    end
+
     # One-off field lists (foil verification, test pieces, water break, ...)
     def self.fields(*names, batching: nil, basis: :general, **rules)
       build(names, batching: batching, basis: basis, **rules)
@@ -44,8 +58,28 @@ module OperationLibrary
     # silently going record-less. Matched against the op's id and wording.
     # Only ever consulted when the op has no spec of its own - an explicit
     # spec (including a deliberate nil-field one) always wins upstream.
+    #
+    # Order matters: specific process patterns first, the generic
+    # "*OCV monitoring*" marker last - the marker states that capture is
+    # required without saying what shape, so it takes the standard time/temp
+    # unless a more specific pattern already answered.
     FALLBACK_PATTERNS = [
-      [/heat[\s_-]?treat|bake/i, -> { time_temp }]
+      [/heat[\s_-]?treat|bake/i, -> { time_temp }],
+      [/chromic\s+acid\s+anodise/i, -> { chromic_ramp }],
+      # Copied/manual water break and foil verification ops lost their library
+      # specs; mirror the shapes the library versions carry. ALIGN THESE with
+      # the explicit specs in WaterBreakOperations / the inspection library if
+      # they differ - two shapes for one physical test is worse than none.
+      [/water[\s-]?break/i, -> {
+        fields(:result, :first_failure, basis: :nadcap,
+               required_if: { first_failure: { result: "FAIL" } },
+               blank_as: { first_failure: "None" })
+      }],
+      [/foil\s+verification|elcometer/i, -> {
+        fields(:meter_no, :foil_value_1, :measured_thickness_1,
+               :foil_value_2, :measured_thickness_2, basis: :nadcap)
+      }],
+      [/OCV\s+monitoring/i, -> { time_temp }]
     ].freeze
 
     def self.fallback_for(id, text = nil, aerospace_defense: false)
