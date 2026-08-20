@@ -44,10 +44,16 @@ module OperationLibrary
         },
 
         # Iridite 15 with Keycote and Chromic Etch Process
+        #
+        # Three chemistries in one operation, so one time/temp pair cannot
+        # describe it - each stage that has a stated window gets its own
+        # fields. The 4-second chromic etch is not captured: it is too short
+        # to time meaningfully and has no temperature window.
         {
           id: 'IRIDITE_15',
           process_type: 'chemical_conversion',
           specifications: 'MIL-DTL-5541F Type II (comprising non-hexavalent chromium conversion coatings)',
+          ocv_fields: [:keycote_time, :keycote_temp, :iridite_time, :iridite_temp],
           operation_text: <<~TEXT.strip
             1. Keycote 245 at 35-80°C for 30 to 60 secs
             2. Chromic etch for 4 secs
@@ -56,32 +62,30 @@ module OperationLibrary
         }
       ]
 
-      # Map to Operation objects with conditional OCV
+      # Map to Operation objects with conditional OCV.
+      #
+      # Operation text carries the process, never blanks: what gets recorded
+      # is declared by the OCV spec and drawn by the renderer, on screen or on
+      # paper. As before, capture is aero/defence only - a commercial
+      # conversion job signs off without readings.
       base_operations.map do |op_data|
-        operation_text = op_data[:operation_text]
-
-        # Append OCV monitoring for aerospace/defense
-        if aerospace_defense
-          ocv_text = build_time_temp_monitoring_text
-          operation_text += "\n\n**OCV Monitoring:**\n#{ocv_text}"
-        end
-
         Operation.new(
           id: op_data[:id],
           process_type: op_data[:process_type],
           specifications: op_data[:specifications],
-          operation_text: operation_text
+          operation_text: op_data[:operation_text],
+          ocv: (ocv_spec(op_data) if aerospace_defense)
         )
       end
     end
 
-    # Build time/temp monitoring text (no voltage for chemical conversion)
-    def self.build_time_temp_monitoring_text
-      text_lines = []
-      (1..3).each do |batch|
-        text_lines << "Batch ___: Time ___    Temp ___°C"
-      end
-      text_lines.join("\n")
+    # Time and temperature is the shape for a single-immersion conversion.
+    # An op declaring ocv_fields overrides it - see IRIDITE_15.
+    def self.ocv_spec(op_data)
+      fields = op_data[:ocv_fields]
+      return OcvSpecs.time_temp if fields.blank?
+
+      OcvSpecs.fields(*fields, basis: :nadcap)
     end
   end
 end

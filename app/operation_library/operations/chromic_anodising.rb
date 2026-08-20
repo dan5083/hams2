@@ -10,25 +10,54 @@ module OperationLibrary
       end
     end
 
+    # Minutes into the cycle at which voltage is read, per process. These are
+    # the ramp's transition points - the moments where a reading tells you
+    # something the neighbouring readings don't. The EXPECTED voltage at each
+    # is not repeated here: it is already stated in the operation text's ramp
+    # description, which is the one place it should live.
+    VOLTAGE_CHECKPOINT_MINUTES = {
+      # 40V reached / 40V held / 50V reached / end
+      'CAA_40_50V_40MIN' => [10, 30, 35, 40],
+      # 22V reached / mid-hold / end
+      'CAA_22V_37MIN' => [7, 20, 37]
+    }.freeze
+
+    # Any chromic process not listed above (new id, renamed id) still captures
+    # a sane three readings rather than dropping to temperature alone.
+    DEFAULT_VOLTAGE_CHECKPOINT_MINUTES = [10, 20, 30].freeze
+
+    def self.voltage_checkpoint_minutes(operation_id)
+      VOLTAGE_CHECKPOINT_MINUTES.fetch(operation_id, DEFAULT_VOLTAGE_CHECKPOINT_MINUTES)
+    end
+
+    # OCV spec. Chromic is a ramped process, so a single voltage box would not
+    # describe what happened - the spec names one field per checkpoint and the
+    # renderer draws them, on screen or on paper.
+    #
+    # Measured film thickness is captured on BOTH bases. The operation text
+    # tells the operator to check it against specification either way, so
+    # there is no reading of this job where the figure isn't taken; the only
+    # question is whether it lands somewhere. Aero/defence adds temperature
+    # and the voltage trace on top, per IP2007 sequential capture.
+    def self.ocv_spec(operation_id, aerospace_defense)
+      if aerospace_defense
+        volts = voltage_checkpoint_minutes(operation_id).map { |m| :"volts_#{m}min" }
+        OcvSpecs.fields(:temp, *volts, :film_thickness, basis: :nadcap)
+      else
+        OcvSpecs.fields(:film_thickness, basis: :general)
+      end
+    end
+
     private
 
     def self.create_operation(data, aerospace_defense)
-      # The ending text is now dynamically generated based on aerospace/defense flag
-      base_text = data[:operation_text]
-
-      ending_text = if aerospace_defense
+      # Operation text carries the process and the instruction, never blanks:
+      # what gets recorded is declared by the OCV spec and drawn by the
+      # renderer. Aero/defence and commercial read identically here - the
+      # difference is in how much the spec captures, not in what the operator
+      # is told to do.
+      operation_text = data[:operation_text] +
         " -- check film thickness against specification, if out of range inform an A stampholder"
-      else
-        " -- check film thickness against specification, if out of range inform an A stampholder\n-- record film thickness ___ μm"
-      end
-
-      operation_text = base_text + ending_text
-
-      # Append OCV monitoring for aerospace/defense (chromic has special checkpoints)
-      if aerospace_defense
-        ocv_text = build_chromic_voltage_monitoring_text(data[:id])
-        operation_text += "\n\n**OCV Monitoring:**\n#{ocv_text}"
-      end
 
       Operation.new(
         id: data[:id],
@@ -37,46 +66,9 @@ module OperationLibrary
         anodic_classes: data[:anodic_classes] || [],
         target_thickness: data[:target_thickness] || 0,
         vat_numbers: data[:vat_numbers],
-        operation_text: operation_text
+        operation_text: operation_text,
+        ocv: ocv_spec(data[:id], aerospace_defense)
       )
-    end
-
-    def self.build_chromic_voltage_monitoring_text(operation_id)
-      checkpoints = case operation_id
-      when 'CAA_40_50V_40MIN'
-        # Check at key transition points: 10min (40V reached), 30min (before ramp), 35min (50V reached), 40min (end)
-        [
-          { time: 10, label: '10min (40V)' },
-          { time: 30, label: '30min (40V held)' },
-          { time: 35, label: '35min (50V)' },
-          { time: 40, label: '40min (end)' }
-        ]
-      when 'CAA_22V_37MIN'
-        # Check at: 7min (22V reached), 20min (mid-hold), 37min (end)
-        [
-          { time: 7, label: '7min (22V)' },
-          { time: 20, label: '20min (held)' },
-          { time: 37, label: '37min (end)' }
-        ]
-      else
-        # Fallback for unknown chromic processes
-        [
-          { time: 10, label: '10min' },
-          { time: 20, label: '20min' },
-          { time: 30, label: '30min' }
-        ]
-      end
-
-      # Build monitoring text for 3 batches with chromic-specific checkpoints
-      text_lines = []
-      (1..3).each do |batch|
-        checkpoint_texts = checkpoints.map do |cp|
-          "#{cp[:label]}: ___V"
-        end
-        text_lines << "Batch ___: Temp ___°C [#{checkpoint_texts.join(' | ')}]"
-      end
-
-      text_lines.join("\n")
     end
 
     def self.base_operations
