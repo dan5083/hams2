@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_08_20_102019) do
+ActiveRecord::Schema[8.0].define(version: 2026_08_20_142356) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -230,6 +230,16 @@ ActiveRecord::Schema[8.0].define(version: 2026_08_20_102019) do
     t.index ["replaces_id"], name: "index_parts_on_replaces_id"
   end
 
+  create_table "process_groups", force: :cascade do |t|
+    t.string "number", null: false
+    t.string "process_fingerprint", null: false
+    t.bigint "lead_works_order_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["lead_works_order_id"], name: "index_process_groups_on_lead_works_order_id"
+    t.index ["number"], name: "index_process_groups_on_number", unique: true
+  end
+
   create_table "quality_document_revisions", force: :cascade do |t|
     t.bigint "quality_document_id", null: false
     t.integer "issue_number", null: false
@@ -375,6 +385,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_08_20_102019) do
     t.jsonb "additional_charge_data", default: {}
     t.string "customer_reference"
     t.boolean "is_fully_released", default: false, null: false
+    t.bigint "process_group_id"
     t.index ["additional_charge_data"], name: "index_works_orders_on_additional_charge_data", using: :gin
     t.index ["customer_order_id"], name: "index_works_orders_on_customer_order_id"
     t.index ["customer_reference"], name: "index_works_orders_on_customer_reference"
@@ -383,6 +394,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_08_20_102019) do
     t.index ["number"], name: "index_works_orders_on_number", unique: true
     t.index ["part_id"], name: "index_works_orders_on_part_id"
     t.index ["part_number", "part_issue"], name: "index_works_orders_on_part_number_and_part_issue"
+    t.index ["process_group_id"], name: "index_works_orders_on_process_group_id"
     t.index ["voided"], name: "index_works_orders_on_voided"
     t.check_constraint "lot_price >= 0::numeric AND (each_price IS NULL OR each_price >= 0::numeric)", name: "check_positive_prices"
     t.check_constraint "quantity > 0 AND quantity_released >= 0 AND quantity_released <= quantity", name: "check_positive_quantities"
