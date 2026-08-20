@@ -13,8 +13,10 @@ class SubUserSessionsController < ApplicationController
     when :ok
       Current.session.start_sub_user!(sub_user)
       Rails.logger.info "=== SUB-USER: #{sub_user.name} unlocked on session #{Current.session.id} " \
-                        "(account #{Current.user.email_address}, ip #{request.remote_ip}) ==="
-      redirect_to safe_return_to, notice: "#{sub_user.name} signed in.", status: :see_other
+                        "(account #{Current.user.email_address}, ip #{request.remote_ip}) " \
+                        "last_seen=#{Current.session.reload.sub_user_last_seen_at.inspect} ==="
+      # No flash. The magenta bar and the name in the corner are the receipt.
+      redirect_to safe_return_to, status: :see_other
     when :locked
       Rails.logger.warn "=== SUB-USER: #{sub_user.name} locked out on session #{Current.session.id} ==="
       redirect_to safe_return_to,
@@ -26,9 +28,8 @@ class SubUserSessionsController < ApplicationController
   end
 
   def destroy
-    name = Current.sub_user&.name
     Current.session.end_sub_user!
-    redirect_to safe_return_to, notice: (name ? "#{name} signed out." : "Signed out."), status: :see_other
+    redirect_to safe_return_to, status: :see_other
   end
 
   private

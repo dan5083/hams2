@@ -18,8 +18,17 @@ class Session < ApplicationRecord
     sub_user
   end
 
+  # An unlock only lapses on a clock that has actually run down. A missing
+  # timestamp is a gap in the record, not twenty minutes of idleness - it gets
+  # repaired by the next touch rather than destroying a live unlock, which
+  # otherwise loops: drop the unlock, operator re-keys, drop it again.
   def sub_user_expired?
-    sub_user_last_seen_at.blank? || sub_user_last_seen_at < SUB_USER_IDLE_TIMEOUT.ago
+    return false if sub_user_id.blank?
+
+    seen = sub_user_last_seen_at || sub_user_started_at
+    return false if seen.blank?
+
+    seen < SUB_USER_IDLE_TIMEOUT.ago
   end
 
   def start_sub_user!(record)
