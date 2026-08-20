@@ -1,10 +1,25 @@
-<!-- app/views/shared/_navbar.html.erb - RBAC VERSION -->
-<nav class="bg-blue-600 shadow-lg sticky top-0 z-50" data-controller="navbar">
+<!-- app/views/shared/_navbar.html.erb - RBAC + sub-user (operator) sessions -->
+<%
+  sub = Current.sub_user
+
+  # Both branches are written out as literal class strings so Tailwind's
+  # scanner sees them. Don't build these by interpolating the hex.
+  nav_bg     = sub ? "bg-[#e8028c]"         : "bg-blue-600"
+  nav_panel  = sub ? "bg-[#c00278]"         : "bg-blue-700"
+  nav_active = sub ? "bg-[#a80268]"         : "bg-blue-700"
+  nav_amob   = sub ? "bg-[#8f0257]"         : "bg-blue-800"
+  nav_hover  = sub ? "hover:bg-[#c00278]"   : "hover:bg-blue-500"
+  nav_hovmob = sub ? "hover:bg-[#c00278]"   : "hover:bg-blue-600"
+  nav_border = sub ? "border-[#c00278]"     : "border-blue-600"
+  link_base  = "text-white hover:text-white/80 px-3 py-2 rounded-md text-sm font-medium"
+  mlink_base = "text-white #{nav_hovmob} block px-3 py-2 rounded-md text-base font-medium"
+%>
+<nav class="<%= nav_bg %> shadow-lg sticky top-0 z-50" data-controller="navbar sub-user">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex justify-between h-16">
       <!-- Logo/Brand -->
       <div class="flex items-center">
-        <%= link_to root_path, class: "flex items-center text-white hover:text-blue-100" do %>
+        <%= link_to root_path, class: "flex items-center text-white hover:text-white/80" do %>
           <%= image_tag "logo.svg", alt: "HAMS 2.0", class: "h-8 w-auto mr-3" %>
           <span class="text-xl font-bold">HAMS 2.0</span>
         <% end %>
@@ -12,53 +27,27 @@
 
       <!-- Desktop Navigation -->
       <div class="hidden md:flex items-center space-x-4">
-        <!-- Home - Always visible -->
-        <%= link_to "Home", root_path,
-            class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(root_path)}" %>
-
-        <!-- Customer Orders - Always visible -->
-        <%= link_to "Customer Orders", customer_orders_path,
-            class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(customer_orders_path)}" %>
-
-        <!-- Works Orders - Always visible -->
-        <%= link_to "Works Orders", works_orders_path,
-            class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(works_orders_path)}" %>
-
-        <!-- Release Notes - Always visible -->
-        <%= link_to "Release Notes", release_notes_path,
-            class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(release_notes_path)}" %>
-
-        <!-- Parts - Always visible -->
-        <%= link_to "Parts", parts_path,
-            class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(parts_path)}" %>
+        <%= link_to "Home", root_path, class: "#{link_base} #{nav_active if current_page?(root_path)}" %>
+        <%= link_to "Customer Orders", customer_orders_path, class: "#{link_base} #{nav_active if current_page?(customer_orders_path)}" %>
+        <%= link_to "Works Orders", works_orders_path, class: "#{link_base} #{nav_active if current_page?(works_orders_path)}" %>
+        <%= link_to "Release Notes", release_notes_path, class: "#{link_base} #{nav_active if current_page?(release_notes_path)}" %>
+        <%= link_to "Parts", parts_path, class: "#{link_base} #{nav_active if current_page?(parts_path)}" %>
 
         <!-- NCRs - visible to all except Judy -->
         <% if Current.user&.sees_ncrs? %>
-          <%= link_to "NCRs", external_ncrs_path,
-              class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(external_ncrs_path)}" %>
+          <%= link_to "NCRs", external_ncrs_path, class: "#{link_base} #{nav_active if current_page?(external_ncrs_path)}" %>
         <% end %>
 
-        <!-- Specifications - Always visible -->
-        <%= link_to "Specs", specifications_path,
-            class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(specifications_path)}" %>
-
-        <!-- Quality Manual - Always visible -->
-        <%= link_to "Manual", quality_documents_path,
-            class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(quality_documents_path)}" %>
-
-        <!-- Artifacts - Always visible -->
-        <%= link_to "Artifacts", artifacts_path,
-            class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(artifacts_path)}" %>
-
-        <!-- Skipton Export - Always visible -->
-        <%= link_to "Skipton Export", skipton_exports_path,
-            class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium #{'bg-blue-700' if current_page?(skipton_exports_path)}" %>
+        <%= link_to "Specs", specifications_path, class: "#{link_base} #{nav_active if current_page?(specifications_path)}" %>
+        <%= link_to "Manual", quality_documents_path, class: "#{link_base} #{nav_active if current_page?(quality_documents_path)}" %>
+        <%= link_to "Artifacts", artifacts_path, class: "#{link_base} #{nav_active if current_page?(artifacts_path)}" %>
+        <%= link_to "Skipton Export", skipton_exports_path, class: "#{link_base} #{nav_active if current_page?(skipton_exports_path)}" %>
       </div>
 
       <!-- Mobile menu button -->
       <div class="md:hidden flex items-center">
         <button type="button"
-                class="text-white hover:text-blue-100 hover:bg-blue-500 p-3 rounded-md min-w-[48px] min-h-[48px] flex items-center justify-center"
+                class="text-white hover:text-white/80 <%= nav_hover %> p-3 rounded-md min-w-[48px] min-h-[48px] flex items-center justify-center"
                 data-action="click->navbar#toggleMenu"
                 data-navbar-target="toggleButton">
           <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -70,12 +59,59 @@
       <!-- User menu (desktop) -->
       <div class="hidden md:flex items-center">
         <% if Current.user %>
-          <span class="text-white text-sm mr-4">Hi, <%= Current.user.display_name %></span>
-          <%= link_to "Logout", session_path, method: :delete,
-              class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium" %>
+          <div class="relative mr-2">
+            <button type="button"
+                    class="flex items-center gap-2 text-white <%= nav_hover %> px-3 py-2 rounded-md text-sm font-medium"
+                    data-action="click->sub-user#toggleMenu">
+              <% if sub %>
+                <span class="flex h-2 w-2 rounded-full bg-white"></span>
+                <span class="font-semibold"><%= sub.name %></span>
+                <span class="text-white/70 text-xs">via <%= Current.user.display_name %></span>
+              <% else %>
+                <span>Hi, <%= Current.user.display_name %></span>
+              <% end %>
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            <!-- Sub-user dropdown -->
+            <div class="hidden absolute right-0 mt-1 w-64 bg-white rounded-md shadow-xl ring-1 ring-black/10 py-1 max-h-[70vh] overflow-y-auto"
+                 data-sub-user-target="menu">
+              <% if sub %>
+                <div class="px-4 py-2 text-xs text-gray-500 border-b border-gray-100">
+                  Signed on as <span class="font-semibold text-gray-900"><%= sub.name %></span>
+                </div>
+                <%= button_to "Sign out #{sub.name}", sub_user_session_path(return_to: request.fullpath),
+                      method: :delete,
+                      form_class: "block",
+                      class: "w-full text-left px-4 py-3 text-sm font-medium text-[#e8028c] hover:bg-gray-50" %>
+                <div class="px-4 py-2 text-xs text-gray-500 border-t border-gray-100">Switch to</div>
+              <% else %>
+                <div class="px-4 py-2 text-xs text-gray-500 border-b border-gray-100">Sign on as operator</div>
+              <% end %>
+
+              <% SubUser.enabled.in_order.each do |candidate| %>
+                <% next if sub && candidate.id == sub.id %>
+                <button type="button"
+                        class="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"
+                        data-action="click->sub-user#choose"
+                        data-sub-user-id-param="<%= candidate.id %>"
+                        data-sub-user-name-param="<%= candidate.name %>">
+                  <%= candidate.name %>
+                </button>
+              <% end %>
+
+              <div class="border-t border-gray-100 mt-1 pt-1">
+                <%= button_to "Log out #{Current.user.display_name}", session_path,
+                      method: :delete,
+                      form_class: "block",
+                      class: "w-full text-left px-4 py-3 text-sm text-gray-500 hover:bg-gray-50" %>
+              </div>
+            </div>
+          </div>
         <% else %>
-          <%= link_to "Login", new_session_path,
-              class: "text-white hover:text-blue-100 px-3 py-2 rounded-md text-sm font-medium" %>
+          <%= link_to "Login", new_session_path, class: link_base %>
         <% end %>
       </div>
     </div>
@@ -83,54 +119,114 @@
 
   <!-- Mobile menu -->
   <div class="md:hidden hidden" data-navbar-target="mobileMenu">
-    <div class="px-2 pt-2 pb-3 space-y-1 bg-blue-700">
-      <!-- Always visible mobile links -->
-      <%= link_to "Home", root_path,
-          class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(root_path)}" %>
-      <%= link_to "Customer Orders", customer_orders_path,
-          class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(customer_orders_path)}" %>
-      <%= link_to "Works Orders", works_orders_path,
-          class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(works_orders_path)}" %>
-      <%= link_to "Release Notes", release_notes_path,
-          class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(release_notes_path)}" %>
-      <%= link_to "Parts", parts_path,
-          class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(parts_path)}" %>
+    <div class="px-2 pt-2 pb-3 space-y-1 <%= nav_panel %>">
+      <%= link_to "Home", root_path, class: "#{mlink_base} #{nav_amob if current_page?(root_path)}" %>
+      <%= link_to "Customer Orders", customer_orders_path, class: "#{mlink_base} #{nav_amob if current_page?(customer_orders_path)}" %>
+      <%= link_to "Works Orders", works_orders_path, class: "#{mlink_base} #{nav_amob if current_page?(works_orders_path)}" %>
+      <%= link_to "Release Notes", release_notes_path, class: "#{mlink_base} #{nav_amob if current_page?(release_notes_path)}" %>
+      <%= link_to "Parts", parts_path, class: "#{mlink_base} #{nav_amob if current_page?(parts_path)}" %>
 
       <!-- Quality submenu (mobile) -->
-      <div class="border-t border-blue-600 mt-2 pt-2">
+      <div class="border-t <%= nav_border %> mt-2 pt-2">
         <div class="text-white text-xs font-semibold px-3 py-1">QUALITY</div>
         <% if Current.user&.sees_ncrs? %>
-          <%= link_to "NCRs", external_ncrs_path,
-              class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(external_ncrs_path)}" %>
+          <%= link_to "NCRs", external_ncrs_path, class: "#{mlink_base} #{nav_amob if current_page?(external_ncrs_path)}" %>
         <% end %>
-        <%= link_to "Specs", specifications_path,
-            class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(specifications_path)}" %>
-        <%= link_to "Manual", quality_documents_path,
-            class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(quality_documents_path)}" %>
+        <%= link_to "Specs", specifications_path, class: "#{mlink_base} #{nav_amob if current_page?(specifications_path)}" %>
+        <%= link_to "Manual", quality_documents_path, class: "#{mlink_base} #{nav_amob if current_page?(quality_documents_path)}" %>
       </div>
 
-      <%= link_to "Artifacts", artifacts_path,
-          class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(artifacts_path)}" %>
+      <%= link_to "Artifacts", artifacts_path, class: "#{mlink_base} #{nav_amob if current_page?(artifacts_path)}" %>
+      <%= link_to "Skipton Export", skipton_exports_path, class: "#{mlink_base} #{nav_amob if current_page?(skipton_exports_path)}" %>
 
-      <!-- Skipton Export - Always visible -->
-      <%= link_to "Skipton Export", skipton_exports_path,
-          class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium #{'bg-blue-800' if current_page?(skipton_exports_path)}" %>
-
-      <!-- User section in mobile -->
+      <!-- Operator section (mobile) -->
       <% if Current.user %>
-        <div class="border-t border-blue-600 pt-4">
-          <div class="text-white text-sm px-3 py-2">
-            Logged in as <%= Current.user.display_name %>
+        <div class="border-t <%= nav_border %> pt-3 mt-2">
+          <div class="text-white text-sm px-3 py-1">
+            <% if sub %>
+              Signed on as <span class="font-semibold"><%= sub.name %></span><br>
+              <span class="text-white/70 text-xs">on <%= Current.user.display_name %>'s login</span>
+            <% else %>
+              Logged in as <%= Current.user.display_name %>
+            <% end %>
           </div>
-          <%= link_to "Logout", session_path, method: :delete,
-              class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium" %>
+
+          <% if sub %>
+            <%= button_to "Sign out #{sub.name}", sub_user_session_path(return_to: request.fullpath),
+                  method: :delete, form_class: "block",
+                  class: "w-full text-left #{mlink_base}" %>
+          <% end %>
+
+          <div class="text-white text-xs font-semibold px-3 pt-3 pb-1">SIGN ON AS</div>
+          <% SubUser.enabled.in_order.each do |candidate| %>
+            <% next if sub && candidate.id == sub.id %>
+            <button type="button"
+                    class="w-full text-left <%= mlink_base %>"
+                    data-action="click->sub-user#choose"
+                    data-sub-user-id-param="<%= candidate.id %>"
+                    data-sub-user-name-param="<%= candidate.name %>">
+              <%= candidate.name %>
+            </button>
+          <% end %>
+
+          <div class="border-t <%= nav_border %> mt-2 pt-2">
+            <%= button_to "Log out #{Current.user.display_name}", session_path,
+                  method: :delete, form_class: "block",
+                  class: "w-full text-left #{mlink_base} text-white/70" %>
+          </div>
         </div>
       <% else %>
-        <div class="border-t border-blue-600 pt-4">
-          <%= link_to "Login", new_session_path,
-              class: "text-white hover:bg-blue-600 block px-3 py-2 rounded-md text-base font-medium" %>
+        <div class="border-t <%= nav_border %> pt-4">
+          <%= link_to "Login", new_session_path, class: mlink_base %>
         </div>
       <% end %>
     </div>
   </div>
+
+  <!-- PIN pad -->
+  <% if Current.user %>
+    <div class="hidden fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4"
+         data-sub-user-target="modal"
+         data-action="click->sub-user#backdrop keydown@window->sub-user#key">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6" data-sub-user-target="card">
+        <div class="text-center">
+          <p class="text-xs uppercase tracking-wide text-gray-500">Enter PIN</p>
+          <p class="text-xl font-bold text-gray-900 mt-1" data-sub-user-target="name">&nbsp;</p>
+        </div>
+
+        <%= form_with url: sub_user_session_path, method: :post, data: { turbo: false } do |f| %>
+          <%= hidden_field_tag :sub_user_id, nil, data: { sub_user_target: "id" } %>
+          <%= hidden_field_tag :return_to, request.fullpath %>
+          <%= hidden_field_tag :pin, nil, data: { sub_user_target: "pin" } %>
+
+          <div class="flex justify-center gap-3 my-6" data-sub-user-target="dots">
+            <% 4.times do %>
+              <span class="h-4 w-4 rounded-full border-2 border-gray-300"></span>
+            <% end %>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2">
+            <% %w[1 2 3 4 5 6 7 8 9].each do |digit| %>
+              <button type="button"
+                      class="h-16 rounded-xl bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-2xl font-semibold text-gray-900"
+                      data-action="click->sub-user#digit"
+                      data-sub-user-digit-param="<%= digit %>"><%= digit %></button>
+            <% end %>
+            <button type="button"
+                    class="h-16 rounded-xl bg-gray-50 hover:bg-gray-100 text-sm font-medium text-gray-500"
+                    data-action="click->sub-user#close">Cancel</button>
+            <button type="button"
+                    class="h-16 rounded-xl bg-gray-100 hover:bg-gray-200 text-2xl font-semibold text-gray-900"
+                    data-action="click->sub-user#digit"
+                    data-sub-user-digit-param="0">0</button>
+            <button type="button"
+                    class="h-16 rounded-xl bg-gray-50 hover:bg-gray-100 text-sm font-medium text-gray-500"
+                    data-action="click->sub-user#backspace">Delete</button>
+          </div>
+
+          <%= f.submit "Sign on", class: "hidden", data: { sub_user_target: "submit" } %>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
 </nav>

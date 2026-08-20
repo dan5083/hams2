@@ -2,6 +2,14 @@
 class WorksOrdersController < ApplicationController
   before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :invoice_to_date, :void, :unvoid, :sign_off_operation, :save_ocv, :set_batch_count, :set_parts_per_batch, :set_batch_qty, :add_fork, :remove_fork, :discard_process_record]
 
+  # Marks on a process record are attributed to Current.actor - the operator
+  # unlocked with a PIN if there is one, otherwise the account holder. That
+  # keeps today's behaviour intact while sub-users bed in. Uncomment to make a
+  # named operator mandatory before anything can be signed or re-batched.
+  #
+  # require_sub_user only: [:sign_off_operation, :save_ocv, :set_parts_per_batch,
+  #                         :set_batch_qty, :set_batch_count, :add_fork, :remove_fork]
+
  def index
     @works_orders = WorksOrder.includes(:customer_order, :part, customer: [])
 
@@ -223,7 +231,7 @@ class WorksOrdersController < ApplicationController
   # Paperless process record: operator sign-off per operation per batch
   def sign_off_operation
     return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
-    @works_order.sign_off_operation!(params[:position], params[:batch], Current.user)
+    @works_order.sign_off_operation!(params[:position], params[:batch], Current.actor)
     redirect_to process_record_path(params[:position].to_i, advance_from: params[:batch]),
                 notice: "Operation #{params[:position]} batch #{params[:batch]} signed off.",
                 status: :see_other
@@ -235,11 +243,11 @@ class WorksOrdersController < ApplicationController
   def save_ocv
     return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
     readings = params.fetch(:readings, {}).permit!.to_h
-    @works_order.save_ocv_readings!(params[:position], readings, Current.user) if readings.present?
+    @works_order.save_ocv_readings!(params[:position], readings, Current.actor) if readings.present?
     checklist = params.fetch(:checklist, {}).permit!.to_h
-    @works_order.save_checklist_responses!(params[:position], checklist, Current.user) if checklist.present?
+    @works_order.save_checklist_responses!(params[:position], checklist, Current.actor) if checklist.present?
     if params[:sign_off_batch].present?
-      @works_order.sign_off_operation!(params[:position], params[:sign_off_batch], Current.user)
+      @works_order.sign_off_operation!(params[:position], params[:sign_off_batch], Current.actor)
       notice = "Readings saved; operation #{params[:position]} batch #{params[:sign_off_batch]} signed off."
       target = process_record_path(params[:position].to_i, advance_from: params[:sign_off_batch])
     else

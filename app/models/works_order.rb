@@ -795,7 +795,7 @@ class WorksOrder < ApplicationRecord
 
       if row != (op.dig("ocv_readings", key) || {})
         (op["ocv_readings"] ||= {})[key] = row
-        op["ocv_recorded_by"] ||= { "id" => user.id, "name" => user.display_name }
+        op["ocv_recorded_by"] ||= signature_for(user)
       end
 
       items = OperationLibrary::ContractReviewOperations.resolve_checklist(op["ocv"]["checklist"])
@@ -808,11 +808,26 @@ class WorksOrder < ApplicationRecord
       end
     end
 
-    op["sign_offs"][key] = { "id" => user.id, "name" => user.display_name }
+    op["sign_offs"][key] = signature_for(user)
     stamp_batch_date(key.to_i, section: section) unless wo_scoped
     customised_process_data_will_change!
     save!
     remember_part_checklist_answers(op)
+  end
+
+  # Who a mark on the process record belongs to. A sub-user is a named
+  # operator who unlocked this terminal with a PIN: they sign in their own
+  # name, with the account they came in through recorded alongside so the
+  # chain from mark back to login is never broken. Marks made before
+  # sub-users existed carry no "kind" key and read back as account sign-offs,
+  # which is exactly what they were.
+  def signature_for(actor)
+    stamp = { "id" => actor.id, "name" => actor.display_name }
+    if actor.is_a?(SubUser)
+      stamp["kind"] = "sub_user"
+      stamp["via"]  = Current.user&.display_name
+    end
+    stamp
   end
 
   # responses: { item_id => {"answer" => "YES"/"NO", "comment" => "..."} }.
@@ -835,7 +850,7 @@ class WorksOrder < ApplicationRecord
 
     op["checklist_responses"] = cleaned
     op["checklist_issue"] = OperationLibrary::ContractReviewOperations::ISSUE
-    op["checklist_completed_by"] = { "id" => user.id, "name" => user.display_name }
+    op["checklist_completed_by"] = signature_for(user)
     customised_process_data_will_change!
     save!
   end
@@ -882,7 +897,7 @@ class WorksOrder < ApplicationRecord
     end
 
     op["ocv_readings"] = existing.merge(cleaned)
-    op["ocv_recorded_by"] = { "id" => user.id, "name" => user.display_name }
+    op["ocv_recorded_by"] = signature_for(user)
     customised_process_data_will_change!
     save!
   end
