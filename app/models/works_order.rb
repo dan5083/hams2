@@ -295,9 +295,10 @@ class WorksOrder < ApplicationRecord
     frozen_operations.present?
   end
 
-  # Pilot gate: the interactive process record is live for open WOs with
-  # electroless nickel work only. Widen per process family as each area goes
-  # paperless; delete once everything has.
+  # Pilot gate. Whether a route has a digital process record at all is a
+  # property of the PART, not of this works order - see Part#paperless? for
+  # the process families in and out. What lives here is the works-order half:
+  # when a paperless part's record is live.
   #
   # A frozen record is viewable FOREVER - closing (or voiding) a works order
   # must never hide its completed process record. Mutation is a separate
@@ -308,13 +309,11 @@ class WorksOrder < ApplicationRecord
   # paperless rollout (or are effectively finished) and complete on their
   # printed paper record - only jobs with parts still to process get the
   # live record.
-  PAPERLESS_PROCESS_TYPES = %w[electroless_nickel_plating].freeze
-
   def paperless_record?
     return true if operations_frozen?
     return false unless is_open
     return false unless unreleased_quantity > 0
-    operations_with_auto_ops.any? { |op| PAPERLESS_PROCESS_TYPES.include?(op.process_type) }
+    part.present? && part.paperless?
   end
 
   # Same gate as #paperless_record?, for a loaded collection. Memoises the part
@@ -326,12 +325,9 @@ class WorksOrder < ApplicationRecord
       next false unless wo.is_open
       next false unless wo.unreleased_quantity > 0
       next false if wo.part_id.blank?
+      next false if wo.part.blank?
 
-      by_part.fetch(wo.part_id) do
-        by_part[wo.part_id] = wo.operations_with_auto_ops.any? { |op|
-          PAPERLESS_PROCESS_TYPES.include?(op.process_type)
-        }
-      end
+      by_part.fetch(wo.part_id) { by_part[wo.part_id] = wo.part.paperless? }
     }.map(&:id).to_set
   end
 

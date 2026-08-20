@@ -450,6 +450,40 @@ class Part < ApplicationRecord
     selected_enp_pre_heat_treatment.present? && selected_enp_pre_heat_treatment != 'none'
   end
 
+  # ============================================================================
+  # PAPERLESS ROLLOUT GATE
+  # ============================================================================
+  #
+  # Whether a part's process record is kept on screen or on paper. Works
+  # orders read this through WorksOrder#paperless_record?, which adds the
+  # per-WO conditions (frozen / open / still to release).
+  #
+  # A part goes paperless when its route includes a process family that has a
+  # digital record, and never when it includes hard or sulphuric anodising -
+  # those lines are still on paper, and they take the whole part with them.
+  # Half a job on screen and half on a route card is worse than all of it on
+  # the card. Widen PAPERLESS_PROCESS_TYPES per family as each area goes over;
+  # delete both lists once everything has.
+  PAPERLESS_PROCESS_TYPES = %w[
+    electroless_nickel_plating
+    chromic_anodising
+    chemical_conversion
+  ].freeze
+
+  NON_PAPERLESS_PROCESS_TYPES = %w[
+    hard_anodising
+    standard_anodising
+  ].freeze
+
+  # Deliberately unmemoised: operation_selection is mutated and re-rendered
+  # within a single request, and a memo here would answer from the route the
+  # part had before the edit.
+  def paperless?
+    types = get_operations_with_auto_ops.filter_map { |op| op.try(:process_type) }.uniq
+    return false if types.any? { |t| NON_PAPERLESS_PROCESS_TYPES.include?(t) }
+    types.any? { |t| PAPERLESS_PROCESS_TYPES.include?(t) }
+  end
+
   # Main method - get operations with correct ordering including water break test, foil verification, and ENP heat treatments
   def get_operations_with_auto_ops
     # If locked, return the locked operations as Operation-like objects
