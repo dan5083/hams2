@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_08_15_092522) do
+ActiveRecord::Schema[8.0].define(version: 2026_08_20_102019) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -291,6 +291,10 @@ ActiveRecord::Schema[8.0].define(version: 2026_08_15_092522) do
     t.string "user_agent"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "sub_user_id"
+    t.datetime "sub_user_started_at"
+    t.datetime "sub_user_last_seen_at"
+    t.index ["sub_user_id"], name: "index_sessions_on_sub_user_id"
     t.index ["user_id"], name: "index_sessions_on_user_id"
   end
 
@@ -320,6 +324,17 @@ ActiveRecord::Schema[8.0].define(version: 2026_08_15_092522) do
     t.index ["is_qs"], name: "index_specifications_on_is_qs"
     t.index ["title"], name: "index_specifications_on_title"
     t.index ["updated_by_id"], name: "index_specifications_on_updated_by_id"
+  end
+
+  create_table "sub_users", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "pin_digest"
+    t.boolean "enabled", default: true, null: false
+    t.integer "failed_pin_count", default: 0, null: false
+    t.datetime "pin_locked_until"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_sub_users_on_name", unique: true
   end
 
   create_table "users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -420,6 +435,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_08_15_092522) do
   add_foreign_key "quality_document_revisions", "quality_documents"
   add_foreign_key "release_notes", "users", column: "issued_by_id"
   add_foreign_key "release_notes", "works_orders"
+  add_foreign_key "sessions", "sub_users"
   add_foreign_key "sessions", "users"
   add_foreign_key "specifications", "users", column: "created_by_id"
   add_foreign_key "specifications", "users", column: "updated_by_id"

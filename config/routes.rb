@@ -1,6 +1,7 @@
 Rails.application.routes.draw do
   # Authentication routes
   resource :session
+  resource :sub_user_session, only: [ :create, :destroy ]
   resources :passwords, param: :token
   resources :registrations, only: [:new, :create]
 
