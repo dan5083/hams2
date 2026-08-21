@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_08_20_142356) do
+ActiveRecord::Schema[8.0].define(version: 2026_08_21_070833) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -233,9 +233,9 @@ ActiveRecord::Schema[8.0].define(version: 2026_08_20_142356) do
   create_table "process_groups", force: :cascade do |t|
     t.string "number", null: false
     t.string "process_fingerprint", null: false
-    t.bigint "lead_works_order_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.uuid "lead_works_order_id"
     t.index ["lead_works_order_id"], name: "index_process_groups_on_lead_works_order_id"
     t.index ["number"], name: "index_process_groups_on_number", unique: true
   end

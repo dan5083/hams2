@@ -29,7 +29,18 @@ class ProcessGroup < ApplicationRecord
   validates :process_fingerprint, presence: true
 
   before_validation :set_number, if: :new_record?
+  # A group must never be leadless while it has members - the record lives on
+  # the lead and every member page resolves through it. Belt (write): heal the
+  # column on any save. Braces (read): lead_works_order below falls back to
+  # the first member, so even a bad row renders instead of 500ing.
+  before_save :ensure_lead
   before_destroy :guard_destroy
+
+  # Read-side fallback for a leadless row. Deliberately does not write - a
+  # GET must not mutate; the next save (or a console repair) fixes the column.
+  def lead_works_order
+    super || works_orders.order(:number).first
+  end
 
   def display_name
     "PG#{number}"
@@ -156,6 +167,10 @@ class ProcessGroup < ApplicationRecord
     sequence = Sequence.find_or_create_by(key: 'process_group_number')
     self.number = sequence.value
     sequence.increment!(:value)
+  end
+
+  def ensure_lead
+    self.lead_works_order_id ||= works_orders.order(:number).pick(:id)
   end
 
   # A frozen group's record references this row (display_name in the
