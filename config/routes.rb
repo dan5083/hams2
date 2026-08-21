@@ -80,13 +80,23 @@ Rails.application.routes.draw do
       patch :invoice_to_date
     end
 
-
     # 5. Release Notes nested under works orders
     resources :release_notes, except: [:index] do
       member do
         patch :void
         get :pdf
       end
+    end
+  end
+
+  # 3.5 Process groups - several works orders sharing one process record
+  # (one tank load, one sign-off). Created from the customer order page;
+  # top-level because a group spans works orders and belongs to none of them.
+  resources :process_groups, only: [:create] do
+    member do
+      patch :add_works_order
+      patch :remove_works_order
+      delete :ungroup
     end
   end
 
