@@ -60,8 +60,17 @@ class CustomerOrdersController < ApplicationController
 
   def show
     @works_orders = @customer_order.works_orders
-                                   .includes(:part)
+                                   .includes(:part, :process_group)
                                    .order(created_at: :desc)
+
+    # Rows offered a "batch together" checkbox: open, ungrouped, unreleased.
+    # Route identity (process fingerprints) is enforced server-side by
+    # ProcessGroup.create_for! on submit, not guessed at render time.
+    released_ids = ReleaseNote.where(works_order_id: @works_orders.map(&:id))
+                              .distinct.pluck(:works_order_id)
+    @batchable_wo_ids = @works_orders.select { |wo|
+      wo.is_open && !wo.voided && !wo.grouped? && !released_ids.include?(wo.id)
+    }.map(&:id)
 
     # Fetch part WO counts in one query rather than once per row
     part_ids = @works_orders.map(&:part_id).compact

@@ -170,9 +170,31 @@
 
     <% if @works_orders.any? %>
       <div class="overflow-x-auto">
+      <%# Batching: tick two or more open, ungrouped, unreleased WOs and batch
+          them into one process group (one shared record, one sign-off per
+          tank load). Route identity is enforced on submit - parts that don't
+          run the identical process are refused with a message naming them. %>
+      <%= form_with url: process_groups_path, method: :post, local: true do %>
+        <% if @batchable_wo_ids.length >= 2 %>
+          <div class="flex items-center justify-between mb-2">
+            <p class="text-xs text-gray-500">
+              Tick works orders that will run as one tank load, then batch them —
+              they'll share a single process record and sign-off.
+            </p>
+            <button type="submit"
+                    class="bg-indigo-500 hover:bg-indigo-700 text-white text-sm font-bold py-1.5 px-3 rounded">
+              Batch together
+            </button>
+          </div>
+        <% end %>
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>
+              <% if @batchable_wo_ids.length >= 2 %>
+                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Batch
+                </th>
+              <% end %>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 WO Number
               </th>
@@ -204,8 +226,23 @@
 
               %>
               <tr class="hover:bg-gray-50">
+                <% if @batchable_wo_ids.length >= 2 %>
+                  <td class="px-3 py-4 whitespace-nowrap">
+                    <% if @batchable_wo_ids.include?(works_order.id) %>
+                      <%= check_box_tag "wo_ids[]", works_order.id, false,
+                          id: "batch_wo_#{works_order.id}",
+                          class: "h-4 w-4 text-indigo-600 border-gray-300 rounded" %>
+                    <% end %>
+                  </td>
+                <% end %>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                   <%= link_to "WO#{works_order.number}", works_order, class: "text-blue-600 hover:text-blue-900" %>
+                  <% if works_order.grouped? %>
+                    <span class="ml-1 inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800"
+                          title="<%= works_order.process_lead? ? "Holds the shared process record for this tank load" : "Processed as one tank load; record on WO#{works_order.process_record_owner.number}" %>">
+                      <%= works_order.process_group.display_name %><%= " ● record" if works_order.process_lead? %>
+                    </span>
+                  <% end %>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   <%= works_order.part_number %>-<%= works_order.part_issue %>
@@ -262,9 +299,19 @@
                     <%= link_to "View", works_order, class: "text-blue-600 hover:text-blue-900" %>
                     <% unless works_order.voided %>
                       <%= link_to "Edit", edit_works_order_path(works_order), class: "text-yellow-600 hover:text-yellow-900" %>
-                      <% if @paperless_wo_ids.include?(works_order.id) %>
+                      <% if works_order.grouped_member? %>
+                        <%= link_to "📱 #{works_order.process_group.display_name} → WO#{works_order.process_record_owner.number}",
+                            works_order_path(works_order.process_record_owner),
+                            title: "Processed as one tank load - the shared process record is on WO#{works_order.process_record_owner.number}. No route card is printed for this works order.",
+                            class: "text-indigo-600 hover:text-indigo-900" %>
+                      <% elsif works_order.process_lead? %>
+                        <%= link_to "📱 #{works_order.process_group.display_name} record",
+                            works_order_path(works_order),
+                            title: "Holds the shared process record for the whole tank load (#{works_order.process_group.total_quantity} parts) - kept in HAMS only, no route card",
+                            class: "text-indigo-600 hover:text-indigo-900" %>
+                      <% elsif @paperless_wo_ids.include?(works_order.id) %>
                         <span class="text-gray-400 cursor-help"
-                              title="ENP process records are kept in HAMS only - no route card">
+                              title="Process records are kept in HAMS only - no route card">
                           📱 Paperless
                         </span>
                       <% else %>
@@ -278,6 +325,7 @@
             <% end %>
           </tbody>
         </table>
+      <% end %>
       </div>
     <% else %>
       <div class="text-center py-8">
