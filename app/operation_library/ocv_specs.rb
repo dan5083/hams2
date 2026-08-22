@@ -85,10 +85,21 @@ module OperationLibrary
       [/OCV\s+monitoring/i, -> { time_temp }]
     ].freeze
 
+    # Commercial (non-aero) stored ops get the same capture the library gives
+    # commercial parts: film thickness only, :general basis. The full traces
+    # above stay aero-gated - IP2007 sequential capture is an aero/defence
+    # requirement - but the thickness figure is taken on every anodising job,
+    # and a spec is the only way it lands anywhere now the paper blank is gone.
+    COMMERCIAL_FALLBACK_PATTERNS = [
+      [/hard\s+anodise|standard\s+anodise|sulphuric\s+anodise|chromic\s+acid\s+anodise/i, -> {
+        fields(:film_thickness, basis: :general)
+      }]
+    ].freeze
+
     def self.fallback_for(id, text = nil, aerospace_defense: false)
-      return nil unless aerospace_defense
       haystack = "#{id} #{text}"
-      FALLBACK_PATTERNS.each do |pattern, spec|
+      patterns = aerospace_defense ? FALLBACK_PATTERNS : COMMERCIAL_FALLBACK_PATTERNS
+      patterns.each do |pattern, spec|
         return spec.call if haystack.match?(pattern)
       end
       nil
