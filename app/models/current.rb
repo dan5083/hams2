@@ -1,6 +1,3 @@
-# NOTE: this is the Rails 8 generated Current plus two class methods. If your
-# existing app/models/current.rb has anything else on it, just paste the two
-# methods in rather than replacing the file.
 class Current < ActiveSupport::CurrentAttributes
   attribute :session
   delegate :user, to: :session, allow_nil: true
@@ -11,9 +8,14 @@ class Current < ActiveSupport::CurrentAttributes
   end
 
   # Who a mark on the record belongs to. The sub-user when one is unlocked,
-  # otherwise the account holder. Permissions still come from Current.user -
-  # a PIN unlock adds an identity, it doesn't grant access.
+  # otherwise the account holder - unless the account holder is one that may
+  # never be named on a record (the kiosk), in which case there is no actor
+  # and anything that stamps must demand a PIN unlock first.
+  #
+  # Permissions still come from Current.user - a PIN unlock adds an identity,
+  # it doesn't grant access.
   def self.actor
-    sub_user || user
+    candidate = sub_user || user
+    candidate if candidate&.can_sign_off?
   end
 end

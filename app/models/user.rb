@@ -1,6 +1,12 @@
 class User < ApplicationRecord
+  KIOSK_EMAIL = "kiosk@hardanodisingstl.com".freeze
+
   has_secure_password
   has_many :sessions, dependent: :destroy
+
+  # This login's operator identity. nullify, never destroy - historical
+  # sign-offs name the operator row and it must outlive the login.
+  has_one :sub_user, dependent: :nullify
 
   normalizes :email_address, with: ->(e) { e.strip.downcase }
 
@@ -19,6 +25,10 @@ class User < ApplicationRecord
   # Default enabled to true for new users
   after_initialize :set_defaults, if: :new_record?
 
+  # Users are created in the console only. Every real person gets an operator
+  # identity at the same moment, so they can PIN on at any terminal.
+  after_create :ensure_sub_user!
+
   scope :enabled, -> { where(enabled: true) }
   scope :disabled, -> { where(enabled: false) }
 
@@ -28,6 +38,33 @@ class User < ApplicationRecord
 
   def active?
     enabled
+  end
+
+  def kiosk?
+    email_address == KIOSK_EMAIL
+  end
+
+  # Whether a mark on a process record may be attributed to this account when
+  # no operator is unlocked. The kiosk is a shared login with no name of its
+  # own, so never.
+  def can_sign_off?
+    !kiosk?
+  end
+
+  # Creates (or claims, by exact name match) this user's operator row. Safe to
+  # re-run; used by the console backfill as well as after_create. Claiming an
+  # existing floor operator avoids two rows for one person, but check the dry
+  # run - two different people with the same full name would bind wrongly.
+  def ensure_sub_user!
+    return if kiosk?
+    return if sub_user.present?
+
+    existing = SubUser.floor.find_by(name: full_name)
+    if existing
+      existing.update!(user: self)
+    else
+      SubUser.create!(name: full_name, user: self, enabled: enabled != false)
+    end
   end
 
   # Magic link token generation

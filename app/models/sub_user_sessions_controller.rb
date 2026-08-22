@@ -3,7 +3,9 @@ class SubUserSessionsController < ApplicationController
              with: -> { redirect_back fallback_location: root_path, alert: "Too many PIN attempts. Wait a moment." }
 
   def create
-    sub_user = SubUser.enabled.find_by(id: params[:sub_user_id])
+    # signable rather than enabled: an operator whose staff login has been
+    # disabled can no longer be found here, so their PIN dies with the login.
+    sub_user = SubUser.signable.find_by(id: params[:sub_user_id])
 
     unless sub_user
       return redirect_to safe_return_to, alert: "That operator isn't set up.", status: :see_other

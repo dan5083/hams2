@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_08_21_070833) do
+ActiveRecord::Schema[8.0].define(version: 2026_08_22_134920) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -344,7 +344,9 @@ ActiveRecord::Schema[8.0].define(version: 2026_08_21_070833) do
     t.datetime "pin_locked_until"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.uuid "user_id"
     t.index ["name"], name: "index_sub_users_on_name", unique: true
+    t.index ["user_id"], name: "index_sub_users_on_user_id", unique: true
   end
 
   create_table "users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -451,6 +453,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_08_21_070833) do
   add_foreign_key "sessions", "users"
   add_foreign_key "specifications", "users", column: "created_by_id"
   add_foreign_key "specifications", "users", column: "updated_by_id"
+  add_foreign_key "sub_users", "users"
   add_foreign_key "works_orders", "customer_orders"
   add_foreign_key "works_orders", "parts"
 end
