@@ -2,70 +2,56 @@
 module OperationLibrary
   class AnodisingHard
     def self.operations(aerospace_defense = nil)
-        Rails.logger.info "🔍 AnodisingHard.operations called with aerospace_defense: #{aerospace_defense.inspect}"
-
       # Default to aerospace/defense true if not specified to maintain existing behavior
       aerospace_defense = true if aerospace_defense.nil?
-
-        Rails.logger.info "🔍 AnodisingHard.operations using aerospace_defense: #{aerospace_defense.inspect}"
 
       base_operations.map do |operation_data|
         create_operation(operation_data, aerospace_defense)
       end
     end
 
+    # OCV spec, chromic-doctrine (see AnodisingChromic): the op text carries
+    # the process and the instruction, never blanks; WHAT gets recorded is
+    # declared here and drawn by the renderer, on screen or on paper.
+    #
+    # Hard anodise ramps read every 5 minutes for the length of the cycle -
+    # the shape the old baked-in "**OCV Monitoring:**" text block drew as
+    # ___V blanks - derived from the op text's "over N minutes".
+    #
+    # Measured film thickness is captured on BOTH bases: the text tells the
+    # operator to check it against specification either way, so there is no
+    # reading of this job where the figure isn't taken. Aero/defence adds
+    # temperature and the voltage trace on top, per IP2007 sequential capture.
+    def self.ocv_spec(operation_text, aerospace_defense)
+      if aerospace_defense
+        OcvSpecs.anodise_ramp(total_minutes_from(operation_text))
+      else
+        OcvSpecs.fields(:film_thickness, basis: :general)
+      end
+    end
+
+    def self.total_minutes_from(operation_text)
+      match = operation_text.match(/over (\d+) minutes/)
+      match ? match[1].to_i : 20
+    end
+
     private
 
-  def self.create_operation(data, aerospace_defense)
-    # The ending text is now dynamically generated based on aerospace/defense flag
-    base_text = data[:operation_text]
+    def self.create_operation(data, aerospace_defense)
+      operation_text = data[:operation_text] +
+        " -- check film thickness against specification, if out of range inform an A stampholder"
 
-    ending_text = if aerospace_defense
-      " -- check film thickness against specification, if out of range inform an A stampholder"
-    else
-      " -- check film thickness against specification, if out of range inform an A stampholder\n-- record film thickness ___ μm"
+      Operation.new(
+        id: data[:id],
+        alloys: data[:alloys],
+        process_type: 'hard_anodising',
+        anodic_classes: data[:anodic_classes],
+        target_thickness: data[:target_thickness],
+        vat_numbers: data[:vat_numbers],
+        operation_text: operation_text,
+        ocv: ocv_spec(data[:operation_text], aerospace_defense)
+      )
     end
-
-    operation_text = base_text + ending_text
-
-    # Append OCV monitoring for aerospace/defense
-    if aerospace_defense
-      ocv_text = build_voltage_monitoring_text(data[:operation_text])
-      operation_text += "\n\n**OCV Monitoring:**\n#{ocv_text}"
-    end
-
-    Operation.new(
-      id: data[:id],
-      alloys: data[:alloys],
-      process_type: 'hard_anodising',
-      anodic_classes: data[:anodic_classes],
-      target_thickness: data[:target_thickness],
-      vat_numbers: data[:vat_numbers],
-      operation_text: operation_text
-    )
-  end
-
-  def self.build_voltage_monitoring_text(operation_text)
-    # Extract total minutes from operation text
-    time_match = operation_text.match(/over (\d+) minutes/)
-    total_minutes = time_match ? time_match[1].to_i : 20
-
-    # Calculate 5-minute intervals
-    intervals = (total_minutes / 5.0).ceil
-
-    # Build monitoring text for 3 batches
-    text_lines = []
-    (1..3).each do |batch|
-      interval_texts = []
-      (1..intervals).each do |interval|
-        time_mark = interval * 5
-        interval_texts << "#{time_mark}min: ___V"
-      end
-      text_lines << "Batch ___: Temp ___°C [#{interval_texts.join(' | ')}]"
-    end
-
-    text_lines.join("\n")
-  end
 
     def self.base_operations
       [

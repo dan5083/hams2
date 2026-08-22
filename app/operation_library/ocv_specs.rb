@@ -34,18 +34,14 @@ module OperationLibrary
       build([:time, :temp, :volts], batching: batching, basis: basis, **rules)
     end
 
-    # Chromic acid anodise voltage ramp (Bengough-Stuart style cycle): bath
-    # temp, voltage held at the checkpoints the op text names, and the
-    # measured film thickness against spec. Film thickness never blocks the
-    # vat sign-off - it is measured after unjig, and an out-of-range reading
-    # routes through an A-stampholder, not through refusing the vat op.
-    def self.chromic_ramp(batching: nil, basis: :nadcap, **rules)
-      build(
-        [:temp, :v_5min, :v_10min, :v_15min, :v_30min, :v_35min, :film_thickness],
-        batching: batching, basis: basis,
-        optional: [:film_thickness],
-        **rules
-      )
+    # Hard/standard anodise ramp: temp, a voltage reading every 5 minutes for
+    # the length of the cycle (the shape the old baked-in "OCV Monitoring"
+    # text blocks drew as blanks), and measured film thickness. The library
+    # derives total_minutes from the op text's "over N minutes"; anything
+    # unparseable captures a 20-minute trace rather than nothing.
+    def self.anodise_ramp(total_minutes, batching: nil, basis: :nadcap, **rules)
+      checkpoints = (1..(total_minutes / 5.0).ceil).map { |i| :"volts_#{i * 5}min" }
+      build([:temp, *checkpoints, :film_thickness], batching: batching, basis: basis, **rules)
     end
 
     # One-off field lists (foil verification, test pieces, water break, ...)
@@ -65,7 +61,14 @@ module OperationLibrary
     # unless a more specific pattern already answered.
     FALLBACK_PATTERNS = [
       [/heat[\s_-]?treat|bake/i, -> { time_temp }],
-      [/chromic\s+acid\s+anodise/i, -> { chromic_ramp }],
+      # Mirrors AnodisingChromic's DEFAULT_VOLTAGE_CHECKPOINT_MINUTES and its
+      # field vocabulary (volts_Nmin), so a copied/manual chromic op records
+      # the same shape a library one would. (PG1 froze before this rename
+      # with v_Nmin field names - historical, correct for its day.)
+      [/chromic\s+acid\s+anodise/i, -> {
+        fields(:temp, :volts_10min, :volts_20min, :volts_30min, :film_thickness, basis: :nadcap)
+      }],
+      [/hard\s+anodise|standard\s+anodise|sulphuric\s+anodise/i, -> { anodise_ramp(20) }],
       # Copied/manual water break and foil verification ops lost their library
       # specs; mirror the shapes the library versions carry. ALIGN THESE with
       # the explicit specs in WaterBreakOperations / the inspection library if
