@@ -195,6 +195,28 @@ class Part < ApplicationRecord
     true
   end
 
+  # Attach (or replace) an explicit OCV capture spec on a locked operation.
+  # Manual/copied ops carry ocv: nil, so the paperless record renders their
+  # legacy "Time ___ Temp ___" blanks with nothing to type into; an explicit
+  # spec puts real capture fields on screen. Same spec shape the works order
+  # engine consumes: {"fields" => [...], "optional" => [...], "required_if"
+  # => {...}, "blank_as" => {...}, "basis" => "nadcap"}. Pass nil to clear.
+  # NOTE: the resolved OCV spec is part of the process fingerprint - sibling
+  # parts sharing a route must be given the IDENTICAL spec, and only
+  # pre-freeze changes flow through to a live works order record.
+  def set_locked_operation_ocv!(position, spec)
+    return false unless locked_for_editing?
+
+    locked_ops = customisation_data.dig('operation_selection', 'locked_operations') || []
+    operation = locked_ops.find { |op| op['position'] == position }
+    return false unless operation
+
+    operation['ocv'] = spec.nil? ? nil : spec.deep_stringify_keys
+    self.customisation_data = customisation_data.dup
+    save!
+    true
+  end
+
   def insert_operation_at(position, operation_text, display_name = nil)
     return false if operation_text.blank?
 
@@ -470,37 +492,24 @@ class Part < ApplicationRecord
   end
 
   # ============================================================================
-  # PAPERLESS ROLLOUT GATE
+  # PAPERLESS
   # ============================================================================
   #
   # Whether a part's process record is kept on screen or on paper. Works
   # orders read this through WorksOrder#paperless_record?, which adds the
   # per-WO conditions (frozen / open / still to release).
   #
-  # A part goes paperless when its route includes a process family that has a
-  # digital record, and never when it includes hard or sulphuric anodising -
-  # those lines are still on paper, and they take the whole part with them.
-  # Half a job on screen and half on a route card is worse than all of it on
-  # the card. Widen PAPERLESS_PROCESS_TYPES per family as each area goes over;
-  # delete both lists once everything has.
-  PAPERLESS_PROCESS_TYPES = %w[
-    electroless_nickel_plating
-    chromic_anodising
-    chemical_conversion
-  ].freeze
-
-  NON_PAPERLESS_PROCESS_TYPES = %w[
-    hard_anodising
-    standard_anodising
-  ].freeze
-
+  # The rollout gate (per-process-family allow/block lists) is retired: as of
+  # Aug 2026 every process family records digitally, so a part is paperless
+  # whenever it has a route at all. A part with no operations has nothing to
+  # record and stays false - freezing an empty route would be a record that
+  # certifies nothing.
+  #
   # Deliberately unmemoised: operation_selection is mutated and re-rendered
   # within a single request, and a memo here would answer from the route the
   # part had before the edit.
   def paperless?
-    types = get_operations_with_auto_ops.filter_map { |op| op.try(:process_type) }.uniq
-    return false if types.any? { |t| NON_PAPERLESS_PROCESS_TYPES.include?(t) }
-    types.any? { |t| PAPERLESS_PROCESS_TYPES.include?(t) }
+    get_operations_with_auto_ops.any?
   end
 
   # Identity of the physical route, for process-group eligibility: two parts
