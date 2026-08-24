@@ -51,6 +51,15 @@ class WorksOrder < ApplicationRecord
   # post-freeze remove_works_order! raises and blocks the destroy.
   before_destroy :leave_process_group, if: :grouped?
 
+  # On booking in, look for an open sibling on the SAME customer order whose
+  # part hashes to the identical route, and batch with it automatically -
+  # either joining the sibling's existing (unfrozen) group or forming a fresh
+  # one. Deliberately scoped to the customer order, not the customer:
+  # same-route WOs on different POs may well run as one bar, but batching
+  # them is a decision, not a default. Failure here must never block booking
+  # a works order in - it logs and moves on; the checkboxes remain.
+  after_create :auto_group_with_siblings
+
   # NEW: Counter cache callbacks
   after_save :update_is_fully_released_flag
   after_save :update_customer_order_counts, if: :saved_change_to_quantity_released_or_voided_or_is_open?
@@ -1397,6 +1406,40 @@ class WorksOrder < ApplicationRecord
   rescue => e
     errors.add(:base, e.message)
     throw :abort
+  end
+
+  # The auto-batch half of process groups (see the PROCESS GROUPS section
+  # above for the manual half). Eligibility mirrors
+  # ProcessGroup#assert_eligible! - anything this pre-filter lets through
+  # still goes through assert_eligible! inside add_works_order! /
+  # create_for!, so a race (e.g. the sibling's group freezing between the
+  # check and the add) raises there and lands in the rescue: logged,
+  # swallowed, WO booked in solo.
+  def auto_group_with_siblings
+    return if process_group_id.present?
+    fp = part&.process_fingerprint
+    return if fp.blank?
+
+    siblings = customer_order.works_orders
+                             .where(voided: false, is_open: true)
+                             .where.not(id: id)
+                             .includes(:part, :process_group)
+                             .select do |wo|
+      wo.frozen_operations.blank? &&
+        !wo.release_notes.exists? &&
+        wo.part&.process_fingerprint == fp
+    end
+    return if siblings.empty?
+
+    # Prefer an existing unfrozen group on the route; otherwise pair up with
+    # the first solo sibling by WO number.
+    if (group = siblings.filter_map(&:process_group).uniq.find { |g| !g.frozen? && g.process_fingerprint == fp })
+      group.add_works_order!(self)
+    elsif (solo = siblings.select { |wo| wo.process_group_id.nil? }.min_by { |wo| wo.number.to_i })
+      ProcessGroup.create_for!([solo, self])
+    end
+  rescue => e
+    Rails.logger.warn "auto_group: WO#{number} left solo - #{e.message}"
   end
 
   def next_release_note_number
