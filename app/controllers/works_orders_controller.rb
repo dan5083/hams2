@@ -1,6 +1,6 @@
 # app/controllers/works_orders_controller.rb - Fixed pricing parameter handling and route card operations with RBAC
 class WorksOrdersController < ApplicationController
-  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :invoice_to_date, :void, :unvoid, :sign_off_operation, :save_ocv, :set_batch_count, :set_parts_per_batch, :set_batch_qty, :add_fork, :remove_fork, :discard_process_record]
+  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :invoice_to_date, :void, :unvoid, :sign_off_operation, :save_ocv, :add_operation_note, :set_batch_count, :set_parts_per_batch, :set_batch_qty, :add_fork, :remove_fork, :discard_process_record]
 
   # Marks on a process record are attributed to Current.actor - the operator
   # unlocked with a PIN if there is one, otherwise the account holder. That
@@ -255,6 +255,21 @@ class WorksOrdersController < ApplicationController
       target = process_record_path(params[:position].to_i)
     end
     redirect_to target, notice: notice, status: :see_other
+  rescue => e
+    redirect_to process_record_path(params[:position]), alert: e.message, status: :see_other
+  end
+
+  # Paperless process record: append a context note to an operation. Rides the
+  # same batch/fb passengers as the OCV form so the redirect lands on the URL
+  # the page is already showing and Turbo morphs in place (the note appears
+  # under the row the operator is looking at). Append-only - the model guard
+  # enforces it, this endpoint only ever adds.
+  def add_operation_note
+    return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
+    @works_order.add_operation_note!(params[:position], params[:note], Current.actor)
+    redirect_to process_record_path(params[:position].to_i),
+                notice: "Note added to operation #{params[:position]}.",
+                status: :see_other
   rescue => e
     redirect_to process_record_path(params[:position]), alert: e.message, status: :see_other
   end

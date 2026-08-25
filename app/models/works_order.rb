@@ -337,6 +337,22 @@ class WorksOrder < ApplicationRecord
       end
     end
 
+    # Notes are append-only annotations: once written, a note is part of the
+    # record regardless of whether the operation is signed. New notes may be
+    # appended; existing ones can never be edited, reordered or removed - a
+    # wrong note is corrected by a later note, exactly like an initialled
+    # annotation on a paper card.
+    old_ops.each do |old_op|
+      old_notes = old_op["notes"].presence
+      next if old_notes.blank?
+
+      new_op = new_ops.find { |o| o["position"] == old_op["position"] }
+      unless new_op && (new_op["notes"] || []).first(old_notes.length) == old_notes
+        errors.add(:base, "Operation #{old_op['position']}: notes are append-only and cannot be altered or removed")
+        throw :abort
+      end
+    end
+
     # Batch numbers carrying any sign-off, across all operations.
     signed_batches = old_ops.flat_map { |o| (o["sign_offs"] || {}).keys }
                             .reject { |k| k == "wo" }.map(&:to_i).uniq
@@ -982,6 +998,27 @@ class WorksOrder < ApplicationRecord
     op["ocv_recorded_by"] = signature_for(user)
     customised_process_data_will_change!
     save!
+  end
+
+  # Append a context note to an operation - the digital margin annotation
+  # ("customer approved concession CN123 by phone", "jig 2 in repair, jig 4
+  # used"). Rare by design. Append-only: the immutability guard refuses any
+  # edit or removal of an existing note, so a wrong note is superseded by a
+  # later one, never erased. Adding a note freezes the record like every
+  # other mutator - a note is part of the record it annotates.
+  def add_operation_note!(position, text, user)
+    assert_record_open!
+    text = text.to_s.strip
+    raise "Note cannot be blank" if text.blank?
+    raise "Note too long (2000 character limit)" if text.length > 2000
+
+    freeze_operations!
+    op = find_frozen_operation!(position)
+    note = { "text" => text, "at" => Time.current.iso8601, "by" => signature_for(user) }
+    op["notes"] = (op["notes"] || []) + [note]
+    customised_process_data_will_change!
+    save!
+    note
   end
 
   # Every process-record mutator calls this first: a closed (or voided) works

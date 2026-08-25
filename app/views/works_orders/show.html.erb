@@ -8,8 +8,24 @@
 <% end %>
 
 <div class="container mx-auto px-4 py-6">
+  <%
+    # Hoisted above the header: the timers banner and the NADCAP accent both
+    # need these before the grid renders.
+    operations = (@works_order.operations_for_display rescue [])
+    aero = @works_order.aerospace_defense?
+    has_ocv = operations.any? { |op| op["ocv"].present? && (op["ocv"]["fields"] || []).any? }
+  %>
+
   <div class="flex justify-between items-center mb-6">
-    <h1 class="text-3xl font-bold text-gray-900">Works Order WO<%= @works_order.number %></h1>
+    <div class="flex items-center gap-3 flex-wrap">
+      <h1 class="text-3xl font-bold text-gray-900">Works Order WO<%= @works_order.number %></h1>
+      <% if aero %>
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-white bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 shadow-md"
+              title="Aerospace/defence part — processed under NADCAP accreditation">
+          ✈ NADCAP · Aerospace/Defence
+        </span>
+      <% end %>
+    </div>
     <div class="flex space-x-2">
       <%= link_to "Edit", edit_works_order_path(@works_order),
           class: "bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded" %>
@@ -39,6 +55,15 @@
           class: "bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" %>
     </div>
   </div>
+
+  <% if has_ocv %>
+    <div class="mb-4 flex items-center gap-2.5 rounded-lg border-2 border-red-300 bg-red-50 px-4 py-2.5">
+      <span class="text-lg">⏱</span>
+      <p class="text-sm font-bold text-red-800 uppercase tracking-wide">
+        When OCV monitoring use calibrated timers ONLY
+      </p>
+    </div>
+  <% end %>
 
   <% if @works_order.grouped? %>
     <div class="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
@@ -81,10 +106,6 @@
       <dd class="text-sm text-gray-900"><%= @works_order.customer_reference %></dd>
     </div>
   <% end %>
-
-  <%
-    operations = (@works_order.operations_for_display rescue [])
-  %>
 
   <!-- Main layout: narrow left (details) + wide right (operations preview) -->
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
@@ -285,9 +306,15 @@
 
     <!-- RIGHT COLUMN: operations preview -->
     <div class="lg:col-span-2">
-      <div class="bg-white shadow rounded-lg p-6 h-full">
+      <div class="bg-white shadow rounded-lg p-6 h-full <%= 'ring-2 ring-amber-400/70' if aero %>">
         <div class="flex justify-between items-center mb-4">
-          <h2 class="text-lg font-semibold text-gray-900">Process Operations</h2>
+          <div class="flex items-center gap-2">
+            <h2 class="text-lg font-semibold text-gray-900">Process Operations</h2>
+            <% if aero %>
+              <span class="inline-flex px-2 py-0.5 text-xs font-bold rounded bg-amber-100 text-amber-800 border border-amber-300 uppercase tracking-wide"
+                    title="OCV monitoring and sign-offs on this record form part of the NADCAP audit trail">NADCAP</span>
+            <% end %>
+          </div>
           <% if operations.any? %>
             <span class="text-sm text-gray-500"><%= operations.length %> operation<%= operations.length == 1 ? '' : 's' %></span>
           <% end %>
@@ -570,6 +597,42 @@
                   <!-- Op content -->
                   <div class="flex-1 px-4 py-3 text-sm text-gray-900 leading-relaxed">
                     <%= simple_format(op["operation_text"].to_s) %>
+
+                    <%# Operation notes: the digital margin annotation. Rare, so the
+                        add form hides in a collapsed details; existing notes always
+                        show. Append-only - the model guard stops edits/removal, so
+                        a wrong note is superseded by another note, never erased. %>
+                    <% op_notes = op["notes"] || [] %>
+                    <% if op_notes.any? %>
+                      <div class="mt-2 space-y-1">
+                        <% op_notes.each do |n| %>
+                          <div class="px-2.5 py-1.5 bg-amber-50 border-l-2 border-amber-400 rounded-r text-xs text-amber-900">
+                            📝 <%= n["text"] %>
+                            <span class="block mt-0.5 text-amber-600">
+                              — <%= n.dig("by", "name") %>,
+                              <%= (Time.parse(n["at"]).strftime("%d/%m/%y %H:%M") rescue n["at"]) %>
+                            </span>
+                          </div>
+                        <% end %>
+                      </div>
+                    <% end %>
+                    <% if paperless %>
+                      <details class="mt-2 text-xs">
+                        <summary class="cursor-pointer select-none text-gray-400 hover:text-gray-600">📝 Add note</summary>
+                        <%= form_with url: add_operation_note_works_order_path(@works_order), method: :patch, local: true, class: "mt-1.5 flex items-start gap-2" do %>
+                          <%= hidden_field_tag :position, position %>
+                          <%= hidden_field_tag :batch, active_batch %>
+                          <% active_fb.each do |k, v| %><%= hidden_field_tag "fb[#{k}]", v %><% end %>
+                          <%= text_area_tag :note, nil, rows: 2, maxlength: 2000,
+                              placeholder: "Context for this operation — permanent once saved",
+                              class: "border border-gray-300 rounded px-2 py-1 text-sm flex-1" %>
+                          <% note_confirm = "Save this note to operation #{position}? Notes are part of the process record and cannot be edited or removed." %>
+                          <%= submit_tag "Save note",
+                              data: { confirm: note_confirm, turbo_confirm: note_confirm },
+                              class: "bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium px-2 py-1.5 rounded" %>
+                        <% end %>
+                      </details>
+                    <% end %>
 
                     <% if paperless && spec.present? %>
                       <% fields = (spec["fields"] || []).map(&:to_s) %>
