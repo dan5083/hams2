@@ -72,7 +72,7 @@ Rails.application.routes.draw do
       patch :set_batch_count
       patch :set_parts_per_batch
       patch :set_batch_qty
-      patch :add_operation_note, on: :member
+      patch :add_operation_note
       patch :discard_process_record
       patch :add_fork
       patch :remove_fork
