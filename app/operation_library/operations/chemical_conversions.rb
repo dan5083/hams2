@@ -43,6 +43,14 @@ module OperationLibrary
           operation_text: 'Immerse parts in SurTec 650V immerse at 30-40°C for 3-4 mins. Ensure solution is agitated before and during use'
         },
 
+        # Iridite TCP Chemical Conversion
+        {
+          id: 'IRIDITE_TCP_4_TO_5_MIN',
+          process_type: 'chemical_conversion',
+          specifications: 'MIL-DTL-5541F Type II (comprising non-hexavalent chromium conversion coatings)',
+          operation_text: 'Convert in Iridite TCP at 30-40°C for 4-5 mins'
+        },
+
         # Iridite 15 with Keycote and Chromic Etch Process
         #
         # Three chemistries in one operation, so one time/temp pair cannot
