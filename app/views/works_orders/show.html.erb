@@ -347,9 +347,6 @@
         <% active_fb = (@active_fork_batches || {}) %>
         <% if paperless && ops_for_display.any? %>
           <% statuses = @works_order.batch_statuses %>
-          <% complete = statuses.count { |_n, s| s == :complete } %>
-          <% in_progress = statuses.count { |_n, s| s == :in_progress } %>
-          <% not_started = batch_count - complete - in_progress %>
           <% qty_total = @works_order.batched_quantity_total %>
           <% active_entry = @works_order.process_batches.find { |b| b["number"] == active_batch } || {} %>
           <% signed_batches = @works_order.signed_batch_numbers %>
@@ -422,15 +419,32 @@
               </div>
             </div>
 
-            <!-- Whole-WO progress -->
+            <!-- Whole-WO progress: every sign-off the record requires - across
+                 all fork sections AND the WO-scoped header ops - measured in
+                 sign-off units (a batch-scoped op contributes one per batch in
+                 ITS section, a WO-scoped op contributes one). The bar is full
+                 exactly when the record is completely signed, which is what
+                 release validation will require. -->
+            <%
+              total_units  = ops_for_display.sum { |o| @works_order.sign_off_keys_for(o).length }
+              signed_units = ops_for_display.sum { |o| @works_order.signed_count_for(o) }
+              # Recorded-but-unsigned units: readings entered, sign-off pending
+              partial_units = ops_for_display.sum do |o|
+                keys = @works_order.sign_off_keys_for(o)
+                (o["ocv_readings"] || {}).count do |k, v|
+                  keys.include?(k) && v.present? && (o["sign_offs"] || {})[k].blank?
+                end
+              end
+              remaining_units = total_units - signed_units - partial_units
+            %>
             <div>
               <div class="flex gap-px h-2 rounded overflow-hidden">
-                <% if complete > 0 %><div class="bg-green-500" style="flex: <%= complete %>"></div><% end %>
-                <% if in_progress > 0 %><div class="bg-amber-500" style="flex: <%= in_progress %>"></div><% end %>
-                <% if not_started > 0 %><div class="bg-gray-300" style="flex: <%= not_started %>"></div><% end %>
+                <% if signed_units > 0 %><div class="bg-green-500" style="flex: <%= signed_units %>"></div><% end %>
+                <% if partial_units > 0 %><div class="bg-amber-500" style="flex: <%= partial_units %>"></div><% end %>
+                <% if remaining_units > 0 %><div class="bg-gray-300" style="flex: <%= remaining_units %>"></div><% end %>
               </div>
               <p class="mt-1 text-xs text-gray-500">
-                <%= complete %> complete<% if in_progress > 0 %> · <%= in_progress %> in progress<% end %> · <%= not_started %> not started
+                <%= signed_units %>/<%= total_units %> sign-offs<% if partial_units > 0 %> · <%= partial_units %> recorded, awaiting sign-off<% end %>
               </p>
             </div>
 
@@ -594,7 +608,12 @@
               <% signed_here = (op["sign_offs"] || {})[active_key].present? %>
               <% signed_count = @works_order.signed_count_for(op) %>
               <% op_signed = signed_count == op_keys.length %>
-              <div class="border border-gray-200 rounded-lg overflow-hidden" id="op-<%= position %>">
+              <%# Checklist-bearing ops (contract review) review the route BELOW
+                  them - keep the rest of the card readable while focused there.
+                  Final inspection stays spotlit: its stamp-check is moving to
+                  release validation, so the operator doesn't scan for it. %>
+              <div class="border border-gray-200 rounded-lg overflow-hidden" id="op-<%= position %>"
+                   <%= "data-keep-context".html_safe if spec.is_a?(Hash) && spec["checklist"].present? %>>
                 <div class="flex items-stretch">
                   <!-- Op number: state shown is for the ACTIVE batch -->
                   <div class="flex-none w-12 <%= signed_here ? 'bg-green-100 border-green-200' : (signed_count > 0 ? 'bg-amber-50 border-amber-200' : 'bg-gray-100 border-gray-200') %> border-r flex items-center justify-center">
@@ -1107,7 +1126,7 @@
     Array.prototype.forEach.call(document.querySelectorAll("[id^='op-']"), function (r) {
       r.classList.remove('ring-2', 'ring-blue-500', 'shadow-lg');
       r.classList.add('transition-opacity', 'duration-150');
-      r.classList.toggle('opacity-40', !!row && r !== row);
+      r.classList.toggle('opacity-40', !!row && r !== row && !row.hasAttribute('data-keep-context'));
     });
     if (row) row.classList.add('ring-2', 'ring-blue-500', 'shadow-lg');
   }

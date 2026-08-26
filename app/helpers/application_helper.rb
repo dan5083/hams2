@@ -39,6 +39,13 @@ module ApplicationHelper
       else
         []
       end
+    # Ramp checkpoint fields (volts_10min, and PG1's frozen v_10min): the
+    # expected voltage AT THAT MINUTE, derived from the ramp description in
+    # the op text - per the chromic library's doctrine, the one place the
+    # expected values live - offered ±2V (or ±5%, whichever is wider).
+    when /\A(?:volts|v)_(\d+)min\z/
+      expected = expected_voltage_at(Regexp.last_match(1).to_i, text)
+      expected ? voltage_spread(expected) : []
     # Foil verification: calibrated meter/foil data lives with the foil
     # library (FOIL_METERS), not here - update it there on recalibration.
     when "meter_no"
@@ -105,6 +112,50 @@ module ApplicationHelper
     mag = 10.0**Math.log10(raw).floor
     norm = raw / mag
     (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag
+  end
+
+  # ---- Voltage ramp parsing for volts_Nmin checkpoint suggestions ----------
+  #
+  # Parses the ramp described in the operation text into ordered segments.
+  # Parenthesised grammar (chromic):
+  #   "0-40V (over 10 minutes)"    -> ramp 0->40 over 10
+  #   "40V (hold for 20 minutes)"  -> hold 40 for 20
+  #   "22V (hold over 30 minutes)" -> hold 22 for 30
+  # Bare grammar (standard / hard anodise):
+  #   "16V over 30 minutes"        -> hold 16 for 30
+  #   "0-45V over 40 minutes"      -> ramp 0->45 over 40
+  # Texts stating no voltage yield no segments and therefore no suggestions.
+  def voltage_segments(text)
+    segs = text.to_s.scan(
+      /(?:(\d+(?:\.\d+)?)\s*-\s*)?(\d+(?:\.\d+)?)\s*V\s*\(\s*(?:over|hold(?:\s+(?:for|over))?)\s+(\d+)\s*min[^)]*\)/i
+    ).map { |from, to, mins| { from: (from || to).to_f, to: to.to_f, mins: mins.to_i } }
+    return segs if segs.any?
+    if (m = text.to_s.match(/(\d+(?:\.\d+)?)\s*(?:-\s*(\d+(?:\.\d+)?))?\s*V\b[^.]*?\bover\s+(\d+)\s*min/i))
+      return [{ from: m[1].to_f, to: (m[2] || m[1]).to_f, mins: m[3].to_i }]
+    end
+    []
+  end
+
+  # Walk the segments to the voltage the ramp should read at `minute`.
+  # Past the described cycle, the final voltage (the meaningful answer for
+  # an anodise_ramp checkpoint rounded up past the stated cycle length).
+  def expected_voltage_at(minute, text)
+    segs = voltage_segments(text)
+    return nil if segs.empty?
+    t = 0
+    segs.each do |s|
+      if minute <= t + s[:mins]
+        frac = s[:mins].zero? ? 1.0 : (minute - t).to_f / s[:mins]
+        return s[:from] + (s[:to] - s[:from]) * frac
+      end
+      t += s[:mins]
+    end
+    segs.last[:to]
+  end
+
+  def voltage_spread(expected)
+    window = [2.0, expected * 0.05].max
+    numeric_suggestions((expected - window).floor, (expected + window).ceil).map { |v| "#{v} V" }
   end
 
   def hour_suggestions(lo, hi)
