@@ -365,9 +365,9 @@
                     initial state is "1 × N", one Apply away. %>
                 <%= number_field_tag :parts_per_batch, @works_order.parts_per_batch || @works_order.record_quantity, min: 1, max: @works_order.record_quantity,
                     id: "parts-per-batch",
-                    data: { quantity: @works_order.record_quantity, max_batches: WorksOrder::MAX_BATCHES },
+                    data: { quantity: @works_order.record_quantity, max_batches: WorksOrder::MAX_BATCHES, keyflow: "ppb" },
                     class: "border border-gray-300 rounded px-2 py-1 text-sm w-20" %>
-                <%= submit_tag "Apply", class: "bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium px-2 py-1.5 rounded" %>
+                <%= submit_tag "Set batches", class: "bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium px-2 py-1.5 rounded" %>
                 <span id="batch-preview" class="text-xs text-gray-500"></span>
               <% end %>
 
@@ -784,7 +784,7 @@
                             certifies a complete record"); surface it before the
                             click rather than after. No keyflow tag - the
                             keyboard walk skips straight past. %>
-                        <button type="button" disabled
+                        <button type="button" disabled data-needs-qty="1"
                                 title="Enter a quantity for batch <%= sec_active %> before signing off"
                                 class="bg-gray-200 text-gray-400 text-xs font-medium px-2 py-1 rounded cursor-not-allowed">
                           Set batch qty
@@ -955,38 +955,43 @@
 (function () {
   var input = document.getElementById('parts-per-batch');
   var out = document.getElementById('batch-preview');
-  if (!input || !out) return;
 
-  function preview() {
-    var per = parseInt(input.value, 10);
-    var total = parseInt(input.dataset.quantity, 10);
-    var max = parseInt(input.dataset.maxBatches, 10);
-    if (!per || per < 1 || !total) { out.textContent = ''; out.className = 'text-xs text-gray-500'; return; }
-    if (per > total) { out.textContent = 'More than the order quantity (' + total + ')'; out.className = 'text-xs text-orange-600'; return; }
-
+  // Shared formatter, mirroring WorksOrder#derive_batch_quantities exactly,
+  // runt rule included: a final load more than 25% short of capacity
+  // balances with the penultimate load (101 at 10 => 9 × 10, then 6 + 5).
+  // The keyflow dropdown labels its parts-per-batch suggestions with the
+  // same text, so the two can never drift.
+  window.__hamsBatchStructure = function (per, total, max) {
+    if (!per || per < 1 || !total) return null;
+    if (per > total) return { text: 'More than the order quantity (' + total + ')', warn: true };
     var count = Math.ceil(total / per);
     var remainder = total - per * (count - 1);
-    if (count > max) {
-      out.textContent = count + ' batches — over the limit of ' + max;
-      out.className = 'text-xs text-orange-600 font-medium';
-      return;
-    }
-    // Mirror WorksOrder#derive_batch_quantities exactly, runt rule included:
-    // a final load more than 25% short of capacity balances with the
-    // penultimate load instead (101 at 10 => 9 × 10, then 6 + 5).
+    if (count > max) return { text: count + ' batches — over the limit of ' + max, warn: true };
+    var text;
     if (remainder === per) {
-      out.textContent = count + ' × ' + per;
+      text = count + ' × ' + per;
     } else if (count > 1 && remainder < per * 0.75) {
       var combined = per + remainder;
       var a = Math.ceil(combined / 2), b = combined - a;
       var full = count - 2;
-      out.textContent = (full > 0 ? full + ' × ' + per + ', then ' : '') + a + ' + ' + b + ' (last two balanced)';
+      text = (full > 0 ? full + ' × ' + per + ', then ' : '') + a + ' + ' + b + ' (last two balanced)';
     } else {
-      out.textContent = (count - 1) + ' × ' + per + ' + 1 × ' + remainder;
+      text = (count - 1) + ' × ' + per + ' + 1 × ' + remainder;
     }
-    out.className = 'text-xs text-gray-500';
-  }
+    return { text: text, warn: false };
+  };
 
+  if (!input || !out) return;
+  function preview() {
+    var s = window.__hamsBatchStructure(
+      parseInt(input.value, 10),
+      parseInt(input.dataset.quantity, 10),
+      parseInt(input.dataset.maxBatches, 10)
+    );
+    if (!s) { out.textContent = ''; out.className = 'text-xs text-gray-500'; return; }
+    out.textContent = s.text;
+    out.className = s.warn ? 'text-xs text-orange-600 font-medium' : 'text-xs text-gray-500';
+  }
   input.addEventListener('input', preview);
   preview();
 })();
@@ -1114,7 +1119,15 @@
   }
   function focusFirst() {
     var r = rows();
-    if (r.length) focusStation(stationFor(r[0]), false);
+    if (r.length) { focusStation(stationFor(r[0]), false); return; }
+    // Nothing signable, but ops are waiting on batch quantities - exactly
+    // the state after the two WO-scoped ops on a fresh works order. Send
+    // the operator to batching; the reload after "Set batches" walks
+    // straight on to the next op.
+    if (document.querySelector('[data-needs-qty]')) {
+      var ppb = document.getElementById('parts-per-batch');
+      if (ppb) { ppb.focus({ preventScroll: true }); ppb.scrollIntoView({ block: 'center' }); }
+    }
   }
   function moveRow(fromEl, dir) {
     var r = rows();
@@ -1139,7 +1152,9 @@
   function openDD(input, filter) {
     var all = input.__sugg || [];
     var q = (filter || '').toLowerCase();
-    var items = q ? all.filter(function (s) { return s.toLowerCase().indexOf(q) !== -1; }) : all;
+    var items = q
+      ? all.filter(function (it) { return (String(it.v) + ' ' + it.label).toLowerCase().indexOf(q) !== -1; })
+      : all;
     closeDD();
     if (!items.length) return;
     dd = document.createElement('div');
@@ -1149,13 +1164,23 @@
     dd.style.top = (r.bottom + 2) + 'px';
     dd.style.minWidth = r.width + 'px';
     ddItems = items; ddFor = input;
-    ddIndex = q ? 0 : Math.floor((items.length - 1) / 2);
-    items.forEach(function (s) {
+    if (q) {
+      ddIndex = 0;
+    } else if (input.dataset.keyflow === 'ppb') {
+      // Highlight the option matching the (prefilled) value - the full
+      // quantity on a fresh works order - falling back to the top.
+      var cur = parseInt(input.value, 10);
+      var m = items.findIndex(function (it) { return parseInt(it.v, 10) === cur; });
+      ddIndex = m >= 0 ? m : 0;
+    } else {
+      ddIndex = Math.floor((items.length - 1) / 2);
+    }
+    items.forEach(function (it) {
       var row = document.createElement('div');
-      row.textContent = s;
+      row.textContent = it.label;
       row.addEventListener('mousedown', function (e) {
         e.preventDefault(); // keep focus on the input
-        input.value = s;
+        input.value = it.v;
         closeDD();
       });
       dd.appendChild(row);
@@ -1176,7 +1201,7 @@
     Array.prototype.forEach.call(document.querySelectorAll('[data-keyflow="ocv"][list]'), function (input) {
       var dl = input.list;
       if (!dl) return;
-      input.__sugg = Array.prototype.map.call(dl.options, function (o) { return o.value; });
+      input.__sugg = Array.prototype.map.call(dl.options, function (o) { return { v: o.value, label: o.value }; });
       input.removeAttribute('list');
     });
   }
@@ -1204,20 +1229,25 @@
       return;
     }
 
-    if (t.dataset.keyflow === 'ocv') {
+    if (t.dataset.keyflow === 'ocv' || t.dataset.keyflow === 'ppb') {
       if (dd && ddFor === t) {
         if (e.key === 'ArrowDown') { e.preventDefault(); highlight(ddIndex + 1); return; }
         if (e.key === 'ArrowUp')   { e.preventDefault(); highlight(ddIndex - 1); return; }
         if (e.key === 'Escape')    { e.preventDefault(); closeDD(); return; }
         if (e.key === 'Enter') {
           e.preventDefault();
-          if (ddIndex >= 0) t.value = ddItems[ddIndex];
+          if (ddIndex >= 0) t.value = ddItems[ddIndex].v;
           closeDD();
-          advance(t);
+          if (t.dataset.keyflow === 'ppb') {
+            if (t.form) (t.form.requestSubmit ? t.form.requestSubmit() : t.form.submit());
+          } else {
+            advance(t);
+          }
           return;
         }
         return; // typing refilters via the input listener
       }
+      if (t.dataset.keyflow === 'ppb') return; // dropdown closed: native Enter submits the form
       if (e.key === 'Escape') { e.preventDefault(); moveRow(t, 1); return; }
       if (e.key !== 'Enter') return; // normal typing
       e.preventDefault();            // never implicitly submit a partial form
@@ -1230,11 +1260,33 @@
     if (t && t.dataset && t.dataset.keyflow === 'ocv' && t.__sugg) openDD(t, t.value);
   });
 
+  // Parts-per-batch suggestions: the full quantity (one batch of the lot)
+  // plus even 2..5-way splits, each labelled with the exact structure the
+  // server will derive - via the shared formatter, so label and outcome
+  // can never disagree.
+  function ppbSuggestions(input) {
+    if (input.__sugg) return;
+    var total = parseInt(input.dataset.quantity, 10);
+    var max = parseInt(input.dataset.maxBatches, 10);
+    if (!total) return;
+    var seen = {}, items = [];
+    [1, 2, 3, 4, 5].forEach(function (ways) {
+      var per = Math.ceil(total / ways);
+      if (per < 1 || seen[per]) return;
+      var s = window.__hamsBatchStructure ? window.__hamsBatchStructure(per, total, max) : null;
+      if (!s || s.warn) return;
+      seen[per] = 1;
+      items.push({ v: per, label: per + ' per batch — ' + s.text });
+    });
+    if (items.length) input.__sugg = items;
+  }
+
   document.addEventListener('focusin', function (e) {
     var t = e.target;
     if (t && t.dataset && t.dataset.keyflow) {
       ring(t.closest("[id^='op-']"));
       if (t.dataset.keyflow === 'ocv' && t.__sugg && !t.value) openDD(t);
+      if (t.dataset.keyflow === 'ppb') { ppbSuggestions(t); if (t.__sugg) { t.select(); openDD(t); } }
     } else {
       ring(null);   // working elsewhere (batch controls, notes) - undim everything
       closeDD();
