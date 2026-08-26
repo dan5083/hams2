@@ -39,6 +39,35 @@ module ApplicationHelper
       else
         []
       end
+    # Foil verification: calibrated meter/foil data lives with the foil
+    # library (FOIL_METERS), not here - update it there on recalibration.
+    when "meter_no"
+      OperationLibrary::FoilVerification.meter_suggestions
+    when /\Afoil_value/
+      OperationLibrary::FoilVerification.foil_value_suggestions
+    when /\Ameasured_thickness/
+      OperationLibrary::FoilVerification.measured_thickness_suggestions
+    when "film_thickness"
+      film_thickness_suggestions(text)
+    else
+      []
+    end
+  end
+
+  # Film thickness readings at 3 sig figs, spread across the range the op
+  # text states: "50 +/- 5 µm" / "25-50 microns" / a bare "25µm" target
+  # (offered ±10%). Same advisory footing as the branches above.
+  MICRON_UNIT = /(?:µm|μm|um\b|microns?)/i
+
+  def film_thickness_suggestions(text)
+    if (m = text.match(/(\d+(?:\.\d+)?)\s*(?:\+\/-|±)\s*(\d+(?:\.\d+)?)\s*#{MICRON_UNIT}/))
+      base, tol = m[1].to_f, m[2].to_f
+      float_suggestions(base - tol, base + tol)
+    elsif (m = text.match(/(\d+(?:\.\d+)?)\s*(?:-|to)\s*(\d+(?:\.\d+)?)\s*#{MICRON_UNIT}/))
+      float_suggestions(m[1].to_f, m[2].to_f)
+    elsif (m = text.match(/(\d+(?:\.\d+)?)\s*#{MICRON_UNIT}/))
+      base = m[1].to_f
+      float_suggestions(base * 0.9, base * 1.1)
     else
       []
     end
@@ -54,6 +83,28 @@ module ApplicationHelper
 
   def unit_suggestions(lo, hi, unit)
     numeric_suggestions(lo, hi).map { |v| "#{v} #{unit}" }
+  end
+
+  # Float counterpart of numeric_suggestions: ~9 points across lo..hi on a
+  # "nice" step (1/2/5 × power of ten), formatted to 3 significant figures.
+  def float_suggestions(lo, hi)
+    return [] if hi < lo
+    return [OperationLibrary::FoilVerification.sig3(lo)] if hi == lo
+    step = nice_step((hi - lo) / 8.0)
+    vals = []
+    v = lo.to_f
+    while v < hi - step / 2
+      vals << v
+      v += step
+    end
+    vals << hi.to_f
+    vals.map { |x| OperationLibrary::FoilVerification.sig3(x) }.uniq
+  end
+
+  def nice_step(raw)
+    mag = 10.0**Math.log10(raw).floor
+    norm = raw / mag
+    (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag
   end
 
   def hour_suggestions(lo, hi)
