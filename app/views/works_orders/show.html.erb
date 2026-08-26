@@ -1061,17 +1061,24 @@
 //   On a sign-off button:  Enter/Space = sign off (native click);
 //                          any other key = skip to the next unsigned op
 //                          (ArrowUp goes back) without doing anything.
-//   On an OCV field:       typing types, and typing opens the suggestions
-//                          dropdown. Enter on an EMPTY field accepts the
-//                          top suggestion; Enter otherwise walks to the
-//                          next empty field of the op, and once every
-//                          field is recorded, Enter signs the op off.
-//                          Escape/ArrowDown skips to the next op.
+//   On an OCV field:       an empty field opens the suggestions dropdown
+//                          immediately, MIDDLE option pre-highlighted
+//                          (mid-range is "done normally"; the bare minimum
+//                          would be the least defensible auto-pick).
+//                          Arrows move the highlight, typing filters,
+//                          Enter accepts the highlight and walks on - to
+//                          the op's next empty field, or, once every field
+//                          is recorded, straight to signing off. Escape
+//                          closes the dropdown; Escape again skips to the
+//                          next op.
+// Suggestions are a custom dropdown, not the native datalist - browsers
+// refuse to open a datalist on programmatic focus and offer no way to
+// pre-highlight an option, which is the whole point here. The datalists
+// stay in the markup for touch devices; on desktop their options are
+// lifted out and the list attribute removed.
 // Enter never implicitly submits a half-recorded OCV form any more - the
 // handler owns the key. Rows without an enabled sign-off button (signed
 // already, or waiting on a batch quantity) are invisible to the walk.
-// Desktop/keyboard stations only: on touch screens autofocus would just
-// pop the on-screen keyboard.
 (function () {
   if (window.__hamsKeyflow) return;
   window.__hamsKeyflow = true;
@@ -1117,6 +1124,73 @@
     if (next) focusStation(stationFor(next), true);
   }
 
+  // ---- Custom suggestion dropdown -----------------------------------------
+  var dd = null, ddItems = [], ddIndex = -1, ddFor = null;
+
+  function closeDD() {
+    if (dd) dd.remove();
+    dd = null; ddItems = []; ddIndex = -1; ddFor = null;
+  }
+  function paintDD() {
+    Array.prototype.forEach.call(dd.children, function (row, j) {
+      row.className = 'px-3 py-1.5 cursor-pointer' + (j === ddIndex ? ' bg-blue-600 text-white' : '');
+    });
+  }
+  function openDD(input, filter) {
+    var all = input.__sugg || [];
+    var q = (filter || '').toLowerCase();
+    var items = q ? all.filter(function (s) { return s.toLowerCase().indexOf(q) !== -1; }) : all;
+    closeDD();
+    if (!items.length) return;
+    dd = document.createElement('div');
+    dd.className = 'fixed z-50 bg-white border border-gray-300 rounded shadow-lg text-sm max-h-64 overflow-y-auto';
+    var r = input.getBoundingClientRect();
+    dd.style.left = r.left + 'px';
+    dd.style.top = (r.bottom + 2) + 'px';
+    dd.style.minWidth = r.width + 'px';
+    ddItems = items; ddFor = input;
+    ddIndex = q ? 0 : Math.floor((items.length - 1) / 2);
+    items.forEach(function (s) {
+      var row = document.createElement('div');
+      row.textContent = s;
+      row.addEventListener('mousedown', function (e) {
+        e.preventDefault(); // keep focus on the input
+        input.value = s;
+        closeDD();
+      });
+      dd.appendChild(row);
+    });
+    paintDD();
+    document.body.appendChild(dd);
+  }
+  function highlight(i) {
+    if (!dd || !ddItems.length) return;
+    ddIndex = (i + ddItems.length) % ddItems.length;
+    paintDD();
+    dd.children[ddIndex].scrollIntoView({ block: 'nearest' });
+  }
+
+  // Lift datalist options onto the inputs and take over (desktop only -
+  // touch keeps the native, OS-integrated datalist UI).
+  function enhance() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-keyflow="ocv"][list]'), function (input) {
+      var dl = input.list;
+      if (!dl) return;
+      input.__sugg = Array.prototype.map.call(dl.options, function (o) { return o.value; });
+      input.removeAttribute('list');
+    });
+  }
+
+  // Enter's walk: next empty field of the op, or sign off once complete.
+  function advance(t) {
+    if (!t.value) { if (t.__sugg) openDD(t); return; } // nothing to accept - reopen and stay
+    var row = t.closest("[id^='op-']");
+    var nextEmpty = ocvFields(row).filter(function (f) { return f !== t && !f.value; })[0];
+    if (nextEmpty) { nextEmpty.focus({ preventScroll: true }); return; }
+    var btn = row.querySelector('[data-keyflow="signoff"]:not([disabled])');
+    if (btn) btn.click();
+  }
+
   var MODIFIERS = { Shift: 1, Control: 1, Alt: 1, Meta: 1, CapsLock: 1 };
 
   document.addEventListener('keydown', function (e) {
@@ -1131,40 +1205,64 @@
     }
 
     if (t.dataset.keyflow === 'ocv') {
-      if (e.key === 'Escape' || e.key === 'ArrowDown') { e.preventDefault(); moveRow(t, 1); return; }
-      if (e.key !== 'Enter') return; // normal typing, arrows within the datalist, etc.
-      e.preventDefault();            // never implicitly submit a partial form
-
-      // Enter on an empty field with suggestions accepts the MIDDLE one -
-      // the dropdown lists a range ("5 mins".."10 mins") in reading order,
-      // and mid-range is "done normally"; auto-accepting the bare minimum
-      // would be the least defensible value on the record.
-      if (t.tagName === 'INPUT' && !t.value && t.list && t.list.options.length) {
-        var opts = t.list.options;
-        t.value = opts[Math.floor((opts.length - 1) / 2)].value;
+      if (dd && ddFor === t) {
+        if (e.key === 'ArrowDown') { e.preventDefault(); highlight(ddIndex + 1); return; }
+        if (e.key === 'ArrowUp')   { e.preventDefault(); highlight(ddIndex - 1); return; }
+        if (e.key === 'Escape')    { e.preventDefault(); closeDD(); return; }
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (ddIndex >= 0) t.value = ddItems[ddIndex];
+          closeDD();
+          advance(t);
+          return;
+        }
+        return; // typing refilters via the input listener
       }
-      if (!t.value) return; // still empty (a select, or no suggestions) - stay put
-
-      var row = t.closest("[id^='op-']");
-      var nextEmpty = ocvFields(row).filter(function (f) { return f !== t && !f.value; })[0];
-      if (nextEmpty) { nextEmpty.focus({ preventScroll: true }); return; }
-
-      var btn = row.querySelector('[data-keyflow="signoff"]:not([disabled])');
-      if (btn) btn.click(); // every field recorded - sign it off
+      if (e.key === 'Escape') { e.preventDefault(); moveRow(t, 1); return; }
+      if (e.key !== 'Enter') return; // normal typing
+      e.preventDefault();            // never implicitly submit a partial form
+      advance(t);
     }
+  });
+
+  document.addEventListener('input', function (e) {
+    var t = e.target;
+    if (t && t.dataset && t.dataset.keyflow === 'ocv' && t.__sugg) openDD(t, t.value);
   });
 
   document.addEventListener('focusin', function (e) {
-    if (e.target && e.target.dataset && e.target.dataset.keyflow) {
-      ring(e.target.closest("[id^='op-']"));
+    var t = e.target;
+    if (t && t.dataset && t.dataset.keyflow) {
+      ring(t.closest("[id^='op-']"));
+      if (t.dataset.keyflow === 'ocv' && t.__sugg && !t.value) openDD(t);
     } else {
-      ring(null); // working elsewhere (batch controls, notes) - undim everything
+      ring(null);   // working elsewhere (batch controls, notes) - undim everything
+      closeDD();
     }
   });
+  document.addEventListener('focusout', function (e) {
+    if (ddFor && e.target === ddFor) {
+      setTimeout(function () { if (document.activeElement !== ddFor) closeDD(); }, 0);
+    }
+  });
+  // Track the input on scroll rather than closing - closing would also kill
+  // the dropdown the instant autofocus scrolls its own row into view.
+  function repositionDD() {
+    if (!dd || !ddFor) return;
+    var r = ddFor.getBoundingClientRect();
+    dd.style.left = r.left + 'px';
+    dd.style.top = (r.bottom + 2) + 'px';
+  }
+  document.addEventListener('scroll', repositionDD, true);
+  document.addEventListener('turbo:submit-start', closeDD);
 
-  function arm() { if (deskop) focusFirst(); }
+  function arm() {
+    if (!deskop) return;
+    enhance();
+    focusFirst();
+  }
   document.addEventListener('turbo:load', arm);
-  document.addEventListener('turbo:morph', function () { setTimeout(arm, 0); });
+  document.addEventListener('turbo:morph', function () { closeDD(); setTimeout(arm, 0); });
   if (document.readyState !== 'loading') { arm(); }
   else { document.addEventListener('DOMContentLoaded', arm); }
 })();
