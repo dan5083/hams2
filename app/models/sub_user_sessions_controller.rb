@@ -1,31 +1,33 @@
 class SubUserSessionsController < ApplicationController
+  # This is the brute-force defence now that failures can't be pinned on an
+  # operator. Scoped per terminal via the session cookie, NOT per IP - the
+  # whole factory reaches Heroku through one public IP, and a shared budget
+  # would jam every terminal at shift start.
   rate_limit to: 20, within: 3.minutes, only: :create,
+             by: -> { cookies.signed[:session_id] || request.remote_ip },
              with: -> { redirect_back fallback_location: root_path, alert: "Too many PIN attempts. Wait a moment." }
 
   def create
-    # signable rather than enabled: an operator whose staff login has been
-    # disabled can no longer be found here, so their PIN dies with the login.
-    sub_user = SubUser.signable.find_by(id: params[:sub_user_id])
+    # The PIN is the identity. Lookup is scoped signable inside find_by_pin,
+    # so a disabled staff login still kills the operator's PIN with it.
+    operator = SubUser.find_by_pin(params[:pin])
 
-    unless sub_user
-      return redirect_to safe_return_to, alert: "That operator isn't set up.", status: :see_other
-    end
-
-    case sub_user.verify_pin(params[:pin])
-    when :ok
-      Current.session.start_sub_user!(sub_user)
-      Rails.logger.info "=== SUB-USER: #{sub_user.name} unlocked on session #{Current.session.id} " \
-                        "(account #{Current.user.email_address}, ip #{request.remote_ip}) " \
-                        "last_seen=#{Current.session.reload.sub_user_last_seen_at.inspect} ==="
-      # No flash. The magenta bar and the name in the corner are the receipt.
-      redirect_to safe_return_to, status: :see_other
-    when :locked
-      Rails.logger.warn "=== SUB-USER: #{sub_user.name} locked out on session #{Current.session.id} ==="
+    if operator.nil?
+      redirect_to safe_return_to, alert: "PIN not recognised.", status: :see_other
+    elsif operator.locked?
+      Rails.logger.warn "=== SUB-USER: #{operator.name} is manually locked, sign-on refused on session #{Current.session.id} ==="
       redirect_to safe_return_to,
-                  alert: "#{sub_user.name} is locked out for #{sub_user.lock_expires_in} more minute(s). See Tariq.",
+                  alert: "#{operator.name} is locked out for #{operator.lock_expires_in} more minute(s). See Tariq.",
                   status: :see_other
     else
-      redirect_to safe_return_to, alert: "Wrong PIN.", status: :see_other
+      Current.session.start_sub_user!(operator)
+      Rails.logger.info "=== SUB-USER: #{operator.name} unlocked on session #{Current.session.id} " \
+                        "(account #{Current.user.email_address}, ip #{request.remote_ip}) " \
+                        "last_seen=#{Current.session.reload.sub_user_last_seen_at.inspect} ==="
+      # No flash. The magenta bar and the name in the corner are the receipt -
+      # doubly important now: a mis-key that lands on a colleague's PIN signs
+      # on silently as them, and the name in the corner is how that gets seen.
+      redirect_to safe_return_to, status: :see_other
     end
   end
 

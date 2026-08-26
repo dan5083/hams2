@@ -90,21 +90,13 @@
                       method: :delete,
                       form_class: "block",
                       class: "w-full text-left px-4 py-3 text-sm font-medium text-[#e8028c] hover:bg-gray-50" %>
-                <div class="px-4 py-2 text-xs text-gray-500 border-t border-gray-100">Switch to</div>
-              <% else %>
-                <div class="px-4 py-2 text-xs text-gray-500 border-b border-gray-100">Sign on as operator</div>
               <% end %>
 
-              <% SubUser.signable.in_order.each do |candidate| %>
-                <% next if sub && candidate.id == sub.id %>
-                <button type="button"
-                        class="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"
-                        data-action="click->sub-user#choose"
-                        data-sub-user-id-param="<%= candidate.id %>"
-                        data-sub-user-name-param="<%= candidate.name %>">
-                  <%= candidate.name %>
-                </button>
-              <% end %>
+              <button type="button"
+                      class="w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                      data-action="click->sub-user#open">
+                <%= sub ? "Switch user" : "Sign on with PIN" %>
+              </button>
 
               <%# A stranded kiosk can't get itself back in - magic link only.
                   Nobody on the floor should be able to log the terminal out. %>
@@ -155,7 +147,7 @@
               Signed on as <span class="font-semibold"><%= sub.name %></span><br>
               <span class="text-white/70 text-xs">on <%= Current.user.display_name %>'s login</span>
             <% elsif kiosk %>
-              <span class="font-semibold">Tap a name below to sign on</span>
+              <span class="font-semibold">Tap below to sign on with your PIN</span>
             <% else %>
               Logged in as <%= Current.user.display_name %>
             <% end %>
@@ -167,17 +159,11 @@
                   class: "w-full text-left #{mlink_base}" %>
           <% end %>
 
-          <div class="text-white text-xs font-semibold px-3 pt-3 pb-1">SIGN ON AS</div>
-          <% SubUser.signable.in_order.each do |candidate| %>
-            <% next if sub && candidate.id == sub.id %>
-            <button type="button"
-                    class="w-full text-left <%= mlink_base %>"
-                    data-action="click->sub-user#choose"
-                    data-sub-user-id-param="<%= candidate.id %>"
-                    data-sub-user-name-param="<%= candidate.name %>">
-              <%= candidate.name %>
-            </button>
-          <% end %>
+          <button type="button"
+                  class="w-full text-left <%= mlink_base %> font-semibold"
+                  data-action="click->sub-user#open">
+            <%= sub ? "Switch user" : "Sign on with PIN" %>
+          </button>
 
           <% unless kiosk %>
             <div class="border-t <%= nav_border %> mt-2 pt-2">
@@ -202,12 +188,11 @@
          data-action="click->sub-user#backdrop keydown@window->sub-user#key">
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6" data-sub-user-target="card">
         <div class="text-center">
-          <p class="text-xs uppercase tracking-wide text-gray-500">Enter PIN</p>
-          <p class="text-xl font-bold text-gray-900 mt-1" data-sub-user-target="name">&nbsp;</p>
+          <p class="text-xs uppercase tracking-wide text-gray-500">Operator sign-on</p>
+          <p class="text-xl font-bold text-gray-900 mt-1">Enter your PIN</p>
         </div>
 
         <%= form_with url: sub_user_session_path, method: :post, data: { turbo: false } do |f| %>
-          <%= hidden_field_tag :sub_user_id, nil, data: { sub_user_target: "id" } %>
           <%= hidden_field_tag :return_to, request.fullpath %>
           <%= hidden_field_tag :pin, nil, data: { sub_user_target: "pin" } %>
 

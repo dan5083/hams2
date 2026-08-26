@@ -3,7 +3,7 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["menu", "modal", "card", "name", "id", "pin", "dots", "submit"]
+  static targets = ["menu", "modal", "card", "pin", "dots", "submit"]
 
   connect() {
     this.boundOutside = this.handleOutsideClick.bind(this)
@@ -33,16 +33,10 @@ export default class extends Controller {
 
   // --- PIN pad ----------------------------------------------------------
 
-  choose(event) {
-    event.preventDefault()
-    const { id, name } = event.params
-    this.idTarget.value = id
-    this.nameTarget.textContent = name
+  // No operator to choose any more - the PIN identifies whoever types it.
+  open(event) {
+    if (event) event.preventDefault()
     this.closeMenu()
-    this.open()
-  }
-
-  open() {
     this.pinTarget.value = ""
     this.render()
     this.modalTarget.classList.remove("hidden")
