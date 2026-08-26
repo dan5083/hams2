@@ -360,7 +360,10 @@
             <div class="flex flex-wrap items-center gap-3">
               <%= form_with url: set_parts_per_batch_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex flex-wrap items-center gap-2" do %>
                 <label class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Parts per batch</label>
-                <%= number_field_tag :parts_per_batch, @works_order.parts_per_batch, min: 1, max: @works_order.record_quantity,
+                <%# Unset batching prefills the full order quantity - the
+                    commonest case is everything through in one load, so the
+                    initial state is "1 × N", one Apply away. %>
+                <%= number_field_tag :parts_per_batch, @works_order.parts_per_batch || @works_order.record_quantity, min: 1, max: @works_order.record_quantity,
                     id: "parts-per-batch",
                     data: { quantity: @works_order.record_quantity, max_batches: WorksOrder::MAX_BATCHES },
                     class: "border border-gray-300 rounded px-2 py-1 text-sm w-20" %>
@@ -717,11 +720,13 @@
                                       <%= select_tag "readings[#{active_key}][#{field}]",
                                           options_for_select(["", "PASS", "FAIL"], row[field]),
                                           disabled: locked,
+                                          data: { keyflow: "ocv" },
                                           class: "border border-gray-300 rounded px-1 py-1 text-sm #{'bg-gray-100 text-gray-500' if locked}" %>
                                     <% else %>
                                       <% sugg = suggestions[field] %>
                                       <%= text_field_tag "readings[#{active_key}][#{field}]", row[field],
                                           disabled: locked,
+                                          data: { keyflow: "ocv" },
                                           class: "border border-gray-300 rounded px-2 py-1 text-sm w-24 #{'bg-gray-100 text-gray-500' if locked}",
                                           autocomplete: "off",
                                           list: (sugg.any? ? "dl-#{position}-#{field}" : nil) %>
@@ -774,8 +779,19 @@
                               form: { data: { confirm: undo_confirm, turbo_confirm: undo_confirm } },
                               class: "text-xs text-red-400 hover:text-red-600 underline" %>
                         <% end %>
+                      <% elsif !wo_scoped && @works_order.section_batch_qty(current_sec, sec_active).blank? %>
+                        <%# The model refuses this sign-off anyway ("a sign-off
+                            certifies a complete record"); surface it before the
+                            click rather than after. No keyflow tag - the
+                            keyboard walk skips straight past. %>
+                        <button type="button" disabled
+                                title="Enter a quantity for batch <%= sec_active %> before signing off"
+                                class="bg-gray-200 text-gray-400 text-xs font-medium px-2 py-1 rounded cursor-not-allowed">
+                          Set batch qty
+                        </button>
                       <% elsif spec.present? %>
                         <button type="submit" form="ocv-form-<%= position %>" name="sign_off_batch" value="<%= active_key %>"
+                                data-keyflow="signoff"
                                 class="bg-gray-700 hover:bg-gray-900 text-white text-xs font-medium px-2 py-1 rounded">
                           Sign off<%= " B#{sec_active}" if multi %>
                         </button>
@@ -784,6 +800,7 @@
                             sign_off_operation_works_order_path(@works_order, position: position, batch: active_key,
                                                                base_batch: active_batch, fb: active_fb.presence),
                             method: :patch,
+                            data: { keyflow: "signoff" },
                             class: "bg-gray-700 hover:bg-gray-900 text-white text-xs font-medium px-2 py-1 rounded" %>
                       <% end %>
                       <% if multi %>
@@ -1036,6 +1053,120 @@
   document.addEventListener('turbo:load', jump);
   if (document.readyState !== 'loading') { jump(); }
   else { document.addEventListener('DOMContentLoaded', jump); }
+})();
+
+// Keyboard sign-off flow. The operator works the card without touching the
+// mouse: focus starts at the first actionable spot on the first unsigned op
+// - an empty OCV field if the op has one, otherwise its sign-off button.
+//   On a sign-off button:  Enter/Space = sign off (native click);
+//                          any other key = skip to the next unsigned op
+//                          (ArrowUp goes back) without doing anything.
+//   On an OCV field:       typing types, and typing opens the suggestions
+//                          dropdown. Enter on an EMPTY field accepts the
+//                          top suggestion; Enter otherwise walks to the
+//                          next empty field of the op, and once every
+//                          field is recorded, Enter signs the op off.
+//                          Escape/ArrowDown skips to the next op.
+// Enter never implicitly submits a half-recorded OCV form any more - the
+// handler owns the key. Rows without an enabled sign-off button (signed
+// already, or waiting on a batch quantity) are invisible to the walk.
+// Desktop/keyboard stations only: on touch screens autofocus would just
+// pop the on-screen keyboard.
+(function () {
+  if (window.__hamsKeyflow) return;
+  window.__hamsKeyflow = true;
+
+  var deskop = window.matchMedia && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
+  function rows() {
+    return Array.prototype.filter.call(
+      document.querySelectorAll("[id^='op-']"),
+      function (row) { return row.querySelector('[data-keyflow="signoff"]:not([disabled])'); }
+    );
+  }
+  function ocvFields(row) {
+    return Array.prototype.slice.call(row.querySelectorAll('[data-keyflow="ocv"]:not([disabled])'));
+  }
+  function stationFor(row) {
+    var empty = ocvFields(row).filter(function (f) { return !f.value; })[0];
+    return empty || row.querySelector('[data-keyflow="signoff"]:not([disabled])');
+  }
+  function ring(row) {
+    Array.prototype.forEach.call(document.querySelectorAll("[id^='op-']"), function (r) {
+      r.classList.remove('ring-2', 'ring-blue-500', 'shadow-lg');
+      r.classList.add('transition-opacity', 'duration-150');
+      r.classList.toggle('opacity-40', !!row && r !== row);
+    });
+    if (row) row.classList.add('ring-2', 'ring-blue-500', 'shadow-lg');
+  }
+  function focusStation(el, center) {
+    if (!el) return;
+    el.focus({ preventScroll: true });
+    var row = el.closest("[id^='op-']");
+    if (row) { row.scrollIntoView({ block: center ? 'center' : 'nearest' }); ring(row); }
+  }
+  function focusFirst() {
+    var r = rows();
+    if (r.length) focusStation(stationFor(r[0]), false);
+  }
+  function moveRow(fromEl, dir) {
+    var r = rows();
+    var row = fromEl.closest("[id^='op-']");
+    var i = r.indexOf(row);
+    var next = r[i + dir] || (i === -1 && dir === 1 ? r[0] : null);
+    if (next) focusStation(stationFor(next), true);
+  }
+
+  var MODIFIERS = { Shift: 1, Control: 1, Alt: 1, Meta: 1, CapsLock: 1 };
+
+  document.addEventListener('keydown', function (e) {
+    var t = e.target;
+    if (!t || !t.dataset || e.metaKey || e.ctrlKey || e.altKey) return;
+
+    if (t.dataset.keyflow === 'signoff') {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Tab' || MODIFIERS[e.key]) return;
+      e.preventDefault();
+      moveRow(t, e.key === 'ArrowUp' ? -1 : 1);
+      return;
+    }
+
+    if (t.dataset.keyflow === 'ocv') {
+      if (e.key === 'Escape' || e.key === 'ArrowDown') { e.preventDefault(); moveRow(t, 1); return; }
+      if (e.key !== 'Enter') return; // normal typing, arrows within the datalist, etc.
+      e.preventDefault();            // never implicitly submit a partial form
+
+      // Enter on an empty field with suggestions accepts the MIDDLE one -
+      // the dropdown lists a range ("5 mins".."10 mins") in reading order,
+      // and mid-range is "done normally"; auto-accepting the bare minimum
+      // would be the least defensible value on the record.
+      if (t.tagName === 'INPUT' && !t.value && t.list && t.list.options.length) {
+        var opts = t.list.options;
+        t.value = opts[Math.floor((opts.length - 1) / 2)].value;
+      }
+      if (!t.value) return; // still empty (a select, or no suggestions) - stay put
+
+      var row = t.closest("[id^='op-']");
+      var nextEmpty = ocvFields(row).filter(function (f) { return f !== t && !f.value; })[0];
+      if (nextEmpty) { nextEmpty.focus({ preventScroll: true }); return; }
+
+      var btn = row.querySelector('[data-keyflow="signoff"]:not([disabled])');
+      if (btn) btn.click(); // every field recorded - sign it off
+    }
+  });
+
+  document.addEventListener('focusin', function (e) {
+    if (e.target && e.target.dataset && e.target.dataset.keyflow) {
+      ring(e.target.closest("[id^='op-']"));
+    } else {
+      ring(null); // working elsewhere (batch controls, notes) - undim everything
+    }
+  });
+
+  function arm() { if (deskop) focusFirst(); }
+  document.addEventListener('turbo:load', arm);
+  document.addEventListener('turbo:morph', function () { setTimeout(arm, 0); });
+  if (document.readyState !== 'loading') { arm(); }
+  else { document.addEventListener('DOMContentLoaded', arm); }
 })();
 
 function printRouteCard(url) {
