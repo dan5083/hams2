@@ -438,16 +438,32 @@ class WorksOrder < ApplicationRecord
 
   # The normal way to batch a works order: state how many parts go through
   # together and let the count fall out. Batches 1..n-1 take the full load;
-  # the last takes the remainder. 48 parts at 1 => 48 x 1. 100 at 30 =>
-  # 3 x 30 + 1 x 10. Individual quantities stay editable afterwards for the
-  # cases where physical reality diverges.
+  # the last takes the remainder - UNLESS the remainder is a runt. A final
+  # load more than 25% short of capacity is never run in practice (101 parts
+  # at 10 per load is not ten full loads plus a lone part down the line), so
+  # the last TWO loads split their combined parts as evenly as possible
+  # instead: 101 at 10 => 9 x 10, then 6 + 5. 100 at 30 => 2 x 30, then
+  # 20 + 20. Capacity is never exceeded - half of (per_batch + runt) is
+  # always <= per_batch. Only the last two quantities differ from the naive
+  # derivation, so re-deriving stays compatible with any earlier batches
+  # already signed off at the full load. 48 at 1 => 48 x 1, unchanged.
+  # Individual quantities stay editable afterwards for the cases where
+  # physical reality diverges.
   def derive_batch_quantities(per_batch, total = record_quantity)
     per_batch = per_batch.to_i
     total = total.to_i
     return {} if per_batch < 1 || total < 1
 
     count = (total.to_f / per_batch).ceil
-    (1..count).index_with { |n| n < count ? per_batch : total - (per_batch * (count - 1)) }
+    qtys = (1..count).index_with { |n| n < count ? per_batch : total - (per_batch * (count - 1)) }
+
+    if count > 1 && qtys[count] < per_batch * 0.75
+      combined = qtys[count - 1] + qtys[count]
+      qtys[count - 1] = (combined / 2.0).ceil
+      qtys[count] = combined - qtys[count - 1]
+    end
+
+    qtys
   end
 
   def set_parts_per_batch!(per_batch)
