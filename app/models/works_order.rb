@@ -298,6 +298,7 @@ class WorksOrder < ApplicationRecord
 
   def protect_frozen_process_record
     return if @discarding_process_record
+    return if @undoing_sign_off # undo_sign_off! makes exactly one change and logs it
 
     old_ops = customised_process_data_was&.dig("operations")
     return if old_ops.blank?
@@ -337,19 +338,21 @@ class WorksOrder < ApplicationRecord
       end
     end
 
-    # Notes are append-only annotations: once written, a note is part of the
-    # record regardless of whether the operation is signed. New notes may be
-    # appended; existing ones can never be edited, reordered or removed - a
-    # wrong note is corrected by a later note, exactly like an initialled
-    # annotation on a paper card.
+    # Notes and sign-off undo breadcrumbs are append-only annotations: once
+    # written, part of the record regardless of whether the operation is
+    # signed. New entries may be appended; existing ones can never be edited,
+    # reordered or removed - a wrong note is corrected by a later note,
+    # exactly like an initialled annotation on a paper card.
     old_ops.each do |old_op|
-      old_notes = old_op["notes"].presence
-      next if old_notes.blank?
+      %w[notes sign_off_undos].each do |field|
+        old_entries = old_op[field].presence
+        next if old_entries.blank?
 
-      new_op = new_ops.find { |o| o["position"] == old_op["position"] }
-      unless new_op && (new_op["notes"] || []).first(old_notes.length) == old_notes
-        errors.add(:base, "Operation #{old_op['position']}: notes are append-only and cannot be altered or removed")
-        throw :abort
+        new_op = new_ops.find { |o| o["position"] == old_op["position"] }
+        unless new_op && (new_op[field] || []).first(old_entries.length) == old_entries
+          errors.add(:base, "Operation #{old_op['position']}: #{field == 'notes' ? 'notes' : 'sign-off undo records'} are append-only and cannot be altered or removed")
+          throw :abort
+        end
       end
     end
 
@@ -1035,6 +1038,55 @@ class WorksOrder < ApplicationRecord
     customised_process_data_will_change!
     save!
     note
+  end
+
+  # Undo a sign-off made in error - almost always the wrong person signed in
+  # (shared terminal, previous operator's PIN still live). Allowed only while
+  # NOTHING has been released against this works order: the same test that
+  # gates discarding, because once parts have left the building the record
+  # they left under is history. The undone signature is never erased - it
+  # moves to an append-only "sign_off_undos" breadcrumb recording who was
+  # signed, who undid it and when, so the record shows the correction rather
+  # than hiding the mistake. Readings stay recorded and simply unlock (the
+  # lock derives from the sign-off's presence); the batch date stays - the
+  # work happened on that date, only the signature was wrong.
+  def undo_sign_off!(position, batch_key, user)
+    assert_record_open!
+    unless can_undo_sign_offs?
+      raise "WO#{number} has release notes; its sign-offs are part of the released record"
+    end
+
+    op = find_frozen_operation!(position)
+    key = batch_key.to_s
+    so = op.dig("sign_offs", key)
+    label = key == "wo" ? "" : " batch #{key}"
+    raise "Operation #{position}#{label} is not signed off" if so.blank?
+
+    entry = { "batch" => key, "was" => so,
+              "at" => Time.current.iso8601, "by" => signature_for(user) }
+    op["sign_off_undos"] = (op["sign_off_undos"] || []) + [entry]
+    op["sign_offs"].delete(key)
+    customised_process_data_will_change!
+
+    @undoing_sign_off = true
+    save!
+    entry
+  ensure
+    @undoing_sign_off = false
+  end
+
+  # Same release test as can_discard_process_record?, minus the frozen-record
+  # requirement (checked where it matters). Once anything is released the
+  # record is what the parts shipped under - corrections stop.
+  def can_undo_sign_offs?
+    return false if grouped_member?
+    return false unless operations_frozen?
+    if process_lead?
+      process_group.record_open? &&
+        process_group.works_orders.all? { |wo| wo.release_notes.empty? }
+    else
+      is_open && !voided? && release_notes.empty?
+    end
   end
 
   # Every process-record mutator calls this first: a closed (or voided) works

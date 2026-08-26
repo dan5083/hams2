@@ -68,6 +68,7 @@ Rails.application.routes.draw do
     member do
       get :route_card
       patch :sign_off_operation
+      patch :undo_sign_off
       patch :save_ocv
       patch :set_batch_count
       patch :set_parts_per_batch

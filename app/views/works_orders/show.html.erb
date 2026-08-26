@@ -13,7 +13,9 @@
     # need these before the grid renders.
     operations = (@works_order.operations_for_display rescue [])
     aero = @works_order.aerospace_defense?
-    has_ocv = operations.any? { |op| op["ocv"].present? && (op["ocv"]["fields"] || []).any? }
+    # OCV *monitoring* specifically - nadcap-basis specs. Correct on frozen
+    # records regardless of the part's current flag.
+    has_ocv = operations.any? { |op| op["ocv"].is_a?(Hash) && op["ocv"]["basis"].to_s == "nadcap" }
   %>
 
   <div class="flex justify-between items-center mb-6">
@@ -56,7 +58,7 @@
     </div>
   </div>
 
-  <% if has_ocv %>
+  <% if aero && has_ocv %>
     <div class="mb-4 flex items-center gap-2.5 rounded-lg border-2 border-red-300 bg-red-50 px-4 py-2.5">
       <span class="text-lg">⏱</span>
       <p class="text-sm font-bold text-red-800 uppercase tracking-wide">
@@ -306,7 +308,7 @@
 
     <!-- RIGHT COLUMN: operations preview -->
     <div class="lg:col-span-2">
-      <div class="bg-white shadow rounded-lg p-6 h-full <%= 'ring-2 ring-amber-400/70' if aero %>">
+      <div class="bg-white shadow rounded-lg p-6 h-full <%= 'ring-2 ring-amber-400/70' if aero %>" id="process-operations-card">
         <div class="flex justify-between items-center mb-4">
           <div class="flex items-center gap-2">
             <h2 class="text-lg font-semibold text-gray-900">Process Operations</h2>
@@ -337,6 +339,7 @@
 
         <% ops_for_display = operations %>
         <% paperless = @works_order.paperless_record? %>
+        <% can_undo = paperless && @works_order.can_undo_sign_offs? %>
         <% batch_count = @works_order.process_batch_count %>
         <% active_batch = (@active_batch || 1).to_i %>
         <% wo_sections = @works_order.sections %>
@@ -616,6 +619,13 @@
                         <% end %>
                       </div>
                     <% end %>
+                    <% op_undos = (op["sign_off_undos"] || []).select { |u| u["batch"] == active_key } %>
+                    <% op_undos.each do |u| %>
+                      <p class="mt-1.5 text-xs text-gray-400">
+                        ↩ Sign-off by <%= u.dig("was", "name") %> undone by <%= u.dig("by", "name") %>,
+                        <%= (Time.parse(u["at"]).strftime("%d/%m/%y %H:%M") rescue u["at"]) %>
+                      </p>
+                    <% end %>
                     <% if paperless %>
                       <details class="mt-2 text-xs">
                         <summary class="cursor-pointer select-none text-gray-400 hover:text-gray-600">📝 Add note</summary>
@@ -756,6 +766,14 @@
                     <div class="flex-none w-32 border-l border-gray-200 flex flex-col items-center justify-center gap-1 p-2 <%= signed_here ? 'bg-green-50' : 'bg-gray-50' %>">
                       <% if so %>
                         <span class="text-xs text-green-700 font-semibold text-center">✓<%= " B#{sec_active}" if multi %> <%= so["name"] %></span>
+                        <% if can_undo %>
+                          <% undo_confirm = "Undo the sign-off by #{so['name']} on operation #{position}#{wo_scoped ? '' : " batch #{sec_active}"}? The undone signature is kept on the record; re-sign as the right person afterwards." %>
+                          <%= button_to "↩ undo", undo_sign_off_works_order_path(@works_order, position: position, batch: active_key,
+                                                                                 base_batch: active_batch, fb: active_fb.presence),
+                              method: :patch,
+                              form: { data: { confirm: undo_confirm, turbo_confirm: undo_confirm } },
+                              class: "text-xs text-red-400 hover:text-red-600 underline" %>
+                        <% end %>
                       <% elsif spec.present? %>
                         <button type="submit" form="ocv-form-<%= position %>" name="sign_off_batch" value="<%= active_key %>"
                                 class="bg-gray-700 hover:bg-gray-900 text-white text-xs font-medium px-2 py-1 rounded">
@@ -936,9 +954,19 @@
       out.className = 'text-xs text-orange-600 font-medium';
       return;
     }
-    out.textContent = remainder === per
-      ? count + ' × ' + per
-      : (count - 1) + ' × ' + per + ' + 1 × ' + remainder;
+    // Mirror WorksOrder#derive_batch_quantities exactly, runt rule included:
+    // a final load more than 25% short of capacity balances with the
+    // penultimate load instead (101 at 10 => 9 × 10, then 6 + 5).
+    if (remainder === per) {
+      out.textContent = count + ' × ' + per;
+    } else if (count > 1 && remainder < per * 0.75) {
+      var combined = per + remainder;
+      var a = Math.ceil(combined / 2), b = combined - a;
+      var full = count - 2;
+      out.textContent = (full > 0 ? full + ' × ' + per + ', then ' : '') + a + ' + ' + b + ' (last two balanced)';
+    } else {
+      out.textContent = (count - 1) + ' × ' + per + ' + 1 × ' + remainder;
+    }
     out.className = 'text-xs text-gray-500';
   }
 
@@ -979,6 +1007,35 @@
 
   document.addEventListener('turbo:morph', restore);
   document.addEventListener('turbo:load', restore);
+})();
+
+// On a phone the layout stacks and the operations card sits below every
+// detail panel - the thing the operator came for starts two screens down.
+// Jump straight to it on arrival. Real navigations only: a same-URL morph
+// (signing off, saving readings) must never yank the view - the scroll-pin
+// above owns that case - so any submit or morph marks the next settle as
+// skipped. The lg breakpoint (1024px) is where the two-column layout kicks
+// in and the card is already beside the details.
+(function () {
+  if (window.__hamsMobileOpsJump) return;
+  window.__hamsMobileOpsJump = true;
+
+  var skip = false;
+  document.addEventListener('turbo:submit-start', function () { skip = true; });
+  document.addEventListener('turbo:morph', function () { skip = true; });
+
+  function jump() {
+    var wasSkip = skip;
+    skip = false;
+    if (wasSkip) return;
+    if (window.innerWidth >= 1024) return;
+    var card = document.getElementById('process-operations-card');
+    if (card) card.scrollIntoView({ block: 'start' });
+  }
+
+  document.addEventListener('turbo:load', jump);
+  if (document.readyState !== 'loading') { jump(); }
+  else { document.addEventListener('DOMContentLoaded', jump); }
 })();
 
 function printRouteCard(url) {

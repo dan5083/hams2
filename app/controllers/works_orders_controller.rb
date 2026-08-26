@@ -1,6 +1,6 @@
 # app/controllers/works_orders_controller.rb - Fixed pricing parameter handling and route card operations with RBAC
 class WorksOrdersController < ApplicationController
-  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :invoice_to_date, :void, :unvoid, :sign_off_operation, :save_ocv, :add_operation_note, :set_batch_count, :set_parts_per_batch, :set_batch_qty, :add_fork, :remove_fork, :discard_process_record]
+  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :invoice_to_date, :void, :unvoid, :sign_off_operation, :undo_sign_off, :save_ocv, :add_operation_note, :set_batch_count, :set_parts_per_batch, :set_batch_qty, :add_fork, :remove_fork, :discard_process_record]
 
   # Marks on a process record are attributed to Current.actor - the operator
   # unlocked with a PIN if there is one, otherwise the account holder. That
@@ -234,6 +234,20 @@ class WorksOrdersController < ApplicationController
     @works_order.sign_off_operation!(params[:position], params[:batch], Current.actor)
     redirect_to process_record_path(params[:position].to_i, advance_from: params[:batch]),
                 notice: "Operation #{params[:position]} batch #{params[:batch]} signed off.",
+                status: :see_other
+  rescue => e
+    redirect_to process_record_path(params[:position]), alert: e.message, status: :see_other
+  end
+
+  # Paperless process record: undo a sign-off made in error (wrong person
+  # signed in on a shared terminal). Gated in the model on nothing having
+  # been released; the undone signature moves to an append-only breadcrumb,
+  # never disappears.
+  def undo_sign_off
+    return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
+    @works_order.undo_sign_off!(params[:position], params[:batch], Current.actor)
+    redirect_to process_record_path(params[:position].to_i),
+                notice: "Sign-off undone on operation #{params[:position]}#{params[:batch] == 'wo' ? '' : " batch #{params[:batch]}"}. Re-sign as the right person.",
                 status: :see_other
   rescue => e
     redirect_to process_record_path(params[:position]), alert: e.message, status: :see_other
