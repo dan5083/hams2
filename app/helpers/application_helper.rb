@@ -124,13 +124,21 @@ module ApplicationHelper
   # Bare grammar (standard / hard anodise):
   #   "16V over 30 minutes"        -> hold 16 for 30
   #   "0-45V over 40 minutes"      -> ramp 0->45 over 40
+  # Hand-edited ops also write ranges as "25V→56V", "25V to 56V", or with
+  # en/em dashes, optionally with a unit on the from-value; all of these
+  # parse as ramps. "to" as a separator is safe against e.g. "2 to 5°C" in
+  # the same sentence because the to-value must be immediately followed by V.
   # Texts stating no voltage yield no segments and therefore no suggestions.
+  VOLT_RANGE_SEP = /\s*(?:-|–|—|→|to)\s*/i
+
   def voltage_segments(text)
     segs = text.to_s.scan(
-      /(?:(\d+(?:\.\d+)?)\s*-\s*)?(\d+(?:\.\d+)?)\s*V\s*\(\s*(?:over|hold(?:\s+(?:for|over))?)\s+(\d+)\s*min[^)]*\)/i
+      /(?:(\d+(?:\.\d+)?)\s*V?#{VOLT_RANGE_SEP})?(\d+(?:\.\d+)?)\s*V\s*\(\s*(?:over|hold(?:\s+(?:for|over))?)\s+(\d+)\s*min[^)]*\)/i
     ).map { |from, to, mins| { from: (from || to).to_f, to: to.to_f, mins: mins.to_i } }
     return segs if segs.any?
-    if (m = text.to_s.match(/(\d+(?:\.\d+)?)\s*(?:-\s*(\d+(?:\.\d+)?))?\s*V\b[^.]*?\bover\s+(\d+)\s*min/i))
+    if (m = text.to_s.match(
+      /(\d+(?:\.\d+)?)\s*(?:V\s*)?(?:#{VOLT_RANGE_SEP}(\d+(?:\.\d+)?))?\s*V\b[^.]*?\bover\s+(\d+)\s*min/i
+    ))
       return [{ from: m[1].to_f, to: (m[2] || m[1]).to_f, mins: m[3].to_i }]
     end
     []
