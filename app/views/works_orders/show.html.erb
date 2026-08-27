@@ -513,6 +513,19 @@
           <% end %>
         <% end %>
         <% if ops_for_display.any? %>
+          <%# Keyboard-flow hint. Rendered hidden here; the keyflow JS moves it
+              into the first focused op card and reveals it (so it only ever
+              shows on desktop, where the keyflow runs). Gated on ZERO sign-offs
+              across the whole record - the reload after the first sign-off
+              re-evaluates this and the hint is gone for good. %>
+          <% if paperless && ops_for_display.sum { |o| @works_order.signed_count_for(o) } == 0 %>
+            <div id="keyflow-hint" class="hidden px-4 py-2.5 bg-blue-50 border-b border-blue-200 text-xs text-blue-900 leading-relaxed">
+              ⌨ Press <kbd class="px-1 py-0.5 bg-white border border-blue-300 rounded font-semibold">Enter</kbd>
+              to sign this op off and jump to the next one. Press any other key to skip it
+              (<kbd class="px-1 py-0.5 bg-white border border-blue-300 rounded font-semibold">↑</kbd> goes back).
+              Stick to the keyboard &mdash; using the mouse part-way through can lose your place.
+            </div>
+          <% end %>
           <div class="space-y-3">
             <% current_sec = wo_sections.first %>
             <% ops_for_display.each do |op| %>
@@ -1136,9 +1149,19 @@
     var row = el.closest("[id^='op-']");
     if (row) { row.scrollIntoView({ block: center ? 'center' : 'nearest' }); ring(row); }
   }
+  // One-time coaching banner: server renders #keyflow-hint (hidden) only
+  // while the record has zero sign-offs. Slot it into the top of the first
+  // focused op card and reveal it - after the first sign-off the morph
+  // re-renders without it.
+  function placeHint(row) {
+    var hint = document.getElementById('keyflow-hint');
+    if (!hint || !row) return;
+    if (hint.parentNode !== row) row.insertBefore(hint, row.firstChild);
+    hint.classList.remove('hidden');
+  }
   function focusFirst() {
     var r = rows();
-    if (r.length) { focusStation(stationFor(r[0]), false); return; }
+    if (r.length) { placeHint(r[0]); focusStation(stationFor(r[0]), false); return; }
     // Nothing signable, but ops are waiting on batch quantities - exactly
     // the state after the two WO-scoped ops on a fresh works order. Send
     // the operator to batching; the reload after "Set batches" walks
