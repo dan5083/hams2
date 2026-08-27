@@ -515,10 +515,11 @@
         <% if ops_for_display.any? %>
           <%# Keyboard-flow hint. Rendered hidden here; the keyflow JS moves it
               into the first focused op card and reveals it (so it only ever
-              shows on desktop, where the keyflow runs). Gated on ZERO sign-offs
-              across the whole record - the reload after the first sign-off
-              re-evaluates this and the hint is gone for good. %>
-          <% if paperless && ops_for_display.sum { |o| @works_order.signed_count_for(o) } == 0 %>
+              shows on desktop, where the keyflow runs). Session-scoped: the JS
+              keeps it away once a sign-off has happened in this browser
+              session, so it coaches the first sign-off of the session and
+              then stays gone - whatever state the record itself is in. %>
+          <% if paperless %>
             <div id="keyflow-hint" class="hidden px-4 py-2.5 bg-blue-50 border-b border-blue-200 text-xs text-blue-900 leading-relaxed">
               ⌨ Press <kbd class="px-1 py-0.5 bg-white border border-blue-300 rounded font-semibold">Enter</kbd>
               to sign this op off and jump to the next one. Press any other key to skip it
@@ -1149,16 +1150,29 @@
     var row = el.closest("[id^='op-']");
     if (row) { row.scrollIntoView({ block: center ? 'center' : 'nearest' }); ring(row); }
   }
-  // One-time coaching banner: server renders #keyflow-hint (hidden) only
-  // while the record has zero sign-offs. Slot it into the top of the first
-  // focused op card and reveal it - after the first sign-off the morph
-  // re-renders without it.
+  // One-time coaching banner: server renders #keyflow-hint (hidden) on every
+  // paperless card. Slot it into the top of the first focused op and reveal
+  // it - but only until the operator makes their first sign-off of this
+  // browser session (flag below), after which it stays hidden across the
+  // morphs/reloads that follow every sign-off.
+  var HINT_KEY = 'hamsKeyflowHintDone';
   function placeHint(row) {
     var hint = document.getElementById('keyflow-hint');
     if (!hint || !row) return;
+    try { if (sessionStorage.getItem(HINT_KEY)) return; } catch (e) {}
     if (hint.parentNode !== row) row.insertBefore(hint, row.firstChild);
     hint.classList.remove('hidden');
   }
+  // Any sign-off - clicked, Enter/Space, or reached via the OCV walk (which
+  // ends in btn.click()) - retires the hint for the rest of the session.
+  document.addEventListener('click', function (e) {
+    if (!e.target || !e.target.closest) return;
+    if (e.target.closest('[data-keyflow="signoff"]')) {
+      try { sessionStorage.setItem(HINT_KEY, '1'); } catch (e2) {}
+      var hint = document.getElementById('keyflow-hint');
+      if (hint) hint.classList.add('hidden');
+    }
+  });
   function focusFirst() {
     var r = rows();
     if (r.length) { placeHint(r[0]); focusStation(stationFor(r[0]), false); return; }
