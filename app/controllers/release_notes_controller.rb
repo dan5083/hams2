@@ -1,428 +1,259 @@
-# app/controllers/release_notes_controller.rb - Updated to handle multi-batch
-# measurements and MIL-PRF-8625F Type III NADCAP sample-plan readings.
-class ReleaseNotesController < ApplicationController
-  before_action :set_release_note, only: [:show, :edit, :update, :destroy, :void, :pdf]
-  before_action :set_works_order, only: [:new, :create]
+# app/lib/film_thickness.rb
+#
+# Film thickness recording rules, shared by the process record and the
+# release note.
+#
+# Paperless aero/defence parts record film thickness IN-LINE, as an OCV
+# field on the operation where it is physically measured:
+#   - anodic: the foil verification op that follows unjig, one Elcometer
+#     set per batch (8 readings, or the MIL-PRF-8625F Type III NADCAP sample
+#     plan when the WO spec calls for it)
+#   - ENP:    the ENP op itself, six micrometer points A-F, start and finish
+#             either side of the plating cycle
+# The value stored in ocv_readings[batch][field] is the same JSON the
+# release note form has always posted, so the RN snapshot builder and the
+# CofC read one shape whether the readings were captured here or on the RN.
+#
+# Everything here is pure: no ActiveRecord, no I/O. WorksOrder calls it at
+# sign-off; ReleaseNote calls it for form-captured (non-paperless) records.
+module FilmThickness
+  ANODIC_FIELD = "elcometer_readings".freeze  # foil verification op
+  ENP_FIELD    = "enp_growth".freeze          # ENP op
+  FIELDS       = [ANODIC_FIELD, ENP_FIELD].freeze
 
-  def index
-    @release_notes = ReleaseNote.includes(:works_order, :issued_by, :invoice_item)
-                                .order(number: :desc)
+  ANODIC_READINGS_PER_BATCH = 8
+  ENP_POINTS  = %w[A B C D E F].freeze
+  MAX_MICRONS = 1000
 
-    case params[:status]
-    when 'active'
-      @release_notes = @release_notes.active
-    when 'voided'
-      @release_notes = @release_notes.voided
-    when 'pending_invoice'
-      @release_notes = @release_notes.requires_invoicing
-    when 'invoiced'
-      @release_notes = @release_notes.joins(:invoice_item)
-    end
-
-    if params[:customer_id].present?
-      @release_notes = @release_notes.joins(works_order: { customer_order: :customer })
-                                     .where(customer_orders: { customer_id: params[:customer_id] })
-    end
-
-    if params[:search].present?
-      @release_notes = @release_notes.where("number::text ILIKE ?", "%#{params[:search]}%")
-    end
-
-    @customers = Organization.customers.enabled.order(:name)
-    @release_notes = @release_notes.page(params[:page]).per(20)
+  # ==========================================================================
+  # NADCAP sample plan (MIL-PRF-8625F Type III hard anodise)
+  # parts_per_batch -> sample size. Total readings for the batch is
+  # max(8, sample_size), distributed as evenly as possible across the
+  # sampled parts:
+  #   - Lot 1  -> sample 1  -> 8 readings on the one part          (8 total)
+  #   - Lot 6  -> sample 6  -> 2 parts x 2 readings, 4 parts x 1   (8 total)
+  #   - Lot 32 -> sample 12 -> 1 reading per part                  (12 total)
+  # ==========================================================================
+  def self.nadcap_sample_size(parts_per_batch)
+    n = parts_per_batch.to_i
+    return 0 if n < 1
+    return n if n <= 12
+    return 12 if n <= 288
+    return 16 if n <= 544
+    return 20 if n <= 960
+    return 24 if n <= 1632
+    32
   end
 
-  def show
+  def self.nadcap_total_readings(parts_per_batch)
+    ss = nadcap_sample_size(parts_per_batch)
+    ss < 1 ? 0 : [ANODIC_READINGS_PER_BATCH, ss].max
   end
 
-  def new
-    @release_note = @works_order.release_notes.build
-    @release_note.issued_by = Current.user
-    @release_note.date = Date.current
+  # Per-part allocation, most heavily loaded parts first: lot 6 -> [2,2,1,1,1,1]
+  def self.nadcap_readings_plan(parts_per_batch)
+    ss = nadcap_sample_size(parts_per_batch)
+    return [] if ss < 1
+    total = [ANODIC_READINGS_PER_BATCH, ss].max
+    base, extra = total.divmod(ss)
+    Array.new(ss) { |i| base + (i < extra ? 1 : 0) }
   end
 
-  def create
-    @release_note = @works_order.release_notes.build(release_note_params)
-    @release_note.issued_by = Current.user
-
-    if thickness_measurements_provided?
-      process_thickness_measurements
-    end
-
-    if @release_note.save
-      redirect_to @release_note, notice: 'Release note was successfully created.'
-    else
-      render :new, status: :unprocessable_entity
-    end
+  # A works order spec triggers NADCAP sampling when it names "PRF" and
+  # "III" as a whole token (so "IIIA" etc. do not false-positive).
+  def self.nadcap_sampling_specification?(specification)
+    spec = specification.to_s.upcase
+    return false if spec.blank?
+    spec.include?("PRF") && /\bIII\b/.match?(spec)
   end
 
-  def edit
-    unless @release_note.can_be_edited?
-      redirect_to @release_note, alert: 'Cannot edit voided release notes.'
-      return
-    end
-
-    @original_quantity_accepted = @release_note.quantity_accepted
-    @original_quantity_rejected = @release_note.quantity_rejected
+  # ==========================================================================
+  # Parsing - tolerant of the JSON strings the JS controllers post and of
+  # already-parsed arrays/hashes.
+  # ==========================================================================
+  def self.parse(value)
+    return value unless value.is_a?(String)
+    JSON.parse(value)
+  rescue JSON::ParserError
+    nil
   end
 
-  def update
-    unless @release_note.can_be_edited?
-      redirect_to @release_note, alert: 'Cannot edit voided release notes.'
-      return
-    end
-
-    if thickness_measurements_provided?
-      process_thickness_measurements
-    end
-
-    was_invoiced = @release_note.invoiced?
-
-    if @release_note.update(release_note_params)
-      success_message = 'Release note was successfully updated.'
-
-      if was_invoiced && (@release_note.quantity_accepted_previously_changed? || @release_note.quantity_rejected_previously_changed?)
-        success_message += ' Note: This release note has already been invoiced - the invoice amounts will not be affected by quantity changes.'
-      end
-
-      redirect_to @release_note, notice: success_message
-    else
-      @original_quantity_accepted = @release_note.quantity_accepted_was
-      @original_quantity_rejected = @release_note.quantity_rejected_was
-      render :edit, status: :unprocessable_entity
+  # Numeric readings rounded to 1dp. Non-numeric entries dropped; sign kept
+  # so a bad value is reported rather than silently vanishing.
+  def self.readings_from(value)
+    list = parse(value)
+    list = [list] unless list.is_a?(Array)
+    list.filter_map do |v|
+      next nil if v.blank?
+      (Float(v.to_s) * 10).round / 10.0
+    rescue ArgumentError, TypeError
+      nil
     end
   end
 
-  def destroy
-    if @release_note.can_be_deleted?
-      @release_note.destroy
-      redirect_to release_notes_url, notice: 'Release note was successfully deleted.'
-    else
-      redirect_to @release_note, alert: 'Cannot delete release note that has been invoiced.'
+  # { 'parts_per_batch' => n, 'parts' => [{ 'part_label' => 'B1p1', 'readings' => [...] }] }
+  def self.nadcap_from(value, parts_per_batch: nil)
+    data = parse(value)
+    data = {} unless data.is_a?(Hash)
+    parts = (data["parts"] || []).each_with_index.map do |part, idx|
+      {
+        "part_label" => part["part_label"].presence || "p#{idx + 1}",
+        "readings"   => readings_from(part["readings"] || [])
+      }
     end
-  end
-
-  def void
-    begin
-      @release_note.void!
-      redirect_to @release_note, notice: 'Release note was successfully voided.'
-    rescue StandardError => e
-      redirect_to @release_note, alert: e.message
-    end
-  end
-
-  def pdf
-    @company_name    = "Hard Anodising Surface Treatments Ltd"
-    @trading_address = "Firs Industrial Estate, Rickets Close\nKidderminster, DY11 7QN"
-
-    respond_to do |format|
-      format.html { render layout: false }
-      format.pdf do
-        pdf = Grover.new(
-          render_to_string(
-            template: 'release_notes/pdf',
-            layout: false,
-            locals: {
-              release_note: @release_note,
-              company_name: @company_name,
-              trading_address: @trading_address
-            }
-          ),
-          format: 'A4',
-          margin: { top: '1cm', bottom: '1cm', left: '1cm', right: '1cm' },
-          print_background: true,
-          prefer_css_page_size: true
-        ).to_pdf
-
-        send_data pdf,
-                  filename: "delivery_note_#{@release_note.number}.pdf",
-                  type: 'application/pdf',
-                  disposition: 'inline'
-      end
-    end
-  end
-
-  private
-
-  def set_release_note
-    @release_note = ReleaseNote.find(params[:id])
-  end
-
-  def set_works_order
-    @works_order = WorksOrder.find(params[:works_order_id]) if params[:works_order_id]
-  end
-
-  def release_note_params
-    params.require(:release_note).permit(
-      :date,
-      :quantity_accepted,
-      :quantity_rejected,
-      :remarks,
-      :no_invoice,
-      :measured_thicknesses
-    )
-  end
-
-  def thickness_measurements_provided?
-    # Primary JSON payload (from submit handler)
-    return true if params[:release_note][:measured_thicknesses].present?
-
-    # Per-batch anodic fields: thickness_readings_<id>_b<n>  OR legacy thickness_readings_<id>
-    return true if params.keys.any? { |k|
-      k.to_s.start_with?('thickness_readings_') || k.to_s.start_with?('thickness_measurement_')
+    {
+      "parts_per_batch" => (parts_per_batch.presence || data["parts_per_batch"]).to_i,
+      "parts"           => parts,
+      "readings"        => parts.flat_map { |p| p["readings"] }
     }
-
-    # Per-batch ENP fields: enp_measurements_<id>_b<n>  OR legacy enp_measurements_<id>
-    return true if params.keys.any? { |k| k.to_s.start_with?('enp_measurements_') }
-
-    false
   end
 
-  # ---------------------------------------------------------------------------
-  # Primary path: the form's submit handler packs everything into a single JSON
-  # blob at release_note[measured_thicknesses].  The blob uses the batches
-  # structure:
-  #
-  #   { "measurements": [
-  #       { "treatment_id": "abc123",
-  #         "process_type": "hard_anodising",
-  #         "display_name": "Hard Anodising",
-  #         "target_thickness": 25,
-  #         "batches": [
-  #           # Standard anodic batch:
-  #           { "batch_number": 1, "readings": [70.5, 70.7, ...] },
-  #
-  #           # NADCAP sample-plan batch (MIL-PRF-8625F Type III):
-  #           # Total readings = max(8, sample_size) distributed across the
-  #           # sampled parts (ReleaseNote.nadcap_readings_plan), e.g.
-  #           # lot 1 -> 1 part x 8, lot 6 -> 2x2 + 4x1, lot 300 -> 16 x 1.
-  #           { "batch_number": 2,
-  #             "parts_per_batch": 300,
-  #             "parts": [
-  #               { "part_label": "B2p1", "readings": [70.5] },
-  #               ...
-  #             ],
-  #             "readings": [...flattened nadcap_total_readings readings...]
-  #           }
-  #         ]
-  #       },
-  #       { "treatment_id": "def456",
-  #         "process_type": "electroless_nickel_plating",
-  #         "batches": [
-  #           { "batch_number": 1, "enp_measurements": [{...}, ...] },
-  #           { "batch_number": 2, "enp_measurements": [{...}, ...] }
-  #         ]
-  #       }
-  #     ]
-  #   }
-  #
-  # Fallback path: individual per-batch fields (legacy or if JS failed).
-  #   Anodic field names: thickness_readings_<treatment_id>_b<n>
-  #     - value is either a JSON array (standard) or JSON object (NADCAP).
-  #   ENP field names:    enp_measurements_<treatment_id>_b<n>
-  # ---------------------------------------------------------------------------
-  def process_thickness_measurements
-    Rails.logger.info "Processing thickness measurements (batch-aware)"
+  # [{ 'point' => 'A', 'start_mm' => 1.234, 'finish_mm' => 1.259, 'growth_um' => 25.0 }, ...]
+  def self.enp_from(value)
+    data = parse(value)
+    return [] unless data.is_a?(Array)
+    data.filter_map do |m|
+      next nil unless m.is_a?(Hash) && ENP_POINTS.include?(m["point"].to_s)
+      {
+        "point"     => m["point"].to_s,
+        "start_mm"  => m["start_mm"].presence&.to_f,
+        "finish_mm" => m["finish_mm"].presence&.to_f,
+        "growth_um" => m["growth_um"].presence&.to_f
+      }
+    end
+  end
 
-    # --- Primary path: JSON blob ---
-    if release_note_params[:measured_thicknesses].present?
-      begin
-        json_data = JSON.parse(release_note_params[:measured_thicknesses])
-        if json_data.is_a?(Hash) && json_data['measurements'].is_a?(Array)
-          Rails.logger.info "Processing JSON payload with #{json_data['measurements'].length} measurements"
-          @release_note.measured_thicknesses = json_data
-          return
-        end
-      rescue JSON::ParserError => e
-        Rails.logger.warn "Failed to parse JSON thickness data: #{e.message}"
-      end
+  # ==========================================================================
+  # Rules - each returns an array of error strings with no batch/treatment
+  # prefix; callers add context.
+  # ==========================================================================
+  def self.anodic_errors(readings)
+    return ["thickness readings are required"] if readings.blank?
+    errors = []
+    unless readings.count % ANODIC_READINGS_PER_BATCH == 0
+      errors << "requires a multiple of #{ANODIC_READINGS_PER_BATCH} readings (#{readings.count} provided)"
+    end
+    errors.concat(reading_value_errors(readings))
+    errors
+  end
+
+  def self.nadcap_errors(data, parts_per_batch)
+    ppb   = parts_per_batch.to_i
+    parts = data["parts"] || []
+    return ["requires 'Parts in this batch' (NADCAP sampling)"] if ppb < 1
+
+    expected_size  = nadcap_sample_size(ppb)
+    expected_plan  = nadcap_readings_plan(ppb)
+    expected_total = nadcap_total_readings(ppb)
+
+    if parts.count != expected_size
+      return ["requires #{expected_size} sampled part(s) for a lot of #{ppb} (got #{parts.count})"]
     end
 
-    # --- Fallback path: individual fields ---
-    required_treatments = @release_note.get_required_treatments
-    @release_note.measured_thicknesses = { 'measurements' => [] }
-
-    # Collect anodic per-batch fields
-    # Field name patterns:
-    #   thickness_readings_<treatment_id>_b<n>    (new batch format)
-    #   thickness_readings_<treatment_id>          (legacy single batch)
-    #   thickness_measurement_<treatment_id>       (older legacy)
-    anodic_fields = params.select { |k, _|
-      k.to_s.start_with?('thickness_readings_') || k.to_s.start_with?('thickness_measurement_')
-    }
-
-    # Group by treatment_id → { treatment_id => { batch_number => field_value } }
-    anodic_by_treatment = {}
-    anodic_fields.each do |field_name, field_value|
-      base = field_name.to_s.sub(/^thickness_(readings|measurement)_/, '')
-
-      treatment_id, batch_number = if base =~ /^(.+)_b(\d+)$/
-        [$1, $2.to_i]
-      else
-        [base, 1]
-      end
-
-      anodic_by_treatment[treatment_id] ||= {}
-      anodic_by_treatment[treatment_id][batch_number] = field_value
+    # The plan is a multiset of per-part counts; any assignment is fine.
+    actual = parts.map { |p| (p["readings"] || []).count }
+    if actual.sort != expected_plan.sort
+      breakdown = expected_plan.tally.sort_by { |c, _| -c }
+                               .map { |c, n| "#{n} part(s) × #{c} reading(s)" }.join(" + ")
+      return ["requires #{expected_total} readings for a lot of #{ppb}, distributed as #{breakdown} " \
+              "(got #{actual.sum} readings across #{parts.count} part(s))"]
     end
 
-    anodic_by_treatment.each do |treatment_id, batches_hash|
-      treatment_info = required_treatments.find { |t| t[:treatment_id] == treatment_id }
-      next unless treatment_info
+    parts.flat_map do |part|
+      reading_value_errors(part["readings"] || []).map { |e| "#{part['part_label']} #{e}" }
+    end
+  end
 
-      batches = batches_hash.map do |batch_number, field_value|
-        parsed = parse_readings_field(field_value)
-
-        if parsed.is_a?(Hash) && parsed['parts'].is_a?(Array)
-          # NADCAP shape: { parts_per_batch, parts: [{ part_label, readings }, ...] }
-          flat = parsed['parts'].flat_map { |p| Array(p['readings']) }
-          {
-            'batch_number'    => batch_number,
-            'parts_per_batch' => parsed['parts_per_batch'],
-            'parts'           => parsed['parts'],
-            'readings'        => flat
-          }
-        else
-          { 'batch_number' => batch_number, 'readings' => Array(parsed) }
-        end
-      end.sort_by { |b| b['batch_number'] }
-
-      has_data = batches.any? { |b| (b['readings'] || []).any? || (b['parts'] || []).any? }
-      if has_data
-        Rails.logger.info "Processing #{batches.count} anodic batch(es) for treatment #{treatment_id}"
-        success = @release_note.set_thickness_measurement(treatment_id, batches, treatment_info)
-        unless success
-          @release_note.errors.add(:measured_thicknesses, "Invalid readings for #{treatment_info[:display_name]}")
-        end
+  def self.enp_errors(measurements)
+    return ["ENP measurements are required"] if measurements.blank?
+    errors = []
+    measurements.each do |m|
+      g = m["growth_um"]
+      if g.nil?
+        errors << "point #{m['point']} is incomplete"
+      elsif g < 0
+        errors << "point #{m['point']} has negative growth (#{g}µm)"
+      elsif g > MAX_MICRONS
+        errors << "point #{m['point']} seems unrealistically high (#{g}µm)"
       end
     end
+    missing = ENP_POINTS - measurements.map { |m| m["point"] }
+    errors << "requires all 6 measurement points (A-F)" if missing.any?
+    errors
+  end
 
-    # Collect ENP per-batch fields
-    # Field name patterns:
-    #   enp_measurements_<treatment_id>_b<n>    (new batch format)
-    #   enp_measurements_<treatment_id>          (legacy single batch)
-    enp_fields = params.select { |k, _| k.to_s.start_with?('enp_measurements_') }
-
-    enp_by_treatment = {}
-    enp_fields.each do |field_name, field_value|
-      base = field_name.to_s.sub(/^enp_measurements_/, '')
-
-      treatment_id, batch_number = if base =~ /^(.+)_b(\d+)$/
-        [$1, $2.to_i]
-      else
-        [base, 1]
-      end
-
-      enp_by_treatment[treatment_id] ||= {}
-      enp_by_treatment[treatment_id][batch_number] = field_value
-    end
-
-    enp_by_treatment.each do |treatment_id, batches_hash|
-      treatment_info = required_treatments.find { |t| t[:treatment_id] == treatment_id }
-      next unless treatment_info
-
-      batches = batches_hash.map do |batch_number, field_value|
-        enp_data = begin
-          field_value.present? ? JSON.parse(field_value) : []
-        rescue JSON::ParserError => e
-          Rails.logger.error "Failed to parse ENP batch #{batch_number} for #{treatment_id}: #{e.message}"
-          @release_note.errors.add(:measured_thicknesses, "Invalid ENP data format for #{treatment_info[:display_name]} batch #{batch_number}")
-          []
-        end
-        { 'batch_number' => batch_number, 'enp_measurements' => enp_data }
-      end.sort_by { |b| b['batch_number'] }
-
-      if batches.any? { |b| b['enp_measurements'].any? }
-        Rails.logger.info "Processing #{batches.count} ENP batch(es) for treatment #{treatment_id}"
-        treatment_info[:enp_type] = treatment_info[:process_type]
-        success = @release_note.set_enp_measurements(treatment_id, batches, treatment_info)
-        unless success
-          @release_note.errors.add(:measured_thicknesses, "Invalid ENP measurements for #{treatment_info[:display_name]}")
-        end
+  def self.reading_value_errors(readings)
+    readings.each_with_index.filter_map do |r, i|
+      if r <= 0
+        "reading #{i + 1} must be greater than 0"
+      elsif r > MAX_MICRONS
+        "reading #{i + 1} seems unrealistically high (>#{MAX_MICRONS}µm)"
       end
     end
   end
 
-  # Parses a readings field value. Accepts:
-  #   - JSON array string  "[70.5, 70.7]"            → returns Array
-  #   - JSON object string '{"parts_per_batch":...}' → returns Hash (NADCAP)
-  #   - Anything else                                → returns [value]
-  def parse_readings_field(field_value)
-    return [] if field_value.blank?
+  # ==========================================================================
+  # Process record integration - operates on the frozen op hash shape
+  # ==========================================================================
 
-    if field_value.is_a?(String)
-      stripped = field_value.strip
-      if stripped.start_with?('[') || stripped.start_with?('{')
-        begin
-          JSON.parse(stripped)
-        rescue JSON::ParserError
-          stripped.start_with?('{') ? {} : []
-        end
+  # Which in-line thickness field this op carries, or nil.
+  def self.field_for(op)
+    fields = (op.dig("ocv", "fields") || []).map(&:to_s)
+    FIELDS.find { |f| fields.include?(f) }
+  end
+
+  def self.thickness_op?(op)
+    field_for(op).present?
+  end
+
+  # NADCAP sampling applies to the HARD anodise foil op on a PRF/Type III
+  # WO - a chromic or standard anodise treatment on the same WO still takes
+  # the plain 8-per-batch set. Mirrors ReleaseNote#get_required_treatments.
+  def self.nadcap_for?(op, specification)
+    nadcap_sampling_specification?(specification) &&
+      op["id"].to_s.upcase.include?("HARD_ANODISING")
+  end
+
+  # Validate one batch's row at sign-off. parts_per_batch is the SECTION's
+  # batch qty - the process record already knows the lot size, so NADCAP
+  # sampling never asks for it twice.
+  def self.row_errors(op, row, parts_per_batch: nil, nadcap: false)
+    field = field_for(op)
+    return [] unless field
+    raw = row[field]
+    return ["#{field.humanize} not recorded"] if raw.to_s.strip.empty?
+
+    case field
+    when ENP_FIELD
+      enp_errors(enp_from(raw))
+    when ANODIC_FIELD
+      if nadcap
+        nadcap_errors(nadcap_from(raw, parts_per_batch: parts_per_batch), parts_per_batch)
       else
-        [field_value]
+        anodic_errors(readings_from(raw))
       end
-    else
-      [field_value]
+    end
+  end
+
+  # The batch hash ReleaseNote#measured_thicknesses stores - identical to
+  # what the RN form produced, plus provenance.
+  def self.batch_from_row(op, row, batch_number, parts_per_batch: nil, nadcap: false)
+    field = field_for(op)
+    raw   = row[field]
+    return nil if raw.to_s.strip.empty?
+
+    base = { "batch_number" => batch_number.to_i, "source" => "process_record", "position" => op["position"] }
+    case field
+    when ENP_FIELD
+      m = enp_from(raw)
+      m.any? ? base.merge("enp_measurements" => m) : nil
+    when ANODIC_FIELD
+      if nadcap
+        base.merge(nadcap_from(raw, parts_per_batch: parts_per_batch))
+      else
+        r = readings_from(raw)
+        r.any? ? base.merge("readings" => r) : nil
+      end
     end
   end
 end
-
-# =============================================================================
-# CHEAT SHEET: Adding Thickness Measurement Requirements to Parts
-# =============================================================================
-#
-# PROBLEM: When copying parts, locked_operations contain anodising processes
-# but customisation_data["operation_selection"]["treatments"] is empty.
-# This causes release notes to NOT require thickness measurements even though
-# the part is aerospace/defense and has anodising.
-#
-# SOLUTION: Manually add the treatment to the treatments field using Heroku console.
-#
-# -----------------------------------------------------------------------------
-# 1. FIND PROBLEMATIC PARTS FOR A CUSTOMER
-# -----------------------------------------------------------------------------
-#
-# customer = Organization.find_by("name ILIKE ?", "%CUSTOMER_NAME%")
-# parts = Part.where(customer: customer, enabled: true)
-#
-# parts.each do |part|
-#   treatments = part.get_treatments
-#   if part.aerospace_defense? && treatments.empty? && part.locked_for_editing?
-#     has_anodising = part.locked_operations.any? do |op|
-#       op_text = op["operation_text"]&.downcase || ""
-#       op_name = op["display_name"]&.downcase || ""
-#       op_text.include?("anodis") || op_name.include?("anodis")
-#     end
-#     puts "❌ #{part.display_name} - needs fixing" if has_anodising
-#   end
-# end
-#
-# -----------------------------------------------------------------------------
-# 2. FIX A PART - Add Thickness Measurement Requirement
-# -----------------------------------------------------------------------------
-#
-# HARD ANODISING:
-# part = Part.find_by(part_number: 'PART-NUMBER-HERE')
-# part.customisation_data["operation_selection"]["treatments"] = [
-#   { "type" => "hard_anodising", "operation_id" => "HARD_ANODISING",
-#     "selected_jig_type" => "titanium_wire", "target_thickness" => 25 }
-# ].to_json
-# part.save!
-#
-# CHROMIC ANODISING:
-# part.customisation_data["operation_selection"]["treatments"] = [
-#   { "type" => "chromic_anodising", "operation_id" => "CHROMIC_22V",
-#     "selected_jig_type" => "titanium_wire", "target_thickness" => 5 }
-# ].to_json
-# part.save!
-#
-# MULTIPLE TREATMENTS:
-# part.customisation_data["operation_selection"]["treatments"] = [
-#   { "type" => "chromic_anodising", ... },
-#   { "type" => "hard_anodising", ... }
-# ].to_json
-# part.save!
-#
-# Valid types: "chromic_anodising", "hard_anodising", "standard_anodising"
-# Common jig types: "titanium_wire", "titanium_bar", "aluminium_bar"
-# =============================================================================
