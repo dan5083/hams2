@@ -83,8 +83,9 @@ module OperationLibrary
           operation_data[:operation_text].gsub('. Time for {THICKNESS}μm: {TIME_RANGE}', '')
         end
 
-        # Attach OCV monitoring spec for aerospace/defense
-        ocv_spec = OcvSpecs.time_temp if aerospace_defense
+        # Attach OCV monitoring spec for aerospace/defense: time/temp plus
+        # the in-line six-point film thickness record (FilmThickness)
+        ocv_spec = OcvSpecs.enp_plate if aerospace_defense
 
         Operation.new(
           id: operation_data[:id],
@@ -106,7 +107,7 @@ module OperationLibrary
       base_operations = [
         { id: 'HIGH_PHOS_VANDALLOY_4100', deposition_rate_range: [12.0, 14.1] },
         { id: 'MEDIUM_PHOS_NICKLAD_767', deposition_rate_range: [18.0, 23.0] },
-        { id: 'LOW_PHOS_NICKLAD_ELV_824', deposition_rate_range: [6.8, 18.2] },
+        { id: 'LOW_PHOS_NICKLAD_ELV_824', deposition_rate_range: [6.8, 12.2] },
         { id: 'PTFE_NICKLAD_ICE', deposition_rate_range: [5.0, 11.0] }
       ]
 

@@ -46,11 +46,18 @@ module OperationLibrary
     # /foil verification|elcometer/ fallback in OcvSpecs, so copied/manual
     # foil ops record the same shape as library ones (see the ALIGN THESE
     # note in ocv_specs.rb).
+    #
+    # elcometer_readings is the batch's film thickness set, recorded here
+    # in-line (paperless) rather than on the release note: a JSON array of
+    # readings, or the NADCAP sample-plan blob on PRF/Type III work. Rules
+    # and shape live in FilmThickness; the release note snapshots it for
+    # the CofC.
     def self.ocv_spec
       OcvSpecs.fields(
         :meter_no,
         :foil_value_1, :measured_thickness_1,
         :foil_value_2, :measured_thickness_2,
+        FilmThickness::ANODIC_FIELD.to_sym,
         basis: :nadcap
       )
     end

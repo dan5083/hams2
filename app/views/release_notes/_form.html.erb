@@ -194,7 +194,33 @@
              MIL-PRF-8625F Type III: NADCAP sample plan based on parts per batch.
              ENP: A-F (6 points) per batch.
              ================================================================ -->
-        <% if @release_note.requires_thickness_measurements? %>
+        <% if @release_note.requires_thickness_measurements? && @release_note.inline_thickness_record? %>
+          <%# Paperless: thickness lives on the process record (foil verification /
+              ENP ops). Show what this RN will certify; capture stays on the WO. %>
+          <% wo = @release_note.works_order %>
+          <% certified = wo.signed_off_quantity %>
+          <% released  = wo.released_quantity_against_record(except: @release_note) %>
+          <div class="sm:col-span-6">
+            <div class="border-t border-gray-200 pt-6">
+              <h3 class="text-lg font-medium text-gray-900 mb-1">Film Thickness</h3>
+              <p class="text-sm text-gray-600">
+                Recorded in-line on the process record. Signed off end to end:
+                <span class="font-semibold"><%= certified %></span> of <%= wo.record_quantity %> parts
+                (<%= released %> already released).
+              </p>
+              <% if @release_note.new_record? %>
+                <p class="text-xs text-gray-500 mt-1">
+                  This release note will carry every batch signed off on the foil verification / ENP
+                  operation that an earlier release note has not already certified.
+                  <%= link_to "Open the process record", works_order_path(wo), class: "text-blue-600 hover:underline" %>
+                  to record or sign off remaining batches.
+                </p>
+              <% elsif @release_note.thickness_measurements_summary %>
+                <p class="text-xs text-gray-500 mt-1"><%= @release_note.thickness_measurements_summary %></p>
+              <% end %>
+            </div>
+          </div>
+        <% elsif @release_note.requires_thickness_measurements? %>
           <div class="sm:col-span-6">
             <div class="border-t border-gray-200 pt-6" data-controller="elcometer-session">
               <h3 class="text-lg font-medium text-gray-900 mb-1">
@@ -665,7 +691,7 @@
        JavaScript for thickness measurements - batch-aware submit handler
        and batch count switcher.
        ======================================================================== -->
-  <% if @release_note.requires_thickness_measurements? %>
+  <% if @release_note.requires_thickness_measurements? && !@release_note.inline_thickness_record? %>
     <script>
       // --------------------------------------------------------------------
       // setBatchCount – show/hide batch containers and their labels

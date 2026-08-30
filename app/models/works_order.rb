@@ -798,6 +798,90 @@ class WorksOrder < ApplicationRecord
     section_batched_quantity_total(sections.first)
   end
 
+  # ============================================================================
+  # RELEASE COVERAGE - what the process record has actually certified
+  # ============================================================================
+  #
+  # A release note may only release parts that have a complete sign-off
+  # THROUGH-LINE: every WO-scoped op signed, and, in every batch section,
+  # enough batches signed on every op of that section to cover the quantity.
+  # A fork re-batches, so batches cannot be traced across sections; the
+  # through-line width is therefore the smallest completed quantity of any
+  # section (a part cannot have finished the last section without having
+  # finished the ones before it). Reads go through the record OWNER: a
+  # grouped member's record lives on the lead and certifies the whole bar.
+
+  # Batches of a section signed on EVERY batch-scoped op in it, with qty.
+  def completed_section_batches(section)
+    owner = process_record_owner
+    ops   = owner.section_ops(section)
+    return [] if ops.empty?
+    (1..owner.section_batch_count(section)).filter_map do |n|
+      key = n.to_s
+      next nil unless ops.all? { |op| (op["sign_offs"] || {}).key?(key) }
+      { batch: key, qty: owner.section_batch_qty(section, key).to_i }
+    end
+  end
+
+  # Width of the sign-off through-line: parts certified end to end.
+  def signed_off_quantity
+    owner = process_record_owner
+    ops   = owner.operations_for_display || []
+    return 0 if ops.empty?
+    wo_ops = ops.select { |op| owner.wo_scoped_operation?(op) }
+    return 0 unless wo_ops.all? { |op| (op["sign_offs"] || {}).key?("wo") }
+    owner.sections.map { |section| completed_section_batches(section).sum { |b| b[:qty] } }.min || 0
+  end
+
+  # Quantity already released against this record by active RNs - across the
+  # bar for a grouped WO, since the record certifies the whole tank load.
+  def released_quantity_against_record(except: nil)
+    scope = grouped? ? ReleaseNote.where(works_order_id: process_group.works_orders.where(voided: false).select(:id)) : release_notes
+    scope = scope.active
+    scope = scope.where.not(id: except.id) if except&.persisted?
+    scope.sum(:quantity_accepted) + scope.sum(:quantity_rejected)
+  end
+
+  # ============================================================================
+  # IN-LINE FILM THICKNESS (paperless aero/defence)
+  # ============================================================================
+  #
+  # Film thickness is recorded on the process record - foil verification op
+  # for anodic, ENP op for ENP - as an OCV field per batch (FilmThickness).
+  # The release note does not copy it; it stores REFERENCES to the (op, batch)
+  # rows it certifies and reads the readings from here.
+
+  # True when this WO's thickness is recorded in-line rather than on the RN
+  # form. Requires a paperless record whose operations actually carry the
+  # field - a WO frozen before the field existed keeps the RN form, so
+  # in-flight work is never stranded between the two mechanisms.
+  def inline_thickness_record?
+    return false unless aerospace_defense? && paperless_record?
+    process_record_owner.film_thickness_ops.any?
+  end
+
+  # Ops carrying an in-line thickness field, in sequence order. Frozen if the
+  # record has started, live otherwise (so the gate above answers before the
+  # first write).
+  def film_thickness_ops
+    operations_for_display.select { |op| FilmThickness.thickness_op?(op) }
+  end
+
+  # (op, batch) rows whose thickness op is signed off with a recorded set.
+  # Returns [{ op:, batch: "1", qty: n }, ...] - one entry per (op, batch), so
+  # a two-treatment part yields two entries per batch.
+  def certified_thickness_batches
+    owner = process_record_owner
+    owner.film_thickness_ops.flat_map do |op|
+      section = owner.section_for_op(op)
+      (op["sign_offs"] || {}).keys.filter_map do |key|
+        row = (op["ocv_readings"] || {})[key] || {}
+        next nil if row[FilmThickness.field_for(op)].to_s.strip.empty?
+        { op: op, batch: key, qty: owner.section_batch_qty(section, key).to_i }
+      end
+    end
+  end
+
   # Uniform hash shape for the show page, frozen or live.
   def operations_for_display
     frozen_operations || operations_with_auto_ops.map.with_index(1) do |op, i|
@@ -908,6 +992,20 @@ class WorksOrder < ApplicationRecord
       missing = required_ocv_fields(spec, row).select { |f| row[f].to_s.strip.empty? }
       if missing.any?
         raise "Record #{missing.map(&:humanize).join(', ')}#{wo_scoped ? '' : " for batch #{key}"} before signing off operation #{position}"
+      end
+
+      # In-line film thickness (foil verification / ENP ops): a sign-off
+      # certifies a COMPLETE set, not merely a non-empty box. Same rules the
+      # release note applied when it captured these - see FilmThickness.
+      if FilmThickness.thickness_op?(op)
+        problems = FilmThickness.row_errors(
+          op, row,
+          parts_per_batch: (wo_scoped ? nil : section_batch_qty(section, key)),
+          nadcap: FilmThickness.nadcap_for?(op, specification)
+        )
+        if problems.any?
+          raise "Film thickness for batch #{key} is incomplete: #{problems.first} (operation #{position})"
+        end
       end
 
       if row != (op.dig("ocv_readings", key) || {})

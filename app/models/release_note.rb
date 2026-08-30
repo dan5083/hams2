@@ -16,6 +16,7 @@ class ReleaseNote < ApplicationRecord
   validate :total_quantity_must_be_positive
   validate :quantity_available_for_release, unless: :invoiced?
   validate :validate_thickness_measurements
+  validate :validate_process_record_coverage, unless: :invoiced?
 
   scope :active, -> { where(voided: false) }
   scope :voided, -> { where(voided: true) }
@@ -34,6 +35,9 @@ class ReleaseNote < ApplicationRecord
 
   before_validation :set_date, if: :new_record?
   before_validation :assign_next_number, if: :new_record?
+  # Paperless aero/defence: thickness was recorded in-line on the process
+  # record; the RN records which (op, batch) rows it certifies (see below).
+  before_validation :assign_certified_batches, if: -> { new_record? && inline_thickness_record? }
   after_initialize :set_defaults, if: :new_record?
   after_save :update_works_order_quantity_released, unless: :invoiced?
   after_destroy :update_works_order_quantity_released
@@ -51,41 +55,19 @@ class ReleaseNote < ApplicationRecord
     enp_medium_phosphorous
   ].freeze
 
-  # ==========================================================================
-  # NADCAP sample plan (MIL-PRF-8625F Type III hard anodise)
-  # parts_per_batch -> sample size. Total readings for the batch is
-  # max(8, sample_size), distributed as evenly as possible across the
-  # sampled parts:
-  #   - Lot 1  -> sample 1  -> 8 readings on the one part          (8 total)
-  #   - Lot 6  -> sample 6  -> 2 parts x 2 readings, 4 parts x 1   (8 total)
-  #   - Lot 32 -> sample 12 -> 1 reading per part                  (12 total)
-  # Once the sample size reaches 8, every sampled part takes one reading.
-  # ==========================================================================
+  # NADCAP sample plan (MIL-PRF-8625F Type III hard anodise) - rules live in
+  # FilmThickness (shared with the process record); these stay as thin
+  # wrappers for existing callers (form, JS values, controller).
   def self.nadcap_sample_size(parts_per_batch)
-    n = parts_per_batch.to_i
-    return 0 if n < 1
-    return n if n <= 12       # All parts tested
-    return 12 if n <= 288
-    return 16 if n <= 544
-    return 20 if n <= 960
-    return 24 if n <= 1632
-    32
+    FilmThickness.nadcap_sample_size(parts_per_batch)
   end
 
-  # Total readings required for a batch of the given lot size.
   def self.nadcap_total_readings(parts_per_batch)
-    ss = nadcap_sample_size(parts_per_batch)
-    ss < 1 ? 0 : [8, ss].max
+    FilmThickness.nadcap_total_readings(parts_per_batch)
   end
 
-  # Per-part reading allocation as an array (length = sample size), most
-  # heavily loaded parts first. e.g. lot 6 -> [2, 2, 1, 1, 1, 1].
   def self.nadcap_readings_plan(parts_per_batch)
-    ss = nadcap_sample_size(parts_per_batch)
-    return [] if ss < 1
-    total = [8, ss].max
-    base, extra = total.divmod(ss)
-    Array.new(ss) { |i| base + (i < extra ? 1 : 0) }
+    FilmThickness.nadcap_readings_plan(parts_per_batch)
   end
 
   def display_name
@@ -285,26 +267,150 @@ class ReleaseNote < ApplicationRecord
   # sampling. Matches "PRF" anywhere and "III" as a whole token (word-bounded)
   # so we don't false-positive on "IIIA" etc.
   def nadcap_sampling_specification?
-    spec = works_order&.specification.to_s.upcase
-    return false if spec.blank?
-    spec.include?("PRF") && /\bIII\b/.match?(spec)
+    FilmThickness.nadcap_sampling_specification?(works_order&.specification)
   end
 
   # -------------------------------------------------------------------------
-  # Batch count helpers
+  # In-line (process record) thickness - paperless aero/defence
+  #
+  # The readings live on the works order's process record and are not copied
+  # here. What the RN owns is ATTRIBUTION: which (op, batch) rows it
+  # certifies. That is the one thing not derivable later - if it were
+  # derived at read time, a batch signed off next week (or freed by voiding a
+  # later RN) would migrate onto this RN's reprint.
+  #
+  # Stored in measured_thicknesses as
+  #   { "source" => "process_record", "certified_batches" => [{ "position" => 14, "batch" => "1" }, ...] }
+  # and the reader below expands that into the same measurements/batches
+  # structure the form always produced, so show page, PDF and every helper
+  # in this file see one shape wherever the readings were captured.
+  #
+  # At creation the RN takes every certified row that no earlier ACTIVE RN
+  # of this WO already holds: a partial release carries the batches
+  # finished so far, the next RN carries the ones finished since, and
+  # voiding an RN hands its batches to the next one.
   # -------------------------------------------------------------------------
+  def inline_thickness_record?
+    works_order.present? && works_order.inline_thickness_record?
+  end
 
-  # Returns how many batches are recorded for a treatment (minimum 1 if any data present).
-  def get_batch_count(treatment_id)
-    return 1 unless measured_thicknesses.is_a?(Hash)
-    measurement = measured_thicknesses['measurements']&.find { |m| m['treatment_id'] == treatment_id }
-    return 1 unless measurement
+  def self.certified_batch_refs?(raw)
+    raw.is_a?(Hash) && raw['source'] == 'process_record' && raw.key?('certified_batches')
+  end
 
-    if measurement['batches'].is_a?(Array) && measurement['batches'].any?
-      measurement['batches'].count
-    else
-      1 # Legacy single-batch data
+  # Raw column value (the refs, for an in-line RN); the public reader expands.
+  def measured_thicknesses_raw
+    self[:measured_thicknesses]
+  end
+
+  def measured_thicknesses
+    raw = self[:measured_thicknesses]
+    return raw unless self.class.certified_batch_refs?(raw)
+    refs = raw['certified_batches'] || []
+    if @expanded_for != refs
+      @expanded_for = refs
+      @expanded = expand_certified_batches(refs)
     end
+    @expanded
+  end
+
+  def certified_batch_refs
+    raw = self[:measured_thicknesses]
+    self.class.certified_batch_refs?(raw) ? (raw['certified_batches'] || []) : []
+  end
+
+  # (position, batch) rows already held by earlier active RNs of THIS works
+  # order. Scoped to the WO, not the group: on a grouped record a batch is
+  # the whole tank load, so every member's CofC references it - only a later
+  # RN of the same WO must not repeat it.
+  def batches_certified_elsewhere
+    scope = works_order.release_notes.active
+    scope = scope.where.not(id: id) if persisted?
+    scope.flat_map { |rn| rn.certified_batch_refs.map { |r| [r['position'].to_i, r['batch'].to_s] } }.to_set
+  end
+
+  def assign_certified_batches
+    return unless inline_thickness_record?
+    taken = batches_certified_elsewhere
+    refs = works_order.certified_thickness_batches.filter_map do |c|
+      pos = c[:op]['position'].to_i
+      next nil if taken.include?([pos, c[:batch]])
+      { 'position' => pos, 'batch' => c[:batch] }
+    end.sort_by { |r| [r['batch'].to_i, r['position']] }
+    self.measured_thicknesses = { 'source' => 'process_record', 'certified_batches' => refs }
+  end
+
+  # Console use: re-attribute an un-invoiced RN after a late sign-off.
+  def reassign_certified_batches!
+    assign_certified_batches
+    save!
+  end
+
+  # Expand refs into the measurements structure, reading rows off the record.
+  # Foil ops appear once per anodic treatment, in treatment order
+  # (Part#add_treatment_cycle), as do ENP ops - so the i-th op of a kind is
+  # the i-th treatment of that kind.
+  def expand_certified_batches(refs)
+    return { 'measurements' => [], 'source' => 'process_record' } if works_order.nil?
+
+    owner      = works_order.process_record_owner
+    ops        = owner.film_thickness_ops
+    treatments = get_required_treatments
+    anodic_tr  = treatments.select { |t| treatment_is_anodic?(t[:process_type]) }
+    enp_tr     = treatments.select { |t| treatment_is_enp?(t[:process_type]) }
+    anodic_ops = ops.select { |op| FilmThickness.field_for(op) == FilmThickness::ANODIC_FIELD }
+    enp_ops    = ops.select { |op| FilmThickness.field_for(op) == FilmThickness::ENP_FIELD }
+    refs_by_pos = refs.group_by { |r| r['position'].to_i }
+
+    batches_for = lambda do |op, treatment|
+      section = owner.section_for_op(op)
+      rows    = op['ocv_readings'] || {}
+      (refs_by_pos[op['position'].to_i] || []).filter_map do |r|
+        key = r['batch'].to_s
+        FilmThickness.batch_from_row(op, rows[key] || {}, key,
+                                     parts_per_batch: owner.section_batch_qty(section, key),
+                                     nadcap: treatment[:requires_nadcap_sampling])
+      end.sort_by { |b| b['batch_number'] }
+    end
+
+    measurements = []
+    anodic_ops.each_with_index do |op, i|
+      treatment = anodic_tr[i] or next
+      batches   = batches_for.call(op, treatment)
+      next if batches.empty?
+      measurements << {
+        'treatment_id'     => treatment[:treatment_id],
+        'process_type'     => treatment[:process_type],
+        'target_thickness' => treatment[:target_thickness] || 0,
+        'display_name'     => treatment[:display_name],
+        'batches'          => batches
+      }
+    end
+    enp_ops.each_with_index do |op, i|
+      treatment = enp_tr[i] or next
+      batches   = batches_for.call(op, treatment)
+      next if batches.empty?
+      measurements << {
+        'treatment_id' => treatment[:treatment_id],
+        'process_type' => treatment[:process_type],
+        'enp_type'     => treatment[:process_type],
+        'display_name' => treatment[:display_name],
+        'batches'      => batches
+      }
+    end
+    { 'measurements' => measurements, 'source' => 'process_record' }
+  end
+
+  # Actual batch numbers recorded for a treatment. Process-record snapshots
+  # carry WO batch numbers, which need not start at 1 or be contiguous (RN2
+  # may certify batches 3-4 only) - iterate these, never (1..count).
+  def batch_numbers(treatment_id)
+    return [1] unless measured_thicknesses.is_a?(Hash)
+    measurement = measured_thicknesses['measurements']&.find { |m| m['treatment_id'] == treatment_id }
+    return [1] unless measurement
+    batches = measurement['batches']
+    return [1] unless batches.is_a?(Array) && batches.any?
+    batches.map { |b| b['batch_number'].to_i }.sort
   end
 
   # Generic batch fetcher - returns the raw batch hash (legacy or NADCAP shape),
@@ -377,8 +483,7 @@ class ReleaseNote < ApplicationRecord
 
   # Returns per-batch statistics as an array of hashes.
   def get_thickness_statistics_by_batch(treatment_id)
-    batch_count = get_batch_count(treatment_id)
-    (1..batch_count).filter_map do |batch_number|
+    batch_numbers(treatment_id).filter_map do |batch_number|
       readings = get_thickness_readings_for_batch(treatment_id, batch_number)
       next if readings.empty?
       {
@@ -478,8 +583,7 @@ class ReleaseNote < ApplicationRecord
 
   # Returns per-batch ENP statistics as an array of hashes.
   def get_enp_statistics_by_batch(treatment_id)
-    batch_count = get_batch_count(treatment_id)
-    (1..batch_count).filter_map do |batch_number|
+    batch_numbers(treatment_id).filter_map do |batch_number|
       measurements = get_enp_measurements_for_batch(treatment_id, batch_number)
       valid_growths = measurements.map { |m| m['growth_um'] }.compact.select { |g| g >= 0 }
       next if valid_growths.empty?
@@ -530,8 +634,7 @@ class ReleaseNote < ApplicationRecord
   end
 
   def has_enp_measurements?(treatment_id)
-    batch_count = get_batch_count(treatment_id)
-    (1..batch_count).any? do |batch_number|
+    batch_numbers(treatment_id).any? do |batch_number|
       measurements = get_enp_measurements_for_batch(treatment_id, batch_number)
       measurements.present? && measurements.any? { |m| m['growth_um'].present? }
     end
@@ -539,7 +642,7 @@ class ReleaseNote < ApplicationRecord
 
   # Returns combined ENP statistics across all batches.
   def get_enp_statistics(treatment_id)
-    all_growths = (1..get_batch_count(treatment_id)).flat_map do |batch_number|
+    all_growths = batch_numbers(treatment_id).flat_map do |batch_number|
       get_enp_measurements_for_batch(treatment_id, batch_number)
         .map { |m| m['growth_um'] }.compact.select { |g| g >= 0 }
     end
@@ -628,8 +731,7 @@ class ReleaseNote < ApplicationRecord
 
     required_treatments = get_required_treatments
     required_treatments.all? do |treatment|
-      batch_count = get_batch_count(treatment[:treatment_id])
-      (1..batch_count).all? do |batch_number|
+      batch_numbers(treatment[:treatment_id]).all? do |batch_number|
         if treatment_is_enp?(treatment[:process_type])
           measurements = get_enp_measurements_for_batch(treatment[:treatment_id], batch_number)
           measurements.present? && measurements.any?
@@ -725,137 +827,55 @@ class ReleaseNote < ApplicationRecord
   end
 
   # ---------------------------------------------------------------------------
-  # Thickness validation dispatcher - branches on treatment type / NADCAP flag.
+  # Thickness validation. Two regimes:
+  #   - in-line (paperless): readings were validated at sign-off on the
+  #     process record and coverage is enforced by
+  #     validate_process_record_coverage below - nothing extra here.
+  #   - form-captured: validate the posted sets against the same rules
+  #     (FilmThickness) the process record applies.
   # ---------------------------------------------------------------------------
   def validate_thickness_measurements
     return unless requires_thickness_measurements?
+    return if inline_thickness_record?
 
-    required_treatments = get_required_treatments
-
-    required_treatments.each do |treatment|
+    get_required_treatments.each do |treatment|
       display_name = treatment[:display_name] || treatment[:process_type].humanize.titleize
-      batch_count  = get_batch_count(treatment[:treatment_id])
+      numbers = batch_numbers(treatment[:treatment_id])
+      numbers.each do |batch_number|
+        prefix = numbers.size > 1 ? "Batch #{batch_number} - " : ""
+        batch  = get_batch(treatment[:treatment_id], batch_number)
 
-      if treatment_is_enp?(treatment[:process_type])
-        validate_enp_treatment(treatment, display_name, batch_count)
-      elsif treatment[:requires_nadcap_sampling]
-        validate_nadcap_treatment(treatment, display_name, batch_count)
-      else
-        validate_anodic_treatment(treatment, display_name, batch_count)
-      end
-    end
-  end
-
-  def validate_enp_treatment(treatment, display_name, batch_count)
-    (1..batch_count).each do |batch_number|
-      batch_prefix     = batch_count > 1 ? "Batch #{batch_number} - " : ""
-      enp_measurements = get_enp_measurements_for_batch(treatment[:treatment_id], batch_number)
-
-      if enp_measurements.blank?
-        errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} ENP measurements are required for aerospace/defense parts")
-        next
-      end
-
-      enp_measurements.each do |m|
-        point  = m['point']
-        growth = m['growth_um']
-        if growth.nil?
-          errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} point #{point} is incomplete")
-        elsif growth < 0
-          errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} point #{point} has negative growth (#{growth}µm)")
-        elsif growth > 1000
-          errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} point #{point} seems unrealistically high (#{growth}µm)")
-        end
-      end
-
-      if enp_measurements.count < 6
-        errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} requires all 6 measurement points (A-F)")
-      end
-    end
-  end
-
-  def validate_anodic_treatment(treatment, display_name, batch_count)
-    (1..batch_count).each do |batch_number|
-      batch_prefix = batch_count > 1 ? "Batch #{batch_number} - " : ""
-      readings     = get_thickness_readings_for_batch(treatment[:treatment_id], batch_number)
-
-      if readings.blank?
-        errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} thickness measurement is required for aerospace/defense parts")
-        next
-      end
-
-      unless readings.count % 8 == 0
-        errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} requires a multiple of 8 readings (#{readings.count} provided)")
-      end
-
-      readings.each_with_index do |reading, index|
-        if reading <= 0
-          errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} reading #{index + 1} must be greater than 0")
-        elsif reading > 1000
-          errors.add(:measured_thicknesses, "#{batch_prefix}#{display_name} reading #{index + 1} seems unrealistically high (>1000µm)")
-        end
-      end
-    end
-  end
-
-  def validate_nadcap_treatment(treatment, display_name, batch_count)
-    (1..batch_count).each do |batch_number|
-      batch_prefix    = batch_count > 1 ? "Batch #{batch_number} - " : ""
-      batch           = get_batch(treatment[:treatment_id], batch_number)
-      parts_per_batch = batch['parts_per_batch'].to_i
-      parts           = batch['parts'] || []
-
-      if parts_per_batch < 1
-        errors.add(:measured_thicknesses,
-                   "#{batch_prefix}#{display_name} requires 'Parts in this batch' (NADCAP sampling)")
-        next
-      end
-
-      expected_sample_size = self.class.nadcap_sample_size(parts_per_batch)
-      expected_plan        = self.class.nadcap_readings_plan(parts_per_batch)
-      expected_total       = self.class.nadcap_total_readings(parts_per_batch)
-
-      if parts.count != expected_sample_size
-        errors.add(:measured_thicknesses,
-                   "#{batch_prefix}#{display_name} requires #{expected_sample_size} sampled part(s) " \
-                   "for a lot of #{parts_per_batch} (got #{parts.count})")
-        next
-      end
-
-      # The plan defines a multiset of per-part reading counts (e.g. lot 6 ->
-      # two parts with 2 readings and four with 1). Any assignment of those
-      # counts to parts is acceptable, so compare sorted counts rather than
-      # position-by-position.
-      actual_counts = parts.map { |part| (part['readings'] || []).count }
-
-      if actual_counts.sort != expected_plan.sort
-        breakdown = expected_plan.tally
-                                 .sort_by { |count, _| -count }
-                                 .map { |count, parts_n| "#{parts_n} part(s) × #{count} reading(s)" }
-                                 .join(' + ')
-        errors.add(:measured_thicknesses,
-                   "#{batch_prefix}#{display_name} requires #{expected_total} readings for a lot " \
-                   "of #{parts_per_batch}, distributed as #{breakdown} " \
-                   "(got #{actual_counts.sum} readings across #{parts.count} part(s))")
-        next
-      end
-
-      parts.each_with_index do |part, idx|
-        part_label = part['part_label'].presence || "p#{idx + 1}"
-        readings   = part['readings'] || []
-
-        readings.each_with_index do |r, ri|
-          rf = r.to_f
-          if rf <= 0
-            errors.add(:measured_thicknesses,
-                       "#{batch_prefix}#{display_name} #{part_label} reading #{ri + 1} must be greater than 0")
-          elsif rf > 1000
-            errors.add(:measured_thicknesses,
-                       "#{batch_prefix}#{display_name} #{part_label} reading #{ri + 1} seems unrealistically high")
+        problems =
+          if treatment_is_enp?(treatment[:process_type])
+            FilmThickness.enp_errors(get_enp_measurements_for_batch(treatment[:treatment_id], batch_number))
+          elsif treatment[:requires_nadcap_sampling]
+            FilmThickness.nadcap_errors(batch, batch['parts_per_batch'])
+          else
+            FilmThickness.anodic_errors(get_thickness_readings_for_batch(treatment[:treatment_id], batch_number))
           end
-        end
+
+        problems.each { |e| errors.add(:measured_thicknesses, "#{prefix}#{display_name} #{e}") }
       end
     end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Paperless release rule: to release x parts, the process record must show
+  # a complete sign-off through-line at least x wide (every WO-scoped op
+  # signed; in every section, batches signed on every op summing to >= x),
+  # counting everything already released against the record. Rejected parts
+  # count as released - they went through the tanks regardless.
+  # ---------------------------------------------------------------------------
+  def validate_process_record_coverage
+    return unless works_order&.paperless_record?
+    certified = works_order.signed_off_quantity
+    released  = works_order.released_quantity_against_record(except: self) + total_quantity
+    return if certified >= released
+
+    errors.add(:base,
+      "The process record certifies #{certified} part(s) end to end, but #{released} would have " \
+      "been released against it. Sign off the remaining operation(s)/batch(es) on " \
+      "WO#{works_order.number}#{works_order.grouped? ? "'s process record" : ''} before releasing.")
   end
 
   def update_works_order_quantity_released

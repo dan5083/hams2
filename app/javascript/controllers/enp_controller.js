@@ -70,9 +70,12 @@ export default class extends Controller {
     const measurement = this.measurements[index]
 
     if (measurement.start_mm !== null && measurement.finish_mm !== null) {
-      // Growth in µm = (finish - start) × 1000
+      // Per-surface deposit in µm = (finish - start) × 1000 / 2.
+      // The micrometer spans two plated faces, so the delta is twice the film
+      // thickness the drawing specifies and the CofC reports. (Pre-2026-08
+      // records stored the unhalved delta - see FilmThickness.)
       const growthMm = measurement.finish_mm - measurement.start_mm
-      measurement.growth_um = Math.round(growthMm * 1000 * 10) / 10 // Round to 1 decimal
+      measurement.growth_um = Math.round((growthMm * 1000 / 2) * 10) / 10 // Round to 1 decimal
     } else {
       measurement.growth_um = null
     }

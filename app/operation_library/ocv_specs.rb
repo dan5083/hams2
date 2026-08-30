@@ -44,6 +44,14 @@ module OperationLibrary
       build([:temp, *checkpoints, :film_thickness], batching: batching, basis: basis, **rules)
     end
 
+    # ENP plating cycle on aero/defence work: time/temp plus the in-line
+    # film thickness record (six micrometer points, start/finish either side
+    # of the cycle - the op stays open across the whole plating cycle, so
+    # the row is editable exactly when both readings are taken).
+    def self.enp_plate(batching: nil, basis: :nadcap, **rules)
+      build([:time, :temp, FilmThickness::ENP_FIELD.to_sym], batching: batching, basis: basis, **rules)
+    end
+
     # One-off field lists (foil verification, test pieces, water break, ...)
     def self.fields(*names, batching: nil, basis: :general, **rules)
       build(names, batching: batching, basis: basis, **rules)
@@ -80,8 +88,14 @@ module OperationLibrary
       }],
       [/foil\s+verification|elcometer/i, -> {
         fields(:meter_no, :foil_value_1, :measured_thickness_1,
-               :foil_value_2, :measured_thickness_2, basis: :nadcap)
+               :foil_value_2, :measured_thickness_2,
+               FilmThickness::ANODIC_FIELD.to_sym, basis: :nadcap)
       }],
+      # ENP ops on aero work carry the six-point micrometer growth record
+      # (FilmThickness::ENP_FIELD) alongside time/temp - see
+      # ElectrolessNickelPlate.operations. Matched on the library ids and
+      # the bath names so a copied ENP op keeps the same shape.
+      [/electroless\s+nickel\s+plat|vandalloy|nicklad/i, -> { enp_plate }],
       [/OCV\s+monitoring/i, -> { time_temp }]
     ].freeze
 
