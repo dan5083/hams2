@@ -27,6 +27,8 @@
 
 import { Controller } from "@hotwired/stimulus"
 
+const RESUME_KEY = "elcometer-session-resume"
+
 export default class extends Controller {
   static targets = ["connectButton", "stopButton", "status"]
 
@@ -49,11 +51,29 @@ export default class extends Controller {
       if (this.hasConnectButtonTarget) this.connectButtonTarget.disabled = true
     } else {
       this.updateBanner()
+      // The process record reloads on every save / sign-off, which tears the
+      // page (and this controller) down. If the operator had the meter
+      // connected, pick the granted port straight back up so one Connect
+      // click lasts the whole WO rather than one batch.
+      if (sessionStorage.getItem(RESUME_KEY) === "1") this.autoResume()
+    }
+  }
+
+  async autoResume() {
+    // Sinks register asynchronously; give them a tick before checking capacity.
+    await new Promise((r) => setTimeout(r, 50))
+    if (!this.firstAvailableSink()) return
+    try {
+      const granted = await navigator.serial.getPorts()
+      if (!granted || granted.length !== 1) return
+      await this.openPort(granted[0])
+    } catch (err) {
+      console.warn("Elcometer auto-resume skipped:", err)
     }
   }
 
   disconnect() {
-    this.stopReading()
+    this.closePort()
     if (this.element.elcometerSession === this) this.element.elcometerSession = null
   }
 
@@ -103,15 +123,8 @@ export default class extends Controller {
       // Reuse a previously-granted port when there's exactly one, so the browser's
       // device chooser does not reappear. Fall back to the chooser otherwise.
       const granted = await navigator.serial.getPorts()
-      this.port = (granted && granted.length === 1) ? granted[0] : await navigator.serial.requestPort()
-
-      await this.port.open({ baudRate: 9600, dataBits: 8, stopBits: 1, parity: "none" })
-
-      this.isReading = true
-      if (this.hasConnectButtonTarget) this.connectButtonTarget.classList.add("hidden")
-      if (this.hasStopButtonTarget) this.stopButtonTarget.classList.remove("hidden")
-      this.updateBanner()
-      this.startReading()
+      const port = (granted && granted.length === 1) ? granted[0] : await navigator.serial.requestPort()
+      await this.openPort(port)
     } catch (err) {
       if (err && err.name === "NotFoundError") {
         this.renderStatus("No device selected.", "warn")
@@ -120,6 +133,17 @@ export default class extends Controller {
       }
       console.error("Elcometer session connect error:", err)
     }
+  }
+
+  async openPort(port) {
+    this.port = port
+    await this.port.open({ baudRate: 9600, dataBits: 8, stopBits: 1, parity: "none" })
+    this.isReading = true
+    sessionStorage.setItem(RESUME_KEY, "1")
+    if (this.hasConnectButtonTarget) this.connectButtonTarget.classList.add("hidden")
+    if (this.hasStopButtonTarget) this.stopButtonTarget.classList.remove("hidden")
+    this.updateBanner()
+    this.startReading()
   }
 
   async startReading() {
@@ -179,7 +203,13 @@ export default class extends Controller {
     return this.sinks.find((s) => s.acceptsReadings && s.acceptsReadings()) || null
   }
 
-  async stopReading() {
+  // Operator pressed Disconnect: forget the resume intent too.
+  stopReading() {
+    sessionStorage.removeItem(RESUME_KEY)
+    return this.closePort()
+  }
+
+  async closePort() {
     this.isReading = false
     try {
       if (this.reader) { await this.reader.cancel(); this.reader = null }

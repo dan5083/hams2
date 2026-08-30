@@ -1,0 +1,204 @@
+<%#
+  app/views/works_orders/_film_thickness_field.html.erb
+
+  In-line film thickness capture for one (operation, batch) on the paperless
+  process record. Rendered by show.html.erb in place of the plain text box
+  for FilmThickness::ANODIC_FIELD / FilmThickness::ENP_FIELD.
+
+  The hidden input keeps the SAME name the text box would have had
+  (readings[<batch>][<field>]), so save_ocv / sign_off_operation! are
+  untouched: the Stimulus controllers write JSON into it, the form posts it.
+
+  Locals:
+    op, ops, position, active_key, field, row, locked, nadcap, parts_per_batch,
+    section_batch (integer batch number for labels), form_id
+%>
+<%
+  raw           = row[field]
+  target        = film_thickness_target_for(ops, op)
+  display_name  = film_thickness_display_name(ops, op)
+  input_name    = "readings[#{active_key}][#{field}]"
+  enp           = (field == FilmThickness::ENP_FIELD)
+  batch_label   = "B#{section_batch}"
+  tid           = "op#{position}_b#{section_batch}"
+%>
+
+<div class="mt-2 w-full">
+  <% if locked %>
+    <%# Signed: read-only summary of the certified set. %>
+    <% if enp %>
+      <% points = FilmThickness.enp_from(raw) %>
+      <table class="text-xs border border-gray-200 rounded">
+        <thead class="bg-gray-50 text-gray-600">
+          <tr><th class="px-2 py-1 text-left">Pt</th><th class="px-2 py-1 text-left">Before (mm)</th><th class="px-2 py-1 text-left">After (mm)</th><th class="px-2 py-1 text-left">Film (µm)</th></tr>
+        </thead>
+        <tbody>
+          <% points.each do |m| %>
+            <tr class="border-t border-gray-100">
+              <td class="px-2 py-1 font-medium"><%= m["point"] %></td>
+              <td class="px-2 py-1"><%= m["start_mm"] %></td>
+              <td class="px-2 py-1"><%= m["finish_mm"] %></td>
+              <td class="px-2 py-1 text-green-700"><%= m["growth_um"] %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% else %>
+      <% parsed = FilmThickness.parse(raw) %>
+      <% if parsed.is_a?(Hash) %>
+        <% data = FilmThickness.nadcap_from(parsed, parts_per_batch: parts_per_batch) %>
+        <p class="text-xs text-gray-500 mb-1">NADCAP sample plan · lot <%= data["parts_per_batch"] %> · <%= data["parts"].size %> part(s) sampled</p>
+        <% data["parts"].each do |part| %>
+          <div class="text-xs mb-1"><span class="text-gray-500 w-12 inline-block"><%= part["part_label"] %></span>
+            <% part["readings"].each do |r| %><span class="inline-block px-1.5 py-0.5 bg-blue-50 text-blue-800 rounded mr-1"><%= r %></span><% end %>
+          </div>
+        <% end %>
+      <% else %>
+        <div>
+          <% FilmThickness.readings_from(parsed).each do |r| %>
+            <span class="inline-block px-2 py-0.5 bg-blue-50 text-blue-800 rounded text-xs mr-1 mb-1"><%= r %> µm</span>
+          <% end %>
+        </div>
+      <% end %>
+    <% end %>
+    <p class="text-xs text-gray-500 mt-1"><%= film_thickness_summary(field, raw) %><%= " · target #{target} µm" if target.to_f > 0 %></p>
+    <%= hidden_field_tag input_name, raw, disabled: true %>
+
+  <% elsif enp %>
+    <%# ── ENP: six-point micrometer growth, start + finish ──────────────── %>
+    <% existing = FilmThickness.enp_from(raw) %>
+    <div data-controller="enp"
+         data-enp-treatment-id-value="<%= tid %>"
+         data-enp-process-type-value="<%= op["process_type"] %>"
+         data-enp-enp-type-value="<%= op["id"] %>"
+         data-enp-display-name-value="<%= display_name %>"
+         class="bg-gray-50 rounded-md p-3 border border-gray-200">
+      <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+        <div class="text-xs text-gray-600">
+          <span class="font-medium text-gray-800">Film thickness <%= batch_label %></span>
+          · micrometer A–F, before and after the plating cycle
+          <%= "· target #{target} µm" if target.to_f > 0 %>
+          <span class="ml-2 text-gray-500" data-enp-target="progressCounter">0/6 complete</span>
+        </div>
+        <div class="flex gap-2">
+          <button type="submit" form="<%= form_id %>"
+                  class="inline-flex items-center px-2.5 py-1 border border-blue-600 rounded text-xs font-medium text-blue-600 bg-white hover:bg-blue-50">Save</button>
+          <button type="button" data-action="click->enp#clearAllMeasurements"
+                  class="inline-flex items-center px-2.5 py-1 border border-gray-300 rounded text-xs font-medium text-gray-700 bg-white hover:bg-gray-50">Clear</button>
+        </div>
+      </div>
+      <div data-enp-target="statistics" class="mb-2"></div>
+      <table class="min-w-[28rem] text-sm border border-gray-200 rounded bg-white">
+        <thead class="bg-gray-100 text-xs text-gray-700 uppercase">
+          <tr><th class="px-2 py-1 text-left">Pt</th><th class="px-2 py-1 text-left">Before (mm)</th><th class="px-2 py-1 text-left">After (mm)</th><th class="px-2 py-1 text-left">Film (µm)</th></tr>
+        </thead>
+        <tbody>
+          <% FilmThickness::ENP_POINTS.each_with_index do |pt, i| %>
+            <% m = existing.find { |e| e["point"] == pt } || {} %>
+            <tr class="border-t border-gray-100">
+              <td class="px-2 py-1 font-medium text-gray-900"><%= pt %></td>
+              <td class="px-2 py-1">
+                <input type="number" step="0.001" min="0" placeholder="10.500" value="<%= m["start_mm"] %>"
+                       data-enp-target="startInput" data-index="<%= i %>" data-field="start"
+                       data-action="blur->enp#updateMeasurement"
+                       class="w-28 text-sm border border-gray-300 rounded px-2 py-1" />
+              </td>
+              <td class="px-2 py-1">
+                <input type="number" step="0.001" min="0" placeholder="10.525" value="<%= m["finish_mm"] %>"
+                       data-enp-target="finishInput" data-index="<%= i %>" data-field="finish"
+                       data-action="blur->enp#updateMeasurement"
+                       class="w-28 text-sm border border-gray-300 rounded px-2 py-1" />
+              </td>
+              <td class="px-2 py-1"><span data-enp-target="growthDisplay" class="text-sm text-gray-500">—</span></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+      <p class="mt-1 text-xs text-gray-500">Film thickness (µm) = (After − Before) × 1000 ÷ 2 — the micrometer spans two plated faces. Take Before readings at jig, After at unjig; Save between.</p>
+      <%= hidden_field_tag input_name, raw, data: { enp_target: "measurementsData" } %>
+    </div>
+
+  <% elsif nadcap %>
+    <%# ── NADCAP sample plan (MIL-PRF-8625F Type III) ─────────────────── %>
+    <%# parts_per_batch comes from the record's batch qty; the controller
+        still owns the plan arithmetic, so we feed it a read-only input. %>
+    <div data-controller="nadcap-sampling"
+         data-nadcap-sampling-treatment-id-value="<%= tid %>"
+         data-nadcap-sampling-batch-number-value="<%= section_batch %>"
+         data-nadcap-sampling-batch-label-value="<%= batch_label %>"
+         data-nadcap-sampling-process-type-value="hard_anodising"
+         data-nadcap-sampling-target-thickness-value="<%= target %>"
+         data-nadcap-sampling-display-name-value="<%= display_name %>"
+         class="bg-gray-50 rounded-md p-3 border border-gray-200">
+      <%= render "works_orders/elcometer_toolbar" unless @elcometer_toolbar_rendered %>
+      <% @elcometer_toolbar_rendered = true %>
+      <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+        <div class="flex items-center gap-2 text-xs text-gray-600">
+          <span class="font-medium text-gray-800">Film thickness <%= batch_label %></span>
+          · NADCAP sample plan · lot
+          <input type="number" min="1" readonly tabindex="-1"
+                 data-nadcap-sampling-target="partsPerBatchInput"
+                 data-action="change->nadcap-sampling#updateSampleSize"
+                 value="<%= parts_per_batch %>"
+                 class="w-16 text-xs border border-gray-200 bg-gray-100 rounded px-1 py-0.5 text-gray-700" />
+          <span data-nadcap-sampling-target="sampleSizeDisplay"></span>
+          <%= "· target #{target} µm" if target.to_f > 0 %>
+        </div>
+        <div class="flex gap-2">
+          <button type="submit" form="<%= form_id %>"
+                  class="inline-flex items-center px-2.5 py-1 border border-blue-600 rounded text-xs font-medium text-blue-600 bg-white hover:bg-blue-50">Save</button>
+          <button type="button" data-action="click->nadcap-sampling#clearReadings"
+                  class="inline-flex items-center px-2.5 py-1 border border-gray-300 rounded text-xs font-medium text-gray-700 bg-white hover:bg-gray-50">Clear</button>
+        </div>
+      </div>
+      <div data-nadcap-sampling-target="statistics" class="mb-2"></div>
+      <div data-nadcap-sampling-target="partsContainer" class="space-y-2"></div>
+      <p class="mt-1 text-xs text-gray-500">Lot size is the batch quantity above. Type readings and TAB, or connect the Elcometer.</p>
+      <%= hidden_field_tag input_name, raw, data: { nadcap_sampling_target: "readingsData" } %>
+    </div>
+
+  <% else %>
+    <%# ── Standard anodic: 8 readings per batch ────────────────────────── %>
+    <% readings = FilmThickness.readings_from(raw) %>
+    <div data-controller="elcometer"
+         data-elcometer-treatment-id-value="<%= tid %>"
+         data-elcometer-process-type-value="anodising"
+         data-elcometer-target-thickness-value="<%= target %>"
+         data-elcometer-display-name-value="<%= "#{display_name} #{batch_label}" %>"
+         class="bg-gray-50 rounded-md p-3 border border-gray-200">
+      <%= render "works_orders/elcometer_toolbar" unless @elcometer_toolbar_rendered %>
+      <% @elcometer_toolbar_rendered = true %>
+      <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+        <div class="text-xs text-gray-600">
+          <span class="font-medium text-gray-800">Film thickness <%= batch_label %></span>
+          · 8 readings per batch
+          <%= "· target #{target} µm" if target.to_f > 0 %>
+        </div>
+        <div class="flex gap-2">
+          <button type="submit" form="<%= form_id %>"
+                  class="inline-flex items-center px-2.5 py-1 border border-blue-600 rounded text-xs font-medium text-blue-600 bg-white hover:bg-blue-50">Save</button>
+          <button type="button" data-action="click->elcometer#clearReadings"
+                  class="inline-flex items-center px-2.5 py-1 border border-gray-300 rounded text-xs font-medium text-gray-700 bg-white hover:bg-gray-50">Clear</button>
+        </div>
+      </div>
+      <div data-elcometer-target="statistics" class="mb-2"></div>
+      <div data-elcometer-target="readingsList" class="min-h-[2.25rem] p-2 bg-white border border-gray-200 rounded mb-2">
+        <% if readings.any? %>
+          <% readings.each do |r| %><span class="inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm mr-2 mb-1"><%= r %> µm</span><% end %>
+        <% else %>
+          <span class="text-gray-400 text-sm">No readings yet...</span>
+        <% end %>
+      </div>
+      <div class="grid grid-cols-4 sm:grid-cols-8 gap-1">
+        <% 8.times do |i| %>
+          <input type="number" step="0.1" min="0" placeholder="<%= i + 1 %>"
+                 data-elcometer-target="manualReadingInput" data-index="<%= i %>"
+                 data-action="blur->elcometer#addManualReading"
+                 class="w-full text-sm border border-gray-300 rounded px-1 py-1" />
+        <% end %>
+      </div>
+      <p class="mt-1 text-xs text-gray-500">Type readings and TAB, or connect the Elcometer — readings land here automatically.</p>
+      <%= hidden_field_tag input_name, raw, data: { elcometer_target: "readingsData" } %>
+    </div>
+  <% end %>
+</div>

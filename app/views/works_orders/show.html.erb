@@ -527,8 +527,11 @@
               Stick to the keyboard &mdash; using the mouse part-way through can lose your place.
             </div>
           <% end %>
-          <div class="space-y-3">
+          <%# elcometer-session: one shared Elcometer connection for the page; the
+              thickness cards (film_thickness_field) register as sinks. %>
+          <div class="space-y-3" data-controller="elcometer-session">
             <% current_sec = wo_sections.first %>
+            <% @elcometer_toolbar_rendered = false %>
             <% ops_for_display.each do |op| %>
               <% position = op["position"] %>
 
@@ -746,7 +749,9 @@
                                 <% unless wo_scoped %>
                                   <span class="text-xs text-gray-500 w-14 flex-none">Batch <%= sec_active %></span>
                                 <% end %>
+                                <% thickness_field = fields.find { |f| FilmThickness::FIELDS.include?(f) } %>
                                 <% fields.each do |field| %>
+                                  <% next if field == thickness_field %>
                                   <label class="flex items-center gap-1 text-xs text-gray-600">
                                     <%= field.humanize %>
                                     <% if field.include?("pass_fail") %>
@@ -772,6 +777,15 @@
                                   </label>
                                 <% end %>
                               </div>
+                              <% if thickness_field && !wo_scoped %>
+                                <%= render "works_orders/film_thickness_field",
+                                    op: op, ops: ops_for_display, position: position,
+                                    active_key: active_key, field: thickness_field, row: row,
+                                    locked: locked, section_batch: sec_active,
+                                    nadcap: FilmThickness.nadcap_for?(op, @works_order.specification),
+                                    parts_per_batch: @works_order.section_batch_qty(current_sec, active_key),
+                                    form_id: "ocv-form-#{position}" %>
+                              <% end %>
 
                               <%
                                 # Drift context: what the last two recorded batches read.
@@ -783,7 +797,7 @@
                               <% if recent.any? %>
                                 <p class="text-xs text-gray-400">
                                   <% recent.each_with_index do |(batch_key, values), i| %>
-                                    <%= " · " if i > 0 %>B<%= batch_key %>: <%= fields.map { |f| values[f].presence || "—" }.join(" / ") %>
+                                    <%= " · " if i > 0 %>B<%= batch_key %>: <%= fields.map { |f| FilmThickness::FIELDS.include?(f) ? film_thickness_summary(f, values[f]) : (values[f].presence || "—") }.join(" / ") %>
                                   <% end %>
                                 </p>
                               <% end %>

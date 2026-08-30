@@ -82,6 +82,11 @@ export default class extends Controller {
     this.session = null
 
     this.loadExisting()
+    // Process record: the lot size is pre-filled from the batch qty. With no
+    // stored payload yet, derive the plan from it straight away.
+    if (this.partsPerBatch < 1 && this.hasPartsPerBatchInputTarget && this.partsPerBatchInputTarget.value) {
+      this.updateSampleSize()
+    }
     this.registerWithSession()
 
     this._onFocus = () => this.session && this.session.setPreferred(this)
