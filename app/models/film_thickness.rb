@@ -1,4 +1,4 @@
-# app/models/film_thickness.rb
+# app/lib/film_thickness.rb
 #
 # Film thickness recording rules, shared by the process record and the
 # release note.
@@ -106,6 +106,43 @@ module FilmThickness
       "parts"           => parts,
       "readings"        => parts.flat_map { |p| p["readings"] }
     }
+  end
+
+  # Per-works-order traceability (grouped bars for customers who want their
+  # own 8 readings on their own release note - see
+  # WorksOrder#thickness_per_works_order?):
+  #   { 'mode' => 'per_wo', 'parts' => [{ 'wo' => 'WO1234', 'part_label' => 'WO1234 · P/N', 'readings' => [8] }] }
+  PER_WO_MODE = "per_wo".freeze
+
+  def self.per_wo?(value)
+    data = parse(value)
+    data.is_a?(Hash) && data["mode"].to_s == PER_WO_MODE
+  end
+
+  def self.per_wo_from(value)
+    data = parse(value)
+    data = {} unless data.is_a?(Hash)
+    parts = (data["parts"] || []).map do |part|
+      {
+        "wo"         => part["wo"].to_s,
+        "part_label" => part["part_label"].presence || part["wo"].to_s,
+        "readings"   => readings_from(part["readings"] || [])
+      }
+    end
+    { "mode" => PER_WO_MODE, "parts" => parts, "readings" => parts.flat_map { |p| p["readings"] } }
+  end
+
+  # Every expected works order present with a full 8-reading set.
+  def self.per_wo_errors(data, expected_wos)
+    parts = data["parts"] || []
+    Array(expected_wos).flat_map do |wo|
+      part = parts.find { |p| p["wo"] == wo }
+      if part.nil? || part["readings"].empty?
+        ["#{wo} has no readings"]
+      else
+        anodic_errors(part["readings"]).map { |e| "#{wo} #{e}" }
+      end
+    end
   end
 
   # [{ 'point' => 'A', 'start_mm' => 1.234, 'finish_mm' => 1.259, 'growth_um' => 25.0 }, ...]
@@ -217,7 +254,9 @@ module FilmThickness
   # Validate one batch's row at sign-off. parts_per_batch is the SECTION's
   # batch qty - the process record already knows the lot size, so NADCAP
   # sampling never asks for it twice.
-  def self.row_errors(op, row, parts_per_batch: nil, nadcap: false)
+  # per_wo: list of works order labels that must each carry 8 readings
+  # (nil/empty = shared batch set). Takes precedence over nadcap.
+  def self.row_errors(op, row, parts_per_batch: nil, nadcap: false, per_wo: nil)
     field = field_for(op)
     return [] unless field
     raw = row[field]
@@ -227,7 +266,9 @@ module FilmThickness
     when ENP_FIELD
       enp_errors(enp_from(raw))
     when ANODIC_FIELD
-      if nadcap
+      if per_wo.present?
+        per_wo_errors(per_wo_from(raw), per_wo)
+      elsif nadcap
         nadcap_errors(nadcap_from(raw, parts_per_batch: parts_per_batch), parts_per_batch)
       else
         anodic_errors(readings_from(raw))
@@ -237,7 +278,9 @@ module FilmThickness
 
   # The batch hash ReleaseNote#measured_thicknesses stores - identical to
   # what the RN form produced, plus provenance.
-  def self.batch_from_row(op, row, batch_number, parts_per_batch: nil, nadcap: false)
+  # `wo` - the release note's works order label; in per_wo mode only that
+  # works order's set is returned, so its CofC carries its own 8 readings.
+  def self.batch_from_row(op, row, batch_number, parts_per_batch: nil, nadcap: false, wo: nil)
     field = field_for(op)
     raw   = row[field]
     return nil if raw.to_s.strip.empty?
@@ -248,7 +291,12 @@ module FilmThickness
       m = enp_from(raw)
       m.any? ? base.merge("enp_measurements" => m) : nil
     when ANODIC_FIELD
-      if nadcap
+      if per_wo?(raw)
+        data = per_wo_from(raw)
+        part = wo ? data["parts"].find { |p| p["wo"] == wo } : nil
+        return nil if part.nil? || part["readings"].empty?
+        base.merge("readings" => part["readings"], "part_label" => part["part_label"], "traceability" => PER_WO_MODE)
+      elsif nadcap
         base.merge(nadcap_from(raw, parts_per_batch: parts_per_batch))
       else
         r = readings_from(raw)

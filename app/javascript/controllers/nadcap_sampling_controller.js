@@ -44,11 +44,20 @@ export default class extends Controller {
     batchLabel:      String,    // "B1", "B2", ...
     processType:     String,
     targetThickness: Number,
-    displayName:     String
+    displayName:     String,
+    // Per-works-order traceability (process record, grouped bars for
+    // customers who want 8 readings per part number on THEIR release note):
+    // [{ wo: "WO1234", label: "WO1234 · P/N" }, ...]. When set, the sample
+    // plan is fixed at 8 readings per listed works order and the lot-size
+    // input is not used. Payload: { mode: "per_wo", parts: [{ wo, part_label, readings }] }
+    fixedParts:      Array
   }
+
+  get fixed() { return this.hasFixedPartsValue && this.fixedPartsValue.length > 0 ? this.fixedPartsValue : null }
 
   // NADCAP sample plan: parts_per_batch -> sample size (parts to test).
   sampleSizeFor(n) {
+    if (this.fixed) return this.fixed.length
     if (n < 1) return 0
     if (n <= 12)   return n     // All parts tested
     if (n <= 288)  return 12
@@ -68,6 +77,7 @@ export default class extends Controller {
   // The total is distributed as evenly as possible; the first (total % ss)
   // parts take one extra reading. e.g. lot 6 → [2,2,1,1,1,1]; lot 32 → [1×12].
   readingsPlanFor(n) {
+    if (this.fixed) return this.fixed.map(() => 8)
     const ss = this.sampleSizeFor(n)
     if (ss < 1) return []
     const total = Math.max(8, ss)
@@ -82,9 +92,17 @@ export default class extends Controller {
     this.session = null
 
     this.loadExisting()
-    // Process record: the lot size is pre-filled from the batch qty. With no
-    // stored payload yet, derive the plan from it straight away.
-    if (this.partsPerBatch < 1 && this.hasPartsPerBatchInputTarget && this.partsPerBatchInputTarget.value) {
+    if (this.fixed) {
+      // Fixed per-WO plan: always exactly the listed works orders, 8 each.
+      this.partsPerBatch = this.fixed.length
+      this.resizeParts(this.readingsPlanFor(this.partsPerBatch))
+      this.renderGrid()
+      this.renderBatchStats()
+      this.updateSampleSizeDisplay()
+      this.persist()
+    } else if (this.partsPerBatch < 1 && this.hasPartsPerBatchInputTarget && this.partsPerBatchInputTarget.value) {
+      // Process record: the lot size is pre-filled from the batch qty. With no
+      // stored payload yet, derive the plan from it straight away.
       this.updateSampleSize()
     }
     this.registerWithSession()
@@ -182,6 +200,7 @@ export default class extends Controller {
   // ── Parts-per-batch input handler ─────────────────────────────────────────
 
   updateSampleSize() {
+    if (this.fixed) return
     const raw = this.partsPerBatchInputTarget.value
     const n = parseInt(raw, 10)
 
@@ -222,7 +241,12 @@ export default class extends Controller {
   }
 
   updateSampleSizeDisplay() {
+    if (!this.hasSampleSizeDisplayTarget) return
     const plan = this.readingsPlanFor(this.partsPerBatch)
+    if (this.fixed) {
+      this.sampleSizeDisplayTarget.textContent = `${plan.length} works order(s) × 8 readings = ${plan.length * 8} readings`
+      return
+    }
     if (plan.length === 0) {
       this.sampleSizeDisplayTarget.textContent = "Enter parts in this batch"
       return
@@ -263,11 +287,14 @@ export default class extends Controller {
     }
     while (this.parts.length < plan.length) {
       const idx = this.parts.length
+      const fx  = this.fixed && this.fixed[idx]
       this.parts.push({
-        label:    `${this.batchLabelValue}p${idx + 1}`,
+        label:    fx ? fx.label : `${this.batchLabelValue}p${idx + 1}`,
+        wo:       fx ? fx.wo : undefined,
         readings: []
       })
     }
+    if (this.fixed) this.parts.forEach((p, i) => { p.label = this.fixed[i].label; p.wo = this.fixed[i].wo })
     this.parts.forEach((part, i) => {
       const target = plan[i]
       const r = part.readings.slice(0, target)
@@ -434,13 +461,17 @@ export default class extends Controller {
       return
     }
 
-    const payload = {
-      parts_per_batch: this.partsPerBatch,
-      parts: this.parts.map((p) => ({
+    const parts = this.parts.map((p) => {
+      const entry = {
         part_label: p.label,
         readings:   p.readings.filter((r) => r != null && r !== "" && !isNaN(r))
-      }))
-    }
+      }
+      if (p.wo) entry.wo = p.wo
+      return entry
+    })
+    const payload = this.fixed
+      ? { mode: "per_wo", parts }
+      : { parts_per_batch: this.partsPerBatch, parts }
     this.readingsDataTarget.value = JSON.stringify(payload)
   }
 
@@ -454,6 +485,19 @@ export default class extends Controller {
 
     try {
       const parsed = JSON.parse(raw)
+      if (this.fixed) {
+        // Match stored rows to the fixed list by works order, so a member
+        // added/removed pre-freeze never shifts another member's readings.
+        this.partsPerBatch = this.fixed.length
+        this.resizeParts(this.readingsPlanFor(this.partsPerBatch))
+        const stored = (parsed && Array.isArray(parsed.parts)) ? parsed.parts : []
+        this.parts.forEach((p) => {
+          const hit = stored.find((sp) => sp.wo === p.wo)
+          const r = hit && Array.isArray(hit.readings) ? hit.readings.slice(0, 8) : []
+          p.readings = [...r, ...Array(8 - r.length).fill(null)]
+        })
+        return
+      }
       if (parsed && typeof parsed === "object" && parsed.parts_per_batch) {
         this.partsPerBatch = parseInt(parsed.parts_per_batch, 10)
         this.partsPerBatchInputTarget.value = this.partsPerBatch

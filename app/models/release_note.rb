@@ -369,7 +369,8 @@ class ReleaseNote < ApplicationRecord
         key = r['batch'].to_s
         FilmThickness.batch_from_row(op, rows[key] || {}, key,
                                      parts_per_batch: owner.section_batch_qty(section, key),
-                                     nadcap: treatment[:requires_nadcap_sampling])
+                                     nadcap: treatment[:requires_nadcap_sampling],
+                                     wo: works_order.display_name)
       end.sort_by { |b| b['batch_number'] }
     end
 

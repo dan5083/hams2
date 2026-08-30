@@ -860,6 +860,21 @@ class WorksOrder < ApplicationRecord
     process_record_owner.film_thickness_ops.any?
   end
 
+  # Customers who need their own 8 readings on their own release note even
+  # when several works orders share a bar. Hard-coded by name, like the
+  # CofC layout in release_notes/pdf.html.erb.
+  def thickness_per_works_order?
+    customer_order&.customer&.name.to_s.include?("Lufthansa")
+  end
+
+  # Works orders a per-WO thickness set must cover: the bar's members for a
+  # grouped record, otherwise just this one. [{ wo:, label: }]
+  def thickness_member_labels
+    owner = process_record_owner
+    members = owner.grouped? ? owner.process_group.members.where(voided: false) : [owner]
+    members.map { |w| { wo: w.display_name, label: "#{w.display_name} · #{w.part_number}" } }
+  end
+
   # Ops carrying an in-line thickness field, in sequence order. Frozen if the
   # record has started, live otherwise (so the gate above answers before the
   # first write).
@@ -1001,7 +1016,8 @@ class WorksOrder < ApplicationRecord
         problems = FilmThickness.row_errors(
           op, row,
           parts_per_batch: (wo_scoped ? nil : section_batch_qty(section, key)),
-          nadcap: FilmThickness.nadcap_for?(op, specification)
+          nadcap: FilmThickness.nadcap_for?(op, specification),
+          per_wo: (thickness_per_works_order? ? thickness_member_labels.map { |m| m[:wo] } : nil)
         )
         if problems.any?
           raise "Film thickness for batch #{key} is incomplete: #{problems.first} (operation #{position})"
