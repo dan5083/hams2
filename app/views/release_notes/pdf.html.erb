@@ -7,7 +7,13 @@
         font-family: sans-serif;
         font-size: 9pt;
         margin: 0;
-        padding: 1cm;
+        /* No bottom padding. @page already reserves a 1cm bottom margin on
+           every sheet, so a bottom padding here is not extra whitespace —
+           it is 1cm of box that has to be placed after the final block in
+           the flow. That pushed .cert-footer (page-break-inside: avoid)
+           onto a sheet of its own whenever the certificate ended within
+           1cm of the bottom, and could also emit a trailing blank page. */
+        padding: 1cm 1cm 0 1cm;
         --standard-border-width: 1pt;
         --standard-border-color: black;
         --standard-border-style: solid;
@@ -272,10 +278,16 @@
       /* ----------------------------------------------------------------
          Certificate footer — statement + signature + accreditation.
          In normal flow (no fixed positioning).
-         page-break-inside: avoid keeps it on one page.
+         The statement and the signature that covers it must never be
+         split, so .cert-signoff is the atomic unit. The accreditation
+         strapline is boilerplate and is left breakable, so a certificate
+         that ends very close to the bottom pushes ~2cm rather than the
+         whole ~8cm block onto a new sheet.
          ---------------------------------------------------------------- */
       .cert-footer {
         margin-top: 0.75rem;
+      }
+      .cert-signoff {
         page-break-inside: avoid;
       }
       .statement {
@@ -832,16 +844,20 @@
 
       <!-- ============================================================
            Statement / Signature / Accreditation
-           page-break-inside: avoid keeps this block together.
+           .cert-signoff is the atomic unit — the signature must stay with
+           the statement it covers. The accreditation strapline below it
+           is boilerplate and may break to the next sheet.
            ============================================================ -->
       <div class="cert-footer">
-        <h2>Statement</h2>
-        <div class="statement">
-          <p><%= @release_note.remarks.present? ? @release_note.remarks : 'Certificate of conformity &ndash; We certify that the above work has been processed and inspected according to the terms of your order.' %></p>
-        </div>
-        <div class="signature-block">
-          <span class="signature-name"><%= @release_note.issued_by.display_name %></span><br/>
-          For and on behalf of Hard Anodising Surface Treatments Ltd
+        <div class="cert-signoff">
+          <h2>Statement</h2>
+          <div class="statement">
+            <p><%= @release_note.remarks.present? ? @release_note.remarks : 'Certificate of conformity &ndash; We certify that the above work has been processed and inspected according to the terms of your order.' %></p>
+          </div>
+          <div class="signature-block">
+            <span class="signature-name"><%= @release_note.issued_by.display_name %></span><br/>
+            For and on behalf of Hard Anodising Surface Treatments Ltd
+          </div>
         </div>
         <div class="company-footer">
           <strong>HARD ANODISING SURFACE TREATMENTS LTD</strong> has been assessed and registered by NQA against the provisions of: AS9100D &amp; BS EN ISO 9001:2015. Certificate No: 22732<br/>
