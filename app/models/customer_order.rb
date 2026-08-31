@@ -137,6 +137,96 @@ class CustomerOrder < ApplicationRecord
     works_orders.empty?
   end
 
+
+  # ---------------------------------------------------------------------------
+  # Quick bookout — release everything the process records currently certify,
+  # for the whole order, in one go.
+  #
+  # A works order is auto-bookable only when HAMS itself can vouch for the
+  # quantity: a paperless process record whose thickness (if required) is
+  # captured in-line. Everything else is listed with a reason and released
+  # manually through the normal form:
+  #   :paper_record      — sign-offs live on the paper route card; HAMS can't
+  #                        verify them, and (for measurable parts) thickness
+  #                        readings have to be typed in anyway.
+  #   :manual_thickness  — paperless record, but thickness is form-captured
+  #                        (WO frozen before the in-line field existed).
+  #   :awaiting_sign_off — paperless + in-line, but the certified through-line
+  #                        is already fully released; nothing new signed off.
+  #
+  # Certified headroom is tracked PER PROCESS RECORD OWNER, not per works
+  # order: a grouped bar's record certifies the whole tank load, so booking
+  # several members of one group must share the same width. Candidates are
+  # walked in WO-number order and each allocation is deducted before the next
+  # member is sized, so the numbers shown in the modal are exactly what
+  # quick_bookout! will create (validate_process_record_coverage remains the
+  # backstop at save time).
+  # ---------------------------------------------------------------------------
+  BookoutCandidate = Struct.new(:works_order, :quantity, :reason, keyword_init: true)
+
+  def bookout_candidates
+    headroom = {} # process record owner id => certified width not yet released/allocated
+
+    works_orders.active.where(is_open: true).order(:number).filter_map do |wo|
+      next nil if wo.quantity_remaining <= 0
+
+      unless wo.paperless_record?
+        next BookoutCandidate.new(works_order: wo, quantity: 0, reason: :paper_record)
+      end
+
+      # Ask an unsaved RN, so the answer uses exactly the rules create will.
+      probe = wo.release_notes.build
+      if probe.requires_thickness_measurements? && !wo.inline_thickness_record?
+        next BookoutCandidate.new(works_order: wo, quantity: 0, reason: :manual_thickness)
+      end
+
+      owner_id = wo.process_record_owner.id
+      headroom[owner_id] ||= wo.signed_off_quantity - wo.released_quantity_against_record
+      qty = [wo.quantity_remaining, headroom[owner_id]].min
+
+      if qty <= 0
+        BookoutCandidate.new(works_order: wo, quantity: 0, reason: :awaiting_sign_off)
+      else
+        headroom[owner_id] -= qty
+        BookoutCandidate.new(works_order: wo, quantity: qty, reason: nil)
+      end
+    end
+  end
+
+  # Create one release note per selected bookable works order, everything as
+  # accepted (rejections go through the manual form — they need remarks and
+  # usually an NCR anyway). Quantities are recomputed server-side from
+  # bookout_candidates, never taken from the client. All-or-nothing: any
+  # validation failure rolls the whole bookout back.
+  #
+  # Returns [created_release_notes, skipped_display_names] — skipped covers
+  # ids that were requested but are no longer bookable (someone released or
+  # signed off in between).
+  def quick_bookout!(works_order_ids, user)
+    ids     = Array(works_order_ids).map(&:to_i)
+    created = []
+    skipped = []
+
+    transaction do
+      candidates = bookout_candidates
+      requested  = candidates.select { |c| ids.include?(c.works_order.id) }
+      bookable   = requested.select { |c| c.reason.nil? && c.quantity.positive? }
+      skipped    = (requested - bookable).map { |c| c.works_order.display_name }
+      skipped   += (ids - requested.map { |c| c.works_order.id }).map { |id| "WO##{id}" }
+
+      bookable.each do |c|
+        created << c.works_order.release_notes.create!(
+          date: Date.current,
+          issued_by: user,
+          quantity_accepted: c.quantity,
+          quantity_rejected: 0
+        )
+      end
+    end
+
+    [created, skipped]
+  end
+
   private
 
   def set_defaults

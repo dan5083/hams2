@@ -1,0 +1,91 @@
+<%# app/views/release_notes/_proof_of_collection.html.erb
+    Consolidated advice note ("Proof of Collection") for a customer order.
+    Locals:
+      customer_order - the order being collected
+      release_note   - the lead release note (carries the RN number + date
+                       shown on the advice note; see CustomerOrder#lead_release_note)
+    One row per active works order on the order, one driver signature per
+    collection. Extracted verbatim from release_notes/pdf.html.erb. %>
+<div class="advice-note">
+        <div class="logo-header">
+          <%= image_tag("logo-with-company-name.png", alt: "Hard Anodising Surface Treatments Ltd") %>
+          <div class="company-contact">
+            Firs Industrial Estate, Rickets Close, Kidderminster DY11 7QN<br/>
+            Tel: 01562 747100 | <a href="https://www.hard-anodising.co.uk/">www.hard-anodising.co.uk</a>
+          </div>
+        </div>
+
+        <h1>Proof of Collection RN<%= release_note.number %></h1>
+
+        <table class="header-table">
+          <tbody>
+            <tr><th>Customer Order</th><td><%= customer_order.number %></td></tr>
+            <tr><th>Date</th><td><%= release_note.date.strftime("%d/%m/%Y") %></td></tr>
+          </tbody>
+        </table>
+
+        <table class="addresses">
+          <tbody>
+            <tr>
+              <td class="address">
+                <h2>Invoice To</h2>
+                <p>
+                  <%= customer_order.customer.display_name %><br/>
+                  <%= simple_format(customer_order.customer.pdf_address) %>
+                </p>
+              </td>
+              <td class="address">
+                <h2>Deliver To</h2>
+                <p>
+                  <%= customer_order.customer.display_name %><br/>
+                  <%= simple_format(customer_order.customer.pdf_address) %>
+                </p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2>Customer Order Summary</h2>
+        <%# ---- One row per works order on this customer order. Driven from
+            works orders (not release notes) so the document is complete even
+            when later release notes haven't been raised yet at print time. ---- %>
+        <% order_works_orders = customer_order.works_orders.active.includes(:part).order(:number).to_a %>
+        <table class="summary-table">
+          <thead>
+            <tr>
+              <th>Works Order</th>
+              <th>Part Number</th>
+              <th>Issue</th>
+              <th>Description</th>
+              <th>Specification</th>
+              <th class="num">Quantity</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% order_works_orders.each do |wo| %>
+              <tr>
+                <td>WO<%= wo.number %></td>
+                <td><%= wo.part_number %></td>
+                <td><%= wo.part_issue %></td>
+                <td><%= wo.part_description %></td>
+                <td><%= wo.specification %></td>
+                <td class="num"><%= wo.quantity %></td>
+              </tr>
+            <% end %>
+          </tbody>
+          <tfoot>
+            <tr>
+              <th colspan="5" style="text-align:right;">Total Quantity</th>
+              <td class="num"><%= order_works_orders.sum(&:quantity) %></td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <table class="signature-table">
+          <tbody>
+            <tr><th>Name</th><td></td></tr>
+            <tr><th>Signature</th><td></td></tr>
+            <tr><th>Date</th><td></td></tr>
+          </tbody>
+        </table>
+      </div>

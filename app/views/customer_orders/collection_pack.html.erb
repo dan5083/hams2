@@ -1,0 +1,34 @@
+<%# app/views/customer_orders/collection_pack.html.erb
+    The full paperwork set handed over at collection, compiled for a whole
+    customer order in ONE document (one Grover render — no per-note Chrome
+    launches, no PDF stitching):
+
+      Page 1   Proof of Collection — the consolidated advice note the driver
+               signs. Same page the lead release note prints; it summarises
+               every works order on the order.
+      Then     Certificate of Conformity for EVERY active release note on the
+               order, lowest number first, each starting on a fresh sheet
+               (.certificate-page carries page-break-before: always).
+
+    Uses the same partials as release_notes/pdf.html.erb, so the pages are
+    pixel-identical to the individually printed documents. %>
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <%= render "release_notes/pdf_styles" %>
+  </head>
+  <body>
+    <% lead = @customer_order.lead_release_note %>
+
+    <% if lead %>
+      <%= render "release_notes/proof_of_collection",
+                 customer_order: @customer_order,
+                 release_note: lead %>
+    <% end %>
+
+    <% @customer_order.delivery_release_notes.each do |release_note| %>
+      <%= render "release_notes/certificate", release_note: release_note %>
+    <% end %>
+  </body>
+</html>

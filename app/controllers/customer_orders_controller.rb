@@ -1,6 +1,6 @@
 class CustomerOrdersController < ApplicationController
   before_action :set_customer_order, only: [:show, :edit, :update, :destroy, :void,
-                                            :invoice_to_date]
+                                            :invoice_to_date, :bookout, :collection_pack]
 
   def index
     @customer_orders = CustomerOrder.includes(:customer, :works_orders)
@@ -80,6 +80,11 @@ class CustomerOrdersController < ApplicationController
 
     # Route card vs 📱 Paperless per row
     @paperless_wo_ids = WorksOrder.paperless_ids(@works_orders)
+
+    # Quick bookout modal: what each works order can release right now, and
+    # why the rest can't (paper record / form-captured thickness / nothing
+    # signed off yet). See CustomerOrder#bookout_candidates.
+    @bookout_candidates = @customer_order.voided ? [] : @customer_order.bookout_candidates
   end
 
   def new
@@ -132,6 +137,64 @@ class CustomerOrdersController < ApplicationController
   rescue StandardError => e
     Rails.logger.error "invoice_to_date (CO #{@customer_order.id}) failed: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
     redirect_to return_path, alert: "❌ Failed to stage invoice: #{e.message}"
+  end
+
+  # Quick bookout: create a release note per selected works order for every
+  # part the process record certifies but hasn't yet released — everything as
+  # accepted, rejections via the normal form. Quantities are recomputed
+  # server-side (CustomerOrder#quick_bookout!), so the posted ids are only a
+  # selection, never amounts. All-or-nothing.
+  def bookout
+    created, skipped = @customer_order.quick_bookout!(params[:works_order_ids], Current.user)
+
+    if created.any?
+      notice = "✅ Booked out #{created.sum(&:quantity_accepted)} part(s) on " \
+               "#{created.count} release note(s): #{created.map(&:display_name).join(', ')}."
+      notice += " Skipped (changed since the page loaded): #{skipped.join(', ')}." if skipped.any?
+      redirect_to @customer_order, notice: notice
+    else
+      redirect_to @customer_order,
+                  alert: "Nothing was booked out#{skipped.any? ? " — no longer bookable: #{skipped.join(', ')}" : ''}."
+    end
+  rescue ActiveRecord::RecordInvalid => e
+    redirect_to @customer_order,
+                alert: "❌ Bookout rolled back — #{e.record.works_order&.display_name}: #{e.record.errors.full_messages.join('; ')}"
+  rescue StandardError => e
+    Rails.logger.error "bookout (CO #{@customer_order.id}) failed: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+    redirect_to @customer_order, alert: "❌ Bookout failed: #{e.message}"
+  end
+
+  # The full paperwork set handed over at collection, in one PDF: the
+  # consolidated Proof of Collection (advice note) followed by the
+  # Certificate of Conformity for every active release note on the order.
+  # Single Grover render of customer_orders/collection_pack — same partials
+  # as the per-note PDF, so pages are identical to the individual prints.
+  def collection_pack
+    if @customer_order.delivery_release_notes.empty?
+      redirect_to @customer_order, alert: "No release notes on this order yet — nothing to compile."
+      return
+    end
+
+    respond_to do |format|
+      format.html { render layout: false }
+      format.pdf do
+        pdf = Grover.new(
+          render_to_string(
+            template: 'customer_orders/collection_pack',
+            layout: false
+          ),
+          format: 'A4',
+          margin: { top: '1cm', bottom: '1cm', left: '1cm', right: '1cm' },
+          print_background: true,
+          prefer_css_page_size: true
+        ).to_pdf
+
+        send_data pdf,
+                  filename: "collection_pack_#{@customer_order.number.to_s.parameterize}.pdf",
+                  type: 'application/pdf',
+                  disposition: 'inline'
+      end
+    end
   end
 
   def edit
