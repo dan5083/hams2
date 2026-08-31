@@ -86,7 +86,7 @@ module OperationLibrary
                required_if: { first_failure: { result: "FAIL" } },
                blank_as: { first_failure: "None" })
       }],
-      [/foil\s+verification|elcometer/i, -> {
+      [/foil\s+verification|elcometer|calibrated\s+film\s+thickness/i, -> {
         fields(:meter_no, :foil_value_1, :measured_thickness_1,
                :foil_value_2, :measured_thickness_2,
                FilmThickness::ANODIC_FIELD.to_sym, basis: :nadcap)

@@ -107,7 +107,7 @@ module OperationLibrary
     # (The old baked-in "Batch 1: Meter no:___ ..." blank lines were the
     # paper recording mechanism; blanks are the renderer's job now.)
     def self.operation_text
-      "**Elcometer foil verification** (Aerospace/Defense requirement)"
+      "**Calibrated film thickness measurement** (Aerospace/Defense requirement)"
     end
   end
 end

@@ -746,16 +746,15 @@
                               <% row = readings[active_key] || {} %>
                               <% locked = signed_here %>
                               <% thickness_field = fields.find { |f| FilmThickness::FIELDS.include?(f) } %>
-                              <% foil_check = !locked && thickness_field == FilmThickness::ANODIC_FIELD && fields.include?("measured_thickness_1") %>
-                              <%# foil-check: routes the shared Elcometer's first readings into the
-                                  calibration-foil check boxes; attached to this row only, never
-                                  around the film card below. %>
-                              <div class="flex flex-wrap items-center gap-2"<%= ' data-controller="foil-check"'.html_safe if foil_check %>>
+                              <%# The foil-check fields render inside the film thickness card
+                                  (film_thickness_field partial), not in this plain row. %>
+                              <% foil_fields = thickness_field == FilmThickness::ANODIC_FIELD ? (fields & FilmThicknessHelper::FOIL_CHECK_FIELDS) : [] %>
+                              <div class="flex flex-wrap items-center gap-2">
                                 <% unless wo_scoped %>
                                   <span class="text-xs text-gray-500 w-14 flex-none">Batch <%= sec_active %></span>
                                 <% end %>
                                 <% fields.each do |field| %>
-                                  <% next if field == thickness_field %>
+                                  <% next if field == thickness_field || foil_fields.include?(field) %>
                                   <label class="flex items-center gap-1 text-xs text-gray-600">
                                     <%= field.humanize %>
                                     <% if field.include?("pass_fail") %>
@@ -788,6 +787,7 @@
                                     locked: locked, section_batch: sec_active,
                                     nadcap: FilmThickness.nadcap_for?(op, @works_order.specification),
                                     parts_per_batch: @works_order.section_batch_qty(current_sec, active_key),
+                                    foil_fields: foil_fields,
                                     form_id: "ocv-form-#{position}" %>
                               <% end %>
 

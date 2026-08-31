@@ -4,6 +4,20 @@
 # process record (FilmThickness::ANODIC_FIELD on foil verification ops,
 # FilmThickness::ENP_FIELD on ENP ops).
 module FilmThicknessHelper
+  # Foil verification check fields drawn inside the film thickness card
+  # (meter identity typed, measured values fed by the shared Elcometer).
+  FOIL_CHECK_FIELDS = %w[meter_no foil_value_1 measured_thickness_1 foil_value_2 measured_thickness_2].freeze
+
+  def foil_check_summary(row)
+    m = row["meter_no"].presence
+    pairs = [1, 2].filter_map do |i|
+      fv = row["foil_value_#{i}"].presence
+      mt = row["measured_thickness_#{i}"].presence
+      "#{fv || '—'} → #{mt || '—'}" if fv || mt
+    end
+    ["Meter #{m || '—'}", *pairs].join(" · ")
+  end
+
   # One-line summary of a stored thickness value for the drift line and the
   # locked (signed) row: "8 readings · mean 70.4 µm" / "6 pts · mean 25.1 µm".
   def film_thickness_summary(field, raw)
