@@ -187,7 +187,10 @@ class CustomerOrdersController < ApplicationController
           format: 'A4',
           margin: { top: '1cm', bottom: '1cm', left: '1cm', right: '1cm' },
           print_background: true,
-          prefer_css_page_size: true
+          prefer_css_page_size: true,
+          # The document is fully self-contained (styles inline, logo a data
+          # URI via PdfHelper), so don't make Chromium wait for network idle.
+          wait_until: 'domcontentloaded'
         ).to_pdf
 
         send_data pdf,

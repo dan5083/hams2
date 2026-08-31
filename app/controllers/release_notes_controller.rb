@@ -124,6 +124,7 @@ class ReleaseNotesController < ApplicationController
         pdf = Grover.new(
           render_to_string(
             template: 'release_notes/pdf',
+            formats: [:html], # request format is :pdf; pin lookup to the .html.erb template
             layout: false,
             locals: {
               release_note: @release_note,
@@ -134,7 +135,10 @@ class ReleaseNotesController < ApplicationController
           format: 'A4',
           margin: { top: '1cm', bottom: '1cm', left: '1cm', right: '1cm' },
           print_background: true,
-          prefer_css_page_size: true
+          prefer_css_page_size: true,
+          # Self-contained document (inline styles, data-URI logo) — no need
+          # to wait for network idle before printing.
+          wait_until: 'domcontentloaded'
         ).to_pdf
 
         send_data pdf,
