@@ -181,6 +181,7 @@ class CustomerOrdersController < ApplicationController
         pdf = Grover.new(
           render_to_string(
             template: 'customer_orders/collection_pack',
+            formats: [:html], # request format is :pdf; pin lookup to the .html.erb template
             layout: false
           ),
           format: 'A4',
