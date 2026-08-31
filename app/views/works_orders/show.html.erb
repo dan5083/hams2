@@ -745,7 +745,11 @@
                             <% if fields.any? %>
                               <% row = readings[active_key] || {} %>
                               <% locked = signed_here %>
-                              <div class="flex flex-wrap items-center gap-2">
+                              <% foil_check = !locked && thickness_field == FilmThickness::ANODIC_FIELD && fields.include?("measured_thickness_1") %>
+                              <%# foil-check: routes the shared Elcometer's first readings into the
+                                  calibration-foil check boxes; attached to this row only, never
+                                  around the film card below. %>
+                              <div class="flex flex-wrap items-center gap-2"<%= ' data-controller="foil-check"'.html_safe if foil_check %>>
                                 <% unless wo_scoped %>
                                   <span class="text-xs text-gray-500 w-14 flex-none">Batch <%= sec_active %></span>
                                 <% end %>
@@ -1358,9 +1362,32 @@
       if (t.dataset.keyflow === 'ocv' && t.__sugg && !t.value) openDD(t);
       if (t.dataset.keyflow === 'ppb') { ppbSuggestions(t); if (t.__sugg) { t.select(); openDD(t); } }
     } else {
-      ring(null);   // working elsewhere (batch controls, notes) - undim everything
+      // Working elsewhere. If it's still inside an op (thickness card,
+      // notes), keep that op ringed so the walk visibly follows the
+      // operator; only undim when focus leaves the ops entirely.
+      var row = t && t.closest ? t.closest("[id^='op-']") : null;
+      ring(row);
       closeDD();
     }
+  });
+
+  // Clicking an op's body (not one of its controls) hands the Enter-walk to
+  // that op: focus lands on its first empty OCV field or its sign-off
+  // button, and the walk continues from there instead of going dead. If the
+  // clicked op has nothing signable (already signed), the walk resumes at
+  // the next signable op after it.
+  document.addEventListener('mousedown', function (e) {
+    if (!deskop || !e.target || !e.target.closest) return;
+    var row = e.target.closest("[id^='op-']");
+    if (!row) return;
+    if (e.target.closest('input, select, textarea, button, a, label, summary, details, [contenteditable]')) return;
+    var r = rows();
+    var target = r.indexOf(row) !== -1 ? row : r.filter(function (cand) {
+      return row.compareDocumentPosition(cand) & Node.DOCUMENT_POSITION_FOLLOWING;
+    })[0];
+    if (!target) return;
+    e.preventDefault(); // beat the blur-to-body, keep the station focus clean
+    focusStation(stationFor(target), false);
   });
   document.addEventListener('focusout', function (e) {
     if (ddFor && e.target === ddFor) {
