@@ -8,7 +8,10 @@
     collection. Extracted verbatim from release_notes/pdf.html.erb. %>
 <div class="advice-note">
         <div class="logo-header">
-          <%= image_tag("logo-with-company-name.png", alt: "Hard Anodising Surface Treatments Ltd") %>
+          <%# Inlined as a data URI (PdfHelper) so Grover's Chromium never makes a
+              network request back to the dyno — fixes the logo not rendering in
+              compiled packs and shaves the asset round-trip off render time. %>
+          <img src="<%= pdf_logo_data_uri %>" alt="Hard Anodising Surface Treatments Ltd">
           <div class="company-contact">
             Firs Industrial Estate, Rickets Close, Kidderminster DY11 7QN<br/>
             Tel: 01562 747100 | <a href="https://www.hard-anodising.co.uk/">www.hard-anodising.co.uk</a>
@@ -24,26 +27,13 @@
           </tbody>
         </table>
 
-        <table class="addresses">
-          <tbody>
-            <tr>
-              <td class="address">
-                <h2>Invoice To</h2>
-                <p>
-                  <%= customer_order.customer.display_name %><br/>
-                  <%= simple_format(customer_order.customer.pdf_address) %>
-                </p>
-              </td>
-              <td class="address">
-                <h2>Deliver To</h2>
-                <p>
-                  <%= customer_order.customer.display_name %><br/>
-                  <%= simple_format(customer_order.customer.pdf_address) %>
-                </p>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <%# Single customer block — the old Invoice To / Deliver To pair was
+            always the same address twice. Name kept large and bold so the
+            driver/goods-in can see whose collection this is at a glance. %>
+        <div class="customer-block">
+          <div class="customer-name"><%= customer_order.customer.display_name %></div>
+          <%= simple_format(customer_order.customer.pdf_address) %>
+        </div>
 
         <h2>Customer Order Summary</h2>
         <%# ---- One row per works order on this customer order. Driven from
