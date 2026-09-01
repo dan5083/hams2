@@ -21,8 +21,8 @@ class ShopSectionBoard
   # boards follow.
   # ==========================================================================
   SHOP_VATS = {
-    "shop1"    => [1, 2, 3, 5, 9, 12],  # TODO Dan: confirm
-    "shop2"    => [6],                  # TODO Dan: confirm
+    "shop1"    => [1, 2, 3, 9, 12],
+    "shop2"    => [5, 6],
     "factory2" => [],                   # TODO Dan: which vats are in Factory 2?
   }.freeze
 
@@ -163,6 +163,22 @@ class ShopSectionBoard
       op["operation_text"].to_s[/over (\d+) minutes/, 1]&.to_i
     end
 
+    # Dye for THIS cycle: the first dye op after the anodising op, before the
+    # next treatment starts. "Black dye for 25-30 minutes", markdown stripped.
+    def dye_after(i)
+      ops[(i + 1)..].each do |o|
+        break if ANODISING_TYPES.include?(o["process_type"]) || o["process_type"] == "electroless_nickel_plating"
+        return o if o["process_type"] == "dye"
+      end
+      nil
+    end
+
+    def dye_label(i)
+      op = dye_after(i)
+      return nil unless op
+      op["operation_text"].to_s.gsub(/\*+/, "").lines.first.to_s.strip.truncate(60)
+    end
+
     def seal_op
       @seal_op ||= ops.find { |o| %w[sealing dichromate_sealing].include?(o["process_type"]) }
     end
@@ -198,6 +214,7 @@ class ShopSectionBoard
         rows << {
           job: self, op: op, vats: vats,
           voltage: voltage_for(op), minutes: minutes_for(op),
+          dye: dye_label(i),
           seal: seal_label,
           batches: ready.sort_by(&:to_i),
           batch_qtys: batch_qtys(op, ready),
@@ -208,7 +225,16 @@ class ShopSectionBoard
 
     # ---- Jiggers: jig itself outstanding -----------------------------------
 
+    # Contract review is WO-scoped (signed under the "wo" key). Nothing hits
+    # a jiggers board until it's signed - an unfrozen record has no
+    # sign-offs, so unreviewed work stays off the boards automatically.
+    def contract_reviewed?
+      cr = ops.find { |o| o["process_type"] == "contract_review" || o["id"] == "CONTRACT_REVIEW" }
+      cr.present? && (cr["sign_offs"] || {}).key?("wo")
+    end
+
     def jig_queue_rows(shop_vats)
+      return [] unless contract_reviewed?
       rows = []
       ops.each_with_index do |op, i|
         next unless op["process_type"] == "jig"

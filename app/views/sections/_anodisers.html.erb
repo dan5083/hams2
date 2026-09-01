@@ -14,7 +14,7 @@
     <table class="min-w-full divide-y divide-gray-200">
       <thead class="bg-gray-50">
         <tr>
-          <% %w[WO Part Batches\ ready Vat Voltage Time Seal].each do |h| %>
+          <% %w[WO Part Batches\ ready Vat Voltage Time Dye Seal].each do |h| %>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"><%= h %></th>
           <% end %>
         </tr>
@@ -41,6 +41,13 @@
             </td>
             <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900"><%= row[:voltage] || "—" %></td>
             <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900"><%= row[:minutes] ? "#{row[:minutes]} min" : "—" %></td>
+            <td class="px-4 py-3 text-sm">
+              <% if row[:dye] %>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800"><%= row[:dye] %></span>
+              <% else %>
+                <span class="text-gray-400">—</span>
+              <% end %>
+            </td>
             <td class="px-4 py-3 text-sm text-gray-700"><%= row[:seal] %></td>
           </tr>
         <% end %>
@@ -58,6 +65,9 @@
         </div>
         <div class="text-sm text-gray-700 mt-1"><%= row[:job].part_number %> · <%= row[:job].customer_name %></div>
         <div class="text-sm text-gray-900 mt-2 font-bold"><%= row[:voltage] || "—" %> · <%= row[:minutes] ? "#{row[:minutes]} min" : "—" %></div>
+        <% if row[:dye] %>
+          <div class="mt-1"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800"><%= row[:dye] %></span></div>
+        <% end %>
         <div class="text-xs text-gray-600 mt-1"><%= row[:seal] %></div>
         <div class="mt-2">
           <% row[:batches].each do |b| %>

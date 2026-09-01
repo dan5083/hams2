@@ -1,7 +1,7 @@
 <%# app/views/sections/_jiggers.html.erb — locals: shop
-    Work whose jig op (feeding this shop's vats) is not yet signed off.
-    Unfrozen records have no sign-offs, so freshly booked work lands here
-    automatically — which is where the jiggers want to see it. %>
+    Work whose jig op (feeding this shop's vats) is not yet signed off AND
+    whose contract review is signed — nothing gets jigged before review.
+    Unfrozen records have no sign-offs at all, so they never appear. %>
 <% rows = @board.jigging_queue(shop) %>
 
 <% if rows.empty? %>
@@ -23,11 +23,7 @@
         </div>
         <div class="mt-2 flex items-center justify-between">
           <span class="text-xs text-gray-500">Qty <%= row[:job].quantity %></span>
-          <% if row[:batches].any? %>
-            <span class="text-xs font-bold text-amber-700">Batches <%= row[:batches].join(", ") %> to jig</span>
-          <% else %>
-            <span class="text-xs text-gray-400">record not started</span>
-          <% end %>
+          <span class="text-xs font-bold text-amber-700">Batches <%= row[:batches].join(", ") %> to jig</span>
         </div>
       <% end %>
     <% end %>
