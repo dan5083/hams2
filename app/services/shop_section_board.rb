@@ -21,9 +21,9 @@ class ShopSectionBoard
   # boards follow.
   # ==========================================================================
   SHOP_VATS = {
-    "shop1"    => [1, 2, 3, 9, 12],
+    "shop1"    => [1, 2, 3],
     "shop2"    => [5, 6],
-    "factory2" => [],                   # TODO Dan: which vats are in Factory 2?
+    "factory2" => [9, 12],
   }.freeze
 
   SECTIONS = {
