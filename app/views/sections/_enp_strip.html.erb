@@ -1,0 +1,16 @@
+<%# app/views/sections/_enp_strip.html.erb — locals: jobs (thickness-ordered) %>
+<div class="flex gap-3 overflow-x-auto pb-1">
+  <% jobs.each do |job| %>
+    <%= link_to works_order_path(job.wo), class: "shrink-0 w-44 border border-gray-200 rounded-lg p-3 hover:border-blue-400 hover:shadow" do %>
+      <div class="flex justify-between items-baseline">
+        <span class="font-bold text-blue-700"><%= job.display_name %></span>
+        <span class="text-sm font-bold text-gray-900">
+          <%= job.enp_thickness ? "#{job.enp_thickness % 1 == 0 ? job.enp_thickness.to_i : job.enp_thickness}μm" : "—" %>
+        </span>
+      </div>
+      <div class="text-xs text-gray-600 truncate mt-1"><%= job.part_number %></div>
+      <div class="text-xs text-gray-400 truncate"><%= job.customer_name %></div>
+      <div class="text-xs text-gray-500 mt-1">Qty <%= job.quantity %></div>
+    <% end %>
+  <% end %>
+</div>

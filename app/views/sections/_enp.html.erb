@@ -1,0 +1,48 @@
+<%# app/views/sections/_enp.html.erb
+    One card per electroless type. Toggle switches each type card between a
+    flat thickness-ordered strip and pretreatment sub-cards (alloy names the
+    pre-process line). Both layouts are rendered; the toggle flips `hidden`. %>
+<% groups = @board.enp_groups %>
+
+<div data-controller="reveal">
+  <label class="inline-flex items-center gap-3 mb-6 bg-white shadow rounded-lg px-4 py-3 cursor-pointer select-none">
+    <input type="checkbox" class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+           data-action="change->reveal#toggle">
+    <span class="text-sm font-bold text-gray-700">Split by pretreatment</span>
+  </label>
+
+  <% if groups.empty? %>
+    <div class="bg-white rounded-lg shadow p-8 text-center text-gray-500">No live ENP work.</div>
+  <% end %>
+
+  <div class="space-y-6">
+    <% groups.each do |group| %>
+      <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="px-4 py-3 bg-gray-800 flex justify-between items-center">
+          <h2 class="text-white font-bold"><%= group[:label] %></h2>
+          <span class="text-gray-300 text-sm"><%= group[:jobs].size %> WO<%= "s" unless group[:jobs].size == 1 %></span>
+        </div>
+
+        <!-- Flat: ordered left→right by thickness -->
+        <div class="p-4" data-reveal-target="off">
+          <%= render "enp_strip", jobs: group[:jobs] %>
+        </div>
+
+        <!-- Grouped: one sub-card per pretreatment line -->
+        <div class="p-4 space-y-4 hidden" data-reveal-target="on">
+          <% group[:by_pretreat].each do |pretreat, jobs| %>
+            <div class="border border-gray-200 rounded-lg">
+              <div class="px-3 py-2 bg-gray-50 border-b border-gray-200 rounded-t-lg">
+                <span class="text-sm font-bold text-gray-700"><%= pretreat %></span>
+                <span class="text-xs text-gray-400 ml-2">pretreatment line</span>
+              </div>
+              <div class="p-3">
+                <%= render "enp_strip", jobs: jobs.sort_by { |j| [j.enp_thickness || Float::INFINITY, j.number] } %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>

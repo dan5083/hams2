@@ -1,0 +1,72 @@
+<%# app/views/sections/_anodisers.html.erb — locals: shop
+    Only work that has been JIGGED and not yet anodised: the jig op is
+    signed for a batch, the anodising op isn't. Shows vat / voltage /
+    time / seal per row; a WO with two cycles can appear twice. %>
+<% rows = @board.anodise_ready(shop) %>
+
+<% if rows.empty? %>
+  <div class="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+    Nothing jigged and waiting for anodise.
+  </div>
+<% else %>
+  <!-- Desktop -->
+  <div class="hidden lg:block bg-white shadow overflow-hidden sm:rounded-lg">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <% %w[WO Part Batches\ ready Vat Voltage Time Seal].each do |h| %>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"><%= h %></th>
+          <% end %>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        <% rows.each do |row| %>
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 whitespace-nowrap">
+              <%= link_to row[:job].display_name, works_order_path(row[:job].wo), class: "font-bold text-blue-700 hover:underline" %>
+            </td>
+            <td class="px-4 py-3">
+              <div class="text-sm text-gray-900"><%= row[:job].part_number %></div>
+              <div class="text-xs text-gray-400"><%= row[:job].customer_name %></div>
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap">
+              <% row[:batches].each do |b| %>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800 mr-1">
+                  B<%= b %><%= " · #{row[:batch_qtys][b]}" if row[:batch_qtys][b].present? %>
+                </span>
+              <% end %>
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900">
+              <%= row[:vats].any? ? row[:vats].map { |v| "Vat #{v}" }.join(" / ") : "—" %>
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900"><%= row[:voltage] || "—" %></td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900"><%= row[:minutes] ? "#{row[:minutes]} min" : "—" %></td>
+            <td class="px-4 py-3 text-sm text-gray-700"><%= row[:seal] %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Mobile cards -->
+  <div class="lg:hidden space-y-3">
+    <% rows.each do |row| %>
+      <%= link_to works_order_path(row[:job].wo), class: "block bg-white rounded-lg shadow p-4" do %>
+        <div class="flex justify-between items-baseline">
+          <span class="font-bold text-blue-700"><%= row[:job].display_name %></span>
+          <span class="text-sm font-bold"><%= row[:vats].map { |v| "Vat #{v}" }.join(" / ").presence || "—" %></span>
+        </div>
+        <div class="text-sm text-gray-700 mt-1"><%= row[:job].part_number %> · <%= row[:job].customer_name %></div>
+        <div class="text-sm text-gray-900 mt-2 font-bold"><%= row[:voltage] || "—" %> · <%= row[:minutes] ? "#{row[:minutes]} min" : "—" %></div>
+        <div class="text-xs text-gray-600 mt-1"><%= row[:seal] %></div>
+        <div class="mt-2">
+          <% row[:batches].each do |b| %>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800 mr-1">
+              B<%= b %><%= " · #{row[:batch_qtys][b]}" if row[:batch_qtys][b].present? %>
+            </span>
+          <% end %>
+        </div>
+      <% end %>
+    <% end %>
+  </div>
+<% end %>

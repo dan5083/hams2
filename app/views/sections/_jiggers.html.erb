@@ -1,0 +1,35 @@
+<%# app/views/sections/_jiggers.html.erb — locals: shop
+    Work whose jig op (feeding this shop's vats) is not yet signed off.
+    Unfrozen records have no sign-offs, so freshly booked work lands here
+    automatically — which is where the jiggers want to see it. %>
+<% rows = @board.jigging_queue(shop) %>
+
+<% if rows.empty? %>
+  <div class="bg-white rounded-lg shadow p-8 text-center text-gray-500">Nothing waiting to be jigged.</div>
+<% else %>
+  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+    <% rows.each do |row| %>
+      <%= link_to works_order_path(row[:job].wo), class: "block bg-white rounded-lg shadow p-4 hover:shadow-md" do %>
+        <div class="flex justify-between items-baseline">
+          <span class="font-bold text-blue-700"><%= row[:job].display_name %></span>
+          <span class="text-sm font-bold text-gray-900">
+            <%= row[:vats].map { |v| "Vat #{v}" }.join(" / ") %>
+          </span>
+        </div>
+        <div class="text-sm text-gray-700 mt-1 truncate"><%= row[:job].part_number %></div>
+        <div class="text-xs text-gray-400 truncate"><%= row[:job].customer_name %></div>
+        <div class="text-xs text-gray-500 mt-2 line-clamp-2">
+          Next: <%= row[:next_op]["operation_text"].to_s.gsub(/\*+/, "").truncate(90) %>
+        </div>
+        <div class="mt-2 flex items-center justify-between">
+          <span class="text-xs text-gray-500">Qty <%= row[:job].quantity %></span>
+          <% if row[:batches].any? %>
+            <span class="text-xs font-bold text-amber-700">Batches <%= row[:batches].join(", ") %> to jig</span>
+          <% else %>
+            <span class="text-xs text-gray-400">record not started</span>
+          <% end %>
+        </div>
+      <% end %>
+    <% end %>
+  </div>
+<% end %>

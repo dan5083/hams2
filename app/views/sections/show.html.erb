@@ -1,0 +1,34 @@
+<%# app/views/sections/show.html.erb %>
+<div class="container mx-auto px-4 py-6">
+
+  <!-- Section tabs -->
+  <div class="flex flex-wrap gap-2 mb-6">
+    <% ShopSectionBoard::SECTIONS.each do |key, label| %>
+      <%= link_to label, section_path(key),
+          class: "px-4 py-2 rounded-full text-sm font-bold #{key == @section ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 shadow hover:bg-gray-100'}" %>
+    <% end %>
+  </div>
+
+  <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-6"><%= @title %></h1>
+
+  <% if @section == "enp" %>
+    <%= render "enp" %>
+  <% elsif @section == "shop1_anodisers" %>
+    <%= render "anodisers", shop: "shop1" %>
+  <% elsif @section == "shop2_anodisers" %>
+    <%= render "anodisers", shop: "shop2" %>
+  <% elsif @section == "shop1_jiggers" %>
+    <%= render "jiggers", shop: "shop1" %>
+  <% elsif @section == "shop2_jiggers" %>
+    <%= render "jiggers", shop: "shop2" %>
+  <% elsif @section == "factory2" %>
+    <% if ShopSectionBoard::SHOP_VATS["factory2"].empty? %>
+      <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-yellow-800">
+        Factory 2 has no vats configured yet — set them in
+        <code class="font-mono text-sm">ShopSectionBoard::SHOP_VATS</code> and this board lights up.
+      </div>
+    <% else %>
+      <%= render "anodisers", shop: "factory2" %>
+    <% end %>
+  <% end %>
+</div>
