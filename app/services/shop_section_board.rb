@@ -110,10 +110,41 @@ class ShopSectionBoard
       @wo.process_record_owner.operations_frozen?
     end
 
+    # ---- Op classification -------------------------------------------------
+    # Copied routes (ENP part copying / copy_operations) carry their real ops
+    # as COPIED_OP_N with process_type "manual", so process_type alone is
+    # blind to them. Classify by process_type first, then fall back to the
+    # op text for manual ops.
+
+    def anodising_op?(op)
+      return true if ANODISING_TYPES.include?(op["process_type"])
+      op["process_type"] == "manual" && op["operation_text"].to_s.match?(/\b(hard|standard|chromic)\s+anodis/i)
+    end
+
+    def enp_op?(op)
+      return true if op["process_type"] == "electroless_nickel_plating"
+      op["process_type"] == "manual" && op["operation_text"].to_s.match?(/electroless\s+nickel/i)
+    end
+
+    def jig_op?(op)
+      return true if op["process_type"] == "jig"
+      op["process_type"] == "manual" && op["operation_text"].to_s.match?(/\A[\s*]*jig\b/i)
+    end
+
+    def sealing_op?(op)
+      return true if %w[sealing dichromate_sealing].include?(op["process_type"])
+      op["process_type"] == "manual" && op["operation_text"].to_s.match?(/\A[\s*]*(dichromate\s+)?seal\b/i)
+    end
+
+    def dye_op?(op)
+      return true if op["process_type"] == "dye"
+      op["process_type"] == "manual" && op["operation_text"].to_s.match?(/\A[\s*]*\w+\s+dye\b/i)
+    end
+
     # ---- ENP ---------------------------------------------------------------
 
     def enp_op
-      @enp_op ||= ops.find { |o| o["process_type"] == "electroless_nickel_plating" }
+      @enp_op ||= ops.find { |o| enp_op?(o) }
     end
 
     def enp?
@@ -154,9 +185,10 @@ class ShopSectionBoard
       op["operation_text"].to_s[/vats? ([\d,\s]+)/i, 1].to_s.scan(/\d+/).map(&:to_i)
     end
 
-    # "16V" or "20V↗️45V" verbatim from the op text.
+    # "16V", "20 V" or "20V↗️45V" from the op text, normalised for display.
     def voltage_for(op)
-      op["operation_text"].to_s[/(\d+(?:\.\d+)?V(?:↗️\d+(?:\.\d+)?V)?)/, 1]
+      m = op["operation_text"].to_s[/(\d+(?:\.\d+)?\s*V(?:\s*↗️\s*\d+(?:\.\d+)?\s*V)?)\b/, 1]
+      m&.gsub(/\s+/, "")
     end
 
     def minutes_for(op)
@@ -167,8 +199,8 @@ class ShopSectionBoard
     # next treatment starts. "Black dye for 25-30 minutes", markdown stripped.
     def dye_after(i)
       ops[(i + 1)..].each do |o|
-        break if ANODISING_TYPES.include?(o["process_type"]) || o["process_type"] == "electroless_nickel_plating"
-        return o if o["process_type"] == "dye"
+        break if anodising_op?(o) || enp_op?(o)
+        return o if dye_op?(o)
       end
       nil
     end
@@ -180,7 +212,7 @@ class ShopSectionBoard
     end
 
     def seal_op
-      @seal_op ||= ops.find { |o| %w[sealing dichromate_sealing].include?(o["process_type"]) }
+      @seal_op ||= ops.find { |o| sealing_op?(o) }
     end
 
     def seal_label
@@ -194,7 +226,7 @@ class ShopSectionBoard
 
     # Nearest jig op before index i (each treatment cycle jigs itself).
     def jig_before(i)
-      ops[0...i].reverse.find { |o| o["process_type"] == "jig" }
+      ops[0...i].reverse.find { |o| jig_op?(o) }
     end
 
     # ---- Anodisers: jigged, anodise outstanding ----------------------------
@@ -202,7 +234,7 @@ class ShopSectionBoard
     def anodise_ready_rows(shop_vats)
       rows = []
       ops.each_with_index do |op, i|
-        next unless ANODISING_TYPES.include?(op["process_type"])
+        next unless anodising_op?(op)
         vats = vats_for(op)
         next if shop_vats.any? && (vats & shop_vats).empty?
 
@@ -237,7 +269,7 @@ class ShopSectionBoard
       return [] unless contract_reviewed?
       rows = []
       ops.each_with_index do |op, i|
-        next unless op["process_type"] == "jig"
+        next unless jig_op?(op)
         nxt = ops[(i + 1)..].find { |o| vats_for(o).any? }
         next unless nxt
         next if shop_vats.any? && (vats_for(nxt) & shop_vats).empty?
