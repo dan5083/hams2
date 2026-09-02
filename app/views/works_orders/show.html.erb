@@ -1194,11 +1194,23 @@
   // and 'nearest' on a below-the-fold row parks the focused input on the
   // bottom edge with the suggestions dropdown off-screen. Centring the input
   // guarantees ~half a viewport below it - the dropdown (max-h-64) always fits.
+  //
+  // Deferred one frame: the morph scroll-pin restores the acted-on row's
+  // position in a rAF after every sign-off, and any scroll performed before
+  // that rAF gets shifted straight back with it. Registering our rAF later
+  // (arm runs in a setTimeout after the morph handlers) means it always runs
+  // after the pin's, and an absolute centring wins over the pin's relative
+  // shift. The pin stays intact for touch, where the keyflow never arms.
+  // The dropdown survives the deferred scroll - repositionDD tracks on
+  // scroll rather than closing.
+  function centerStation(el) {
+    requestAnimationFrame(function () { el.scrollIntoView({ block: 'center' }); });
+  }
   function focusStation(el) {
     if (!el) return;
     el.focus({ preventScroll: true });
     ring(el.closest("[id^='op-']"));
-    el.scrollIntoView({ block: 'center' });
+    centerStation(el);
   }
   // One-time coaching banner: server renders #keyflow-hint (hidden) on every
   // paperless card. Slot it into the top of the first focused op and reveal
@@ -1319,7 +1331,7 @@
     var row = t.closest("[id^='op-']");
     refreshGates(row); // e.g. accepting FAIL enables first_failure_detail before the walk looks
     var nextEmpty = ocvFields(row).filter(function (f) { return f !== t && !f.value; })[0];
-    if (nextEmpty) { nextEmpty.focus({ preventScroll: true }); return; }
+    if (nextEmpty) { nextEmpty.focus({ preventScroll: true }); centerStation(nextEmpty); return; }
     var btn = row.querySelector('[data-keyflow="signoff"]:not([disabled])');
     if (btn) btn.click();
   }
