@@ -43,6 +43,15 @@ class ShopSectionBoard
   ANODISING_TYPES = %w[standard_anodising hard_anodising chromic_anodising].freeze
   ENP_VATS = [7, 8].freeze
 
+  # Contract review exemptions. Internal (HASTL's own) work carries no
+  # contract review op by design, and anything numbered before 6000 predates
+  # review-on-record - both are classed as reviewed for the Contract Review
+  # board. ⚠️ Pattern GUESSED - check it against the internal customer's
+  # actual name in the customers table and tighten to an exact match if the
+  # regex is too loose.
+  INTERNAL_CUSTOMER_PATTERN = /\bHASTL\b|hard\s+anodising/i
+  REVIEWED_BEFORE_WO_NUMBER = 5000
+
   ENP_TYPE_LABELS = {
     "high_phosphorous" => "High Phos — Vandalloy 4100",
     "medium_phosphorous" => "Medium Phos — Nicklad 767",
@@ -105,7 +114,7 @@ class ShopSectionBoard
     Rails.cache.fetch(CONTRACT_REVIEW_COUNT_CACHE_KEY, expires_in: 1.hour) do
       scope = WorksOrder.open
                         .with_unreleased_quantity
-                        .includes(:release_notes, :process_group, :part)
+                        .includes(:release_notes, :process_group, :part, customer_order: :customer)
       new(scope).contract_review_queue.size
     end
   end
@@ -312,10 +321,20 @@ class ShopSectionBoard
       cr.present? && (cr["sign_offs"] || {}).key?("wo")
     end
 
-    # Contract Review board membership: never released, review not signed.
-    # (Releases can't exist without a signed review anyway - the empty check
-    # is belt and braces against legacy/paper-era records.)
+    # Classed as reviewed without a signed review op: legacy work (numbered
+    # before the cutoff) and HASTL's own internal jobs. Number check first -
+    # it's a loaded attribute; the customer check walks customer_order ->
+    # customer (preloaded in both board scopes).
+    def review_exempt?
+      return true if number.to_i < REVIEWED_BEFORE_WO_NUMBER
+      customer_name.to_s.match?(INTERNAL_CUSTOMER_PATTERN)
+    end
+
+    # Contract Review board membership: never released, review not signed,
+    # not exempt. (Releases can't exist without a signed review anyway - the
+    # empty check is belt and braces against legacy/paper-era records.)
     def awaiting_contract_review?
+      return false if review_exempt?
       !contract_reviewed? && @wo.release_notes.empty?
     end
 
