@@ -74,29 +74,38 @@ class ShopSectionBoard
   end
 
   # -- Contract Review board -------------------------------------------------
-  # Live work that has never been released and whose contract review is not
-  # yet signed. The review is signed once, on the record owner (a group lead
-  # answers for all its members), so the queue is one row per RECORD - a
-  # member whose lead is unreviewed rides in under the lead, not as its own
-  # row. Unfrozen records have no sign-offs at all, so brand-new work lands
-  # here automatically - this board is the entry gate the jiggers boards
-  # (which require contract_reviewed?) deliberately exclude.
+  # PAPERLESS live work that has never been released and whose contract
+  # review is not yet signed. The paperless gate matters: pre-pilot /
+  # non-paperless WOs complete on their printed route card and never carry a
+  # digital review sign-off, so without it every paper job counts as
+  # "unreviewed" forever. WorksOrder.paperless_ids is the memoised
+  # collection form of paperless_record? (one Part#paperless? per unique
+  # part, not per row).
+  #
+  # The review is signed once, on the record owner (a group lead answers for
+  # all its members), so the queue is one row per RECORD - paperless_ids
+  # already drops grouped members (their record IS the lead's), and the
+  # group_by mops up any residual duplication. Unfrozen records have no
+  # sign-offs at all, so brand-new work lands here automatically - this
+  # board is the entry gate the jiggers boards (which require
+  # contract_reviewed?) deliberately exclude.
   def contract_review_queue
-    pending = @jobs.select(&:awaiting_contract_review?)
+    paperless = WorksOrder.paperless_ids(@jobs.map(&:wo))
+    pending = @jobs.select { |j| paperless.include?(j.wo.id) && j.awaiting_contract_review? }
     pending.group_by { |j| j.wo.process_record_owner.id }
            .map { |owner_id, js| js.find { |j| j.wo.id == owner_id } || js.first }
            .sort_by(&:number)
   end
 
-  # For the navbar badge. Cheap because Job#contract_reviewed? short-circuits
-  # on unfrozen records (no route generation) and frozen ops are a direct
-  # read of the already-loaded JSON. Cached anyway - see WorksOrder's
-  # after_commit :expire_contract_review_count.
+  # For the navbar badge. The cache is load-bearing here: paperless_ids runs
+  # Part#paperless? per unique live part (route generation), so this must
+  # only recompute on bust - see WorksOrder's after_commit
+  # :expire_contract_review_count.
   def self.pending_contract_review_count
     Rails.cache.fetch(CONTRACT_REVIEW_COUNT_CACHE_KEY, expires_in: 1.hour) do
       scope = WorksOrder.open
                         .with_unreleased_quantity
-                        .includes(:release_notes, :process_group)
+                        .includes(:release_notes, :process_group, :part)
       new(scope).contract_review_queue.size
     end
   end

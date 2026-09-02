@@ -30,5 +30,11 @@
 
     <h2 class="text-lg font-bold text-gray-700 mt-8 mb-3">Jigged — ready for the vat</h2>
     <%= render "anodisers", shop: "factory2" %>
+  <% else %>
+    <%# A key in SECTIONS with no branch here would otherwise render a silent
+        blank page. Fail loudly instead. %>
+    <div class="bg-red-50 border border-red-200 rounded-lg p-6 text-red-700 font-medium">
+      Section "<%= @section %>" is routed but has no view branch — add it to sections/show.html.erb.
+    </div>
   <% end %>
 </div>
