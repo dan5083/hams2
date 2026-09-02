@@ -127,6 +127,24 @@
           </dd>
         </div>
 
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Created By</dt>
+          <dd class="text-sm text-gray-900">
+            <%= @customer_order.created_by&.display_name || "—" %>
+            <span class="text-gray-500">on <%= @customer_order.created_at.strftime("%d/%m/%Y %H:%M") %></span>
+          </dd>
+        </div>
+
+        <% if @customer_order.updated_by.present? && @customer_order.updated_at > @customer_order.created_at + 1.minute %>
+          <div>
+            <dt class="text-sm font-medium text-gray-500">Last Updated By</dt>
+            <dd class="text-sm text-gray-900">
+              <%= @customer_order.updated_by.display_name %>
+              <span class="text-gray-500">on <%= @customer_order.updated_at.strftime("%d/%m/%Y %H:%M") %></span>
+            </dd>
+          </div>
+        <% end %>
+
       </dl>
     </div>
 

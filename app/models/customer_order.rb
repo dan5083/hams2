@@ -1,6 +1,8 @@
 # app/models/customer_order.rb - Fixed outstanding logic and auto-marking
 class CustomerOrder < ApplicationRecord
   belongs_to :customer, class_name: 'Organization'
+  belongs_to :created_by, class_name: 'User', optional: true
+  belongs_to :updated_by, class_name: 'User', optional: true
   has_many :works_orders, dependent: :restrict_with_error
   has_many :release_notes, through: :works_orders
 
@@ -23,6 +25,12 @@ class CustomerOrder < ApplicationRecord
 
   after_initialize :set_defaults, if: :new_record?
   after_create :mark_customer_as_customer
+
+  # Audit stamping. Current.user is set per-request by the auth layer; the
+  # guard means console/rake saves keep the last real web user rather than
+  # nulling the stamp out.
+  before_create -> { self.created_by ||= Current.user }
+  before_save   -> { self.updated_by = Current.user if Current.user }
 
   def display_name
     "#{customer.name} - #{number}"
@@ -203,16 +211,22 @@ class CustomerOrder < ApplicationRecord
   # ids that were requested but are no longer bookable (someone released or
   # signed off in between).
   def quick_bookout!(works_order_ids, user)
-    ids     = Array(works_order_ids).map(&:to_i)
+    # UUID primary keys — compare as strings. (map(&:to_i) here previously
+    # truncated "4461ba80-…" to 4461, so no posted id ever matched a
+    # candidate and every bookout reported "no longer bookable".)
+    ids     = Array(works_order_ids).map(&:to_s).reject(&:blank?)
     created = []
     skipped = []
 
     transaction do
       candidates = bookout_candidates
-      requested  = candidates.select { |c| ids.include?(c.works_order.id) }
+      requested  = candidates.select { |c| ids.include?(c.works_order.id.to_s) }
       bookable   = requested.select { |c| c.reason.nil? && c.quantity.positive? }
       skipped    = (requested - bookable).map { |c| c.works_order.display_name }
-      skipped   += (ids - requested.map { |c| c.works_order.id }).map { |id| "WO##{id}" }
+      # Ids posted but not among current candidates (voided/closed/released
+      # since the page loaded). Truncate — a full UUID makes an ugly label.
+      skipped   += (ids - requested.map { |c| c.works_order.id.to_s })
+                     .map { |id| "WO##{id[0, 8]}…" }
 
       bookable.each do |c|
         created << c.works_order.release_notes.create!(

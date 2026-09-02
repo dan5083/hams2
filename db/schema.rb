@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_08_26_193351) do
+ActiveRecord::Schema[8.0].define(version: 2026_09_02_090316) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -91,10 +91,14 @@ ActiveRecord::Schema[8.0].define(version: 2026_08_26_193351) do
     t.integer "open_works_orders_count", default: 0, null: false
     t.integer "fully_released_works_orders_count", default: 0, null: false
     t.integer "uninvoiced_accepted_quantity", default: 0, null: false
+    t.uuid "created_by_id"
+    t.uuid "updated_by_id"
+    t.index ["created_by_id"], name: "index_customer_orders_on_created_by_id"
     t.index ["customer_id"], name: "index_customer_orders_on_customer_id"
     t.index ["date_received"], name: "index_customer_orders_on_date_received"
     t.index ["number"], name: "index_customer_orders_on_number"
     t.index ["open_works_orders_count", "fully_released_works_orders_count", "uninvoiced_accepted_quantity"], name: "index_customer_orders_on_cached_invoice_status"
+    t.index ["updated_by_id"], name: "index_customer_orders_on_updated_by_id"
     t.index ["voided"], name: "index_customer_orders_on_voided"
   end
 
@@ -435,6 +439,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_08_26_193351) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "buyers", "organizations"
   add_foreign_key "customer_orders", "organizations", column: "customer_id"
+  add_foreign_key "customer_orders", "users", column: "created_by_id"
+  add_foreign_key "customer_orders", "users", column: "updated_by_id"
   add_foreign_key "external_ncr_documents", "external_ncrs"
   add_foreign_key "external_ncr_documents", "users", column: "uploaded_by_id"
   add_foreign_key "external_ncr_release_notes", "external_ncrs"
