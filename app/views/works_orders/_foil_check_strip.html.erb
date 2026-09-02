@@ -23,7 +23,7 @@
 <%
   typed_ff    = foil_fields & %w[meter_no foil_value_1 foil_value_2]
   measured_ff = foil_fields & %w[measured_thickness_1 measured_thickness_2]
-  suggestions = foil_fields.index_with { |f| ocv_suggestions(f, op["operation_text"]) }
+  suggestions = typed_ff.index_with { |f| ocv_suggestions(f, op["operation_text"]) }
 %>
 <div data-controller="foil-check" class="bg-white rounded-t-md p-3 border border-b-0 border-gray-200 space-y-2">
   <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600">
@@ -55,20 +55,19 @@
 
   <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600">
     <span class="font-medium text-gray-800">Foil check</span>
+    <%# Meter-fed: the first two readings off the Elcometer land here, so no
+        suggestions dropdown - a suggested value for a measurement invites
+        typing what should be measured. Still keyflow-tagged (the walk pauses
+        here, which IS the "connect the meter" moment) and still manually
+        typeable if a meter is ever offline. %>
     <% measured_ff.each do |ff| %>
       <label class="flex items-center gap-1">
         <%= ff.humanize %>
-        <% sugg = suggestions[ff] %>
         <%= text_field_tag "readings[#{active_key}][#{ff}]", row[ff],
             data: { keyflow: "ocv" },
+            placeholder: "from meter",
             class: "border border-gray-300 rounded px-2 py-1 text-sm w-20",
-            autocomplete: "off",
-            list: (sugg.any? ? "dl-#{position}-#{ff}" : nil) %>
-        <% if sugg.any? %>
-          <datalist id="dl-<%= position %>-<%= ff %>">
-            <% sugg.each do |sv| %><option value="<%= sv %>"></option><% end %>
-          </datalist>
-        <% end %>
+            autocomplete: "off" %>
       </label>
     <% end %>
   </div>
