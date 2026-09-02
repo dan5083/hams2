@@ -21,6 +21,8 @@
     <%= render "jiggers", shop: "shop1" %>
   <% elsif @section == "shop2_jiggers" %>
     <%= render "jiggers", shop: "shop2" %>
+  <% elsif @section == "contract_review" %>
+    <%= render "contract_review" %>
   <% elsif @section == "factory2" %>
     <%# Factory 2 does its own jigging, so it gets both boards on one page. %>
     <h2 class="text-lg font-bold text-gray-700 mb-3">Jigging queue</h2>

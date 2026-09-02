@@ -15,6 +15,10 @@
   mlink_base = "text-white #{nav_hovmob} block px-3 py-2 rounded-md text-base font-medium"
 
   kiosk = Current.user&.kiosk?
+
+  # Contract review notification - Phil, Tariq, Daniel, Nigel only. Cached
+  # class-side, so this is a cache read on most requests.
+  cr_count = Current.user&.sees_contract_review_count? ? ShopSectionBoard.pending_contract_review_count : 0
 %>
 <nav class="<%= nav_bg %> shadow-lg sticky top-0 z-50" data-controller="navbar sub-user">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -32,7 +36,14 @@
         <%= link_to "Home", root_path, class: "#{link_base} #{nav_active if current_page?(root_path)}" %>
         <%= link_to "Customer Orders", customer_orders_path, class: "#{link_base} #{nav_active if current_page?(customer_orders_path)}" %>
         <%= link_to "Works Orders", works_orders_path, class: "#{link_base} #{nav_active if current_page?(works_orders_path)}" %>
-        <%= link_to "Sections", section_path("enp"), class: "#{link_base} #{nav_active if request.path.start_with?("/sections")}" %>
+        <span class="relative inline-flex items-center">
+          <%= link_to "Sections", section_path("enp"), class: "#{link_base} #{nav_active if request.path.start_with?("/sections")}" %>
+          <% if cr_count > 0 %>
+            <%= link_to section_path("contract_review"),
+                  title: "#{cr_count} works #{'order'.pluralize(cr_count)} awaiting contract review",
+                  class: "absolute -top-1 -right-2 min-w-[20px] h-5 px-1 flex items-center justify-center rounded-full bg-red-500 hover:bg-red-600 text-white text-xs font-bold ring-2 ring-white/40" do %><%= cr_count %><% end %>
+          <% end %>
+        </span>
         <%= link_to "Release Notes", release_notes_path, class: "#{link_base} #{nav_active if current_page?(release_notes_path)}" %>
         <%= link_to "Parts", parts_path, class: "#{link_base} #{nav_active if current_page?(parts_path)}" %>
 
@@ -49,6 +60,10 @@
 
       <!-- Mobile menu button -->
       <div class="md:hidden flex items-center">
+        <% if cr_count > 0 %>
+          <%= link_to section_path("contract_review"),
+                class: "mr-1 min-w-[24px] h-6 px-1.5 flex items-center justify-center rounded-full bg-red-500 text-white text-xs font-bold ring-2 ring-white/40" do %><%= cr_count %><% end %>
+        <% end %>
         <button type="button"
                 class="text-white hover:text-white/80 <%= nav_hover %> p-3 rounded-md min-w-[48px] min-h-[48px] flex items-center justify-center"
                 data-action="click->navbar#toggleMenu"
@@ -129,7 +144,12 @@
       <%= link_to "Home", root_path, class: "#{mlink_base} #{nav_amob if current_page?(root_path)}" %>
       <%= link_to "Customer Orders", customer_orders_path, class: "#{mlink_base} #{nav_amob if current_page?(customer_orders_path)}" %>
       <%= link_to "Works Orders", works_orders_path, class: "#{mlink_base} #{nav_amob if current_page?(works_orders_path)}" %>
-      <%= link_to "Sections", section_path("enp"), class: "#{mlink_base} #{nav_amob if request.path.start_with?("/sections")}" %>
+      <%= link_to section_path("enp"), class: "#{mlink_base} #{nav_amob if request.path.start_with?("/sections")} flex items-center justify-between" do %>
+        <span>Sections</span>
+        <% if cr_count > 0 %>
+          <span class="min-w-[24px] h-6 px-1.5 flex items-center justify-center rounded-full bg-red-500 text-white text-xs font-bold"><%= cr_count %></span>
+        <% end %>
+      <% end %>
       <%= link_to "Release Notes", release_notes_path, class: "#{mlink_base} #{nav_amob if current_page?(release_notes_path)}" %>
       <%= link_to "Parts", parts_path, class: "#{mlink_base} #{nav_amob if current_page?(parts_path)}" %>
 

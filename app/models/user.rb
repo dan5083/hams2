@@ -132,6 +132,15 @@ class User < ApplicationRecord
     ])
   end
 
+  def sees_contract_review_count?
+    email_address.in?([
+      'phil@hardanodisingstl.com',     # Phil Bayliss
+      'tariq@hardanodisingstl.com',    # Tariq Anwar
+      'daniel@hardanodisingstl.com',   # Daniel Bayliss
+      'nigel@hardanodisingstl.com'     # Nigel
+    ])
+  end
+
   def can_reissue_documents?
     email_address.in?([
       'quality@hardanodisingstl.com',    # Jim Ledger

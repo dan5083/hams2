@@ -33,7 +33,12 @@ class ShopSectionBoard
     "shop1_jiggers"   => "Shop 1 · Jiggers",
     "shop2_jiggers"   => "Shop 2 · Jiggers",
     "factory2"        => "Factory 2",
+    "contract_review" => "Contract Review",
   }.freeze
+
+  # Navbar badge cache. Busted by WorksOrder's after_commit; the TTL is only
+  # a backstop against a missed invalidation.
+  CONTRACT_REVIEW_COUNT_CACHE_KEY = "sections/contract_review_pending_count".freeze
 
   ANODISING_TYPES = %w[standard_anodising hard_anodising chromic_anodising].freeze
   ENP_VATS = [7, 8].freeze
@@ -65,6 +70,34 @@ class ShopSectionBoard
         jobs: jobs,
         by_pretreat: jobs.group_by(&:enp_pretreat_label).sort.to_h,
       }
+    end
+  end
+
+  # -- Contract Review board -------------------------------------------------
+  # Live work that has never been released and whose contract review is not
+  # yet signed. The review is signed once, on the record owner (a group lead
+  # answers for all its members), so the queue is one row per RECORD - a
+  # member whose lead is unreviewed rides in under the lead, not as its own
+  # row. Unfrozen records have no sign-offs at all, so brand-new work lands
+  # here automatically - this board is the entry gate the jiggers boards
+  # (which require contract_reviewed?) deliberately exclude.
+  def contract_review_queue
+    pending = @jobs.select(&:awaiting_contract_review?)
+    pending.group_by { |j| j.wo.process_record_owner.id }
+           .map { |owner_id, js| js.find { |j| j.wo.id == owner_id } || js.first }
+           .sort_by(&:number)
+  end
+
+  # For the navbar badge. Cheap because Job#contract_reviewed? short-circuits
+  # on unfrozen records (no route generation) and frozen ops are a direct
+  # read of the already-loaded JSON. Cached anyway - see WorksOrder's
+  # after_commit :expire_contract_review_count.
+  def self.pending_contract_review_count
+    Rails.cache.fetch(CONTRACT_REVIEW_COUNT_CACHE_KEY, expires_in: 1.hour) do
+      scope = WorksOrder.open
+                        .with_unreleased_quantity
+                        .includes(:release_notes, :process_group)
+      new(scope).contract_review_queue.size
     end
   end
 
@@ -261,8 +294,20 @@ class ShopSectionBoard
     # a jiggers board until it's signed - an unfrozen record has no
     # sign-offs, so unreviewed work stays off the boards automatically.
     def contract_reviewed?
+      # The first write to a record freezes it, so an unfrozen record cannot
+      # carry a signed review. Bailing out here also keeps this cheap for the
+      # navbar count: it avoids operations_for_display regenerating the live
+      # route from the part for every unfrozen WO.
+      return false unless frozen?
       cr = ops.find { |o| o["process_type"] == "contract_review" || o["id"] == "CONTRACT_REVIEW" }
       cr.present? && (cr["sign_offs"] || {}).key?("wo")
+    end
+
+    # Contract Review board membership: never released, review not signed.
+    # (Releases can't exist without a signed review anyway - the empty check
+    # is belt and braces against legacy/paper-era records.)
+    def awaiting_contract_review?
+      !contract_reviewed? && @wo.release_notes.empty?
     end
 
     def jig_queue_rows(shop_vats)

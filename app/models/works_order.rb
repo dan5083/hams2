@@ -63,6 +63,12 @@ class WorksOrder < ApplicationRecord
   # NEW: Counter cache callbacks
   after_save :update_is_fully_released_flag
   after_save :update_customer_order_counts, if: :saved_change_to_quantity_released_or_voided_or_is_open?
+
+  # Navbar contract-review badge (ShopSectionBoard.pending_contract_review_count)
+  # is cached; any WO commit can change it (new WO, review signed via
+  # customised_process_data, void, close, release), so bust unconditionally -
+  # a cache delete is far cheaper than being clever about which change matters.
+  after_commit :expire_contract_review_count
   after_destroy :update_customer_order_counts
 
   def display_name
@@ -1233,6 +1239,10 @@ class WorksOrder < ApplicationRecord
   end
 
   private
+
+  def expire_contract_review_count
+    Rails.cache.delete(ShopSectionBoard::CONTRACT_REVIEW_COUNT_CACHE_KEY)
+  end
 
   def operation_snapshot(op, position)
     ocv = op.try(:ocv)
