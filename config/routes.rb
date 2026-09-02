@@ -247,9 +247,9 @@ Rails.application.routes.draw do
   # Vat Stations
   get "vat-station", to: "vat_station#show", as: :vat_station
 
-  # Shop-floor section boards (ENP, anodisers, jiggers, Factory 2)
+  # Shop-floor section boards (ENP, anodisers, jiggers, Factory 2, contract review)
   get "sections/:section", to: "sections#show", as: :section,
-      constraints: { section: /enp|shop1_anodisers|shop2_anodisers|shop1_jiggers|shop2_jiggers|factory2/ }
+      constraints: { section: /enp|shop1_anodisers|shop2_anodisers|shop1_jiggers|shop2_jiggers|factory2|contract_review/ }
 
   # Artifacts management
   get 'artifacts', to: 'artifacts#index'
