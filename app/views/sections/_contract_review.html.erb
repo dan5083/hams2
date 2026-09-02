@@ -1,0 +1,75 @@
+<%# app/views/sections/_contract_review.html.erb
+    Live work that has never been released and whose contract review is not
+    yet signed. One row per process RECORD - a group lead answers for its
+    members, so a group appears once (under its lead) however many members
+    it has. This is also where brand-new, not-yet-frozen work first
+    surfaces: nothing hits a jiggers board until the review is signed. %>
+<% rows = @board.contract_review_queue %>
+
+<% if rows.empty? %>
+  <div class="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+    Nothing awaiting contract review.
+  </div>
+<% else %>
+  <!-- Desktop -->
+  <div class="hidden lg:block bg-white shadow overflow-hidden sm:rounded-lg">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <% %w[WO Part Qty Booked Record].each do |h| %>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"><%= h %></th>
+          <% end %>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        <% rows.each do |job| %>
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 whitespace-nowrap">
+              <%= link_to job.display_name, works_order_path(job.wo), class: "font-bold text-blue-700 hover:underline" %>
+              <% if job.wo.grouped? %>
+                <div class="text-xs text-gray-400">Group <%= job.wo.process_group.display_name %></div>
+              <% end %>
+            </td>
+            <td class="px-4 py-3">
+              <div class="text-sm text-gray-900"><%= job.part_number %></div>
+              <div class="text-xs text-gray-400"><%= job.customer_name %></div>
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900"><%= job.quantity %></td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700"><%= job.wo.created_at&.strftime("%d %b %Y") %></td>
+            <td class="px-4 py-3 whitespace-nowrap">
+              <% if job.frozen? %>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">Started — review unsigned</span>
+              <% else %>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800">Not reviewed</span>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Mobile cards -->
+  <div class="lg:hidden space-y-3">
+    <% rows.each do |job| %>
+      <%= link_to works_order_path(job.wo), class: "block bg-white rounded-lg shadow p-4" do %>
+        <div class="flex justify-between items-baseline">
+          <span class="font-bold text-blue-700"><%= job.display_name %></span>
+          <span class="text-sm font-bold text-gray-900">Qty <%= job.quantity %></span>
+        </div>
+        <div class="text-sm text-gray-700 mt-1"><%= job.part_number %> · <%= job.customer_name %></div>
+        <% if job.wo.grouped? %>
+          <div class="text-xs text-gray-400 mt-0.5">Group <%= job.wo.process_group.display_name %></div>
+        <% end %>
+        <div class="flex justify-between items-center mt-2">
+          <% if job.frozen? %>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">Started — review unsigned</span>
+          <% else %>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800">Not reviewed</span>
+          <% end %>
+          <span class="text-xs text-gray-500"><%= job.wo.created_at&.strftime("%d %b %Y") %></span>
+        </div>
+      <% end %>
+    <% end %>
+  </div>
+<% end %>
