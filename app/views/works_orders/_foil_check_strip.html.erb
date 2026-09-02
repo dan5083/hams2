@@ -46,12 +46,15 @@
     <% end %>
   </div>
 
+  <p class="text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-900">
+    <span class="font-semibold">Calibrate before connecting.</span>
+    With the USB unplugged, calibrate the Elcometer against the foils.
+    When happy the difference reads under 5%, plug in and connect the device,
+    measure both foils, then the work / test pieces.
+  </p>
+
   <%= render "works_orders/elcometer_toolbar" unless @elcometer_toolbar_rendered %>
   <% @elcometer_toolbar_rendered = true %>
-  <p class="text-xs text-gray-500">
-    When happy with calibration, connect the Elcometer — the first two readings
-    land in the foil checks below, then roll into the film readings.
-  </p>
 
   <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600">
     <span class="font-medium text-gray-800">Foil check</span>
@@ -71,4 +74,8 @@
       </label>
     <% end %>
   </div>
+  <%# Filled by foil_check_controller when a measured value sits more than 5%
+      off its calibrated foil - advisory, never blocking: the out-of-window
+      reading is exactly the one that must be recorded and investigated. %>
+  <p data-foil-check-target="warning" class="hidden text-xs px-3 py-2 rounded border border-red-300 bg-red-50 text-red-800"></p>
 </div>

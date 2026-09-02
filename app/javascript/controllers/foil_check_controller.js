@@ -22,14 +22,24 @@ import { Controller } from "@hotwired/stimulus"
 const FIELDS = ["measured_thickness_1", "measured_thickness_2"]
 const TYPED_FIELDS = ["meter_no", "foil_value_1", "foil_value_2"]
 
+// Advisory deviation limit for measured-vs-foil: matches the 5% window the
+// calibration procedure works to (and MEASURED_WINDOW in FoilVerification).
+const DEVIATION_LIMIT = 0.05
+
 export default class extends Controller {
+  static targets = ["warning"]
+
   connect() {
     this.session = null
     this.registerWithSession()
     this._onFocus = () => this.session && this.session.setPreferred(this)
-    this._onInput = () => this.session && this.session.refresh()
+    this._onInput = () => {
+      if (this.session) this.session.refresh()
+      this.checkDeviation()
+    }
     this.element.addEventListener("focusin", this._onFocus)
     this.element.addEventListener("input", this._onInput)
+    this.checkDeviation() // saved rows re-render with their values in place
   }
 
   disconnect() {
@@ -101,6 +111,40 @@ export default class extends Controller {
     input.classList.add("ring-2", "ring-blue-400")
     setTimeout(() => input.classList.remove("ring-2", "ring-blue-400"), 300)
     if (this.session) this.session.refresh()
+    this.checkDeviation()
     return true
+  }
+
+  // ── Calibration deviation check ──────────────────────────────────────────
+  //
+  // Compares each measured foil check against its calibrated foil value and
+  // flags any pair more than DEVIATION_LIMIT off: red field + a message
+  // naming the pair and the percentage. Advisory only - nothing is blocked,
+  // because an out-of-window reading is exactly the one that must be
+  // recorded and investigated, per the foil library's doctrine.
+
+  checkDeviation() {
+    const problems = []
+    ;[1, 2].forEach((i) => {
+      const foil = this.element.querySelector(`input[name$="[foil_value_${i}]"]`)
+      const measured = this.element.querySelector(`input[name$="[measured_thickness_${i}]"]`)
+      if (!foil || !measured) return
+      const f = parseFloat(foil.value)
+      const m = parseFloat(measured.value)
+      const comparable = f > 0 && measured.value.trim() !== "" && !isNaN(m)
+      const deviation = comparable ? Math.abs(m - f) / f : 0
+      const bad = comparable && deviation > DEVIATION_LIMIT
+      measured.classList.toggle("border-red-500", bad)
+      measured.classList.toggle("bg-red-50", bad)
+      if (bad) problems.push(`Foil ${i}: ${m} µm is ${(deviation * 100).toFixed(1)}% off the ${f} µm foil`)
+    })
+    if (!this.hasWarningTarget) return
+    if (problems.length) {
+      this.warningTarget.textContent =
+        `${problems.join(" · ")} — over the 5% calibration limit. Recalibrate and re-check before measuring the work.`
+      this.warningTarget.classList.remove("hidden")
+    } else {
+      this.warningTarget.classList.add("hidden")
+    }
   }
 }
