@@ -56,6 +56,12 @@ module ApplicationHelper
       OperationLibrary::FoilVerification.measured_thickness_suggestions
     when "film_thickness"
       film_thickness_suggestions(text)
+    # Pass/fail checks (water break etc; "result" is the copied-op fallback
+    # name). PASS first: the keyflow dropdown pre-highlights the middle
+    # option, and the middle of a 2-item list is index 0 - so the passing
+    # case is a single Enter, while FAIL stays one arrow away.
+    when "pass_fail", "result"
+      %w[PASS FAIL]
     else
       []
     end
@@ -124,12 +130,21 @@ module ApplicationHelper
   # Bare grammar (standard / hard anodise):
   #   "16V over 30 minutes"        -> hold 16 for 30
   #   "0-45V over 40 minutes"      -> ramp 0->45 over 40
-  # Hand-edited ops also write ranges as "25V→56V", "25V to 56V", or with
-  # en/em dashes, optionally with a unit on the from-value; all of these
-  # parse as ramps. "to" as a separator is safe against e.g. "2 to 5°C" in
-  # the same sentence because the to-value must be immediately followed by V.
-  # Texts stating no voltage yield no segments and therefore no suggestions.
-  VOLT_RANGE_SEP = /\s*(?:-|–|—|→|to)\s*/i
+  # Hand-edited ops also write ranges as "25V→56V", "25V↗️60V", "25V->60V",
+  # "25V to 56V", "up to", or with en/em dashes, optionally with a unit on
+  # the from-value; all of these parse as ramps. The character class covers
+  # the Unicode arrow blocks (plus dingbat/supplemental arrows and an
+  # optional emoji variation selector) so whatever arrow the office types
+  # into an op still reads as a ramp. "to" as a separator is safe against
+  # e.g. "2 to 5°C" in the same sentence because the to-value must be
+  # immediately followed by V. Texts stating no voltage yield no segments
+  # and therefore no suggestions.
+  #
+  # An unrecognised separator here is worse than a parse failure: the bare
+  # fallback in voltage_segments then matches "25V ... over 30 min" WITHOUT
+  # the to-value and reads the whole cycle as a hold at the start voltage,
+  # so every checkpoint suggests the same flat window.
+  VOLT_RANGE_SEP = /\s*(?:->|=>|(?:up\s+)?to|[-\u2013\u2014\u2190-\u21FF\u2900-\u297F\u2B00-\u2BFF\u27F0-\u27FF][\uFE0E\uFE0F]?)\s*/i
 
   def voltage_segments(text)
     segs = text.to_s.scan(

@@ -10,7 +10,8 @@ module OperationLibrary
           operation_text: '**Water-break test** - Check all areas (including holes and jigging locations) for signs of water-breaking after 30 seconds. If fail: repeat degrease once and retest. If fail twice: put works on hold in clean swill and inform company director.',
           ocv: OcvSpecs.fields(:pass_fail, :first_failure_detail,
                                basis: :nadcap,
-                               required_if: { first_failure_detail: { pass_fail: "FAIL" } })
+                               required_if: { first_failure_detail: { pass_fail: "FAIL" } },
+                               blank_as: { first_failure_detail: "N/A" })
         )
       ]
     end

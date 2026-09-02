@@ -1,0 +1,75 @@
+<%#
+  app/views/works_orders/_foil_check_strip.html.erb
+
+  Foil verification strip - the head of the film thickness card, rendered
+  once by _film_thickness_field for whichever anodic branch is active.
+
+  Laid out in the physical working order:
+    1. Calibrate  - meter no + both foil values, typed (datalist suggestions
+                    from FoilVerification). These GATE the sink: the
+                    foil-check controller refuses meter readings until all
+                    three are recorded, so the session can't jump the queue.
+    2. Connect    - the shared Elcometer toolbar (first render on the page)
+                    with the instruction to connect once happy.
+    3. Foil check - measured_thickness_1/2, fed by the meter (or typed);
+                    the stream then rolls into the film readings below.
+
+  The foil-check controller wraps the whole strip (typed + measured fields)
+  and remains a sibling of the film card, never an ancestor - see the note
+  in foil_check_controller.js.
+
+  Locals: foil_fields, active_key, row, position, op
+%>
+<%
+  typed_ff    = foil_fields & %w[meter_no foil_value_1 foil_value_2]
+  measured_ff = foil_fields & %w[measured_thickness_1 measured_thickness_2]
+  suggestions = foil_fields.index_with { |f| ocv_suggestions(f, op["operation_text"]) }
+%>
+<div data-controller="foil-check" class="bg-white rounded-t-md p-3 border border-b-0 border-gray-200 space-y-2">
+  <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600">
+    <span class="font-medium text-gray-800">Calibrate</span>
+    <% typed_ff.each do |ff| %>
+      <label class="flex items-center gap-1">
+        <%= ff.humanize %>
+        <% sugg = suggestions[ff] %>
+        <%= text_field_tag "readings[#{active_key}][#{ff}]", row[ff],
+            data: { keyflow: "ocv" },
+            class: "border border-gray-300 rounded px-2 py-1 text-sm w-20",
+            autocomplete: "off",
+            list: (sugg.any? ? "dl-#{position}-#{ff}" : nil) %>
+        <% if sugg.any? %>
+          <datalist id="dl-<%= position %>-<%= ff %>">
+            <% sugg.each do |sv| %><option value="<%= sv %>"></option><% end %>
+          </datalist>
+        <% end %>
+      </label>
+    <% end %>
+  </div>
+
+  <%= render "works_orders/elcometer_toolbar" unless @elcometer_toolbar_rendered %>
+  <% @elcometer_toolbar_rendered = true %>
+  <p class="text-xs text-gray-500">
+    When happy with calibration, connect the Elcometer — the first two readings
+    land in the foil checks below, then roll into the film readings.
+  </p>
+
+  <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600">
+    <span class="font-medium text-gray-800">Foil check</span>
+    <% measured_ff.each do |ff| %>
+      <label class="flex items-center gap-1">
+        <%= ff.humanize %>
+        <% sugg = suggestions[ff] %>
+        <%= text_field_tag "readings[#{active_key}][#{ff}]", row[ff],
+            data: { keyflow: "ocv" },
+            class: "border border-gray-300 rounded px-2 py-1 text-sm w-20",
+            autocomplete: "off",
+            list: (sugg.any? ? "dl-#{position}-#{ff}" : nil) %>
+        <% if sugg.any? %>
+          <datalist id="dl-<%= position %>-<%= ff %>">
+            <% sugg.each do |sv| %><option value="<%= sv %>"></option><% end %>
+          </datalist>
+        <% end %>
+      </label>
+    <% end %>
+  </div>
+</div>

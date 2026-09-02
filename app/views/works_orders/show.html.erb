@@ -755,27 +755,34 @@
                                 <% end %>
                                 <% fields.each do |field| %>
                                   <% next if field == thickness_field || foil_fields.include?(field) %>
+                                  <%
+                                    # required_if-gated fields (e.g. first_failure_detail on a
+                                    # water break) render disabled until their trigger row value
+                                    # is present, so the Enter-walk and the form both skip them;
+                                    # blank_as stamps the frozen record at sign-off. The keyflow
+                                    # JS re-evaluates data-gated-by live as values change.
+                                    # pass_fail/result now go through the same text+suggestions
+                                    # path as everything else: the keyflow dropdown pre-highlights
+                                    # the middle option, and for the 2-item PASS/FAIL list the
+                                    # middle IS index 0 - PASS - so Enter accepts it in one press.
+                                    req_if = op.dig("ocv", "required_if")&.dig(field)
+                                    gated  = req_if.present? && req_if.none? { |f, v|
+                                      Array(v).map { |x| x.to_s.strip.upcase }.include?(row[f].to_s.strip.upcase)
+                                    }
+                                  %>
                                   <label class="flex items-center gap-1 text-xs text-gray-600">
                                     <%= field.humanize %>
-                                    <% if field.include?("pass_fail") %>
-                                      <%= select_tag "readings[#{active_key}][#{field}]",
-                                          options_for_select(["", "PASS", "FAIL"], row[field]),
-                                          disabled: locked,
-                                          data: { keyflow: "ocv" },
-                                          class: "border border-gray-300 rounded px-1 py-1 text-sm #{'bg-gray-100 text-gray-500' if locked}" %>
-                                    <% else %>
-                                      <% sugg = suggestions[field] %>
-                                      <%= text_field_tag "readings[#{active_key}][#{field}]", row[field],
-                                          disabled: locked,
-                                          data: { keyflow: "ocv" },
-                                          class: "border border-gray-300 rounded px-2 py-1 text-sm w-24 #{'bg-gray-100 text-gray-500' if locked}",
-                                          autocomplete: "off",
-                                          list: (sugg.any? ? "dl-#{position}-#{field}" : nil) %>
-                                      <% if sugg.any? %>
-                                        <datalist id="dl-<%= position %>-<%= field %>">
-                                          <% sugg.each do |s| %><option value="<%= s %>"></option><% end %>
-                                        </datalist>
-                                      <% end %>
+                                    <% sugg = suggestions[field] %>
+                                    <%= text_field_tag "readings[#{active_key}][#{field}]", row[field],
+                                        disabled: locked || gated,
+                                        data: { keyflow: "ocv", gated_by: (req_if&.to_json unless locked) },
+                                        class: "border border-gray-300 rounded px-2 py-1 text-sm w-24 #{'bg-gray-100 text-gray-500' if locked || gated}",
+                                        autocomplete: "off",
+                                        list: (sugg.any? ? "dl-#{position}-#{field}" : nil) %>
+                                    <% if sugg.any? %>
+                                      <datalist id="dl-<%= position %>-<%= field %>">
+                                        <% sugg.each do |s| %><option value="<%= s %>"></option><% end %>
+                                      </datalist>
                                     <% end %>
                                   </label>
                                 <% end %>
@@ -1154,6 +1161,27 @@
     var empty = ocvFields(row).filter(function (f) { return !f.value; })[0];
     return empty || row.querySelector('[data-keyflow="signoff"]:not([disabled])');
   }
+  // required_if fields (data-gated-by, server-rendered only on unlocked rows)
+  // stay disabled - invisible to the walk, absent from the POST, stamped by
+  // blank_as at sign-off - until their trigger value is present in the row.
+  // Re-evaluated whenever a row value changes by any route (typed, dropdown
+  // Enter, dropdown click), mirroring the server's case-insensitive match.
+  function refreshGates(row) {
+    if (!row) return;
+    Array.prototype.forEach.call(row.querySelectorAll('[data-gated-by]'), function (el) {
+      var conds;
+      try { conds = JSON.parse(el.dataset.gatedBy); } catch (e) { return; }
+      var met = Object.keys(conds).some(function (f) {
+        var other = row.querySelector('[name$="[' + f + ']"]');
+        if (!other) return false;
+        var vals = [].concat(conds[f]).map(function (v) { return String(v).trim().toUpperCase(); });
+        return vals.indexOf(other.value.trim().toUpperCase()) !== -1;
+      });
+      el.disabled = !met;
+      el.classList.toggle('bg-gray-100', !met);
+      el.classList.toggle('text-gray-500', !met);
+    });
+  }
   function ring(row) {
     Array.prototype.forEach.call(document.querySelectorAll("[id^='op-']"), function (r) {
       r.classList.remove('ring-2', 'ring-blue-500', 'shadow-lg');
@@ -1162,11 +1190,15 @@
     });
     if (row) row.classList.add('ring-2', 'ring-blue-500', 'shadow-lg');
   }
-  function focusStation(el, center) {
+  // Centre the STATION ELEMENT, not the row: rows with film cards are tall,
+  // and 'nearest' on a below-the-fold row parks the focused input on the
+  // bottom edge with the suggestions dropdown off-screen. Centring the input
+  // guarantees ~half a viewport below it - the dropdown (max-h-64) always fits.
+  function focusStation(el) {
     if (!el) return;
     el.focus({ preventScroll: true });
-    var row = el.closest("[id^='op-']");
-    if (row) { row.scrollIntoView({ block: center ? 'center' : 'nearest' }); ring(row); }
+    ring(el.closest("[id^='op-']"));
+    el.scrollIntoView({ block: 'center' });
   }
   // One-time coaching banner: server renders #keyflow-hint (hidden) on every
   // paperless card. Slot it into the top of the first focused op and reveal
@@ -1193,7 +1225,7 @@
   });
   function focusFirst() {
     var r = rows();
-    if (r.length) { placeHint(r[0]); focusStation(stationFor(r[0]), false); return; }
+    if (r.length) { placeHint(r[0]); focusStation(stationFor(r[0])); return; }
     // Nothing signable, but ops are waiting on batch quantities - exactly
     // the state after the two WO-scoped ops on a fresh works order. Send
     // the operator to batching; the reload after "Set batches" walks
@@ -1208,7 +1240,7 @@
     var row = fromEl.closest("[id^='op-']");
     var i = r.indexOf(row);
     var next = r[i + dir] || (i === -1 && dir === 1 ? r[0] : null);
-    if (next) focusStation(stationFor(next), true);
+    if (next) focusStation(stationFor(next));
   }
 
   // ---- Custom suggestion dropdown -----------------------------------------
@@ -1256,6 +1288,7 @@
         e.preventDefault(); // keep focus on the input
         input.value = it.v;
         closeDD();
+        refreshGates(input.closest("[id^='op-']"));
       });
       dd.appendChild(row);
     });
@@ -1284,6 +1317,7 @@
   function advance(t) {
     if (!t.value) { if (t.__sugg) openDD(t); return; } // nothing to accept - reopen and stay
     var row = t.closest("[id^='op-']");
+    refreshGates(row); // e.g. accepting FAIL enables first_failure_detail before the walk looks
     var nextEmpty = ocvFields(row).filter(function (f) { return f !== t && !f.value; })[0];
     if (nextEmpty) { nextEmpty.focus({ preventScroll: true }); return; }
     var btn = row.querySelector('[data-keyflow="signoff"]:not([disabled])');
@@ -1331,7 +1365,9 @@
 
   document.addEventListener('input', function (e) {
     var t = e.target;
-    if (t && t.dataset && t.dataset.keyflow === 'ocv' && t.__sugg) openDD(t, t.value);
+    if (!t || !t.dataset || t.dataset.keyflow !== 'ocv') return;
+    if (t.__sugg) openDD(t, t.value);
+    refreshGates(t.closest("[id^='op-']"));
   });
 
   // Parts-per-batch suggestions: the full quantity (one batch of the lot)
@@ -1387,7 +1423,7 @@
     })[0];
     if (!target) return;
     e.preventDefault(); // beat the blur-to-body, keep the station focus clean
-    focusStation(stationFor(target), false);
+    focusStation(stationFor(target));
   });
   document.addEventListener('focusout', function (e) {
     if (ddFor && e.target === ddFor) {

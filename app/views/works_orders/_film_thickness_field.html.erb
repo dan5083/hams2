@@ -138,35 +138,11 @@
         who want their own readings on their own release note ─────────── %>
 
 <% if foil_fields.any? && !locked %>
-  <%# Foil verification strip - the head of the film thickness card. The
-      shared Elcometer toolbar lives here; the foil-check controller is a
-      sink, so the first readings off the meter land in the measured boxes,
-      then the stream rolls into the film readings below. Meter no and the
-      foil values are typed (datalist suggestions from FoilVerification). %>
-  <div data-controller="foil-check" class="bg-white rounded-t-md p-3 border border-b-0 border-gray-200">
-    <%= render "works_orders/elcometer_toolbar" unless @elcometer_toolbar_rendered %>
-    <% @elcometer_toolbar_rendered = true %>
-    <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600">
-      <span class="font-medium text-gray-800">Foil check</span>
-      <% suggestions = foil_fields.index_with { |f| ocv_suggestions(f, op["operation_text"]) } %>
-      <% foil_fields.each do |ff| %>
-        <label class="flex items-center gap-1">
-          <%= ff.humanize %>
-          <% sugg = suggestions[ff] %>
-          <%= text_field_tag "readings[#{active_key}][#{ff}]", row[ff],
-              data: { keyflow: "ocv" },
-              class: "border border-gray-300 rounded px-2 py-1 text-sm w-20",
-              autocomplete: "off",
-              list: (sugg.any? ? "dl-#{position}-#{ff}" : nil) %>
-          <% if sugg.any? %>
-            <datalist id="dl-<%= position %>-<%= ff %>">
-              <% sugg.each do |sv| %><option value="<%= sv %>"></option><% end %>
-            </datalist>
-          <% end %>
-        </label>
-      <% end %>
-    </div>
-  </div>
+  <%# Foil verification strip (calibrate -> connect -> foil check) - shared
+      partial so both anodic branches render the identical strip. %>
+  <%= render "works_orders/foil_check_strip",
+      foil_fields: foil_fields, active_key: active_key, row: row,
+      position: position, op: op %>
 <% end %>
     <div data-controller="nadcap-sampling"
          data-nadcap-sampling-treatment-id-value="<%= tid %>"
@@ -210,35 +186,11 @@
     <% readings = FilmThickness.readings_from(raw) %>
 
 <% if foil_fields.any? && !locked %>
-  <%# Foil verification strip - the head of the film thickness card. The
-      shared Elcometer toolbar lives here; the foil-check controller is a
-      sink, so the first readings off the meter land in the measured boxes,
-      then the stream rolls into the film readings below. Meter no and the
-      foil values are typed (datalist suggestions from FoilVerification). %>
-  <div data-controller="foil-check" class="bg-white rounded-t-md p-3 border border-b-0 border-gray-200">
-    <%= render "works_orders/elcometer_toolbar" unless @elcometer_toolbar_rendered %>
-    <% @elcometer_toolbar_rendered = true %>
-    <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600">
-      <span class="font-medium text-gray-800">Foil check</span>
-      <% suggestions = foil_fields.index_with { |f| ocv_suggestions(f, op["operation_text"]) } %>
-      <% foil_fields.each do |ff| %>
-        <label class="flex items-center gap-1">
-          <%= ff.humanize %>
-          <% sugg = suggestions[ff] %>
-          <%= text_field_tag "readings[#{active_key}][#{ff}]", row[ff],
-              data: { keyflow: "ocv" },
-              class: "border border-gray-300 rounded px-2 py-1 text-sm w-20",
-              autocomplete: "off",
-              list: (sugg.any? ? "dl-#{position}-#{ff}" : nil) %>
-          <% if sugg.any? %>
-            <datalist id="dl-<%= position %>-<%= ff %>">
-              <% sugg.each do |sv| %><option value="<%= sv %>"></option><% end %>
-            </datalist>
-          <% end %>
-        </label>
-      <% end %>
-    </div>
-  </div>
+  <%# Foil verification strip (calibrate -> connect -> foil check) - shared
+      partial so both anodic branches render the identical strip. %>
+  <%= render "works_orders/foil_check_strip",
+      foil_fields: foil_fields, active_key: active_key, row: row,
+      position: position, op: op %>
 <% end %>
     <div data-controller="elcometer"
          data-elcometer-treatment-id-value="<%= tid %>"

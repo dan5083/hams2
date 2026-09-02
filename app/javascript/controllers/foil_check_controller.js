@@ -3,17 +3,24 @@
 // Makes the foil verification CHECK inputs (measured_thickness_1/2 - the
 // meter read against the calibrated foils) a sink on the shared
 // elcometer-session, so the same connection fills them before the film
-// readings. Attached to the plain-fields row of the foil op ONLY (never an
+// readings. Attached to the foil strip of the foil op ONLY (never an
 // ancestor of the film card, or its focusin would steal the card's
 // preferred-target clicks).
 //
 // Document order puts this sink before the film card in the same op, so
 // auto-routing does the physical sequence: foil check x2, then the film set.
-// meter_no / foil_value_1/2 are typed (datalist) fields and are not touched.
+// meter_no / foil_value_1/2 are typed (datalist) fields and are not touched -
+// but they GATE the sink: until all three are recorded, acceptsReadings() is
+// false and the session will not route meter readings into the check slots.
+// That enforces the physical order (type calibration data, connect when
+// happy, then measure) regardless of what the operator clicks first. The
+// strip's own input listener refreshes the session, so the sink lights up
+// the moment foil_value_2 is typed.
 
 import { Controller } from "@hotwired/stimulus"
 
 const FIELDS = ["measured_thickness_1", "measured_thickness_2"]
+const TYPED_FIELDS = ["meter_no", "foil_value_1", "foil_value_2"]
 
 export default class extends Controller {
   connect() {
@@ -56,11 +63,21 @@ export default class extends Controller {
 
   emptyInputs() { return this.inputs().filter((i) => !i.value) }
 
+  // Calibration data (meter identity + both foil values) typed yet?
+  typedComplete() {
+    return TYPED_FIELDS.every((f) => {
+      const el = this.element.querySelector(`input[name$="[${f}]"]`)
+      return el && el.value.trim() !== ""
+    })
+  }
+
   isActive() { return this.element.offsetParent !== null && this.inputs().length > 0 }
 
   sinkLabel() { return "Foil verification check" }
 
-  acceptsReadings() { return this.isActive() && this.emptyInputs().length > 0 }
+  acceptsReadings() {
+    return this.isActive() && this.typedComplete() && this.emptyInputs().length > 0
+  }
 
   isComplete() { return this.isActive() && this.emptyInputs().length === 0 }
 
@@ -77,6 +94,7 @@ export default class extends Controller {
   }
 
   acceptReading(value) {
+    if (!this.acceptsReadings()) return false
     const input = this.emptyInputs()[0]
     if (!input) return false
     input.value = value
