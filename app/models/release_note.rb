@@ -868,7 +868,11 @@ class ReleaseNote < ApplicationRecord
   # count as released - they went through the tanks regardless.
   # ---------------------------------------------------------------------------
   def validate_process_record_coverage
-    return unless works_order&.paperless_record?
+    # Resolve through the record owner: a grouped member's own
+    # paperless_record? is false (UI gate), but its releases still draw down
+    # the lead's record - the coverage rule applies to every member.
+    owner = works_order&.process_record_owner
+    return unless owner&.paperless_record?
     certified = works_order.signed_off_quantity
     released  = works_order.released_quantity_against_record(except: self) + total_quantity
     return if certified >= released
@@ -876,7 +880,7 @@ class ReleaseNote < ApplicationRecord
     errors.add(:base,
       "The process record certifies #{certified} part(s) end to end, but #{released} would have " \
       "been released against it. Sign off the remaining operation(s)/batch(es) on " \
-      "WO#{works_order.number}#{works_order.grouped? ? "'s process record" : ''} before releasing.")
+      "WO#{owner.number}#{works_order.grouped? ? " (#{works_order.process_group.display_name})" : ''} before releasing.")
   end
 
   def update_works_order_quantity_released

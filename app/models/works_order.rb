@@ -858,12 +858,17 @@ class WorksOrder < ApplicationRecord
   # rows it certifies and reads the readings from here.
 
   # True when this WO's thickness is recorded in-line rather than on the RN
-  # form. Requires a paperless record whose operations actually carry the
-  # field - a WO frozen before the field existed keeps the RN form, so
-  # in-flight work is never stranded between the two mechanisms.
+  # form. This is a DATA-MECHANISM gate, so it resolves through the record
+  # owner: a grouped member's paperless_record? is deliberately false (its
+  # page renders no record UI), but its thickness still lives in-line on the
+  # lead's record - the member's release notes must reference it, not demand
+  # manual entry. Requires the owner's record to actually carry the field -
+  # a WO frozen before the field existed keeps the RN form, so in-flight
+  # work is never stranded between the two mechanisms.
   def inline_thickness_record?
-    return false unless aerospace_defense? && paperless_record?
-    process_record_owner.film_thickness_ops.any?
+    return false unless aerospace_defense?
+    owner = process_record_owner
+    owner.paperless_record? && owner.film_thickness_ops.any?
   end
 
   # Customers who need their own 8 readings on their own release note even
