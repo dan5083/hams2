@@ -1,6 +1,13 @@
 // app/javascript/controllers/ai_assistant_controller.js
 import { Controller } from "@hotwired/stimulus"
 
+// Photographed POs come off a phone at 4000×3000 and 5–15 MB. That blows
+// Cloudinary's 10 MB upload cap, costs vision tokens for pixels that carry no
+// information, and makes every subsequent turn re-send the same base64.
+// Anything above this long-edge is downscaled to a JPEG before it goes anywhere.
+const IMAGE_MAX_EDGE = 2000
+const IMAGE_JPEG_QUALITY = 0.82
+
 export default class extends Controller {
   static targets = ["panel", "input", "messages", "button", "sendBtn", "spinner", "fileInput", "filePreview", "resizeHandle"]
 
@@ -101,17 +108,90 @@ export default class extends Controller {
         this.addMessage("error", `${file.name}: Only images (JPEG, PNG, GIF, WEBP) and PDFs are supported.`)
         continue
       }
-      if (file.size > 10 * 1024 * 1024) {
-        this.addMessage("error", `${file.name}: File too large — maximum 10MB.`)
+
+      // PDFs go through untouched — the size cap applies to them as-is.
+      if (file.type === "application/pdf") {
+        if (file.size > 10 * 1024 * 1024) {
+          this.addMessage("error", `${file.name}: File too large — maximum 10MB.`)
+          continue
+        }
+        const base64 = await this.readFileAsBase64(file)
+        this.pendingFiles.push({ base64, mediaType: file.type, name: file.name })
         continue
       }
 
-      const base64 = await this.readFileAsBase64(file)
-      this.pendingFiles.push({ base64, mediaType: file.type, name: file.name })
+      // Images are downscaled first, then size-checked. A phone photo of a PO
+      // is 5–15 MB raw and well under 1 MB after this, so the cap should only
+      // ever trip on something pathological.
+      try {
+        const { base64, mediaType, name, bytes } = await this.prepareImage(file)
+        if (bytes > 10 * 1024 * 1024) {
+          this.addMessage("error", `${file.name}: still over 10MB after resizing — try a smaller image.`)
+          continue
+        }
+        this.pendingFiles.push({ base64, mediaType, name })
+      } catch (err) {
+        console.error("Image prepare failed", err)
+        this.addMessage("error", `${file.name}: couldn't read this image.`)
+      }
     }
 
     this.renderFilePreviews()
     event.target.value = ""
+  }
+
+  // Downscale to IMAGE_MAX_EDGE on the long side and re-encode as JPEG.
+  // Returns the original untouched if it's already small enough (both in
+  // pixels and bytes) — no point re-encoding a screenshot that's already fine.
+  async prepareImage(file) {
+    const bitmap = await this.loadBitmap(file)
+    const { width, height } = bitmap
+    const longEdge = Math.max(width, height)
+
+    if (longEdge <= IMAGE_MAX_EDGE && file.size <= 2 * 1024 * 1024) {
+      bitmap.close?.()
+      const base64 = await this.readFileAsBase64(file)
+      return { base64, mediaType: file.type, name: file.name, bytes: file.size }
+    }
+
+    const scale = Math.min(1, IMAGE_MAX_EDGE / longEdge)
+    const canvas = document.createElement("canvas")
+    canvas.width  = Math.round(width  * scale)
+    canvas.height = Math.round(height * scale)
+
+    const ctx = canvas.getContext("2d")
+    // JPEG has no alpha — paint white first so transparent PNG regions don't go black
+    ctx.fillStyle = "#ffffff"
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+    bitmap.close?.()
+
+    const blob = await new Promise((resolve, reject) =>
+      canvas.toBlob(b => b ? resolve(b) : reject(new Error("toBlob returned null")), "image/jpeg", IMAGE_JPEG_QUALITY)
+    )
+
+    const base64 = await this.readFileAsBase64(blob)
+    const name   = file.name.replace(/\.[^.]+$/, "") + ".jpg"
+    return { base64, mediaType: "image/jpeg", name, bytes: blob.size }
+  }
+
+  // createImageBitmap honours EXIF orientation with imageOrientation:"from-image",
+  // so a portrait photo taken on a phone comes out the right way up. Falls back
+  // to an <img> for browsers without it (the <img> path also applies EXIF in
+  // every current browser).
+  async loadBitmap(file) {
+    if ("createImageBitmap" in window) {
+      try {
+        return await createImageBitmap(file, { imageOrientation: "from-image" })
+      } catch (_) { /* fall through */ }
+    }
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file)
+      const img = new Image()
+      img.onload  = () => { URL.revokeObjectURL(url); resolve(img) }
+      img.onerror = (e) => { URL.revokeObjectURL(url); reject(e) }
+      img.src = url
+    })
   }
 
   removePendingFileAt(index) {

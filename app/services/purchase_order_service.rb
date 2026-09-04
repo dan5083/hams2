@@ -6,12 +6,15 @@ class PurchaseOrderService
   class PurchaseOrderError < StandardError; end
 
   # Applied to every photographed page before it's combined into the PDF —
-  # deskew from EXIF orientation, drop colour noise, even out lighting/shadows
-  # from a phone photo, then a light sharpen so text stays legible after
-  # grayscale. Cloudinary applies these server-side via the `multi` transform,
-  # so no local image-processing gem is needed (none is in the Gemfile).
+  # deskew from EXIF orientation, cap the resolution (the browser already
+  # downscales to ~2000px, this is the backstop for anything that arrives via
+  # another route), drop colour noise, even out lighting/shadows from a phone
+  # photo, then a light sharpen so text stays legible after grayscale.
+  # Cloudinary applies these server-side via the `multi` transform, so no local
+  # image-processing gem is needed (none is in the Gemfile).
   IMAGE_CLEANUP_TRANSFORMATION = [
     { angle: "exif" },
+    { width: 1700, height: 1700, crop: "limit" },
     { effect: "grayscale" },
     { effect: "improve" },
     { effect: "sharpen:60" }
@@ -136,16 +139,18 @@ class PurchaseOrderService
   private_class_method :upload_pdf
 
   def self.upload_images_as_pdf(base64_images, customer_order)
-    tag = "po_#{customer_order.id}_#{SecureRandom.hex(4)}"
+    tag      = "po_#{customer_order.id}_#{SecureRandom.hex(4)}"
+    page_ids = []
 
     base64_images.each do |data|
       with_tempfile("po_page", ".jpg", data) do |tempfile|
-        Cloudinary::Uploader.upload(
+        uploaded = Cloudinary::Uploader.upload(
           tempfile.path,
           folder: "#{folder_path(customer_order)}/pages",
           tags: [tag],
           overwrite: true
         )
+        page_ids << uploaded["public_id"]
       end
     end
 
@@ -157,6 +162,15 @@ class PurchaseOrderService
       format: "pdf",
       transformation: IMAGE_CLEANUP_TRANSFORMATION
     )
+
+    # The combined PDF is its own stored asset (type "multi"), so the raw page
+    # originals are just dead weight once it exists. Best-effort — a failure
+    # here shouldn't lose the PO attachment.
+    begin
+      Cloudinary::Api.delete_resources(page_ids) if page_ids.any?
+    rescue => e
+      Rails.logger.warn "[PurchaseOrderService] page cleanup failed for #{tag}: #{e.message}"
+    end
 
     { public_id: combined["public_id"], secure_url: combined["secure_url"],
       format: "pdf", bytes: combined["bytes"] }
