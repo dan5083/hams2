@@ -14,10 +14,12 @@ class PurchaseOrderService
   # image-processing gem is needed (none is in the Gemfile).
   IMAGE_CLEANUP_TRANSFORMATION = [
     { angle: "exif" },
-    { width: 1700, height: 1700, crop: "limit" },
+    { width: 1400, height: 1400, crop: "limit" },
     { effect: "grayscale" },
     { effect: "improve" },
-    { effect: "sharpen:60" }
+    { effect: "contrast:25" },     # pushes paper towards white, kills grain
+    { effect: "sharpen:60" },
+    { quality: "auto:eco" }
   ].freeze
 
   # ---------------------------------------------------------------------------
