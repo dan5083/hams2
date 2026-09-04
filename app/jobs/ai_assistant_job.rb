@@ -20,6 +20,10 @@ class AiAssistantJob < ApplicationJob
     /\.save[!\s(]/, /\.update[!\s(]/, /\.create[!\s(]/,
     /\.destroy(?!_all)/, /\.delete(?!_all)/,
     /\.increment/, /\.decrement/, /\.toggle/,
+    # Service entry points that persist to the DB internally (PurchaseOrderService,
+    # XeroQuoteService). Without this they classify as READ and get rolled back —
+    # the external upload succeeds, the row write is silently discarded.
+    /\battach_from_request\b/,
   ].freeze
 
   # Inspection / thickness readings (measured_thicknesses) are quality records for
