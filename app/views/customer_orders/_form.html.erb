@@ -1,5 +1,5 @@
 <%# Customer Order Form with Autocomplete - app/views/customer_orders/_form.html.erb %>
-<%= form_with model: customer_order, local: true, class: "space-y-6", id: "customer_order_form" do |form| %>
+<%= form_with model: customer_order, local: true, multipart: true, class: "space-y-6", id: "customer_order_form" do |form| %>
   <% if customer_order.errors.any? %>
     <div class="bg-red-50 border border-red-200 rounded-md p-4">
       <div class="flex">
@@ -72,6 +72,25 @@
             value: customer_order.date_received&.strftime("%Y-%m-%d") || Date.current.strftime("%Y-%m-%d"),
             class: "mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm",
             required: true %>
+      </div>
+
+      <!-- Purchase Order Document -->
+      <div class="sm:col-span-2">
+        <%= form.label :po_file, "Purchase Order (PDF)", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <% if customer_order.persisted? && customer_order.po_attached? %>
+          <p class="text-xs text-gray-500 mb-1">
+            Currently attached:
+            <%= link_to "view PO", customer_order.po_document_url, target: "_blank", class: "text-blue-600 hover:text-blue-900" %>
+            — choose a file below to replace it.
+          </p>
+        <% end %>
+        <%= form.file_field :po_file,
+            accept: "application/pdf",
+            class: "mt-1 block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" %>
+        <p class="mt-1 text-xs text-gray-500">
+          For POs that arrive as a ready-made PDF (e.g. by email). Hard-copy POs are
+          best handled via the HAMS Assistant chat — attach photos of the pages there.
+        </p>
       </div>
     </div>
   </div>

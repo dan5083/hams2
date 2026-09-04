@@ -96,6 +96,7 @@ class CustomerOrdersController < ApplicationController
     @customer_order = CustomerOrder.new(customer_order_params)
 
     if @customer_order.save
+      attach_po_if_present
       redirect_to @customer_order, notice: 'Customer order was successfully created.'
     else
       @customers = Organization.enabled.order(:name)
@@ -207,6 +208,7 @@ class CustomerOrdersController < ApplicationController
 
   def update
     if @customer_order.update(customer_order_params)
+      attach_po_if_present
       redirect_to @customer_order, notice: 'Customer order was successfully updated.'
     else
       @customers = Organization.enabled.order(:name)
@@ -277,5 +279,18 @@ class CustomerOrdersController < ApplicationController
       :number,
       :date_received
     )
+  end
+
+  # po_file deliberately isn't in customer_order_params — it's not a mass-
+  # assignable column, it's handed to PurchaseOrderService which computes the
+  # actual po_document value after uploading to Cloudinary.
+  def attach_po_if_present
+    file = params.dig(:customer_order, :po_file)
+    return if file.blank?
+
+    PurchaseOrderService.attach_upload(customer_order: @customer_order, file: file)
+  rescue StandardError => e
+    Rails.logger.error "PO attach (CO #{@customer_order.id}) failed: #{e.message}"
+    flash[:alert] = "Saved, but the PO upload failed: #{e.message}"
   end
 end

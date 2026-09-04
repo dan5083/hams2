@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_09_02_090316) do
+ActiveRecord::Schema[8.0].define(version: 2026_09_04_075157) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -93,6 +93,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_09_02_090316) do
     t.integer "uninvoiced_accepted_quantity", default: 0, null: false
     t.uuid "created_by_id"
     t.uuid "updated_by_id"
+    t.jsonb "po_document"
     t.index ["created_by_id"], name: "index_customer_orders_on_created_by_id"
     t.index ["customer_id"], name: "index_customer_orders_on_customer_id"
     t.index ["date_received"], name: "index_customer_orders_on_date_received"

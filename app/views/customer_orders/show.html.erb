@@ -145,6 +145,21 @@
           </div>
         <% end %>
 
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Purchase Order</dt>
+          <dd class="text-sm text-gray-900">
+            <% if @customer_order.po_attached? %>
+              <%= link_to "View PO (PDF)", @customer_order.po_document_url,
+                  target: "_blank", class: "text-blue-600 hover:text-blue-900 font-medium" %>
+            <% else %>
+              <span class="text-gray-400">Not attached</span>
+              <% unless @customer_order.voided %>
+                — <%= link_to "add one", edit_customer_order_path(@customer_order), class: "text-blue-600 hover:text-blue-900" %>
+              <% end %>
+            <% end %>
+          </dd>
+        </div>
+
       </dl>
     </div>
 

@@ -145,6 +145,19 @@ class CustomerOrder < ApplicationRecord
     works_orders.empty?
   end
 
+  # ---------------------------------------------------------------------------
+  # Customer PO attachment (Cloudinary) — see PurchaseOrderService.
+  # po_document is a jsonb hash: public_id, secure_url, format, bytes,
+  # source ("pdf" / "scanned_images" / "upload"), attached_at.
+  # ---------------------------------------------------------------------------
+  def po_attached?
+    po_document.present?
+  end
+
+  def po_document_url
+    po_document&.dig("secure_url")
+  end
+
 
   # ---------------------------------------------------------------------------
   # Quick bookout — release everything the process records currently certify,

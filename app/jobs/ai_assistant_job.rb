@@ -462,8 +462,70 @@ class AiAssistantJob < ApplicationJob
   end
 
   def order_creation
-    # TODO: CustomerOrder + WorksOrder creation from POs
-    nil
+    <<~PROMPT
+      CREATING CUSTOMER ORDERS FROM A PURCHASE ORDER:
+      When the user attaches one or more files (PDF and/or images) — a customer's PO,
+      or photographs of a hard-copy PO — this means they want a CustomerOrder created
+      from it. Read the attachment(s) directly; you have vision, so read images the
+      same way you'd read a drawing.
+
+      SCOPE — READ CAREFULLY:
+      Today this only covers creating the CustomerOrder and attaching the PO document.
+      It does NOT create WorksOrders, regardless of what the accompanying message says
+      ("book this in", "process these lines", etc). If asked to book the line items in,
+      create the CustomerOrder and attach the PO as below, then tell the user works
+      order creation from a PO isn't wired up yet and they'll need to add works orders
+      manually (or ask Daniel).
+
+      STEP 1 — Identify the customer:
+      Find the customer on the PO (letterhead, "Buyer", "Bill To", etc) and look them
+      up:
+        Organization.where("name ILIKE ?", "%name fragment%")
+      If there's no clean single match, ask the user rather than guessing — do not
+      create the order against the wrong customer.
+
+      STEP 2 — Extract the PO number and date:
+      The PO number is usually labelled "PO Number", "Purchase Order No.", "Order No."
+      or similar — this becomes CustomerOrder#number. Take the order date if it's on
+      the document; if illegible or absent, leave date_received unset and it defaults
+      to today.
+
+      LUFTHANSA: before creating, check the hard-anodise split rule above — if any
+      line requires hard anodising, that line's order gets its own CustomerOrder
+      numbered with a leading "_".
+
+      STEP 3 — Check for an existing order first:
+        existing = CustomerOrder.find_by(customer_id: customer.id, number: po_number)
+      If found and it already has a PO attached (existing.po_attached?), tell the user
+      it's already on file — don't recreate or silently overwrite. If found with no PO
+      attached, attach to it (skip to Step 5) rather than creating a duplicate —
+      CustomerOrder#number is unique per customer, so create! will fail on a dupe
+      anyway.
+
+      STEP 4 — Create the order:
+        co = CustomerOrder.create!(
+          customer_id: customer.id,
+          number: "...",
+          date_received: parsed_date # omit the key entirely if not found on the PO
+        )
+
+      STEP 5 — Attach the PO document:
+        PurchaseOrderService.attach_from_request(
+          customer_order_id: co.id,
+          request_id: @request_id
+        )
+      @request_id is available in the eval context. This MUST happen in the same
+      assistant run the files were attached in — the raw file data is only available
+      while this request is still in progress, not on a later turn. Photographed pages
+      are cleaned up and combined into one PDF automatically; just pass all of it
+      through in one call.
+
+      STEP 6 — Reply:
+      Confirm the order was created with a link ([CustomerOrder N](/customer_orders/N)),
+      and summarise what's on the PO (line items — part descriptions/numbers, quantities,
+      any prices given) so the user can sanity-check it against what was actually read.
+      Mention that works orders still need to be added manually.
+    PROMPT
   end
 
   def quote_creation
