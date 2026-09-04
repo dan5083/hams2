@@ -95,7 +95,7 @@ class CustomerOrdersController < ApplicationController
   def create
     @customer_order = CustomerOrder.new(customer_order_params)
 
-    if @customer_order.save
+    if po_file_valid? && @customer_order.save
       attach_po_if_present
       redirect_to @customer_order, notice: 'Customer order was successfully created.'
     else
@@ -207,7 +207,9 @@ class CustomerOrdersController < ApplicationController
   end
 
   def update
-    if @customer_order.update(customer_order_params)
+    @customer_order.assign_attributes(customer_order_params)
+
+    if po_file_valid? && @customer_order.save
       attach_po_if_present
       redirect_to @customer_order, notice: 'Customer order was successfully updated.'
     else
@@ -284,13 +286,43 @@ class CustomerOrdersController < ApplicationController
   # po_file deliberately isn't in customer_order_params — it's not a mass-
   # assignable column, it's handed to PurchaseOrderService which computes the
   # actual po_document value after uploading to Cloudinary.
+  def po_file_param
+    params.dig(:customer_order, :po_file)
+  end
+
+  # Every customer order created through the form must carry the customer's
+  # PO as a PDF — paper copies get shredded, so this is the record. Hard-copy
+  # POs come in via the assistant (photo -> PDF), which creates the order and
+  # attaches in a separate step, hence this lives here and not as a model
+  # validation. On edit the file is only mandatory while nothing is attached;
+  # once one is on file it's optional (choose a file to replace it).
+  #
+  # Runs BEFORE save so a bad submission never half-creates an order.
+  def po_file_valid?
+    file = po_file_param
+
+    if file.blank?
+      return true if @customer_order.po_attached?
+
+      @customer_order.errors.add(:base, "Attach the customer's purchase order as a PDF — it's required.")
+      return false
+    end
+
+    unless file.content_type.to_s == "application/pdf"
+      @customer_order.errors.add(:base, "The purchase order must be a PDF (got #{file.content_type.presence || 'unknown type'}). For photos of a paper PO, use the HAMS Assistant instead.")
+      return false
+    end
+
+    true
+  end
+
   def attach_po_if_present
-    file = params.dig(:customer_order, :po_file)
+    file = po_file_param
     return if file.blank?
 
     PurchaseOrderService.attach_upload(customer_order: @customer_order, file: file)
   rescue StandardError => e
     Rails.logger.error "PO attach (CO #{@customer_order.id}) failed: #{e.message}"
-    flash[:alert] = "Saved, but the PO upload failed: #{e.message}"
+    flash[:alert] = "Saved, but the PO upload failed: #{e.message} — edit the order to attach it."
   end
 end
