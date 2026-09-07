@@ -3,20 +3,8 @@
 
   The single Elcometer connection for the page (elcometer-session controller
   wraps the operations list). Rendered once, inside the first anodic
-  thickness card, so it sits where the operator is working.
-
-  Two ways in, both feeding the same reading router:
-    Cable     - Web Serial (RS232/USB, or a Bluetooth Classic gauge that
-                Windows has paired as an outgoing COM port)
-    Bluetooth - Web Bluetooth (BLE), no Windows pairing needed
-  Buttons hide themselves if the browser lacks that API. The session
-  auto-resumes the last transport after the sign-off reload.
-
-  To pin a known service/characteristic once you've read them off the gauge,
-  add to the elcometer-session element:
-    data-elcometer-session-ble-service-value="…"
-    data-elcometer-session-ble-notify-value="…"
-    data-elcometer-session-ble-name-prefix-value="Elcometer"
+  thickness card, so it sits where the operator is working. The session
+  auto-resumes a previously granted port after the sign-off reload.
 %>
 <div class="flex items-center justify-between gap-3 mb-3 p-2 bg-white border border-gray-200 rounded-md">
   <div data-elcometer-session-target="status"
@@ -29,14 +17,7 @@
             data-action="click->elcometer-session#connectElcometer"
             class="inline-flex items-center px-3 py-1.5 border border-blue-600 rounded text-xs font-medium text-blue-600 bg-white hover:bg-blue-50">
       <svg class="h-3.5 w-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-      Cable
-    </button>
-    <button type="button"
-            data-elcometer-session-target="bluetoothButton"
-            data-action="click->elcometer-session#connectBluetooth"
-            class="inline-flex items-center px-3 py-1.5 border border-blue-600 rounded text-xs font-medium text-blue-600 bg-white hover:bg-blue-50">
-      <svg class="h-3.5 w-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v18l6-4.5L7 8m0 8l11-8.5L12 3"/></svg>
-      Bluetooth
+      Connect Elcometer
     </button>
     <button type="button"
             data-elcometer-session-target="stopButton"
