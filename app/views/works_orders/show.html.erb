@@ -20,7 +20,7 @@
 
   <div class="flex justify-between items-center mb-6">
     <div class="flex items-center gap-3 flex-wrap">
-      <h1 class="text-3xl font-bold text-gray-900">Works Order WO<%= @works_order.number %></h1>
+      <h1 id="wo-title" class="text-3xl font-bold text-gray-900">Works Order WO<%= @works_order.number %></h1>
       <% if aero %>
         <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-white bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 shadow-md"
               title="Aerospace/defence part — processed under NADCAP accreditation">
@@ -109,28 +109,30 @@
     </div>
   <% end %>
 
+  <%# Floating identity card. Lives outside the grid because it is fixed, not
+      sticky: JS aligns it to the left column and only reveals it once the H1
+      has scrolled off, so the WO number is never on screen twice. %>
+  <div id="wo-sticky-card"
+       class="hidden lg:block fixed z-30 opacity-0 invisible pointer-events-none transition-opacity duration-150 bg-white shadow-lg rounded-lg border-l-4 <%= aero ? 'border-orange-500' : 'border-blue-500' %> p-5">
+    <div class="flex items-baseline justify-between gap-2">
+      <span class="text-3xl font-bold text-gray-900 leading-none">WO<%= @works_order.number %></span>
+      <span class="px-2.5 py-1 rounded-full text-sm font-semibold uppercase tracking-wide <%= @works_order.status_badge_class %>">
+        <%= @works_order.status %>
+      </span>
+    </div>
+    <div class="mt-3 text-xl font-semibold text-gray-800 leading-snug truncate" title="<%= @works_order.customer.name %>">
+      <%= @works_order.customer.name %>
+    </div>
+    <div class="mt-1 text-base text-gray-600">
+      Qty <span class="font-semibold text-gray-800"><%= @works_order.quantity %></span>
+    </div>
+  </div>
+
   <!-- Main layout: narrow left (details) + wide right (operations preview) -->
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
 
     <!-- LEFT COLUMN: stacked detail panels -->
-    <div class="lg:col-span-1 space-y-6">
-
-      <!-- Sticky identity card: pins to the top of the viewport while the long
-           operations list scrolls, so it is always obvious which WO this tab is. -->
-      <div class="lg:sticky lg:top-4 z-20 bg-white shadow-lg rounded-lg border-l-4 <%= aero ? 'border-orange-500' : 'border-blue-500' %> p-4">
-        <div class="flex items-baseline justify-between gap-2">
-          <span class="text-2xl font-bold text-gray-900 leading-none">WO<%= @works_order.number %></span>
-          <span class="px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide <%= @works_order.status_badge_class %>">
-            <%= @works_order.status %>
-          </span>
-        </div>
-        <div class="mt-2 text-sm font-semibold text-gray-800 truncate" title="<%= @works_order.customer.name %>">
-          <%= @works_order.customer.name %>
-        </div>
-        <div class="text-sm text-gray-600 line-clamp-2" title="<%= @works_order.part_description %>">
-          <%= @works_order.part_description %>
-        </div>
-      </div>
+    <div id="wo-left-column" class="lg:col-span-1 space-y-6">
 
       <!-- Basic Details -->
       <div class="bg-white shadow rounded-lg p-6">
@@ -1479,6 +1481,51 @@
   document.addEventListener('turbo:morph', function () { closeDD(); setTimeout(arm, 0); });
   if (document.readyState !== 'loading') { arm(); }
   else { document.addEventListener('DOMContentLoaded', arm); }
+})();
+
+// Floating WO identity card. Fixed rather than sticky so it can be hidden
+// while the real H1 is still on screen - two WO numbers at once reads as a
+// bug. JS only does two things: keep it lined up with the left column, and
+// flip it on once the H1 leaves the top of the viewport.
+(function () {
+  // Gap from the top of the viewport. If the main nav is fixed or sticky,
+  // raise this to clear it (nav height + 16).
+  var TOP_OFFSET = 16;
+
+  function init() {
+    var card  = document.getElementById('wo-sticky-card');
+    var col   = document.getElementById('wo-left-column');
+    var title = document.getElementById('wo-title');
+    if (!card || !col || !title) return;
+
+    // The card is out of flow, so it has no width of its own - borrow the
+    // left column's geometry. Horizontal only; scrolling never moves it.
+    function place() {
+      var r = col.getBoundingClientRect();
+      card.style.left  = r.left + 'px';
+      card.style.width = r.width + 'px';
+      card.style.top   = TOP_OFFSET + 'px';
+    }
+    place();
+
+    // Re-init runs on every morph, so tear down the previous listeners first.
+    if (card._woPlace) window.removeEventListener('resize', card._woPlace);
+    card._woPlace = place;
+    window.addEventListener('resize', place);
+
+    if (card._woObs) card._woObs.disconnect();
+    card._woObs = new IntersectionObserver(function (entries) {
+      var show = !entries[0].isIntersecting;
+      card.classList.toggle('opacity-0', !show);
+      card.classList.toggle('invisible', !show);
+    }, { rootMargin: '-' + TOP_OFFSET + 'px 0px 0px 0px' });
+    card._woObs.observe(title);
+  }
+
+  document.addEventListener('turbo:load', init);
+  document.addEventListener('turbo:morph', function () { setTimeout(init, 0); });
+  if (document.readyState !== 'loading') { init(); }
+  else { document.addEventListener('DOMContentLoaded', init); }
 })();
 
 function printRouteCard(url) {
