@@ -16,14 +16,25 @@ class AiAssistantJob < ApplicationJob
     /File\.(write|delete|unlink|rename)/, /FileUtils\./, /IO\.popen/, /Open3\./,
   ].freeze
 
+  # Service entry points that persist to the DB internally and/or talk to
+  # Xero. They MUST classify as WRITE (a READ is rolled back — the external
+  # call succeeds, the local row write is silently discarded; this also
+  # rolled back XeroToken refreshes and broke the Xero connection) and they
+  # are exempt from the >10-writes bulk guard: one invoice with n release
+  # notes is 2n+ row writes by design, not a bulk edit.
+  SERVICE_ENTRY_PATTERNS = [
+    /\bPurchaseOrderService\./,
+    /\bProofOfCollectionService\./,
+    /\bXero\w*Service\./,
+    /\bInvoice\.stage_to_date\b/,
+    /\bInvoice\.create_from_release_notes\b/,
+  ].freeze
+
   WRITE_PATTERNS = [
     /\.save[!\s(]/, /\.update[!\s(]/, /\.create[!\s(]/,
     /\.destroy(?!_all)/, /\.delete(?!_all)/,
     /\.increment/, /\.decrement/, /\.toggle/,
-    # Service entry points that persist to the DB internally (PurchaseOrderService,
-    # XeroQuoteService). Without this they classify as READ and get rolled back —
-    # the external upload succeeds, the row write is silently discarded.
-    /\battach_from_request\b/,
+    *SERVICE_ENTRY_PATTERNS,
   ].freeze
 
   # Inspection / thickness readings (measured_thicknesses) are quality records for
@@ -174,6 +185,7 @@ class AiAssistantJob < ApplicationJob
       pricing_rules,
       part_creation,
       order_creation,
+      invoice_from_proof_of_collection,
       quote_creation,
       response_style,
       schema_section
@@ -238,6 +250,8 @@ class AiAssistantJob < ApplicationJob
       - VATs are the treatment tanks, numbered approximately 1–12
       - ReleaseNotes record accepted/rejected quantities when work is completed
       - Invoices sync to Xero via xero_id
+      - Proof of Collection: per-customer-order advice note signed on collection;
+        photographing it triggers invoicing (see below)
 
       PROCESS TERMINOLOGY:
       Drawings use various terms for the same processes. Be precise:
@@ -532,6 +546,58 @@ class AiAssistantJob < ApplicationJob
     PROMPT
   end
 
+  def invoice_from_proof_of_collection
+    <<~PROMPT
+      INVOICING FROM A SIGNED PROOF OF COLLECTION:
+      A Proof of Collection is a HAMS-generated advice note headed
+      "Proof of Collection RN<number>", with a "Customer Order" number, the
+      customer's name and address, a table of every works order on that order
+      (WO number, part number, issue, description, spec, quantity), and a
+      Name / Signature / Date box the driver signs on collection.
+
+      When the user attaches a photo or PDF of one (with or without a message),
+      this means: invoice everything on that customer order that has been
+      released but not yet invoiced, push it to Xero, and attach the PoC.
+
+      DO NOT use the quantities on the sheet. They are the FULL order
+      quantities for every works order, regardless of what has actually been
+      released. The invoice is built from release notes, not from the photo.
+
+      STEP 1 — Identify the customer order. In order of reliability:
+        a) The RN number in the title:
+             rn = ReleaseNote.find_by(number: <n>); co = rn&.works_order&.customer_order
+        b) Cross-check co.number against the "Customer Order" value and
+           co.customer.name against the customer block on the sheet.
+        c) If the RN is unreadable, fall back to
+             CustomerOrder.joins(:customer).where(number: "<co number>").where("organizations.name ILIKE ?", "%<name>%")
+      If anything doesn't line up or resolves to more than one order, STOP
+      and ask — do not invoice the wrong customer.
+
+      STEP 2 — Check it is signed. If the Name/Signature box looks blank, say
+      so and ask before proceeding. An unsigned PoC is not proof of collection.
+
+      STEP 3 — One call, in this same run (the file data is only available now):
+        ProofOfCollectionService.process_from_request(
+          customer_order_id: co.id,
+          request_id: @request_id
+        )
+      This stages the invoice for all released-but-uninvoiced release notes on
+      the order (or reuses the latest existing invoice if there's nothing new),
+      pushes it to Xero as Awaiting Approval if not already there, and attaches
+      the PoC (as a PDF) to the Xero invoice. Do not create the Invoice or push
+      it yourself — the service does all of it.
+
+      STEP 4 — Reply. Report: invoice number with a HAMS link
+      ([INV1234](/invoices/1234)) and the Xero link (xero_url), what was
+      invoiced (release notes / WOs / quantities from the result, NOT from the
+      sheet), the ex-VAT total, and whether the invoice was newly staged or
+      already existed. If the result says pushed_to_xero: false and
+      staged_new: false, say plainly the invoice was already in Xero and only
+      the PoC was attached. If it failed part-way, say exactly which step
+      failed — the result tells you — and what state the invoice is in.
+    PROMPT
+  end
+
   def quote_creation
     <<~PROMPT
       CREATING QUOTES:
@@ -572,7 +638,8 @@ class AiAssistantJob < ApplicationJob
           reference: "enquirer@email.com",
           line_items: [
             { description: "Hard Anodising 50µm — PN123, Part Desc", quantity: 10, unit_amount: 4.50 }
-          ]
+          ],
+          request_id: @request_id   # ALWAYS pass this — attaches any drawings from this conversation
         )
 
       Field mapping:
@@ -590,17 +657,11 @@ class AiAssistantJob < ApplicationJob
       Settings > Xero and try again.
 
       ATTACHING DRAWINGS TO QUOTES:
-      After creating a quote, if the user attached a drawing/PDF in this conversation,
-      attach it to the Xero quote:
-
-        XeroQuoteService.attach_from_request(
-          quote_id: "<quote_id from create result>",
-          request_id: @request_id
-        )
-
-      @request_id is available in the eval context. Always attempt this after creating
-      a quote if the user attached files. It pulls the original file data from the
-      request messages and uploads it to Xero as an attachment on the quote.
+      Handled by create_draft_quote when you pass request_id: @request_id —
+      always pass it. The result includes an `attachments` key telling you
+      how many files were attached (or why it failed); report that. Only call
+      XeroQuoteService.attach_from_request(quote_id:, request_id: @request_id)
+      separately if the user asks to attach a file to a quote that already exists.
     PROMPT
   end
 
@@ -682,7 +743,8 @@ class AiAssistantJob < ApplicationJob
           ActiveSupport::Notifications.unsubscribe(counter)
         end
 
-        if write_count > 10 && !unrestricted_user?
+        service_call = SERVICE_ENTRY_PATTERNS.any? { |p| code.match?(p) }
+        if write_count > 10 && !unrestricted_user? && !service_call
           Rails.logger.warn "[AI Assistant Job] BULK WRITE BLOCKED | #{write_count} writes | user: #{@request_user&.email_address} | code: #{code}"
           raise "Write blocked: this operation would modify #{write_count} records. Bulk writes are restricted to admin users. Ask Daniel or Tariq to run this, or use the Rails console."
         end
