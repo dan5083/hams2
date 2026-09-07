@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Hard Anodising Management System",
   "engines": {
-    "node": "18.x"
+    "node": "22.x"
   },
   "dependencies": {
     "puppeteer": "^21.0.0"
