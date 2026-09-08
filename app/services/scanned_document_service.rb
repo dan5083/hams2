@@ -2,9 +2,8 @@
 #
 # Turn the files on an AI assistant request into PDF bytes — no storage.
 # A PDF attachment is passed through as-is; photographed pages are laid out
-# one per A4 page and printed through Grover (already in the stack for the
-# release-note PDFs), with a CSS filter doing the grayscale/contrast cleanup
-# that Cloudinary used to do for POs.
+# one per A4 page and printed through Grover (same Chromium as the release-
+# note PDFs), each page redrawn as a compact grayscale "scan" first.
 #
 # MUST run in the same assistant run the files were attached in — base64 is
 # stripped from AiAssistantRequest#messages once the job finishes.
@@ -51,13 +50,20 @@ class ScannedDocumentService
   end
   private_class_method :collect_base64
 
-  # One image per page, fitted inside the printable area, EXIF orientation
-  # honoured by Chromium. Filter: grayscale + contrast lift so a phone photo of
-  # a signed sheet prints like a scan.
+  # Each photographed page is redrawn by Chromium as a "scan": scaled to
+  # ~150dpi A4 (1240px on the short side), grayscaled, levels stretched so
+  # paper -> white and ink -> black, then re-encoded as a JPEG at 65%. Phone
+  # photos come in at 1-2MB a page and Chromium would otherwise embed the
+  # original bytes in the PDF; this brings a page down to ~150-300KB and
+  # improves legibility. Grover waits for body.ready, set once every page
+  # has been processed.
+  SCAN_MAX_WIDTH   = 1240   # px, short side of A4 at 150dpi
+  SCAN_JPEG_QUALITY = 0.65
+  SCAN_LEVELS_LOW  = 70     # luminance <= this -> black
+  SCAN_LEVELS_HIGH = 200    # luminance >= this -> white
+
   def self.images_to_pdf(images)
-    pages = images.map do |img|
-      %(<div class="page"><img src="data:#{img[:media_type]};base64,#{img[:data]}"></div>)
-    end.join
+    sources = images.map { |img| "data:#{img[:media_type]};base64,#{img[:data]}" }
 
     html = <<~HTML
       <!DOCTYPE html><html><head><meta charset="utf-8"><style>
@@ -66,13 +72,55 @@ class ScannedDocumentService
         .page { width: 194mm; height: 281mm; display: flex; align-items: center;
                 justify-content: center; page-break-after: always; }
         .page:last-child { page-break-after: auto; }
-        img { max-width: 100%; max-height: 100%; object-fit: contain;
-              image-orientation: from-image; filter: grayscale(1) contrast(1.25); }
-      </style></head><body>#{pages}</body></html>
+        .page img { max-width: 100%; max-height: 100%; object-fit: contain; }
+      </style></head><body>
+      <script>
+        const SOURCES = #{sources.to_json};
+        const MAX_W = #{SCAN_MAX_WIDTH}, Q = #{SCAN_JPEG_QUALITY};
+        const LO = #{SCAN_LEVELS_LOW}, HI = #{SCAN_LEVELS_HIGH};
+
+        function load(src) {
+          return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+        }
+
+        function scan(img) {
+          // Scale so the shorter side is MAX_W (portrait or landscape both fit A4 at ~150dpi).
+          const short = Math.min(img.naturalWidth, img.naturalHeight);
+          const k = Math.min(1, MAX_W / short);
+          const w = Math.round(img.naturalWidth * k), h = Math.round(img.naturalHeight * k);
+          const c = document.createElement('canvas'); c.width = w; c.height = h;
+          const ctx = c.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+
+          const d = ctx.getImageData(0, 0, w, h), p = d.data, range = HI - LO;
+          for (let i = 0; i < p.length; i += 4) {
+            // luminance -> levels stretch -> gray
+            let v = 0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2];
+            v = v <= LO ? 0 : v >= HI ? 255 : ((v - LO) * 255 / range);
+            p[i] = p[i + 1] = p[i + 2] = v;
+          }
+          ctx.putImageData(d, 0, 0);
+          return c.toDataURL('image/jpeg', Q);
+        }
+
+        (async () => {
+          for (const src of SOURCES) {
+            const img = await load(src);
+            const page = document.createElement('div'); page.className = 'page';
+            const out = document.createElement('img'); out.src = scan(img);
+            page.appendChild(out); document.body.appendChild(page);
+            await load(out.src); // make sure the re-encoded image is decoded before print
+          }
+          document.body.classList.add('ready');
+        })().catch(e => { document.body.textContent = 'scan failed: ' + e; document.body.classList.add('ready'); });
+      </script>
+      </body></html>
     HTML
 
     Grover.new(html, format: "A4", print_background: true,
-                     prefer_css_page_size: true, wait_until: "domcontentloaded").to_pdf
+                     prefer_css_page_size: true,
+                     wait_until: "domcontentloaded",
+                     wait_for_selector: "body.ready").to_pdf
   end
   private_class_method :images_to_pdf
 end
