@@ -22,6 +22,13 @@ Rails.application.routes.draw do
       delete :delete_operation
       patch :update_locked_operation
       get :search_operations
+      # Alternate routes: a library op that may be run INSTEAD of a locked op
+      # (same hard anodise, different vat). Position rides as a path segment
+      # so the autocomplete's ?q= stays clean.
+      get 'search_alternates/:position', action: :search_alternates, as: :search_alternates
+      post :add_alternate
+      delete :remove_alternate
+      patch :update_alternate
       get :copy_operations
       post :upload_file
       delete 'delete_file/:index', action: :delete_file, as: :delete_file
