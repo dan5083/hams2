@@ -893,6 +893,35 @@ class WorksOrder < ApplicationRecord
     operations_for_display.select { |op| FilmThickness.thickness_op?(op) }
   end
 
+  # Does the NADCAP sample plan (MIL-PRF-8625F Type III) apply to this
+  # thickness op? The spec test lives in FilmThickness; which TREATMENT a
+  # foil op belongs to does not - the op's id is FOIL_VERIFICATION and says
+  # nothing about hard vs chromic - so it is resolved here from the part:
+  # foil ops appear once per anodic treatment in treatment order
+  # (Part#add_treatment_cycle), so the i-th anodic foil op is the i-th
+  # anodic treatment. Same mapping ReleaseNote#expand_certified_batches
+  # uses to attribute readings. This is the ONE gate for the process record
+  # card, sign-off validation and RN expansion - they must never diverge.
+  def nadcap_for_op?(op)
+    return false unless FilmThickness.field_for(op) == FilmThickness::ANODIC_FIELD
+    return false unless FilmThickness.nadcap_sampling_specification?(specification)
+
+    owner      = process_record_owner
+    anodic_ops = owner.film_thickness_ops.select { |o| FilmThickness.field_for(o) == FilmThickness::ANODIC_FIELD }
+    idx        = anodic_ops.index { |o| o["position"].to_i == op["position"].to_i }
+    return false if idx.nil?
+
+    types = (owner.part&.send(:parse_treatments_data) || [])
+              .map { |t| t["type"].to_s }
+              .select { |t| ANODIC_TREATMENT_TYPES.include?(t) }
+    types[idx] == "hard_anodising"
+  rescue => e
+    Rails.logger.error "nadcap_for_op? WO#{number} op #{op['position']}: #{e.message}"
+    false
+  end
+
+  ANODIC_TREATMENT_TYPES = %w[chromic_anodising hard_anodising standard_anodising].freeze
+
   # (op, batch) rows whose thickness op is signed off with a recorded set.
   # Returns [{ op:, batch: "1", qty: n }, ...] - one entry per (op, batch), so
   # a two-treatment part yields two entries per batch.
@@ -1027,7 +1056,7 @@ class WorksOrder < ApplicationRecord
         problems = FilmThickness.row_errors(
           op, row,
           parts_per_batch: (wo_scoped ? nil : section_batch_qty(section, key)),
-          nadcap: FilmThickness.nadcap_for?(op, specification),
+          nadcap: nadcap_for_op?(op),
           per_wo: (thickness_per_works_order? ? thickness_member_labels.map { |m| m[:wo] } : nil)
         )
         if problems.any?

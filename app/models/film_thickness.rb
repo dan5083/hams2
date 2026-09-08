@@ -245,11 +245,12 @@ module FilmThickness
 
   # NADCAP sampling applies to the HARD anodise foil op on a PRF/Type III
   # WO - a chromic or standard anodise treatment on the same WO still takes
-  # the plain 8-per-batch set. Mirrors ReleaseNote#get_required_treatments.
-  def self.nadcap_for?(op, specification)
-    nadcap_sampling_specification?(specification) &&
-      op["id"].to_s.upcase.include?("HARD_ANODISING")
-  end
+  # the plain 8-per-batch set. Whether a foil op belongs to a hard anodise
+  # treatment is NOT readable off the op (its id is FOIL_VERIFICATION and its
+  # process_type "verification"); it has to be resolved from the part's
+  # treatment list, which this pure module cannot see. That resolution lives
+  # in WorksOrder#nadcap_for_op?, the single gate for the process record
+  # card, sign-off validation and release note expansion.
 
   # Validate one batch's row at sign-off. parts_per_batch is the SECTION's
   # batch qty - the process record already knows the lot size, so NADCAP
@@ -296,9 +297,13 @@ module FilmThickness
         part = wo ? data["parts"].find { |p| p["wo"] == wo } : nil
         return nil if part.nil? || part["readings"].empty?
         base.merge("readings" => part["readings"], "part_label" => part["part_label"], "traceability" => PER_WO_MODE)
-      elsif nadcap
+      elsif nadcap && parse(raw).is_a?(Hash)
         base.merge(nadcap_from(raw, parts_per_batch: parts_per_batch))
       else
+        # Plain set - including sets recorded on NADCAP WOs before the
+        # sample plan was wired to the process record (the gate never fired
+        # on a foil op, so every such batch was signed at 8 flat readings).
+        # Shown as recorded: the CofC must never blank a certified set.
         r = readings_from(raw)
         r.any? ? base.merge("readings" => r) : nil
       end

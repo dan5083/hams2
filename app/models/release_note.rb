@@ -362,14 +362,18 @@ class ReleaseNote < ApplicationRecord
     enp_ops    = ops.select { |op| FilmThickness.field_for(op) == FilmThickness::ENP_FIELD }
     refs_by_pos = refs.group_by { |r| r['position'].to_i }
 
-    batches_for = lambda do |op, treatment|
+    batches_for = lambda do |op, _treatment|
       section = owner.section_for_op(op)
       rows    = op['ocv_readings'] || {}
+      # Same gate the record was signed against (WorksOrder#nadcap_for_op?),
+      # not the treatment's requires_nadcap_sampling: the two once diverged
+      # and every NADCAP RN read back blank.
+      nadcap  = owner.nadcap_for_op?(op)
       (refs_by_pos[op['position'].to_i] || []).filter_map do |r|
         key = r['batch'].to_s
         FilmThickness.batch_from_row(op, rows[key] || {}, key,
                                      parts_per_batch: owner.section_batch_qty(section, key),
-                                     nadcap: treatment[:requires_nadcap_sampling],
+                                     nadcap: nadcap,
                                      wo: works_order.display_name)
       end.sort_by { |b| b['batch_number'] }
     end

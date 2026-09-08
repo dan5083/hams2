@@ -811,7 +811,7 @@
                                     op: op, ops: ops_for_display, position: position,
                                     active_key: active_key, field: thickness_field, row: row,
                                     locked: locked, section_batch: sec_active,
-                                    nadcap: FilmThickness.nadcap_for?(op, @works_order.specification),
+                                    nadcap: @works_order.nadcap_for_op?(op),
                                     parts_per_batch: @works_order.section_batch_qty(current_sec, active_key),
                                     foil_fields: foil_fields,
                                     form_id: "ocv-form-#{position}" %>
