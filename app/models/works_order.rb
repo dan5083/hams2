@@ -223,6 +223,12 @@ class WorksOrder < ApplicationRecord
   #   "operations"  - frozen snapshot; per op:
   #       "sign_offs"    => { "1" => {"id","name"}, ... }  (keyed by batch)
   #       "ocv_readings" => { "1" => {field => value}, ... } (keyed by batch)
+  #       "alternates"   => [ {text, ocv, vat_numbers, ...}, ... ] other ways
+  #                         this step may be run (e.g. the same hard anodise
+  #                         in a different vat) - frozen with the primary
+  #       "alternate_choices" => { "1" => 0, "2" => 1, ... } which of
+  #                         [primary, *alternates] each batch actually ran
+  #                         (0 = primary); stamped at sign-off, locked by it
   #
   # Until the first write, operations render live from the part (pre-work
   # corrections flow through). The first write freezes the full snapshot -
@@ -322,14 +328,21 @@ class WorksOrder < ApplicationRecord
         throw :abort
       end
 
-      if signed.any? && (new_op["operation_text"] != old_op["operation_text"] || new_op["ocv"] != old_op["ocv"])
-        errors.add(:base, "Operation #{pos} has signed batches; its text and OCV spec are immutable")
+      if signed.any? && (new_op["operation_text"] != old_op["operation_text"] || new_op["ocv"] != old_op["ocv"] || new_op["alternates"] != old_op["alternates"])
+        errors.add(:base, "Operation #{pos} has signed batches; its text, OCV spec and alternates are immutable")
         throw :abort
       end
 
       signed.each do |batch, so|
         unless new_op.dig("sign_offs", batch) == so
           errors.add(:base, "Operation #{pos} batch #{batch}: sign-offs cannot be altered or removed")
+          throw :abort
+        end
+
+        # The sign-off certifies WHICH route the batch ran as much as the
+        # readings it took on it.
+        unless new_op.dig("alternate_choices", batch) == old_op.dig("alternate_choices", batch)
+          errors.add(:base, "Operation #{pos} batch #{batch}: the chosen route is locked by sign-off")
           throw :abort
         end
 
@@ -1033,8 +1046,16 @@ class WorksOrder < ApplicationRecord
       where = section["key"] == "base" ? "top of the operations list" : "fork header at op #{section['from']}"
       raise "Enter a quantity for batch #{key} (#{where}) before signing off"
     end
-    if op["ocv"].present?
-      spec = op["ocv"]
+    # Which route this batch ran: the primary unless the operator chose an
+    # alternate. Stamped explicitly so the frozen record states it even when
+    # the answer is "the primary".
+    if alternates_for(op).any?
+      (op["alternate_choices"] ||= {})[key] = alternate_choice(op, key)
+    end
+    eop = effective_operation(op, key)
+
+    if eop["ocv"].present?
+      spec = eop["ocv"]
       row = (op.dig("ocv_readings", key) || {}).dup
 
       # A field with a declared stand-in is recorded as absent rather than
@@ -1052,9 +1073,9 @@ class WorksOrder < ApplicationRecord
       # In-line film thickness (foil verification / ENP ops): a sign-off
       # certifies a COMPLETE set, not merely a non-empty box. Same rules the
       # release note applied when it captured these - see FilmThickness.
-      if FilmThickness.thickness_op?(op)
+      if FilmThickness.thickness_op?(eop)
         problems = FilmThickness.row_errors(
-          op, row,
+          eop, row,
           parts_per_batch: (wo_scoped ? nil : section_batch_qty(section, key)),
           nadcap: nadcap_for_op?(op),
           per_wo: (thickness_per_works_order? ? thickness_member_labels.map { |m| m[:wo] } : nil)
@@ -1069,7 +1090,7 @@ class WorksOrder < ApplicationRecord
         op["ocv_recorded_by"] ||= signature_for(user)
       end
 
-      items = OperationLibrary::ContractReviewOperations.resolve_checklist(op["ocv"]["checklist"])
+      items = OperationLibrary::ContractReviewOperations.resolve_checklist(eop["ocv"]["checklist"])
       if items.any?
         answered = op["checklist_responses"] || {}
         unanswered = items.reject { |i| answered.dig(i["id"], "answer").present? }
@@ -1147,14 +1168,16 @@ class WorksOrder < ApplicationRecord
     assert_record_open!
     freeze_operations!
     op = find_frozen_operation!(position)
-    spec = op["ocv"]
-    raise "Operation #{position} has no OCV spec" if spec.blank?
+    raise "Operation #{position} has no OCV spec" if op["ocv"].blank? && alternates_for(op).none? { |a| a["ocv"].present? }
 
-    allowed = (spec["fields"] || []).map(&:to_s)
     valid_keys = sign_off_keys_for(op)
     cleaned = {}
     (readings || {}).each do |batch_key, row|
       next unless valid_keys.include?(batch_key.to_s)
+      # Fields are those of the route THIS batch is running - an alternate
+      # ramp may carry different voltage checkpoints to the primary.
+      spec = effective_operation(op, batch_key.to_s)["ocv"] || {}
+      allowed = (spec["fields"] || []).map(&:to_s)
       values = row.to_h.slice(*allowed).transform_values { |v| v.to_s.strip }
       cleaned[batch_key.to_s] = values unless values.values.all?(&:blank?)
     end
@@ -1169,6 +1192,75 @@ class WorksOrder < ApplicationRecord
 
     op["ocv_readings"] = existing.merge(cleaned)
     op["ocv_recorded_by"] = signature_for(user)
+    customised_process_data_will_change!
+    save!
+  end
+
+  # ---------------------------------------------------------------------------
+  # Alternate routes: an op frozen with "alternates" may be run as any one of
+  # [primary, *alternates]. The choice is per batch (two batches of one WO
+  # can go in different vats), defaults to the primary, and is locked by the
+  # batch's sign-off. Everything that reads an op's text or OCV spec for a
+  # given batch goes through effective_operation so the two never diverge.
+  # ---------------------------------------------------------------------------
+
+  def alternates_for(op)
+    Array(op["alternates"])
+  end
+
+  # 0 = primary, n = alternates[n - 1]. Out-of-range stored values (an
+  # alternate removed pre-freeze, say) read as the primary rather than raising.
+  def alternate_choice(op, batch_key)
+    idx = op.dig("alternate_choices", batch_key.to_s).to_i
+    idx.between?(0, alternates_for(op).length) ? idx : 0
+  end
+
+  # Labels for the route selector: [label, index]. Vat first, since that is
+  # what the operator is choosing between.
+  def route_options_for(op)
+    [op, *alternates_for(op)].map.with_index do |o, i|
+      vats = Array(o["vat_numbers"])
+      label = vats.any? ? "Vat #{vats.join('/')}" : (o["display_name"].presence || "Route #{i + 1}")
+      label += " (primary)" if i.zero?
+      [label, i]
+    end
+  end
+
+  # The op as it reads for one batch: primary fields overlaid with the chosen
+  # alternate's text / OCV spec / vat numbers / identity. Never mutates the
+  # frozen op - readings, sign-offs and notes still live on `op` itself.
+  def effective_operation(op, batch_key)
+    idx = alternate_choice(op, batch_key)
+    return op if idx.zero?
+
+    alt = alternates_for(op)[idx - 1]
+    op.merge(alt.slice("id", "display_name", "operation_text", "vat_numbers", "target_thickness", "ocv"))
+  end
+
+  def choose_alternate!(position, batch_number, index, user)
+    assert_record_open!
+    freeze_operations!
+    op = find_frozen_operation!(position)
+    raise "Operation #{position} has no alternates" if alternates_for(op).empty?
+
+    wo_scoped = wo_scoped_operation?(op)
+    section = wo_scoped ? nil : section_for_op(op)
+    key = wo_scoped ? "wo" : normalise_batch!(batch_number, section: section).to_s
+    raise "Operation #{position} batch #{key} is signed off; its route cannot be changed" if op.dig("sign_offs", key).present?
+
+    idx = index.to_i
+    raise "No such route for operation #{position}" unless idx.between?(0, alternates_for(op).length)
+
+    # Changing route discards readings taken against the old one - the
+    # fields may not even exist on the new spec, and a half-row from another
+    # ramp on this record would be worse than an empty one. Nothing is signed
+    # (checked above), so nothing certified is lost.
+    if alternate_choice(op, key) != idx && op.dig("ocv_readings", key).present?
+      op["ocv_readings"].delete(key)
+    end
+
+    (op["alternate_choices"] ||= {})[key] = idx
+    op["alternate_chosen_by"] = signature_for(user)
     customised_process_data_will_change!
     save!
   end
@@ -1286,17 +1378,41 @@ class WorksOrder < ApplicationRecord
     if ocv.nil? && defined?(OperationLibrary::OcvSpecs)
       ocv = OperationLibrary::OcvSpecs.fallback_for(op.id, op.operation_text, aerospace_defense: aerospace_defense?)
     end
-    {
+    snapshot = {
       "position" => position,
       "id" => op.id,
       "display_name" => (op.respond_to?(:display_name) ? op.display_name : op.id),
       "operation_text" => op.operation_text,
       "process_type" => (op.respond_to?(:process_type) ? op.process_type : nil),
       "target_thickness" => (op.respond_to?(:target_thickness) ? op.target_thickness : nil),
+      "vat_numbers" => (op.respond_to?(:vat_numbers) ? (op.vat_numbers || []) : []),
       "ocv" => (ocv.respond_to?(:deep_stringify_keys) ? ocv.deep_stringify_keys : ocv),
       "sign_offs" => {},
       "ocv_readings" => {}
     }
+
+    # Alternates freeze verbatim alongside the primary, each with its own
+    # resolved OCV spec (same fallback rule as above), so the record holds
+    # every instruction the batch may have been run to.
+    alts = op.try(:alternates)
+    if alts.present?
+      snapshot["alternates"] = alts.map do |a|
+        a_ocv = a["ocv"]
+        if a_ocv.nil? && defined?(OperationLibrary::OcvSpecs)
+          a_ocv = OperationLibrary::OcvSpecs.fallback_for(a["id"], a["operation_text"], aerospace_defense: aerospace_defense?)
+        end
+        {
+          "id" => a["id"],
+          "display_name" => a["display_name"],
+          "operation_text" => a["operation_text"],
+          "vat_numbers" => a["vat_numbers"] || [],
+          "process_type" => a["process_type"],
+          "target_thickness" => a["target_thickness"],
+          "ocv" => (a_ocv.respond_to?(:deep_stringify_keys) ? a_ocv.deep_stringify_keys : a_ocv)
+        }
+      end
+    end
+    snapshot
   end
 
   def normalise_batch!(batch_number, section: nil)

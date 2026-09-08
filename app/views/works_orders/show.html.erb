@@ -15,7 +15,7 @@
     aero = @works_order.aerospace_defense?
     # OCV *monitoring* specifically - nadcap-basis specs. Correct on frozen
     # records regardless of the part's current flag.
-    has_ocv = operations.any? { |op| op["ocv"].is_a?(Hash) && op["ocv"]["basis"].to_s == "nadcap" }
+    has_ocv = operations.any? { |op| [op, *Array(op["alternates"])].any? { |o| o["ocv"].is_a?(Hash) && o["ocv"]["basis"].to_s == "nadcap" } }
   %>
 
   <div class="flex justify-between items-center mb-6">
@@ -637,10 +637,16 @@
               <% sec_key = current_sec["key"] %>
               <% sec_active = (sec_key == "base" ? active_batch : (active_fb[sec_key] || 1)).to_i %>
               <% sec_batch_count = @works_order.section_batch_count(current_sec) %>
-              <% spec = op["ocv"] %>
               <% op_keys = @works_order.sign_off_keys_for(op) %>
               <% wo_scoped = (op_keys == ["wo"]) %>
               <% active_key = wo_scoped ? "wo" : sec_active.to_s %>
+              <%# The op as it reads for the ACTIVE batch: an alternate route
+                  (other vat, other ramp) swaps in its own text and OCV spec.
+                  Readings and sign-offs stay on `op`. %>
+              <% eop = @works_order.effective_operation(op, active_key) %>
+              <% spec = eop["ocv"] %>
+              <% route_options = @works_order.route_options_for(op) %>
+              <% route_idx = @works_order.alternate_choice(op, active_key) %>
               <% signed_here = (op["sign_offs"] || {})[active_key].present? %>
               <% signed_count = @works_order.signed_count_for(op) %>
               <% op_signed = signed_count == op_keys.length %>
@@ -657,7 +663,32 @@
                   </div>
                   <!-- Op content -->
                   <div class="flex-1 px-4 py-3 text-sm text-gray-900 leading-relaxed">
-                    <%= simple_format(op["operation_text"].to_s) %>
+                    <% if route_options.length > 1 %>
+                      <%# Route selector: which of [primary, *alternates] this batch
+                          is running. Submits on change so the row re-renders with
+                          that route's text and OCV fields; read-only once signed. %>
+                      <div class="flex flex-wrap items-center gap-2 mb-2 px-2.5 py-1.5 bg-indigo-50 border border-indigo-200 rounded">
+                        <span class="text-xs font-semibold text-indigo-800 uppercase tracking-wide">Route<%= " · B#{sec_active}" unless wo_scoped %></span>
+                        <% if signed_here || !paperless %>
+                          <span class="text-xs text-indigo-900 font-medium"><%= route_options[route_idx].first %></span>
+                          <% if signed_here %><span class="text-xs text-gray-400">· locked by sign-off</span><% end %>
+                        <% else %>
+                          <%= form_with url: choose_alternate_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex items-center gap-1" do %>
+                            <%= hidden_field_tag :position, position %>
+                            <%= hidden_field_tag :batch, active_key %>
+                            <%= hidden_field_tag :base_batch, active_batch %>
+                            <% active_fb.each do |k, v| %><%= hidden_field_tag "fb[#{k}]", v %><% end %>
+                            <%= select_tag :alternate, options_for_select(route_options, route_idx),
+                                onchange: "this.form.requestSubmit()",
+                                class: "border border-indigo-300 rounded px-2 py-1 text-sm bg-white" %>
+                          <% end %>
+                          <% if (op["ocv_readings"] || {})[active_key].present? %>
+                            <span class="text-xs text-amber-700">changing route clears this batch's readings</span>
+                          <% end %>
+                        <% end %>
+                      </div>
+                    <% end %>
+                    <%= simple_format(eop["operation_text"].to_s) %>
 
                     <%# Operation notes: the digital margin annotation. Rare, so the
                         add form hides in a collapsed details; existing notes always
@@ -758,7 +789,7 @@
                           <%
                             # Suggestions depend on field + operation text only, never on
                             # the batch - compute once per field, not once per batch.
-                            suggestions = fields.index_with { |f| ocv_suggestions(f, op["operation_text"]) }
+                            suggestions = fields.index_with { |f| ocv_suggestions(f, eop["operation_text"]) }
                           %>
                           <div class="space-y-1">
                             <% if fields.any? %>
@@ -784,7 +815,7 @@
                                     # path as everything else: the keyflow dropdown pre-highlights
                                     # the middle option, and for the 2-item PASS/FAIL list the
                                     # middle IS index 0 - PASS - so Enter accepts it in one press.
-                                    req_if = op.dig("ocv", "required_if")&.dig(field)
+                                    req_if = eop.dig("ocv", "required_if")&.dig(field)
                                     gated  = req_if.present? && req_if.none? { |f, v|
                                       Array(v).map { |x| x.to_s.strip.upcase }.include?(row[f].to_s.strip.upcase)
                                     }
@@ -808,10 +839,10 @@
                               </div>
                               <% if thickness_field && !wo_scoped %>
                                 <%= render "works_orders/film_thickness_field",
-                                    op: op, ops: ops_for_display, position: position,
+                                    op: eop, ops: ops_for_display, position: position,
                                     active_key: active_key, field: thickness_field, row: row,
                                     locked: locked, section_batch: sec_active,
-                                    nadcap: @works_order.nadcap_for_op?(op),
+                                    nadcap: @works_order.nadcap_for_op?(eop),
                                     parts_per_batch: @works_order.section_batch_qty(current_sec, active_key),
                                     foil_fields: foil_fields,
                                     form_id: "ocv-form-#{position}" %>

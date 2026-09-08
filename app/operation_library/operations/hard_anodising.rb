@@ -525,15 +525,6 @@ module OperationLibrary
           operation_text: "Hard anodise 25V↗️35V over 15 minutes in vat 2"
         },
 
-        {
-          id: '2014_HARD_25_VAT3',
-          alloys: ['2014', 'h15', 'lt68'],
-          anodic_classes: ['class_1', 'class_2'],
-          target_thickness: 25,
-          vat_numbers: [3],
-          operation_text: "Hard anodise 20V↗️30V over 30 minutes in vat 3"
-        },
-
         # 2014, H15, LT68 - 30μm
         {
           id: '2014_HARD_30_VAT2',

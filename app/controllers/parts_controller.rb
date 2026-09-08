@@ -2,6 +2,7 @@ class PartsController < ApplicationController
  before_action :set_part, only: [:show, :edit, :update, :destroy, :toggle_enabled, :toggle_aerospace_defense,
                                   :insert_operation, :reorder_operation, :delete_operation,
                                   :update_locked_operation, :search_operations,
+                                  :search_alternates, :add_alternate, :remove_alternate, :update_alternate,
                                   :upload_file, :delete_file, :download_file]
 
   def index
@@ -118,8 +119,9 @@ class PartsController < ApplicationController
             "process_type" => ((src.respond_to?(:process_type) && src.process_type.presence) || "manual"),
             "target_thickness" => (src.respond_to?(:target_thickness) ? (src.target_thickness || 0) : 0),
             "auto_inserted" => (src.respond_to?(:auto_inserted?) ? src.auto_inserted? : false),
-            "ocv" => (src.respond_to?(:ocv) ? src.ocv&.deep_stringify_keys : nil)
-          }
+            "ocv" => (src.respond_to?(:ocv) ? src.ocv&.deep_stringify_keys : nil),
+            "alternates" => (src.respond_to?(:alternates) ? src.alternates : nil).presence
+          }.compact
         end.sort_by { |op| op["position"] }
 
       else
@@ -144,8 +146,9 @@ class PartsController < ApplicationController
             "process_type" => op.respond_to?(:process_type) ? op.process_type : 'manual',
             "target_thickness" => op.respond_to?(:target_thickness) ? (op.target_thickness || 0) : 0,
             "auto_inserted" => op.respond_to?(:auto_inserted?) ? op.auto_inserted? : false,
-            "ocv" => op.respond_to?(:ocv) ? op.ocv&.deep_stringify_keys : nil
-          }
+            "ocv" => op.respond_to?(:ocv) ? op.ocv&.deep_stringify_keys : nil,
+            "alternates" => (op.respond_to?(:alternates) ? op.alternates : nil).presence
+          }.compact
         end
       end
 
@@ -598,6 +601,81 @@ end
     render json: { success: false, error: 'An error occurred while updating the operation' }
   end
 
+  # --- Alternate operations -------------------------------------------------
+  # An alternate is a library op that may be run INSTEAD of the locked op at
+  # a position (e.g. the same hard anodise in vat 2 rather than vat 5). The
+  # search is scoped to the primary's process family so nothing else can be
+  # attached; see Part#alternate_candidates_for.
+
+  def search_alternates
+    position = params[:position]&.to_i
+    query = params[:q].to_s.strip
+    if position.nil? || position < 1
+      render json: []
+      return
+    end
+
+    candidates = @part.alternate_candidates_for(position)
+    candidates = candidates.select { |op| operation_matches?(op, query) } if query.length >= 2
+    render json: candidates.first(15).map { |op| operation_json(op).merge(vat_numbers: (op.respond_to?(:vat_numbers) ? op.vat_numbers : [])) }
+  end
+
+  def add_alternate
+    position = params[:position]&.to_i
+    operation_id = params[:operation_id].presence
+
+    if position.nil? || operation_id.blank?
+      render json: { success: false, error: 'Position and library operation are required' }, status: :unprocessable_entity
+      return
+    end
+
+    if @part.add_alternate_operation!(position, operation_id)
+      @part.reload
+      render json: { success: true, message: 'Alternate added', operations: serialize_locked_operations(@part) }
+    else
+      render json: { success: false, error: 'Could not add that alternate - it must be a library operation of the same process type, not already on this operation' }, status: :unprocessable_entity
+    end
+  rescue => e
+    render json: { success: false, error: 'An error occurred while adding the alternate' }, status: :internal_server_error
+  end
+
+  def remove_alternate
+    position = params[:position]&.to_i
+    index = params[:index]&.to_i
+
+    if position.nil? || index.nil?
+      render json: { success: false, error: 'Position and index are required' }, status: :unprocessable_entity
+      return
+    end
+
+    if @part.remove_alternate_operation!(position, index)
+      @part.reload
+      render json: { success: true, message: 'Alternate removed', operations: serialize_locked_operations(@part) }
+    else
+      render json: { success: false, error: 'Failed to remove alternate' }, status: :unprocessable_entity
+    end
+  rescue => e
+    render json: { success: false, error: 'An error occurred while removing the alternate' }, status: :internal_server_error
+  end
+
+  def update_alternate
+    position = params[:position]&.to_i
+    index = params[:index]&.to_i
+
+    if position.nil? || index.nil?
+      render json: { success: false, error: 'Position and index are required' }
+      return
+    end
+
+    if @part.update_alternate_operation!(position, index, params[:operation_text])
+      render json: { success: true }
+    else
+      render json: { success: false, error: 'Failed to update alternate' }
+    end
+  rescue => e
+    render json: { success: false, error: 'An error occurred while updating the alternate' }
+  end
+
   # Search all parts across all customers (for copy functionality)
   def search_all_parts
     if params[:q].present?
@@ -762,7 +840,8 @@ end
         vat_numbers: op["vat_numbers"] || [],
         process_type: op["process_type"],
         target_thickness: op["target_thickness"] || 0,
-        auto_inserted: op["auto_inserted"] || false
+        auto_inserted: op["auto_inserted"] || false,
+        alternates: Array(op["alternates"]).map { |a| a.slice("id", "display_name", "operation_text", "vat_numbers", "target_thickness") }
       }
     end
   end
@@ -863,6 +942,13 @@ end
       result = @part.update_locked_operation!(position.to_i, operation_text)
       unless result
         success = false
+      end
+    end
+
+    # Alternate route text edits ride the same form: alternate_operations[pos][idx]
+    (params[:alternate_operations] || {}).each do |position, by_index|
+      by_index.to_unsafe_h.each do |index, text|
+        success = false unless @part.update_alternate_operation!(position.to_i, index.to_i, text)
       end
     end
 

@@ -1,6 +1,6 @@
 # app/controllers/works_orders_controller.rb - Fixed pricing parameter handling and route card operations with RBAC
 class WorksOrdersController < ApplicationController
-  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :invoice_to_date, :void, :unvoid, :sign_off_operation, :undo_sign_off, :save_ocv, :add_operation_note, :set_batch_count, :set_parts_per_batch, :set_batch_qty, :add_fork, :remove_fork, :discard_process_record]
+  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :invoice_to_date, :void, :unvoid, :sign_off_operation, :undo_sign_off, :save_ocv, :add_operation_note, :set_batch_count, :set_parts_per_batch, :set_batch_qty, :add_fork, :remove_fork, :discard_process_record, :choose_alternate]
 
   # Marks on a process record are attributed to Current.actor - the operator
   # unlocked with a PIN if there is one, otherwise the account holder. That
@@ -167,14 +167,16 @@ class WorksOrdersController < ApplicationController
     @operations = operations_data.map.with_index(1) do |operation, index|
       next unless operation
 
+      # A paper card can't record a per-batch choice, so it carries every
+      # route and the operator rings the one used.
+      texts = [operation.operation_text || operation.display_name || "Operation #{index}"]
+      Array(operation.try(:alternates)).each do |alt|
+        texts << "— OR —"
+        texts << alt["operation_text"]
+      end
       {
         number: index,
-        content: [
-          {
-            type: "paragraph",
-            as_html: operation.operation_text || operation.display_name || "Operation #{index}"
-          }
-        ],
+        content: texts.map { |t| { type: "paragraph", as_html: t } },
         all_variables: [],
         ocv: operation.try(:ocv)
       }
@@ -269,6 +271,17 @@ class WorksOrdersController < ApplicationController
       target = process_record_path(params[:position].to_i)
     end
     redirect_to target, notice: notice, status: :see_other
+  rescue => e
+    redirect_to process_record_path(params[:position]), alert: e.message, status: :see_other
+  end
+
+  # Paperless process record: which of an operation's alternate routes the
+  # ACTIVE batch is running (e.g. vat 2 rather than vat 5). Reloads the row
+  # with that route's text and OCV fields; stamped for good at sign-off.
+  def choose_alternate
+    return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
+    @works_order.choose_alternate!(params[:position], params[:batch], params[:alternate], Current.actor)
+    redirect_to process_record_path(params[:position].to_i), status: :see_other
   rescue => e
     redirect_to process_record_path(params[:position]), alert: e.message, status: :see_other
   end

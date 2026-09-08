@@ -129,8 +129,9 @@ class Part < ApplicationRecord
         "process_type" => op.respond_to?(:process_type) ? (op.process_type || 'manual') : 'manual',
         "target_thickness" => op.respond_to?(:target_thickness) ? (op.target_thickness || 0) : 0,
         "auto_inserted" => op.respond_to?(:auto_inserted?) ? op.auto_inserted? : false,
-        "ocv" => op.respond_to?(:ocv) ? op.ocv : nil
-      }
+        "ocv" => op.respond_to?(:ocv) ? op.ocv : nil,
+        "alternates" => (op.respond_to?(:alternates) ? op.alternates : nil).presence
+      }.compact
     end
 
     save! if persisted?
@@ -154,8 +155,9 @@ class Part < ApplicationRecord
         "process_type" => op.process_type,
         "target_thickness" => op.target_thickness,
         "auto_inserted" => op.respond_to?(:auto_inserted?) ? op.auto_inserted? : false,
-        "ocv" => op.respond_to?(:ocv) ? op.ocv : nil
-      }
+        "ocv" => op.respond_to?(:ocv) ? op.ocv : nil,
+        "alternates" => (op.respond_to?(:alternates) ? op.alternates : nil).presence
+      }.compact
     end
     save!
   end
@@ -212,6 +214,109 @@ class Part < ApplicationRecord
     return false unless operation
 
     operation['ocv'] = spec.nil? ? nil : spec.deep_stringify_keys
+    self.customisation_data = customisation_data.dup
+    save!
+    true
+  end
+
+  # ---------------------------------------------------------------------------
+  # Alternate operations
+  #
+  # Some parts can run one step in more than one place - a hard anodise that
+  # is fine in vat 5 or vat 2, each with its own ramp. The locked op stays
+  # the PRIMARY instruction; "alternates" is an ordered list of complete
+  # library ops that may be run INSTEAD of it. The operator picks which one
+  # was actually run, per batch, on the works order (WorksOrder#choose_alternate!).
+  #
+  # Each alternate carries its own text and OCV spec - the two ramps have
+  # different cycle lengths, so different voltage checkpoints - and freezes
+  # into the process record alongside the primary. Only library ops qualify:
+  # an alternate with no vat and no spec is just a note, and a note goes in
+  # the primary text.
+  # ---------------------------------------------------------------------------
+
+  # Library ops that can stand in for the locked op at `position`: same
+  # process family, nearest target thickness first. This is what the "add
+  # alternate" search offers - so a 25μm hard anodise is only ever offered
+  # other hard anodises, closest thickness at the top.
+  def alternate_candidates_for(position)
+    primary = locked_operations.find { |op| op["position"].to_i == position.to_i }
+    return [] unless primary
+
+    type = primary["process_type"].to_s
+    return [] if type.blank? || type == "manual"
+
+    existing_ids = [primary["id"], *Array(primary["alternates"]).map { |a| a["id"] }]
+    target = primary["target_thickness"].to_f
+
+    searchable_library_operations
+      .select { |op| op.respond_to?(:process_type) && op.process_type == type }
+      .reject { |op| existing_ids.include?(op.id) }
+      .sort_by { |op| [((op.respond_to?(:target_thickness) ? op.target_thickness.to_f : 0) - target).abs, op.id] }
+  end
+
+  def add_alternate_operation!(position, operation_id)
+    return false unless locked_for_editing?
+
+    locked_ops = customisation_data.dig('operation_selection', 'locked_operations') || []
+    operation = locked_ops.find { |op| op['position'].to_i == position.to_i }
+    return false unless operation
+
+    op = find_library_operation(operation_id)
+    return false unless op
+    # An alternate is a different way of doing the SAME step.
+    return false if op.respond_to?(:process_type) && op.process_type.to_s != operation["process_type"].to_s
+
+    alternates = Array(operation["alternates"])
+    return false if op.id == operation["id"] || alternates.any? { |a| a["id"] == op.id }
+
+    alternates << {
+      "id" => op.id,
+      "display_name" => op.display_name,
+      "operation_text" => op.operation_text,
+      "specifications" => op.respond_to?(:specifications) ? (op.specifications || "") : "",
+      "vat_numbers" => op.respond_to?(:vat_numbers) ? (op.vat_numbers || []) : [],
+      "process_type" => op.respond_to?(:process_type) ? (op.process_type || "manual") : "manual",
+      "target_thickness" => op.respond_to?(:target_thickness) ? (op.target_thickness || 0) : 0,
+      "ocv" => op.respond_to?(:ocv) ? op.ocv&.deep_stringify_keys : nil
+    }
+    operation["alternates"] = alternates
+    self.customisation_data = customisation_data.dup
+    save!
+    true
+  end
+
+  # `index` is 0-based within the alternates list (the primary is not in it).
+  def remove_alternate_operation!(position, index)
+    return false unless locked_for_editing?
+
+    locked_ops = customisation_data.dig('operation_selection', 'locked_operations') || []
+    operation = locked_ops.find { |op| op['position'].to_i == position.to_i }
+    return false unless operation
+
+    alternates = Array(operation["alternates"])
+    return false unless alternates.delete_at(index.to_i)
+
+    if alternates.empty?
+      operation.delete("alternates")
+    else
+      operation["alternates"] = alternates
+    end
+    self.customisation_data = customisation_data.dup
+    save!
+    true
+  end
+
+  def update_alternate_operation!(position, index, new_text)
+    return false unless locked_for_editing?
+    return false if new_text.blank?
+
+    locked_ops = customisation_data.dig('operation_selection', 'locked_operations') || []
+    operation = locked_ops.find { |op| op['position'].to_i == position.to_i }
+    alternate = operation && Array(operation["alternates"])[index.to_i]
+    return false unless alternate
+
+    alternate["operation_text"] = new_text.strip
     self.customisation_data = customisation_data.dup
     save!
     true
@@ -539,10 +644,17 @@ class Part < ApplicationRecord
       if ocv.nil? && defined?(OperationLibrary::OcvSpecs)
         ocv = OperationLibrary::OcvSpecs.fallback_for(op.id, op.operation_text, aerospace_defense: aerospace_defense?)
       end
-      {
+      entry = {
         "text" => op.operation_text,
         "ocv" => (ocv.respond_to?(:deep_stringify_keys) ? ocv.deep_stringify_keys : ocv)
       }
+      # Alternates are part of the route: two parts where one may run in
+      # vat 2 and the other may not are not the same physical instruction.
+      alts = op.try(:alternates)
+      if alts.present?
+        entry["alternates"] = alts.map { |a| { "text" => a["operation_text"], "ocv" => a["ocv"] } }
+      end
+      entry
     end
     return nil if ops.empty?
     Digest::SHA256.hexdigest({ "aero" => aerospace_defense?, "ops" => ops }.to_json)
@@ -563,7 +675,8 @@ class Part < ApplicationRecord
           process_type: op_data["process_type"],
           target_thickness: op_data["target_thickness"] || 0,
           auto_inserted?: op_data["auto_inserted"] || false,
-          ocv: op_data["ocv"]
+          ocv: op_data["ocv"],
+          alternates: op_data["alternates"]
         )
       end
     end
@@ -850,8 +963,9 @@ class Part < ApplicationRecord
         vat_numbers: operation.respond_to?(:vat_numbers) ? (operation.vat_numbers || []) : [],
         process_type: operation.respond_to?(:process_type) ? (operation.process_type || 'manual') : 'manual',
         target_thickness: operation.respond_to?(:target_thickness) ? (operation.target_thickness || 0) : 0,
-        auto_inserted: operation.respond_to?(:auto_inserted?) ? operation.auto_inserted? : false
-      }
+        auto_inserted: operation.respond_to?(:auto_inserted?) ? operation.auto_inserted? : false,
+        alternates: (operation.respond_to?(:alternates) ? operation.alternates : nil).presence
+      }.compact
     end
   end
 

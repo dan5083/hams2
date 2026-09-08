@@ -13,6 +13,7 @@
 import { Controller } from "@hotwired/stimulus"
 
 const MODAL_ID = "insert-operation-modal"
+const ALT_MODAL_ID = "alternate-operation-modal"
 const AUTOSAVE_DEBOUNCE_MS = 500
 const DELETE_DEBOUNCE_MS = 1000
 
@@ -29,12 +30,14 @@ export default class extends Controller {
     this.selectedOperation = null // set when a library operation is chosen
 
     this.setupModalEventListeners()
+    this.setupAlternateModalEventListeners()
 
     // Delegate add/delete/reorder clicks within this section.
     this.boundClickHandler = this.handleClick.bind(this)
     this.element.addEventListener("click", this.boundClickHandler)
 
     this.setupOperationAutoSave()
+    this.setupAlternateAutoSave()
   }
 
   disconnect() {
@@ -43,6 +46,9 @@ export default class extends Controller {
     }
     if (this.boundEscHandler) {
       document.removeEventListener("keydown", this.boundEscHandler)
+    }
+    if (this.boundAltEscHandler) {
+      document.removeEventListener("keydown", this.boundAltEscHandler)
     }
   }
 
@@ -93,6 +99,10 @@ export default class extends Controller {
     } else if (target.classList.contains("reorder-down-btn")) {
       const from = parseInt(target.dataset.position)
       this.reorderOperation(from, from + 1)
+    } else if (target.classList.contains("add-alternate-btn")) {
+      this.showAlternateModal(parseInt(target.dataset.position))
+    } else if (target.classList.contains("remove-alternate-btn")) {
+      this.removeAlternate(parseInt(target.dataset.position), parseInt(target.dataset.index))
     } else {
       return
     }
@@ -205,6 +215,121 @@ export default class extends Controller {
       meta
     )
     this.hideInsertModal()
+  }
+
+  // ---------------------------------------------------------------------------
+  // Alternate routes (library op that may be run INSTEAD of a locked op)
+  // ---------------------------------------------------------------------------
+
+  setupAlternateModalEventListeners() {
+    const modal = document.getElementById(ALT_MODAL_ID)
+    if (!modal) return
+
+    const closeModal = () => this.hideAlternateModal()
+    document.getElementById("alternate-modal-cancel-btn").addEventListener("click", closeModal)
+    modal.querySelector(".modal-backdrop").addEventListener("click", closeModal)
+    document.getElementById("alternate-modal-confirm-btn").addEventListener("click", () => this.confirmAlternate())
+
+    // Retyping after a pick means the pick no longer stands.
+    document.getElementById("alternate-operation-name").addEventListener("input", () => {
+      this.setAlternateSelection(null)
+    })
+
+    this.boundAltEscHandler = (e) => {
+      if (e.key === "Escape" && !modal.classList.contains("hidden")) closeModal()
+    }
+    document.addEventListener("keydown", this.boundAltEscHandler)
+  }
+
+  showAlternateModal(position) {
+    this.currentAlternatePosition = position
+    const modal = document.getElementById(ALT_MODAL_ID)
+    const nameInput = document.getElementById("alternate-operation-name")
+
+    // The search is scoped server-side to this op's process family; the
+    // position rides as a path segment so the autocomplete's ?q= stays clean.
+    const search = modal.querySelector("[data-alternate-search-base]")
+    if (search) {
+      search.setAttribute("data-autocomplete-url-value", `${search.dataset.alternateSearchBase}/${position}`)
+    }
+
+    document.getElementById("alternate-modal-subtitle").textContent = `For operation ${position}`
+    nameInput.value = ""
+    this.setAlternateSelection(null)
+
+    modal.classList.remove("hidden")
+    setTimeout(() => nameInput.focus(), 100)
+  }
+
+  hideAlternateModal() {
+    document.getElementById(ALT_MODAL_ID).classList.add("hidden")
+    this.currentAlternatePosition = null
+    this.selectedAlternate = null
+  }
+
+  // Fired by the alternate modal's autocomplete (autocomplete:select).
+  useAlternateOperation(event) {
+    this.setAlternateSelection(event.detail.item)
+  }
+
+  setAlternateSelection(op) {
+    this.selectedAlternate = op
+    const label = document.getElementById("alternate-modal-selection")
+    const text = document.getElementById("alternate-modal-text")
+    const confirm = document.getElementById("alternate-modal-confirm-btn")
+
+    if (op) {
+      const vats = Array.isArray(op.vat_numbers) && op.vat_numbers.length ? ` · Vats ${op.vat_numbers.join(", ")}` : ""
+      label.textContent = `Selected: ${op.display_name}${vats}`
+      label.className = "text-xs mb-2 text-green-700"
+      text.textContent = op.operation_text || ""
+      text.classList.remove("hidden")
+      confirm.disabled = false
+    } else {
+      label.textContent = "Pick an operation from the library to add it as an alternate."
+      label.className = "text-xs mb-2 text-gray-500"
+      text.textContent = ""
+      text.classList.add("hidden")
+      confirm.disabled = true
+    }
+  }
+
+  async confirmAlternate() {
+    const op = this.selectedAlternate
+    const position = this.currentAlternatePosition
+    if (!op || !position) return
+
+    try {
+      const data = await this.request(`/parts/${this.partId}/add_alternate`, "POST", {
+        position,
+        operation_id: op.id
+      })
+      if (data.success) {
+        this.hideAlternateModal()
+        location.reload()
+      } else {
+        alert("Error: " + data.error)
+      }
+    } catch (error) {
+      console.error("Error:", error)
+      alert("An error occurred while adding the alternate")
+    }
+  }
+
+  async removeAlternate(position, index) {
+    if (!confirm("Remove this alternate route? Works orders already frozen with it are unaffected.")) return
+
+    try {
+      const data = await this.request(`/parts/${this.partId}/remove_alternate`, "DELETE", { position, index })
+      if (data.success) {
+        location.reload()
+      } else {
+        alert("Error: " + data.error)
+      }
+    } catch (error) {
+      console.error("Error:", error)
+      alert("An error occurred while removing the alternate")
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -461,6 +586,38 @@ export default class extends Controller {
 
         clearTimeout(saveTimeout)
         saveTimeout = setTimeout(() => this.saveOperationText(position, newText, textarea), AUTOSAVE_DEBOUNCE_MS)
+      })
+    })
+  }
+
+  setupAlternateAutoSave() {
+    this.element.querySelectorAll("textarea.alternate-textarea").forEach((textarea) => {
+      let saveTimeout
+      textarea.addEventListener("blur", () => {
+        const position = parseInt(textarea.dataset.position)
+        const index = parseInt(textarea.dataset.index)
+        const newText = textarea.value.trim()
+        if (!newText || newText === textarea.dataset.originalValue) return
+
+        clearTimeout(saveTimeout)
+        saveTimeout = setTimeout(async () => {
+          textarea.style.backgroundColor = "#fef3c7"
+          try {
+            const data = await this.request(`/parts/${this.partId}/update_alternate`, "PATCH", {
+              position,
+              index,
+              operation_text: newText
+            })
+            if (!data.success) throw new Error("Save failed")
+            textarea.dataset.originalValue = newText
+            textarea.style.backgroundColor = "#f0fdf4"
+            setTimeout(() => (textarea.style.backgroundColor = ""), 1000)
+          } catch (error) {
+            console.error("Error saving alternate text:", error)
+            textarea.style.backgroundColor = "#fef2f2"
+            setTimeout(() => (textarea.style.backgroundColor = ""), 2000)
+          }
+        }, AUTOSAVE_DEBOUNCE_MS)
       })
     })
   }
