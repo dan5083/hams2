@@ -83,9 +83,16 @@ module OperationLibrary
           operation_data[:operation_text].gsub('. Time for {THICKNESS}μm: {TIME_RANGE}', '')
         end
 
-        # Attach OCV monitoring spec for aerospace/defense: time/temp plus
-        # the in-line six-point film thickness record (FilmThickness)
-        ocv_spec = OcvSpecs.enp_plate if aerospace_defense
+        # Aero/defence: time/temp plus the in-line six-point film thickness
+        # record (FilmThickness). Commercial: the thickness figure only - the
+        # same capture the library gives commercial anodising, since the
+        # figure is taken on every plating job either way. The time/temp
+        # trace stays aero-gated (IP2007 sequential capture).
+        ocv_spec = if aerospace_defense
+          OcvSpecs.enp_plate
+        else
+          OcvSpecs.fields(:film_thickness, basis: :general)
+        end
 
         Operation.new(
           id: operation_data[:id],

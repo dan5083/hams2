@@ -102,10 +102,18 @@ module OperationLibrary
     # Commercial (non-aero) stored ops get the same capture the library gives
     # commercial parts: film thickness only, :general basis. The full traces
     # above stay aero-gated - IP2007 sequential capture is an aero/defence
-    # requirement - but the thickness figure is taken on every anodising job,
+    # requirement - but the thickness figure is taken on every coating job,
     # and a spec is the only way it lands anywhere now the paper blank is gone.
     COMMERCIAL_FALLBACK_PATTERNS = [
       [/hard\s+anodise|standard\s+anodise|sulphuric\s+anodise|chromic\s+acid\s+anodise/i, -> {
+        fields(:film_thickness, basis: :general)
+      }],
+      # Commercial ENP: thickness only. The time/temp trace and the six-point
+      # micrometer growth record (FilmThickness::ENP_FIELD) stay aero-gated,
+      # but the thickness figure is taken on every plating job - mirrors the
+      # commercial spec ElectrolessNickelPlate.operations attaches, so a
+      # copied/manual ENP op captures the same shape a library one would.
+      [/electroless\s+nickel\s+plat|vandalloy|nicklad/i, -> {
         fields(:film_thickness, basis: :general)
       }]
     ].freeze
