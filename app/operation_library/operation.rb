@@ -2,7 +2,7 @@
 class Operation
   attr_accessor :id, :alloys, :process_type, :anodic_classes, :target_thickness, :vat_numbers,
                 :operation_text, :specifications, :enp_type, :deposition_rate_range, :time,
-                :is_cleaning_step, :ocv
+                :is_cleaning_step, :ocv, :alternates
 
   def initialize(id:, process_type:, operation_text:, specifications: nil, alloys: [],
                  anodic_classes: [], target_thickness: 0, vat_numbers: [],
@@ -513,7 +513,24 @@ class Operation
       enp_type: enp_type,
       deposition_rate_range: deposition_rate_range,
       time: time,
-      ocv: ocv
+      ocv: ocv,
+      alternates: alternates
+    }
+  end
+
+  # The shape an alternate route is stored in on a locked op / frozen record:
+  # a complete instruction (text, vat, OCV spec) that may be run INSTEAD of
+  # the primary. String keys because it lives in customisation_data JSON.
+  def to_alternate_hash
+    {
+      "id" => id,
+      "display_name" => display_name,
+      "operation_text" => operation_text,
+      "specifications" => specifications || "",
+      "vat_numbers" => vat_numbers || [],
+      "process_type" => process_type || "manual",
+      "target_thickness" => target_thickness || 0,
+      "ocv" => ocv&.deep_stringify_keys
     }
   end
 

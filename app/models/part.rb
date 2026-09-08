@@ -270,16 +270,7 @@ class Part < ApplicationRecord
     alternates = Array(operation["alternates"])
     return false if op.id == operation["id"] || alternates.any? { |a| a["id"] == op.id }
 
-    alternates << {
-      "id" => op.id,
-      "display_name" => op.display_name,
-      "operation_text" => op.operation_text,
-      "specifications" => op.respond_to?(:specifications) ? (op.specifications || "") : "",
-      "vat_numbers" => op.respond_to?(:vat_numbers) ? (op.vat_numbers || []) : [],
-      "process_type" => op.respond_to?(:process_type) ? (op.process_type || "manual") : "manual",
-      "target_thickness" => op.respond_to?(:target_thickness) ? (op.target_thickness || 0) : 0,
-      "ocv" => op.respond_to?(:ocv) ? op.ocv&.deep_stringify_keys : nil
-    }
+    alternates << op.to_alternate_hash
     operation["alternates"] = alternates
     self.customisation_data = customisation_data.dup
     save!
@@ -797,6 +788,18 @@ class Part < ApplicationRecord
         operation = all_operations.find { |op| op.id == data["operation_id"] }
         next unless operation
 
+        # Alternate routes picked on the treatment form ("this part may also
+        # run as ..."): same process family only, and never the primary
+        # itself. Attached to a dup so the shared library op isn't mutated.
+        alt_ids = Array(data["alternate_operation_ids"]).map(&:to_s).uniq - [operation.id.to_s]
+        if alt_ids.any?
+          alts = alt_ids.filter_map { |aid| all_operations.find { |op| op.id == aid && op.process_type == operation.process_type } }
+          if alts.any?
+            operation = operation.dup
+            operation.alternates = alts.map(&:to_alternate_hash)
+          end
+        end
+
         masking_data = data["masking"].present? ? data["masking"] : (data["masking_methods"].present? ? { "enabled" => true, "methods" => data["masking_methods"] } : {})
 
         {
@@ -846,6 +849,7 @@ class Part < ApplicationRecord
         "id" => treatment["id"] || treatment[:id],
         "type" => treatment["type"] || treatment[:type],
         "operation_id" => treatment["operation_id"] || treatment[:operation_id],
+        "alternate_operation_ids" => treatment["alternate_operation_ids"] || treatment[:alternate_operation_ids] || [],
         "selected_alloy" => treatment["selected_alloy"] || treatment[:selected_alloy],
         "selected_material_type" => treatment["selected_material_type"] || treatment[:selected_material_type], # Add material type support
         "target_thickness" => treatment["target_thickness"] || treatment[:target_thickness],

@@ -431,6 +431,7 @@ export default class extends Controller {
       id: `treatment_${this.treatmentIdCounter}`,
       type: treatmentType,
       operation_id: null,
+      alternate_operation_ids: [], // other library ops this step may run as (e.g. another vat)
       selected_alloy: null,
       selected_material_type: null,
       target_thickness: null,
@@ -1092,9 +1093,13 @@ export default class extends Controller {
       <div class="bg-white border border-gray-200 rounded px-2 py-1 cursor-pointer hover:bg-blue-50 text-xs operation-card"
            data-operation-id="${op.id}"
            data-treatment-id="${treatmentId}">
-        <div class="flex justify-between items-center">
+        <div class="flex justify-between items-center gap-2">
           <span class="font-medium">${op.display_name || op.id.replace(/_/g, " ")}</span>
-          <span class="select-operation-indicator text-blue-600 text-xs font-medium">Select</span>
+          <span class="flex items-center gap-2">
+            <button type="button" class="alternate-operation-toggle text-indigo-600 text-xs font-medium hidden"
+                    title="This part may also be run as this operation - the operator picks at sign-off">+ Alternate</button>
+            <span class="select-operation-indicator text-blue-600 text-xs font-medium">Select</span>
+          </span>
         </div>
         <p class="text-gray-600 mt-1">${op.operation_text}</p>
         ${op.specifications ? `<p class="text-purple-600 text-xs mt-1">${op.specifications}</p>` : ""}
@@ -1107,7 +1112,38 @@ export default class extends Controller {
       card.addEventListener("click", () =>
         this.selectOperationForTreatment(card.dataset.operationId, card.dataset.treatmentId)
       )
+      card.querySelector(".alternate-operation-toggle")?.addEventListener("click", (e) => {
+        e.stopPropagation()
+        this.toggleAlternateOperation(card.dataset.operationId, card.dataset.treatmentId)
+      })
     })
+
+    // Re-rendered list (alloy/thickness changed, or page restored): reflect
+    // the treatment's current primary + alternates.
+    const treatment = this.treatments.find((t) => t.id === treatmentId)
+    if (treatment?.operation_id) {
+      const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
+      this.highlightSelectedOperation(card, treatment.operation_id)
+    }
+  }
+
+  // Alternate routes: with a primary chosen, any OTHER matching op can be
+  // marked as one this part may run as instead (same hard anodise, different
+  // vat). Server-side these become `alternates` on the locked op; the
+  // operator chooses per batch on the works order.
+  toggleAlternateOperation(operationId, treatmentId) {
+    const treatment = this.treatments.find((t) => t.id === treatmentId)
+    if (!treatment || !treatment.operation_id || operationId === treatment.operation_id) return
+
+    treatment.alternate_operation_ids = treatment.alternate_operation_ids || []
+    const idx = treatment.alternate_operation_ids.indexOf(operationId)
+    if (idx === -1) treatment.alternate_operation_ids.push(operationId)
+    else treatment.alternate_operation_ids.splice(idx, 1)
+
+    const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
+    this.highlightSelectedOperation(card, treatment.operation_id)
+    this.updateTreatmentsField()
+    this.updatePreview()
   }
 
   selectOperationForTreatment(operationId, treatmentId) {
@@ -1118,6 +1154,8 @@ export default class extends Controller {
     }
 
     treatment.operation_id = operationId
+    // The primary can't also be its own alternate.
+    treatment.alternate_operation_ids = (treatment.alternate_operation_ids || []).filter((id) => id !== operationId)
 
     const card = this.treatmentsContainerTarget.querySelector(`[data-treatment-id="${treatmentId}"]`)
 
@@ -1151,14 +1189,33 @@ export default class extends Controller {
     const operationsList = card?.querySelector(".operations-list")
     if (!operationsList) return
 
+    const treatmentId = card.dataset.treatmentId
+    const treatment = this.treatments.find((t) => t.id === treatmentId)
+    const alternates = treatment?.alternate_operation_ids || []
+
     operationsList.querySelectorAll(".operation-card").forEach((div) => {
-      div.classList.remove("bg-blue-100", "border-blue-400")
+      div.classList.remove("bg-blue-100", "border-blue-400", "bg-indigo-50", "border-indigo-400")
       div.classList.add("bg-white", "border-gray-200")
       const indicator = div.querySelector(".select-operation-indicator")
       if (indicator) {
         indicator.textContent = "Select"
         indicator.classList.remove("text-green-600", "font-bold")
         indicator.classList.add("text-blue-600")
+      }
+
+      // "+ Alternate" only makes sense once a primary exists, and never on
+      // the primary itself.
+      const toggle = div.querySelector(".alternate-operation-toggle")
+      if (toggle) {
+        const isPrimary = div.dataset.operationId === operationId
+        const isAlt = alternates.includes(div.dataset.operationId)
+        toggle.classList.toggle("hidden", !operationId || isPrimary)
+        toggle.textContent = isAlt ? "✓ Alternate" : "+ Alternate"
+        toggle.classList.toggle("font-bold", isAlt)
+        if (isAlt) {
+          div.classList.remove("bg-white", "border-gray-200")
+          div.classList.add("bg-indigo-50", "border-indigo-400")
+        }
       }
     })
 
@@ -1288,6 +1345,7 @@ export default class extends Controller {
       id: treatment.id,
       type: treatment.type,
       operation_id: treatment.operation_id,
+      alternate_operation_ids: treatment.alternate_operation_ids || [],
       selected_alloy: treatment.selected_alloy,
       selected_material_type: treatment.selected_material_type,
       target_thickness: treatment.target_thickness,
