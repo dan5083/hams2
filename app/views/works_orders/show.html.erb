@@ -76,15 +76,38 @@
           (<%= group.total_quantity %> parts across <%= group.members.count %> works orders)
         </div>
         <div class="mt-1 text-sm text-indigo-800">
+          <%# Membership is editable until the record freezes (first sign-off /
+              batch write). The model raises on a race; the controller turns
+              that into a flash, so the view only hides the controls. %>
+          <% removable = !group.frozen? %>
           <% group.members.each do |m| %>
-            <span class="inline-block mr-3">
+            <span class="inline-flex items-center gap-1 mr-3">
               <% if m.id == @works_order.id %>
                 <span class="font-semibold"><%= m.display_name %></span>
               <% else %>
                 <%= link_to m.display_name, works_order_path(m), class: "underline" %>
               <% end %>
               <span class="text-indigo-600"><%= m.part_number %> ×<%= m.quantity %></span>
+              <% if removable %>
+                <% msg = "Remove #{m.display_name} from #{group.display_name}? It goes back to a solo record" \
+                         "#{m.id == @works_order.id ? ' and the shared record moves to the next WO' : ''}." \
+                         "#{' The group will dissolve (fewer than 2 left).' if group.members.count == 2}" %>
+                <%= button_to "×", remove_works_order_process_group_path(group, works_order_id: m.id),
+                    method: :patch,
+                    form: { class: "inline", data: { confirm: msg, turbo_confirm: msg } },
+                    title: "Remove #{m.display_name} from the group",
+                    class: "text-indigo-400 hover:text-red-600 font-bold leading-none px-1" %>
+              <% end %>
             </span>
+          <% end %>
+          <% if removable %>
+            <% ung = "Dissolve #{group.display_name}? All #{group.members.count} works orders go back to solo records." %>
+            <%= button_to "Ungroup all", ungroup_process_group_path(group),
+                method: :delete,
+                form: { class: "inline ml-2", data: { confirm: ung, turbo_confirm: ung } },
+                class: "text-xs text-indigo-500 hover:text-red-600 underline" %>
+          <% else %>
+            <span class="text-xs text-indigo-500 ml-2">membership locked by sign-off — discard the record to change it</span>
           <% end %>
         </div>
       <% else %>
@@ -877,6 +900,15 @@
                     <% so = (op["sign_offs"] || {})[active_key] %>
                     <% multi = !wo_scoped && sec_batch_count > 1 %>
                     <div class="flex-none w-32 border-l border-gray-200 flex flex-col items-center justify-center gap-1 p-2 <%= signed_here ? 'bg-green-50' : 'bg-gray-50' %>">
+                      <%# What this signature certifies: the whole record for a
+                          WO-scoped op (the full tank load on a group lead), the
+                          active batch's qty in this section otherwise. %>
+                      <% so_qty = wo_scoped ? @works_order.record_quantity : @works_order.section_batch_qty(current_sec, sec_active) %>
+                      <% if so_qty.present? %>
+                        <span class="text-[11px] text-gray-500 leading-none">
+                          <%= so_qty %> pcs<%= " · tank load" if wo_scoped && @works_order.process_lead? %>
+                        </span>
+                      <% end %>
                       <% if so %>
                         <span class="text-xs text-green-700 font-semibold text-center">✓<%= " B#{sec_active}" if multi %> <%= so["name"] %></span>
                         <% if can_undo %>
