@@ -127,6 +127,21 @@
               class: "font-semibold underline" %>.
           Release notes, certificates and invoicing stay on this WO as normal.
         </div>
+        <%# A member can pull itself off the bar until processing starts; the
+            lead's page has the same control per member. %>
+        <% if group.can_remove?(@works_order) %>
+          <% leave = "Remove #{@works_order.display_name} from #{group.display_name}? It goes back to a solo record" \
+                     "#{' and the group will dissolve (fewer than 2 left)' if group.members.count == 2}." %>
+          <div class="mt-2">
+            <%= button_to "Remove this WO from #{group.display_name}",
+                remove_works_order_process_group_path(group, works_order_id: @works_order.id),
+                method: :patch,
+                form: { class: "inline", data: { confirm: leave, turbo_confirm: leave } },
+                class: "text-xs text-indigo-600 hover:text-red-600 underline" %>
+          </div>
+        <% elsif (why = group.removal_blocker(@works_order)) %>
+          <div class="mt-1 text-xs text-indigo-500"><%= why %></div>
+        <% end %>
       <% end %>
     </div>
   <% end %>
