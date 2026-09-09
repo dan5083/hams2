@@ -82,7 +82,7 @@
               so the view only hides the controls. %>
           <% locked = group.membership_locked? %>
           <% group.members.each do |m| %>
-            <span class="inline-flex items-center gap-1 mr-3">
+            <span class="inline-flex items-center gap-1 mr-4 mb-1">
               <% if m.id == @works_order.id %>
                 <span class="font-semibold"><%= m.display_name %></span>
               <% else %>
@@ -93,11 +93,10 @@
                 <% msg = "Remove #{m.display_name} from #{group.display_name}? It goes back to a solo record" \
                          "#{m.id == @works_order.id ? ' and the shared record moves to the next WO' : ''}." \
                          "#{' The group will dissolve (fewer than 2 left).' if group.members.count == 2}" %>
-                <%= button_to "×", remove_works_order_process_group_path(group, works_order_id: m.id),
+                <%= button_to "Remove from group", remove_works_order_process_group_path(group, works_order_id: m.id),
                     method: :patch,
                     form: { class: "inline", data: { confirm: msg, turbo_confirm: msg } },
-                    title: "Remove #{m.display_name} from the group",
-                    class: "text-indigo-400 hover:text-red-600 font-bold leading-none px-1" %>
+                    class: "ml-1 text-[11px] font-medium text-indigo-700 bg-white border border-indigo-300 hover:border-red-400 hover:text-red-600 rounded px-1.5 py-0.5" %>
               <% end %>
             </span>
           <% end %>
@@ -105,15 +104,10 @@
             <% ung = "Dissolve #{group.display_name}? All #{group.members.count} works orders go back to solo records." %>
             <%= button_to "Ungroup all", ungroup_process_group_path(group),
                 method: :delete,
-                form: { class: "inline ml-2", data: { confirm: ung, turbo_confirm: ung } },
-                class: "text-xs text-indigo-500 hover:text-red-600 underline" %>
+                form: { class: "inline", data: { confirm: ung, turbo_confirm: ung } },
+                class: "text-[11px] font-medium text-indigo-700 bg-white border border-indigo-300 hover:border-red-400 hover:text-red-600 rounded px-1.5 py-0.5" %>
           <% else %>
             <span class="text-xs text-indigo-500 ml-2">processed — membership locked; discard the record to change it</span>
-          <% end %>
-          <% if group.frozen? && !locked && group.members.count > 1 %>
-            <span class="text-xs text-indigo-500 ml-2" title="The lead holds the signed contract review; remove the others, not the lead">
-              lead can't leave after review
-            </span>
           <% end %>
         </div>
       <% else %>
