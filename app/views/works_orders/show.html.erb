@@ -76,10 +76,11 @@
           (<%= group.total_quantity %> parts across <%= group.members.count %> works orders)
         </div>
         <div class="mt-1 text-sm text-indigo-800">
-          <%# Membership is editable until the record freezes (first sign-off /
-              batch write). The model raises on a race; the controller turns
-              that into a flash, so the view only hides the controls. %>
-          <% removable = !group.frozen? %>
+          <%# Membership is editable until processing starts on the record -
+              contract review alone doesn't lock it (see ProcessGroup). The
+              model raises on a race; the controller turns that into a flash,
+              so the view only hides the controls. %>
+          <% locked = group.membership_locked? %>
           <% group.members.each do |m| %>
             <span class="inline-flex items-center gap-1 mr-3">
               <% if m.id == @works_order.id %>
@@ -88,7 +89,7 @@
                 <%= link_to m.display_name, works_order_path(m), class: "underline" %>
               <% end %>
               <span class="text-indigo-600"><%= m.part_number %> ×<%= m.quantity %></span>
-              <% if removable %>
+              <% if group.can_remove?(m) %>
                 <% msg = "Remove #{m.display_name} from #{group.display_name}? It goes back to a solo record" \
                          "#{m.id == @works_order.id ? ' and the shared record moves to the next WO' : ''}." \
                          "#{' The group will dissolve (fewer than 2 left).' if group.members.count == 2}" %>
@@ -100,14 +101,19 @@
               <% end %>
             </span>
           <% end %>
-          <% if removable %>
+          <% if !locked %>
             <% ung = "Dissolve #{group.display_name}? All #{group.members.count} works orders go back to solo records." %>
             <%= button_to "Ungroup all", ungroup_process_group_path(group),
                 method: :delete,
                 form: { class: "inline ml-2", data: { confirm: ung, turbo_confirm: ung } },
                 class: "text-xs text-indigo-500 hover:text-red-600 underline" %>
           <% else %>
-            <span class="text-xs text-indigo-500 ml-2">membership locked by sign-off — discard the record to change it</span>
+            <span class="text-xs text-indigo-500 ml-2">processed — membership locked; discard the record to change it</span>
+          <% end %>
+          <% if group.frozen? && !locked && group.members.count > 1 %>
+            <span class="text-xs text-indigo-500 ml-2" title="The lead holds the signed contract review; remove the others, not the lead">
+              lead can't leave after review
+            </span>
           <% end %>
         </div>
       <% else %>

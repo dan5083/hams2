@@ -16,9 +16,19 @@
 #   * lead_works_order    - where the record lives. First member by WO number;
 #     reassignable only while the record is unfrozen.
 #
-# Membership is fluid until the lead's record freezes (first sign-off /
-# batch write). At freeze, the member manifest is embedded in the snapshot -
-# the record itself states what was on the bar - and membership locks.
+# Membership is fluid until PROCESSING starts on the lead's record. The
+# snapshot itself freezes at the first sign-off - and the first sign-off is
+# contract review, done at booking, long before the bar is loaded - so a
+# frozen snapshot is NOT the lock. Pulling a WO off the bar after review but
+# before the first batch goes in the tank is routine ("push these over to
+# Thursday's load"), and the route is identical by construction, so the
+# review stands for whoever is left. The lock is the record showing the load
+# has actually been processed (membership_locked?): any batch-scoped
+# sign-off or OCV reading, or a batch date stamped.
+#
+# The member manifest is embedded in the lead's snapshot at freeze - the
+# record itself states what was on the bar - and is refreshed on every
+# post-freeze membership change, with a change log, so it never goes stale.
 # Redo = discard on the lead, same rules as a solo WO but gated on EVERY
 # member having no release notes.
 class ProcessGroup < ApplicationRecord
@@ -34,7 +44,10 @@ class ProcessGroup < ApplicationRecord
   # column on any save. Braces (read): lead_works_order below falls back to
   # the first member, so even a bad row renders instead of 500ing.
   before_save :ensure_lead
-  before_destroy :guard_destroy
+  # prepend: both must run BEFORE dependent: :nullify empties works_orders.
+  # Declared in this order so guard_destroy runs first, then detach.
+  before_destroy :detach_lead_record, prepend: true
+  before_destroy :guard_destroy, prepend: true
 
   # Read-side fallback for a leadless row. Deliberately does not write - a
   # GET must not mutate; the next save (or a console repair) fixes the column.
@@ -65,8 +78,37 @@ class ProcessGroup < ApplicationRecord
     works_orders.where(is_open: true, voided: false).exists?
   end
 
+  # The lead's snapshot exists (contract review or later). Informational -
+  # it is NOT what locks membership; see membership_locked?.
   def frozen?
     lead_works_order.present? && lead_works_order.frozen_operations.present?
+  end
+
+  # Something has been recorded against a BATCH on the lead's record, so the
+  # load has physically been through (or into) the process. From here the
+  # manifest is evidence and membership is locked; the only way back is
+  # discard on the lead.
+  def membership_locked?
+    lead_works_order.present? && lead_works_order.processing_started?
+  end
+
+  # Why `wo` cannot leave right now, or nil if it can. The view and the
+  # mutators share this so the button and the raise never disagree.
+  def removal_blocker(wo)
+    return "#{wo.display_name} is not in #{display_name}" unless wo.process_group_id == id
+    if membership_locked?
+      return "#{display_name} has been processed; its record names #{wo.display_name} and membership is locked " \
+             "(discard the record on WO#{lead_works_order.number} to change it)"
+    end
+    if lead_works_order_id == wo.id && frozen?
+      return "#{wo.display_name} is the lead and holds the signed record (contract review); " \
+             "remove the other members instead, or discard the record first"
+    end
+    nil
+  end
+
+  def can_remove?(wo)
+    removal_blocker(wo).nil?
   end
 
   # Embedded in the lead's snapshot at freeze - the audit answer to "one
@@ -105,27 +147,41 @@ class ProcessGroup < ApplicationRecord
   end
 
   def add_works_order!(wo)
-    raise "#{display_name} is frozen; membership is locked (discard the record on WO#{lead_works_order.number} first)" if frozen?
+    if membership_locked?
+      raise "#{display_name} has been processed; membership is locked (discard the record on WO#{lead_works_order.number} first)"
+    end
     assert_eligible!(wo)
-    wo.update!(process_group: self)
-    self.lead_works_order ||= wo
-    save! if changed?
+    transaction do
+      wo.update!(process_group: self)
+      self.lead_works_order ||= wo
+      save! if changed?
+      refresh_lead_manifest!("added", wo)
+    end
     wo
   end
 
-  # Pre-freeze only: moving a WO out (to another bar, or back to solo) is the
-  # "push parts over" path. If the lead leaves, the record moves with the
-  # lead ROLE to the next member - safe, because pre-freeze the data is empty.
+  # Moving a WO out (to another bar, or back to solo) is the "push parts
+  # over" path. Allowed until processing starts. If the lead leaves pre-
+  # freeze, the lead ROLE moves to the next member - safe, because the data
+  # is empty. Post-freeze the lead holds the signed review and cannot leave
+  # (removal_blocker); the others can, and the lead's manifest is rewritten
+  # to say who is left. The leaver goes back to a blank solo record, so it
+  # shows as pending contract review in its own right.
   def remove_works_order!(wo)
-    raise "#{wo.display_name} is not in #{display_name}" unless wo.process_group_id == id
-    raise "#{display_name} is frozen; its manifest names #{wo.display_name} and membership is locked" if frozen?
+    if (why = removal_blocker(wo))
+      raise why
+    end
 
     transaction do
       wo.update!(process_group: nil)
       if lead_works_order_id == wo.id
         update!(lead_works_order: works_orders.order(:number).first)
       end
-      destroy! if works_orders.count < 2
+      if works_orders.count < 2
+        destroy!
+      else
+        refresh_lead_manifest!("removed", wo)
+      end
     end
     wo
   end
@@ -173,12 +229,46 @@ class ProcessGroup < ApplicationRecord
     self.lead_works_order_id ||= works_orders.order(:number).pick(:id)
   end
 
-  # A frozen group's record references this row (display_name in the
-  # snapshot, lead resolution for members). Ungrouping is a pre-freeze
-  # operation only; post-freeze the path back is discard on the lead.
+  # Post-freeze membership changes rewrite the manifest in the lead's
+  # snapshot so the record always names exactly what is on the bar, and log
+  # the change. The immutability guard only watches operations and batch
+  # dates, so the "group" key is ours to maintain.
+  def refresh_lead_manifest!(action, wo)
+    lead = lead_works_order
+    return unless lead&.operations_frozen?
+    lead.reload
+    data = (lead.customised_process_data || {}).deep_dup
+    group = data["group"] || {}
+    group["number"]  = display_name
+    group["members"] = manifest
+    group["changes"] = (group["changes"] || []) + [{
+      "at" => Time.current.iso8601, "action" => action, "wo" => wo.display_name, "part_number" => wo.part_number
+    }]
+    data["group"] = group
+    lead.update!(customised_process_data: data)
+  end
+
+  # The lead's record is a solo record again once the group goes: drop the
+  # manifest so it doesn't claim a bar that no longer exists. Runs before
+  # nullify (prepend), after guard_destroy.
+  def detach_lead_record
+    lead = lead_works_order
+    return unless lead&.operations_frozen?
+    data = (lead.customised_process_data || {}).deep_dup
+    return unless data.key?("group")
+    data["group"] = data["group"].merge(
+      "dissolved_at" => Time.current.iso8601,
+      "members" => []
+    )
+    lead.update!(customised_process_data: data)
+  end
+
+  # A processed group's record references this row (display_name in the
+  # snapshot, lead resolution for members). Ungrouping is allowed until
+  # processing starts; after that the path back is discard on the lead.
   def guard_destroy
-    return unless frozen?
-    errors.add(:base, "#{display_name} is frozen; it cannot be deleted")
+    return unless membership_locked?
+    errors.add(:base, "#{display_name} has been processed; it cannot be dissolved")
     throw :abort
   end
 end

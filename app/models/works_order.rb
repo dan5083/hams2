@@ -100,14 +100,15 @@ class WorksOrder < ApplicationRecord
   end
 
   def can_be_voided?
-    return false if grouped? && process_group.frozen?
+    return false if grouped? && !process_group.can_remove?(self)
     release_notes.empty?
   end
 
   def void!
     return false unless can_be_voided?
-    # Pre-freeze, leaving the group is just bookkeeping. Post-freeze,
-    # can_be_voided? already said no - the group's manifest names this WO.
+    # Leaving the group is allowed until processing starts (the lead's
+    # manifest is rewritten). Once processed, or if this WO is the lead
+    # holding the signed record, can_be_voided? already said no.
     process_group.remove_works_order!(self) if grouped?
     update!(voided: true, is_open: false)
   end
@@ -399,6 +400,20 @@ class WorksOrder < ApplicationRecord
 
   def operations_frozen?
     frozen_operations.present?
+  end
+
+  # The record shows the parts have physically entered the process: a sign-off
+  # or OCV reading against a BATCH (not a WO-scoped op like contract review or
+  # incoming inspection, which precede loading), or a batch date stamped in
+  # any section. This, not the snapshot's existence, is what locks a process
+  # group's membership - see ProcessGroup#membership_locked?.
+  def processing_started?
+    ops = frozen_operations
+    return false if ops.blank?
+    return true if ops.any? { |o|
+      ((o["sign_offs"] || {}).keys + (o["ocv_readings"] || {}).keys).any? { |k| k != "wo" }
+    }
+    sections.any? { |sec| section_batches(sec).any? { |b| b["date"].present? } }
   end
 
   # Pilot gate. Whether a route has a digital process record at all is a
@@ -1810,9 +1825,9 @@ class WorksOrder < ApplicationRecord
     end
     return if siblings.empty?
 
-    # Prefer an existing unfrozen group on the route; otherwise pair up with
-    # the first solo sibling by WO number.
-    if (group = siblings.filter_map(&:process_group).uniq.find { |g| !g.frozen? && g.process_fingerprint == fp })
+    # Prefer an existing unprocessed group on the route; otherwise pair up
+    # with the first solo sibling by WO number.
+    if (group = siblings.filter_map(&:process_group).uniq.find { |g| !g.membership_locked? && g.process_fingerprint == fp })
       group.add_works_order!(self)
     elsif (solo = siblings.select { |wo| wo.process_group_id.nil? }.min_by { |wo| wo.number.to_i })
       ProcessGroup.create_for!([solo, self])
