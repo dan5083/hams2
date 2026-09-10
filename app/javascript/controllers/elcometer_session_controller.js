@@ -157,9 +157,7 @@ export default class extends Controller {
         const { value, done } = await this.reader.read()
         if (done) break
         buffer += value
-        const lines = buffer.split("\n")
-        buffer = lines.pop()
-        for (const line of lines) this.processLine(line)
+        buffer = this.drainReadings(buffer)
       }
     } catch (err) {
       if (this.isReading) {
@@ -169,12 +167,25 @@ export default class extends Controller {
     }
   }
 
-  processLine(line) {
-    const match = line.match(/\s*([\d.]+)\s*um/i)
-    if (!match) return
-    const value = parseFloat(match[1])
-    if (isNaN(value) || value <= 0) return
-    this.routeReading(Math.round(value * 10) / 10)
+  // Emit every complete "<number> um" in the buffer and return the unconsumed
+  // tail. The unit suffix marks the end of a reading, so we deliberately do
+  // NOT wait for a line ending: the meter's terminator (CR, LF, CRLF, or a
+  // leading one on the NEXT transmission) varies, and buffering until "\n"
+  // left each reading stuck until the following beep flushed it - the
+  // classic "always one behind" symptom. Keeping the tail guards against a
+  // value split across two chunks.
+  drainReadings(buffer) {
+    const re = /([\d.]+)\s*[\u00b5u]m/gi
+    let last = 0
+    let m
+    while ((m = re.exec(buffer)) !== null) {
+      const value = parseFloat(m[1])
+      if (!isNaN(value) && value > 0) this.routeReading(Math.round(value * 10) / 10)
+      last = re.lastIndex
+    }
+    const tail = buffer.slice(last)
+    // A long tail with no unit in it is noise, not a half-received reading.
+    return tail.length > 64 ? "" : tail
   }
 
   routeReading(value) {
