@@ -1,7 +1,10 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>HAMS 2.0 - Hard Anodising Management System</title>
+    <%# Pages may set their own tab title with `provide :title, "..."`
+        (works_orders/show does, so several WO tabs are tellable apart).
+        Everything else keeps the default. %>
+    <title><%= content_for?(:title) ? yield(:title) : "HAMS 2.0 - Hard Anodising Management System" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
