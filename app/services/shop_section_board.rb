@@ -361,6 +361,32 @@ class ShopSectionBoard
       rows
     end
 
+    # ---- Order page: headline facts per treatment, sign-off state ignored --
+    # Used by customer_orders/show, which wants the same facts the boards
+    # lead with (vat / voltage / time / dye / seal, or ENP type / thickness /
+    # pretreat line) for EVERY treatment cycle on the record, not just the
+    # ones sitting at a particular queue position. Same parsers as the board
+    # rows so the two never drift. One row per anodising or ENP op.
+    def treatment_rows
+      ops.each_with_index.filter_map do |op, i|
+        if anodising_op?(op)
+          { kind: :anodise, label: op_label(op), vats: vats_for(op),
+            voltage: voltage_for(op), minutes: minutes_for(op),
+            dye: dye_label(i), seal: seal_label }
+        elsif enp_op?(op)
+          { kind: :enp, label: ENP_TYPE_LABELS[enp_type], vats: vats_for(op),
+            thickness: enp_thickness, pretreat: enp_pretreat_label }
+        end
+      end
+    end
+
+    # Library ops carry a display_name; copied/manual ops don't, so fall
+    # back to the first line of the text ("Hard anodise in vat 2 at 20V...").
+    def op_label(op)
+      op["display_name"].presence ||
+        op["operation_text"].to_s.gsub(/\*+/, "").lines.first.to_s.strip.truncate(50)
+    end
+
     def batch_qtys(op, keys)
       return {} unless frozen?
       owner = @wo.process_record_owner

@@ -1,0 +1,41 @@
+<%# app/views/works_orders/_process_facts.html.erb — locals: rows
+    One line per treatment cycle, the same facts the section boards lead
+    with. `rows` is ShopSectionBoard::Job#treatment_rows for the works
+    order (customer_orders/show passes @process_rows[wo.id]). %>
+<% if rows.empty? %>
+  <span class="text-gray-400 italic">No route configured</span>
+<% else %>
+  <div class="space-y-2">
+    <% rows.each do |row| %>
+      <div>
+        <div class="flex flex-wrap items-center gap-1.5">
+          <span class="font-medium text-gray-900"><%= row[:label] %></span>
+          <% if row[:vats].any? %>
+            <span class="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+              <%= row[:vats].map { |v| "Vat #{v}" }.join(" / ") %>
+            </span>
+          <% end %>
+          <% if row[:kind] == :enp && row[:thickness] %>
+            <span class="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+              <%= row[:thickness] %>µm
+            </span>
+          <% end %>
+        </div>
+
+        <% if row[:kind] == :anodise %>
+          <div class="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5 text-xs text-gray-600">
+            <span class="font-bold text-gray-900"><%= row[:voltage] || "—" %> · <%= row[:minutes] ? "#{row[:minutes]} min" : "—" %></span>
+            <% if row[:dye] %>
+              <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800"><%= row[:dye] %></span>
+            <% end %>
+            <span><%= row[:seal] %></span>
+          </div>
+        <% else %>
+          <div class="mt-0.5 text-xs text-gray-600">
+            <span class="text-gray-400">Pretreat:</span> <%= row[:pretreat] %>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+<% end %>

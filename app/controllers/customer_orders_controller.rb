@@ -63,6 +63,15 @@ class CustomerOrdersController < ApplicationController
                                    .includes(:part, :process_group)
                                    .order(created_at: :desc)
 
+    # Headline process facts per row and for the order-level Process card,
+    # read the same way the shop-floor boards read them (ShopSectionBoard::Job
+    # parses vat / voltage / time / dye / seal / ENP type out of the ops).
+    # Built once here: Job#ops walks process_record_owner.operations_for_display,
+    # which regenerates the live route for unfrozen WOs.
+    @process_rows = @works_orders.index_by(&:id).transform_values do |wo|
+      ShopSectionBoard::Job.new(wo).treatment_rows
+    end
+
     # Rows offered a "batch together" checkbox: open, ungrouped, unreleased.
     # Route identity (process fingerprints) is enforced server-side by
     # ProcessGroup.create_for! on submit, not guessed at render time.
