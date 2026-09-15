@@ -17,6 +17,8 @@ module OperationLibrary
       stripping
       stripping_only
       dye
+      double_anodise
+      double_etch
     ].freeze
 
     # Define which process types are extreme pH processes WITHOUT sulphates
@@ -27,6 +29,18 @@ module OperationLibrary
       dichromate_sealing
       stripping
       stripping_only
+      double_anodise
+      double_etch
+    ].freeze
+
+    # Processes that are cascade-rinsed but must NOT trigger bung removal:
+    # stripping (bungs stay in for the following ops) and the double-and-etch
+    # pair (runs before the main anodise, bungs stay in until after it).
+    NO_BUNG_REMOVAL_PROCESSES = %w[
+      stripping
+      stripping_only
+      double_anodise
+      double_etch
     ].freeze
 
     # Define which process types are extreme pH processes WITH sulphates (requiring 5-minute wait)
@@ -102,9 +116,9 @@ module OperationLibrary
     end
 
     # If extreme pH process without sulphates, use standard cascade rinse
-    # BUT skip bung removal for stripping operations (both regular stripping and strip-only)
+    # BUT skip bung removal for stripping and double-and-etch operations
     if EXTREME_PH_SANS_SULPHATES_PROCESSES.include?(previous_operation.process_type)
-      if bungs_present_in_masking?(masking) && !['stripping', 'stripping_only'].include?(previous_operation.process_type)
+      if bungs_present_in_masking?(masking) && !NO_BUNG_REMOVAL_PROCESSES.include?(previous_operation.process_type)
         return operations.find { |op| op.id == 'CASCADE_RINSE_BUNGS' }
       else
         return operations.find { |op| op.id == 'CASCADE_RINSE' }

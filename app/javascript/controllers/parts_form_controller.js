@@ -182,6 +182,13 @@ const SECONDARY_STRIPPING = [
   { value: "metex_dekote", label: "Metex Dekote" }
 ]
 
+const DOUBLE_ETCH_OPTIONS = [
+  { value: "auto", label: "Auto (dyed, non-aerospace)" },
+  { value: "none", label: "None" },
+  { value: "normal", label: "Normal (3 min)" },
+  { value: "matte", label: "Matte (5 min)" }
+]
+
 const DYE_COLORS = [
   { value: "none", label: "No Dye" },
   { value: "BLACK_DYE", label: "Black" },
@@ -444,6 +451,7 @@ export default class extends Controller {
       stripping_method_secondary: "none",
       sealing_method: "none",
       dye_color: "none",
+      double_etch: "auto",
       ptfe_enabled: false,
       local_treatment_type: "none"
     })
@@ -819,6 +827,20 @@ export default class extends Controller {
             ${
               show
                 ? `
+            <!-- Double and Etch (for anodising only) -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Double &amp; Etch</label>
+              <select class="double-etch-select w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-lime-500 focus:border-lime-500 sm:text-sm" data-treatment-id="${treatment.id}">
+                ${optionsHtml(DOUBLE_ETCH_OPTIONS, treatment.double_etch || "auto")}
+              </select>
+            </div>
+            `
+                : ""
+            }
+
+            ${
+              show
+                ? `
             <!-- Sealing Method (for anodising only) -->
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Sealing</label>
@@ -1001,6 +1023,10 @@ export default class extends Controller {
 
     if (has("dye-color-select")) {
       treatment.dye_color = target.value
+    }
+
+    if (has("double-etch-select")) {
+      treatment.double_etch = target.value
     }
 
     if (has("ptfe-checkbox")) {
@@ -1369,6 +1395,7 @@ export default class extends Controller {
         enabled: treatment.dye_color !== "none",
         color: treatment.dye_color !== "none" ? treatment.dye_color : null
       },
+      double_etch: treatment.double_etch || "auto",
       ptfe: { enabled: treatment.ptfe_enabled },
       local_treatment: {
         enabled: treatment.local_treatment_type !== "none",
@@ -1437,6 +1464,14 @@ export default class extends Controller {
         bgColor: "bg-purple-50 border border-purple-200",
         textColor: "text-purple-800",
         autoLabel: '<span class="text-xs text-purple-600 ml-2">(dye operation)</span>'
+      }
+    }
+
+    if (id.startsWith("DOUBLE_ANODISE_") || id.startsWith("DOUBLE_ETCH_")) {
+      style = {
+        bgColor: "bg-lime-50 border border-lime-200",
+        textColor: "text-lime-800",
+        autoLabel: '<span class="text-xs text-lime-600 ml-2">(double and etch)</span>'
       }
     }
 

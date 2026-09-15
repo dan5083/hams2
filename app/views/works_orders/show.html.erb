@@ -1,7 +1,8 @@
-<%# Tab title: first 12 chars of the customer name, then the quantity, so a
-    row of open WO tabs reads "Lufthansa Te, 40" rather than "HAMS 2.0 - Ha…".
-    The layout falls back to the default when a page doesn't provide one. %>
-<% provide :title, "#{@works_order.customer_name.to_s.first(12)}, #{@works_order.quantity}" %>
+<%# Tab title: customer name (hard-cut at 18 chars, no ellipsis - Chrome
+    fades long tab titles itself) then the quantity, so a row of open WO tabs
+    reads "Contracts Engineer, 20" rather than "HAMS 2.0 - Ha…". The layout
+    falls back to the default when a page doesn't provide one. %>
+<% provide :title, "#{@works_order.customer_name.to_s.strip.first(18)}, #{@works_order.quantity}" %>
 
 <% content_for :head do %>
   <%# Signing off redirects back to this exact URL. Turbo treats a redirect to
@@ -169,6 +170,15 @@
     <div class="mt-1 text-base text-gray-600">
       Qty <span class="font-semibold text-gray-800"><%= @works_order.quantity %></span>
     </div>
+    <%# Specified thicknesses (parts.specified_thicknesses, free text from the
+        drawing/spec) - what the operator is aiming for, on screen while the
+        record is scrolled. Omitted when the part has none recorded. %>
+    <% if @works_order.specified_thicknesses.present? %>
+      <div class="mt-2 pt-2 border-t border-gray-100 text-sm text-gray-600">
+        <span class="text-gray-400">Thickness</span>
+        <span class="font-semibold text-gray-800 whitespace-pre-line"><%= @works_order.specified_thicknesses %></span>
+      </div>
+    <% end %>
   </div>
 
   <!-- Main layout: narrow left (details) + wide right (operations preview) -->

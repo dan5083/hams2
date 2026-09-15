@@ -778,6 +778,7 @@ class Part < ApplicationRecord
           stripping: data["stripping"] || {},
           sealing: data["sealing"] || {},
           dye: data["dye"] || {},
+          double_etch: 'none',
           ptfe: data["ptfe"] || {},
           local_treatment: data["local_treatment"] || {}
         }
@@ -814,6 +815,7 @@ class Part < ApplicationRecord
           },
           sealing: data["sealing"].present? ? data["sealing"] : (data["sealing_method"] && data["sealing_method"] != 'none' ? { "enabled" => true, "type" => data["sealing_method"] } : {}),
           dye: data["dye"].present? ? data["dye"] : (data["dye_color"] && data["dye_color"] != 'none' ? { "enabled" => true, "color" => data["dye_color"] } : {}),
+          double_etch: data["double_etch"].presence || 'auto',
           ptfe: data["ptfe"].present? ? data["ptfe"] : { "enabled" => data["ptfe_enabled"] || false },
           local_treatment: data["local_treatment"].present? ? data["local_treatment"] : (data["local_treatment_type"] && data["local_treatment_type"] != 'none' ? { "enabled" => true, "type" => data["local_treatment_type"] } : {})
         }
@@ -882,6 +884,8 @@ class Part < ApplicationRecord
       else
         formatted_treatment["dye_color"] = treatment["dye_color"] || treatment[:dye_color] || 'none'
       end
+
+      formatted_treatment["double_etch"] = treatment["double_etch"] || treatment[:double_etch] || 'auto'
 
       if treatment["ptfe"]
         formatted_treatment["ptfe_enabled"] = treatment["ptfe"]["enabled"] || false
@@ -1287,6 +1291,7 @@ end
     stripping = treatment[:stripping]
     sealing = treatment[:sealing]
     dye = treatment[:dye]
+    double_etch = treatment[:double_etch]
     ptfe = treatment[:ptfe]
     local_treatment = treatment[:local_treatment]
 
@@ -1341,6 +1346,23 @@ end
       strip_op = OperationLibrary::Stripping.get_stripping_operation(stripping[:type], stripping[:method], aerospace_defense: aerospace_defense)
       safe_add_to_sequence(sequence, strip_op, "Stripping")
       safe_add_to_sequence(sequence, get_rinse(strip_op, has_enp, masking), "Rinse after Stripping")
+    end
+
+    # 5.5. Double and etch + cascade rinses (anodising only), before the DeOx.
+    # 'auto' resolves to normal when the treatment is dyed and the part is not
+    # aerospace/defence; an explicit normal/matte/none on the card always wins.
+    if is_anodising?(op)
+      finish = OperationLibrary::DoubleAndEtch.resolve_finish(
+        double_etch,
+        dyed: treatment_dyed?(dye),
+        aerospace_defense: aerospace_defense
+      )
+      if finish
+        OperationLibrary::DoubleAndEtch.operations_for(finish, aerospace_defense: aerospace_defense).each do |de_op|
+          safe_add_to_sequence(sequence, de_op, "Double and Etch")
+          safe_add_to_sequence(sequence, get_rinse(de_op, has_enp, masking), "Rinse after Double and Etch")
+        end
+      end
     end
 
     # 6. Pretreatments + rinses (NOW AFTER STRIPPING for anodising)
@@ -1536,6 +1558,12 @@ end
 
   def is_anodising?(op)
     ['standard_anodising', 'hard_anodising', 'chromic_anodising'].include?(op.process_type)
+  end
+
+  # Dye hash as normalised by get_treatments: enabled flag or a colour present.
+  def treatment_dyed?(dye)
+    return false unless dye.is_a?(Hash)
+    dye["enabled"] == true || dye["enabled"] == "true" || dye["color"].present?
   end
 
   def get_rinse(op, has_enp, masking = {})

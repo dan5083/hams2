@@ -612,6 +612,7 @@
                 <% is_heat_treatment = operation.respond_to?(:enp_heat_treatment?) && operation.enp_heat_treatment? %>
                 <% is_local_treatment = operation.respond_to?(:local_treatment?) && operation.local_treatment? %>
                 <% is_stripping = operation.respond_to?(:stripping?) && operation.stripping? %>
+                <% is_double_etch = operation.respond_to?(:double_and_etch?) && operation.double_and_etch? %>
                 <% bg_color_class = is_auto_inserted ? 'bg-gray-100 border border-gray-300' : 'bg-blue-100 border border-blue-300' %>
                 <% bg_color_class = 'bg-red-50 border border-red-200' if is_water_break_test %>
                 <% bg_color_class = 'bg-yellow-50 border border-yellow-200' if is_foil_verification %>
@@ -619,6 +620,7 @@
                 <% bg_color_class = 'bg-orange-50 border border-orange-200' if is_heat_treatment %>
                 <% bg_color_class = 'bg-teal-50 border border-teal-200' if is_local_treatment %>
                 <% bg_color_class = 'bg-red-100 border border-red-300' if is_stripping %>
+                <% bg_color_class = 'bg-lime-50 border border-lime-200' if is_double_etch %>
                 <% text_color_class = is_auto_inserted ? 'italic text-gray-600' : 'text-gray-900' %>
                 <% text_color_class = 'text-red-800' if is_water_break_test %>
                 <% text_color_class = 'text-yellow-800' if is_foil_verification %>
@@ -626,6 +628,7 @@
                 <% text_color_class = 'text-orange-800' if is_heat_treatment %>
                 <% text_color_class = 'text-teal-800' if is_local_treatment %>
                 <% text_color_class = 'text-red-900' if is_stripping %>
+                <% text_color_class = 'text-lime-800' if is_double_etch %>
 
                 <div class="<%= bg_color_class %> rounded px-3 py-2 flex justify-between items-center">
                   <span class="text-sm <%= text_color_class %>">
@@ -648,6 +651,9 @@
                     <% end %>
                     <% if is_local_treatment %>
                       <span class="text-xs text-teal-600 ml-2">(local treatment)</span>
+                    <% end %>
+                    <% if is_double_etch %>
+                      <span class="text-xs text-lime-600 ml-2">(double and etch)</span>
                     <% end %>
                     <% if is_stripping %>
                       <span class="text-xs text-red-600 ml-2">(strip-only treatment)</span>
