@@ -19,6 +19,7 @@ require Rails.root.join('app', 'operation_library', 'operations', 'pretreatments
 require Rails.root.join('app', 'operation_library', 'operations', 'sealing')
 require Rails.root.join('app', 'operation_library', 'operations', 'water_break_operations')
 require Rails.root.join('app', 'operation_library', 'operations', 'dye')
+require Rails.root.join('app', 'operation_library', 'operations', 'double_and_etch')
 require Rails.root.join('app', 'operation_library', 'operations', 'ptfe')
 require Rails.root.join('app', 'operation_library', 'operations', 'enp_heat_treatments')
 require Rails.root.join('app', 'operation_library', 'operations', 'local_treatment')
