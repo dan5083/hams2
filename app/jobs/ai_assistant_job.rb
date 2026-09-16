@@ -281,9 +281,9 @@ class AiAssistantJob < ApplicationJob
       part number — use it instead of the Part-No. column value.
       The "CS-Order: XXXXX  SerialNo.: XXXXX" text goes into the customer_reference
       field on the WorksOrder.
-      Before creating a Lufthansa customer order, check whether any line requires hard
-      anodising. Put those lines onto their own customer order, numbered as the PO with
-      a leading "_" (e.g. 45231 → _45231).
+      Lufthansa POs are created as a single customer order regardless of process mix —
+      do not split hard anodising lines onto a separate order. (Historic orders may
+      still exist with a leading "_" in the number; that convention is retired.)
     PROMPT
   end
 
@@ -507,10 +507,6 @@ class AiAssistantJob < ApplicationJob
       or similar — this becomes CustomerOrder#number. Take the order date if it's on
       the document; if illegible or absent, leave date_received unset and it defaults
       to today.
-
-      LUFTHANSA: before creating, check the hard-anodise split rule above — if any
-      line requires hard anodising, that line's order gets its own CustomerOrder
-      numbered with a leading "_".
 
       STEP 3 — Check for an existing order first:
         existing = CustomerOrder.find_by(customer_id: customer.id, number: po_number)
