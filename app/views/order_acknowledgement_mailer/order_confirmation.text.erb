@@ -28,12 +28,19 @@ Total Quantity:   <%= @total_quantity %> items
 Total Value:      £<%= number_with_precision(@total_value, precision: 2, delimiter: ',') %>
 ================================================================================
 
+PLEASE SEND ALL FUTURE ORDERS TO orders@hardanodisingstl.com
+--------------------------------------------------------------------------------
+Purchase orders sent to this address are picked up and booked in straight away,
+rather than waiting in an individual's inbox. Please update your records and
+pass this address on to your purchasing team.
+
 IMPORTANT INFORMATION:
 • This is an automated acknowledgement of your order.
 • Orders usually take us between 5-10 working days to complete; however, if
   your works require NADCAP certification or contain multiple processes or
   both, please make allowance for a 15-20 day turnaround.
-• If you have any questions about your order, please contact us.
+• If you have any questions about your order, please call us on 01562 747100
+  quoting order <%= @customer_order.number %>.
 
 Thank you for your business.
 

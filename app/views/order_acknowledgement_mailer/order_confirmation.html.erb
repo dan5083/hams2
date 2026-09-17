@@ -102,6 +102,21 @@
       font-weight: bold;
       color: #1e40af;
     }
+    .orders-note {
+      background-color: #eff6ff;
+      border-left: 4px solid #2563eb;
+      padding: 16px 20px;
+      margin-bottom: 30px;
+      color: #1e40af;
+    }
+    .orders-note p {
+      margin: 0;
+    }
+    .orders-note p + p {
+      margin-top: 8px;
+      font-size: 14px;
+      color: #1e3a8a;
+    }
     .footer {
       margin-top: 40px;
       padding-top: 20px;
@@ -200,11 +215,19 @@
     </table>
   </div>
 
+  <div class="orders-note">
+    <p><strong>Please send all future orders to
+      <a href="mailto:orders@hardanodisingstl.com" style="color: #1e40af;">orders@hardanodisingstl.com</a></strong></p>
+    <p>Purchase orders sent to this address are picked up and booked in straight away,
+      rather than waiting in an individual's inbox. Please update your records and pass
+      this address on to your purchasing team.</p>
+  </div>
+
   <div class="footer">
     <p><strong>Important Information:</strong></p>
     <p>• This is an automated acknowledgement of your order.</p>
     <p>• Orders usually take us between 5-10 working days to complete; however, if your works require NADCAP certification or contain multiple processes or both, please make allowance for a 15-20 day turnaround.</p>
-    <p>• If you have any questions about your order, please contact us.</p>
+    <p>• If you have any questions about your order, please call us on 01562 747100 quoting order <%= @customer_order.number %>.</p>
     <br>
     <p>Thank you for your business.</p>
     <br>
