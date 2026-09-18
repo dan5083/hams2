@@ -1,0 +1,40 @@
+<%# app/views/works_orders/_ocv_choice_field.html.erb
+    One OCV field that is a CHOICE rather than a reading (spec["options"]
+    lists its permitted values) - today "vat_used" on a multi-vat hard
+    anodise. Drawn as a required <select>, never a text box, so the operator
+    picks the vat the batch actually went in and cannot type around it.
+
+    Locals:
+      spec      - the effective op's OCV spec hash (string keys)
+      field     - field name, e.g. "vat_used"
+      batch_key - "1", "2", ... (the batch this row belongs to)
+      row       - op.dig("ocv_readings", batch_key) || {}
+      locked    - true once the batch is signed off (readings are immutable)
+
+    Posts as readings[<batch_key>][<field>], exactly like the text fields, so
+    save_ocv / sign-off need no changes. The `required` attribute stops the
+    browser submitting a sign-off with no vat chosen; the model's
+    required_ocv_fields + assert_option_values! are the backstop.
+%>
+<% options = Array(spec.dig("options", field)).map(&:to_s) %>
+<% label   = spec.dig("labels", field).presence || field.to_s.humanize %>
+<% current = row[field].to_s %>
+<% dom_id  = "readings_#{batch_key}_#{field}" %>
+
+<div class="flex flex-col">
+  <label for="<%= dom_id %>" class="text-xs font-medium text-gray-600 mb-1">
+    <%= label %><span class="text-red-600" title="Required before sign-off">*</span>
+  </label>
+  <% if locked %>
+    <div class="px-2 py-1 text-sm font-semibold text-gray-900 bg-gray-100 rounded border border-gray-200">
+      <%= current.present? ? "Vat #{current}" : "—" %>
+    </div>
+    <%= hidden_field_tag "readings[#{batch_key}][#{field}]", current, id: "#{dom_id}_locked" %>
+  <% else %>
+    <%= select_tag "readings[#{batch_key}][#{field}]",
+          options_for_select([["Select vat…", ""]] + options.map { |v| ["Vat #{v}", v] }, current),
+          id: dom_id,
+          required: true,
+          class: "px-2 py-1 text-sm rounded border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 #{'border-amber-400 bg-amber-50' if current.blank?}" %>
+  <% end %>
+</div>

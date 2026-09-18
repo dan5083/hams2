@@ -22,17 +22,49 @@ module OperationLibrary
     # operator to check it against specification either way, so there is no
     # reading of this job where the figure isn't taken. Aero/defence adds
     # temperature and the voltage trace on top, per IP2007 sequential capture.
-    def self.ocv_spec(operation_text, aerospace_defense)
-      if aerospace_defense
+    #
+    # Where the instruction offers a CHOICE of vats ("in any of vats 1, 3, 9,
+    # 12"), the record must state which one the batch actually went in - on
+    # both bases, aero/defence and general. See with_vat_used below.
+    def self.ocv_spec(operation_text, aerospace_defense, vat_numbers = [])
+      spec = if aerospace_defense
         OcvSpecs.anodise_ramp(total_minutes_from(operation_text))
       else
         OcvSpecs.fields(:film_thickness, basis: :general)
       end
+      with_vat_used(spec, vat_numbers)
     end
 
     def self.total_minutes_from(operation_text)
       match = operation_text.match(/over (\d+) minutes/)
       match ? match[1].to_i : 20
+    end
+
+    VAT_USED_FIELD = "vat_used".freeze
+
+    # The vat actually used is declared as an ordinary OCV field so it rides
+    # the existing per-batch readings mechanism end to end: posted with the
+    # readings, sliced against the spec, frozen with the op, locked by the
+    # batch's sign-off, and - because required_ocv_fields treats every
+    # non-optional field as blocking - REQUIRED before that sign-off. Nothing
+    # new to store, nothing new to guard.
+    #
+    # spec["options"][field] is the list of permitted values. The renderer
+    # draws a select for any field that has one (never a free text box), and
+    # WorksOrder#assert_option_values! refuses anything off the list, so the
+    # record can only ever name a vat the instruction allowed.
+    #
+    # Single-vat ops add nothing: the op text already names the vat, and a
+    # dropdown with one entry is a box to tick, not a fact to record.
+    def self.with_vat_used(spec, vat_numbers)
+      vats = Array(vat_numbers).compact.map(&:to_s)
+      return spec if vats.length < 2
+
+      spec = spec.respond_to?(:deep_stringify_keys) ? spec.deep_stringify_keys : {}
+      spec["fields"]  = (Array(spec["fields"]).map(&:to_s) + [VAT_USED_FIELD]).uniq
+      spec["options"] = (spec["options"] || {}).merge(VAT_USED_FIELD => vats)
+      spec["labels"]  = (spec["labels"]  || {}).merge(VAT_USED_FIELD => "Vat used")
+      spec
     end
 
     private
@@ -49,7 +81,7 @@ module OperationLibrary
         target_thickness: data[:target_thickness],
         vat_numbers: data[:vat_numbers],
         operation_text: operation_text,
-        ocv: ocv_spec(data[:operation_text], aerospace_defense)
+        ocv: ocv_spec(data[:operation_text], aerospace_defense, data[:vat_numbers])
       )
     end
 

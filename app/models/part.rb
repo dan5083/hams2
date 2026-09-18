@@ -1147,8 +1147,88 @@ def generate_file_download_url(index)
   end
 end
 
+# ---------------------------------------------------------------------------
+# File previews (drawing thumbnails on the part page)
+#
+# Cloudinary renders PDFs and images on the fly via URL transformations, so a
+# thumbnail costs nothing to store: we take the secure_url we already keep in
+# customisation_data["files"] and splice a transformation segment in after
+# "/image/upload/". Only files delivered as Cloudinary "image" resources can
+# be transformed - a PDF that was uploaded as resource_type "raw" (URL
+# contains "/raw/upload/") has no rendered preview, and DWG/DXF never do.
+# Those simply get no thumbnail and stay in the files list as before.
+# ---------------------------------------------------------------------------
+
+PREVIEWABLE_EXTENSIONS = %w[pdf png jpg jpeg gif webp].freeze
+
+def file_pdf?(index)
+  file = files[index]
+  return false unless file
+
+  file["content_type"].to_s.downcase == "application/pdf" ||
+    file["original_filename"].to_s.downcase.end_with?(".pdf")
+end
+
+def file_previewable?(index)
+  file = files[index]
+  return false unless file.is_a?(Hash)
+  return false unless file["cloudinary_url"].to_s.include?("/image/upload/")
+
+  content_type = file["content_type"].to_s.downcase
+  ext = File.extname(file["original_filename"].to_s).delete(".").downcase
+
+  content_type.start_with?("image/") ||
+    content_type == "application/pdf" ||
+    PREVIEWABLE_EXTENSIONS.include?(ext)
+end
+
+# Indexes into #files for every file that can be rendered as a thumbnail,
+# in upload order (so the first drawing uploaded is the front of the stack).
+def previewable_file_indexes
+  files.each_index.select { |i| file_previewable?(i) }
+end
+
+def has_previewable_files?
+  previewable_file_indexes.any?
+end
+
+# Small padded JPG of the file (page 1 for PDFs) for the tilted thumbnail.
+def file_thumbnail_url(index, width: 240)
+  return nil unless file_previewable?(index)
+
+  height = (width * 1.35).round
+  transformation = [
+    ("pg_1" if file_pdf?(index)),
+    "w_#{width}",
+    "h_#{height}",
+    "c_pad",
+    "b_white",
+    "f_jpg",
+    "q_auto"
+  ].compact.join(",")
+
+  cloudinary_transformed_url(files[index]["cloudinary_url"], transformation)
+end
+
+# What the modal shows. Images get a large auto-quality render; PDFs get the
+# original document so every page is available in the browser's viewer.
+def file_preview_url(index)
+  return nil unless file_previewable?(index)
+
+  url = files[index]["cloudinary_url"]
+  return url if file_pdf?(index)
+
+  cloudinary_transformed_url(url, "w_1600,c_limit,f_auto,q_auto")
+end
+
 
   private
+
+  def cloudinary_transformed_url(url, transformation)
+    return nil if url.blank?
+
+    url.sub("/image/upload/", "/image/upload/#{transformation}/")
+  end
 
   def must_have_configured_treatments
     # Skip for existing parts

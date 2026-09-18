@@ -224,6 +224,11 @@ class WorksOrder < ApplicationRecord
   #   "operations"  - frozen snapshot; per op:
   #       "sign_offs"    => { "1" => {"id","name"}, ... }  (keyed by batch)
   #       "ocv_readings" => { "1" => {field => value}, ... } (keyed by batch)
+  #                         A field listed in the spec's "options" hash (e.g.
+  #                         "vat_used" => ["1","3","9","12"] on a multi-vat
+  #                         hard anodise) is a CHOICE: drawn as a select,
+  #                         required before sign-off, and only ever one of
+  #                         the listed values - see assert_option_values!
   #       "alternates"   => [ {text, ocv, vat_numbers, ...}, ... ] other ways
   #                         this step may be run (e.g. the same hard anodise
   #                         in a different vat) - frozen with the primary
@@ -1082,8 +1087,12 @@ class WorksOrder < ApplicationRecord
 
       missing = required_ocv_fields(spec, row).select { |f| row[f].to_s.strip.empty? }
       if missing.any?
-        raise "Record #{missing.map(&:humanize).join(', ')}#{wo_scoped ? '' : " for batch #{key}"} before signing off operation #{position}"
+        raise "Record #{missing.map { |f| ocv_field_label(spec, f) }.join(', ')}#{wo_scoped ? '' : " for batch #{key}"} before signing off operation #{position}"
       end
+
+      # A choice field (which vat the batch went in) certifies a fact the
+      # instruction permits - never a free-typed one.
+      assert_option_values!(spec, row, position)
 
       # In-line film thickness (foil verification / ENP ops): a sign-off
       # certifies a COMPLETE set, not merely a non-empty box. Same rules the
@@ -1194,6 +1203,9 @@ class WorksOrder < ApplicationRecord
       spec = effective_operation(op, batch_key.to_s)["ocv"] || {}
       allowed = (spec["fields"] || []).map(&:to_s)
       values = row.to_h.slice(*allowed).transform_values { |v| v.to_s.strip }
+      # A tampered select (or a stale page after a route change) must not
+      # write a vat the instruction never offered.
+      assert_option_values!(spec, values, position)
       cleaned[batch_key.to_s] = values unless values.values.all?(&:blank?)
     end
 
@@ -1209,6 +1221,49 @@ class WorksOrder < ApplicationRecord
     op["ocv_recorded_by"] = signature_for(user)
     customised_process_data_will_change!
     save!
+  end
+
+  # ---------------------------------------------------------------------------
+  # Choice fields: an OCV field whose spec carries "options" => { field =>
+  # [values] } records ONE permitted value rather than a reading. Today that
+  # is "vat_used" on a hard anodise offering several vats (see
+  # OperationLibrary::AnodisingHard.with_vat_used); the mechanism is generic.
+  # ---------------------------------------------------------------------------
+
+  # Permitted values for a choice field on this spec; [] for a free field.
+  def ocv_field_options(spec, field)
+    Array((spec || {}).dig("options", field.to_s)).map(&:to_s)
+  end
+
+  # Human label for an OCV field: the spec's own label if it declares one,
+  # otherwise the humanised field name (matches how errors always read).
+  def ocv_field_label(spec, field)
+    (spec || {}).dig("labels", field.to_s).presence || field.to_s.humanize
+  end
+
+  # The vat this batch actually went in, as recorded on the op's readings.
+  # nil until the operator has picked one; for a single-vat op there is no
+  # choice field and the vat is simply the op's only vat_numbers entry.
+  def vat_used_for(op, batch_key)
+    eop = effective_operation(op, batch_key.to_s)
+    recorded = op.dig("ocv_readings", batch_key.to_s, "vat_used").to_s.strip
+    return recorded if recorded.present?
+
+    vats = Array(eop["vat_numbers"])
+    vats.length == 1 ? vats.first.to_s : nil
+  end
+
+  # Refuse any choice field holding a value the spec does not list. Blank is
+  # not judged here - required_ocv_fields decides whether blank blocks a
+  # sign-off; this only guarantees that whatever IS recorded was permitted.
+  def assert_option_values!(spec, row, position)
+    ((spec || {})["options"] || {}).each do |field, choices|
+      value = row[field.to_s].to_s.strip
+      next if value.empty?
+      permitted = Array(choices).map(&:to_s)
+      next if permitted.include?(value)
+      raise "#{ocv_field_label(spec, field)} '#{value}' is not permitted on operation #{position} (choose from #{permitted.join(', ')})"
+    end
   end
 
   # ---------------------------------------------------------------------------
