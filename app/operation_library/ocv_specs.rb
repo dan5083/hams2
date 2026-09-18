@@ -122,9 +122,58 @@ module OperationLibrary
       haystack = "#{id} #{text}"
       patterns = aerospace_defense ? FALLBACK_PATTERNS : COMMERCIAL_FALLBACK_PATTERNS
       patterns.each do |pattern, spec|
-        return spec.call if haystack.match?(pattern)
+        return with_vat_used(spec.call, vats_in(text)) if haystack.match?(pattern)
       end
       nil
+    end
+
+    # -----------------------------------------------------------------------
+    # Vat choice
+    #
+    # Where an instruction offers a CHOICE of vats the record must state
+    # which one the batch actually went in. Library ops declare their vats
+    # (AnodisingHard.with_vat_used); a copied or manual op has only its
+    # wording, and that wording is not always a library sentence - a stitched
+    # "... in vat 5 . 25V↗️50V over 30 minutes in any of vats 1, 3, 9, 12"
+    # is a real op. So the fallback reads the vats out of the text: every
+    # "vat N" / "vats A, B, C" mention, union, numerically ordered. One vat
+    # (or none) adds nothing - see with_vat_used.
+    #
+    # "VAT Inspection" / "VAT solutions" carry no numbers and never match.
+    # -----------------------------------------------------------------------
+
+    VAT_USED_FIELD = "vat_used".freeze
+
+    VAT_MENTION = /\bvats?\s+(\d+(?:\s*(?:,|and|or|&|\/)\s*\d+)*)/i
+
+    def self.vats_in(text)
+      text.to_s.scan(VAT_MENTION).flatten
+          .flat_map { |list| list.scan(/\d+/) }
+          .uniq
+          .sort_by(&:to_i)
+    end
+
+    # Adds the vat_used choice field to a spec when two or more vats are
+    # offered. The field rides the ordinary per-batch readings mechanism end
+    # to end - posted, sliced against the spec, frozen, locked by sign-off,
+    # and required before it (required_ocv_fields treats every non-optional
+    # field as blocking). spec["options"][field] lists the permitted values:
+    # the renderer draws a select for any field that has one, and
+    # WorksOrder#assert_option_values! refuses anything off the list.
+    #
+    # Returns the spec untouched (same object) for a single vat: the op text
+    # already names it, and a one-entry dropdown is a box to tick, not a
+    # fact to record. Accepts symbol- or string-keyed specs; returns string
+    # keys, matching the shape everything downstream stores.
+    def self.with_vat_used(spec, vat_numbers)
+      vats = Array(vat_numbers).compact.map(&:to_s).uniq
+      return spec if spec.nil? || vats.length < 2
+
+      spec = spec.deep_stringify_keys
+      spec["fields"]  = (Array(spec["fields"]).map(&:to_s) + [VAT_USED_FIELD]).uniq
+      spec["options"] = (spec["options"] || {}).merge(VAT_USED_FIELD => vats)
+      spec["labels"]  = (spec["labels"]  || {}).merge(VAT_USED_FIELD => "Vat used")
+      spec
     end
 
     def self.build(fields, batching:, basis:, optional: nil, required_if: nil, blank_as: nil)

@@ -20,8 +20,15 @@ def self.upload_file(uploaded_file, folder_path, filename_prefix: nil, resource_
     sanitized_name = sanitize_filename(File.basename(original_name, file_extension))
     timestamp = Time.current.strftime("%Y%m%d_%H%M%S")
 
-    # Determine resource type
-    detected_resource_type = if original_name.match?(/\.(pdf|doc|docx)$/i)
+    # Determine resource type. PDFs go up as IMAGE resources: Cloudinary can
+    # then render any page of them on the fly (pg_N,w_...,f_jpg), which is
+    # what the drawing thumbnails and preview modal on parts/works orders
+    # use. Raw is for genuinely opaque documents (Word, DWG, DXF ...) that
+    # Cloudinary can't rasterise - nothing is lost storing them that way.
+    # 'auto' lets Cloudinary classify images/video itself.
+    detected_resource_type = if original_name.match?(/\.pdf$/i)
+                               'image'
+                             elsif original_name.match?(/\.(doc|docx|dwg|dxf|step|stp|iges|igs)$/i)
                                'raw'
                              else
                                'auto'
@@ -82,45 +89,69 @@ def self.upload_file(uploaded_file, folder_path, filename_prefix: nil, resource_
   end
 end
 
-def self.generate_download_url(public_id, options = {})
-  raise ArgumentError, "Public ID is required" if public_id.blank?
-
-  begin
-    # Determine resource type based on file extension
-    resource_type = if public_id.match?(/\.(pdf|doc|docx)$/i)
-                      'raw'
-                    else
-                      'image'
-                    end
-
-    # Build the URL manually for maximum reliability
-    cloud_name = Cloudinary.config.cloud_name
-
-    if resource_type == 'raw'
-      # For raw files, use the simple secure URL without any transformations
-      # This should work reliably for PDFs and documents
-      url = "https://res.cloudinary.com/#{cloud_name}/raw/upload/#{public_id}"
-    else
-      # For images, we can use transformations
-      url = Cloudinary::Utils.cloudinary_url(
-        public_id,
-        {
-          resource_type: 'image',
-          secure: true,
-          flags: 'attachment',
-          type: 'upload'
-        }.merge(options)
-      )
+  # Which Cloudinary resource type an asset lives under, read off the
+  # delivery URL we stored at upload time (".../image/upload/...",
+  # ".../raw/upload/..."). Guessing from the filename is how PDFs ended up
+  # raw in the first place, and how delete_file was sent 'auto' (which
+  # destroy rejects) - the URL is the one thing that is always right.
+  def self.resource_type_for_url(url)
+    case url.to_s
+    when %r{/raw/upload/}   then 'raw'
+    when %r{/video/upload/} then 'video'
+    else 'image'
     end
+  end
 
-    Rails.logger.info "Generated Cloudinary download URL for #{public_id}: #{url}"
-    url
-
-  rescue => e
-    Rails.logger.error "Error generating Cloudinary download URL for #{public_id}: #{e.message}"
+  # File format (delivery extension) from a stored URL, e.g. "pdf".
+  def self.format_for_url(url)
+    ext = File.extname(URI.parse(url.to_s).path.to_s).delete('.').downcase
+    ext.presence
+  rescue URI::InvalidURIError
     nil
   end
-end
+
+  # Download URL. Pass the asset's stored `url:` so resource type and format
+  # come from what was actually uploaded; without it we fall back to the
+  # legacy name-based guess (raw for a public_id ending .pdf/.doc/.docx).
+  def self.generate_download_url(public_id, options = {})
+    raise ArgumentError, "Public ID is required" if public_id.blank?
+
+    begin
+      stored_url    = options.delete(:url)
+      resource_type = options.delete(:resource_type) ||
+                      (stored_url ? resource_type_for_url(stored_url) : (public_id.match?(/\.(pdf|doc|docx)$/i) ? 'raw' : 'image'))
+      format        = options.delete(:format) || (stored_url ? format_for_url(stored_url) : nil)
+
+      cloud_name = Cloudinary.config.cloud_name
+
+      url = if resource_type == 'raw'
+        # Raw assets: plain secure URL, no transformations (the public_id
+        # already carries the extension for raw uploads).
+        "https://res.cloudinary.com/#{cloud_name}/raw/upload/#{public_id}"
+      else
+        # Image/video assets: fl_attachment forces a download; the format
+        # keeps the original extension (a PDF stored as an image resource
+        # has no extension in its public_id, so it must be passed here).
+        Cloudinary::Utils.cloudinary_url(
+          public_id,
+          {
+            resource_type: resource_type,
+            format: format,
+            secure: true,
+            flags: 'attachment',
+            type: 'upload'
+          }.compact.merge(options)
+        )
+      end
+
+      Rails.logger.info "Generated Cloudinary download URL for #{public_id}: #{url}"
+      url
+
+    rescue => e
+      Rails.logger.error "Error generating Cloudinary download URL for #{public_id}: #{e.message}"
+      nil
+    end
+  end
 
   # Generate view URL (for displaying in browser)
   def self.generate_view_url(public_id, options = {})
@@ -139,9 +170,13 @@ end
     end
   end
 
-  # Delete file from Cloudinary
-  def self.delete_file(public_id, resource_type: 'auto')
+  # Delete file from Cloudinary. destroy() needs a concrete resource type
+  # ('auto' is upload-only and comes back "not found"), so pass either
+  # resource_type: or the asset's stored url: and it is derived from that.
+  def self.delete_file(public_id, resource_type: nil, url: nil)
     raise ArgumentError, "Public ID is required" if public_id.blank?
+
+    resource_type ||= url ? resource_type_for_url(url) : (public_id.match?(/\.(pdf|doc|docx)$/i) ? 'raw' : 'image')
 
     begin
       result = Cloudinary::Uploader.destroy(public_id, resource_type: resource_type)

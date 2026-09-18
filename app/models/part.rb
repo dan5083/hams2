@@ -1087,9 +1087,11 @@ def delete_file(index)
   cloudinary_public_id = file_to_delete["cloudinary_public_id"]
 
   begin
-    # Delete from Cloudinary first (following NCR pattern)
+    # Delete from Cloudinary first (following NCR pattern). The stored URL
+    # tells the service whether this is an image or raw asset - without it
+    # destroy() was sent 'auto' and silently deleted nothing.
     if cloudinary_public_id.present?
-      CloudinaryService.delete_file(cloudinary_public_id)
+      CloudinaryService.delete_file(cloudinary_public_id, url: file_to_delete["cloudinary_url"])
       Rails.logger.info "Deleted Cloudinary file for Part #{display_name}: #{cloudinary_public_id}"
     end
   rescue => e
@@ -1139,8 +1141,9 @@ def generate_file_download_url(index)
   return nil unless cloudinary_public_id.present?
 
   begin
-    # Use the same method as NCRs to generate download URL
-    CloudinaryService.generate_download_url(cloudinary_public_id)
+    # Same method as NCRs; the stored URL fixes the resource type and format
+    # (PDFs are image resources now, so the name alone can't tell).
+    CloudinaryService.generate_download_url(cloudinary_public_id, url: file["cloudinary_url"])
   rescue => e
     Rails.logger.error "Failed to generate download URL for Part #{display_name} file #{index}: #{e.message}"
     nil

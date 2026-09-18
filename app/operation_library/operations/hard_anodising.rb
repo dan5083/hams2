@@ -40,31 +40,14 @@ module OperationLibrary
       match ? match[1].to_i : 20
     end
 
-    VAT_USED_FIELD = "vat_used".freeze
+    VAT_USED_FIELD = OcvSpecs::VAT_USED_FIELD
 
-    # The vat actually used is declared as an ordinary OCV field so it rides
-    # the existing per-batch readings mechanism end to end: posted with the
-    # readings, sliced against the spec, frozen with the op, locked by the
-    # batch's sign-off, and - because required_ocv_fields treats every
-    # non-optional field as blocking - REQUIRED before that sign-off. Nothing
-    # new to store, nothing new to guard.
-    #
-    # spec["options"][field] is the list of permitted values. The renderer
-    # draws a select for any field that has one (never a free text box), and
-    # WorksOrder#assert_option_values! refuses anything off the list, so the
-    # record can only ever name a vat the instruction allowed.
-    #
-    # Single-vat ops add nothing: the op text already names the vat, and a
-    # dropdown with one entry is a box to tick, not a fact to record.
+    # The vat actually used is an ordinary OCV field with a permitted-values
+    # list; the mechanism lives in OcvSpecs.with_vat_used (shared with the
+    # pattern fallback, which parses the vats out of copied/manual op text).
+    # Kept here as a delegate so library code and console fixes read the same.
     def self.with_vat_used(spec, vat_numbers)
-      vats = Array(vat_numbers).compact.map(&:to_s)
-      return spec if vats.length < 2
-
-      spec = spec.respond_to?(:deep_stringify_keys) ? spec.deep_stringify_keys : {}
-      spec["fields"]  = (Array(spec["fields"]).map(&:to_s) + [VAT_USED_FIELD]).uniq
-      spec["options"] = (spec["options"] || {}).merge(VAT_USED_FIELD => vats)
-      spec["labels"]  = (spec["labels"]  || {}).merge(VAT_USED_FIELD => "Vat used")
-      spec
+      OcvSpecs.with_vat_used(spec, vat_numbers)
     end
 
     private
