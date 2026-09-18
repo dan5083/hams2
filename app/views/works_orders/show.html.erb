@@ -192,15 +192,15 @@
         <div class="flex justify-between items-start mb-4">
           <h2 class="text-lg font-semibold text-gray-900">Basic Details</h2>
 
-          <%# Tilted drawing thumbnails for the part: newest upload on top, click to open the modal (bottom of page). %>
+          <%# Drawing/photo thumbnails for the part, newest first; click opens the modal at the bottom of the page. %>
           <% wo_part = @works_order.part %>
-          <% preview_indexes = wo_part ? wo_part.previewable_file_indexes.last(3).reverse : [] %>
+          <% preview_indexes = wo_part ? wo_part.previewable_file_indexes.reverse : [] %>
           <% if preview_indexes.any? %>
-            <div class="part-doc-stack relative flex-shrink-0 -mt-2 mr-2" style="width: 5.5rem; height: 6.25rem;" title="Click to view drawing">
-              <% preview_indexes.each_with_index do |file_index, stack_position| %>
+            <div class="flex items-start gap-2 flex-shrink-0 -mt-1" title="Click to view drawing">
+              <% preview_indexes.first(4).each do |file_index| %>
                 <button type="button"
-                        class="part-doc-thumb absolute top-0 right-0 w-16 h-20 bg-white border border-gray-200 rounded shadow-md overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        style="transform: rotate(<%= [-7, 5, -3][stack_position] %>deg) translateX(-<%= stack_position * 6 %>px); z-index: <%= 10 - stack_position %>;"
+                        class="part-doc-thumb w-14 bg-white border border-gray-200 rounded shadow-sm overflow-hidden focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        style="height: 4.5rem;"
                         data-part-file-preview
                         data-preview-url="<%= wo_part.file_preview_url(file_index) %>"
                         data-preview-kind="<%= wo_part.file_pdf?(file_index) ? 'pdf' : 'image' %>"
@@ -212,6 +212,11 @@
                        loading="lazy"
                        class="w-full h-full object-cover pointer-events-none">
                 </button>
+              <% end %>
+              <% if preview_indexes.length > 4 %>
+                <%= link_to "+#{preview_indexes.length - 4}", part_path(wo_part),
+                    class: "w-14 flex items-center justify-center text-xs font-medium text-gray-500 border border-dashed border-gray-300 rounded",
+                    style: "height: 4.5rem;", title: "All files on the part" %>
               <% end %>
             </div>
           <% end %>
@@ -868,7 +873,10 @@
                           <%
                             # Suggestions depend on field + operation text only, never on
                             # the batch - compute once per field, not once per batch.
-                            suggestions = fields.index_with { |f| ocv_suggestions(f, eop["operation_text"]) }
+                            # A field with a permitted-values list in the spec (vat_used on a
+                            # multi-vat anodise) offers exactly that list, same as PASS/FAIL;
+                            # save_ocv_readings! refuses anything off it.
+                            suggestions = fields.index_with { |f| @works_order.ocv_field_options(spec, f).presence || ocv_suggestions(f, eop["operation_text"]) }
                           %>
                           <div class="space-y-1">
                             <% if fields.any? %>
@@ -899,13 +907,6 @@
                                       Array(v).map { |x| x.to_s.strip.upcase }.include?(row[f].to_s.strip.upcase)
                                     }
                                   %>
-                                  <% if @works_order.ocv_field_options(spec, field).any? %>
-                                    <%# Choice field (e.g. vat_used on a multi-vat hard anodise): a
-                                        required <select> of the spec's permitted values, never a text box. %>
-                                    <%= render "works_orders/ocv_choice_field",
-                                        spec: spec, field: field, batch_key: active_key, row: row, locked: locked %>
-                                    <% next %>
-                                  <% end %>
                                   <label class="flex items-center gap-1 text-xs text-gray-600">
                                     <%= field.humanize %>
                                     <% sugg = suggestions[field] %>
@@ -1691,11 +1692,11 @@ function printRouteCard(url) {
   </div>
 
   <style>
-    .part-doc-thumb { transition: transform 150ms ease, box-shadow 150ms ease; cursor: zoom-in; }
+    .part-doc-thumb { position: relative; transition: transform 150ms ease, box-shadow 150ms ease; cursor: zoom-in; }
     .part-doc-thumb:hover,
     .part-doc-thumb:focus-visible {
-      transform: rotate(0deg) scale(1.2) !important;
-      z-index: 30 !important;
+      transform: scale(1.15);
+      z-index: 30;
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
     }
   </style>
