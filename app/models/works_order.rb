@@ -508,7 +508,10 @@ class WorksOrder < ApplicationRecord
     qtys
   end
 
-  def set_parts_per_batch!(per_batch)
+  # section_key: "base" (default) or a fork's from_position - every batch
+  # section, not just the WO's own, can be re-derived. Earlier this was
+  # base-only, so a fork's structure was fixed at add_fork! for life.
+  def set_parts_per_batch!(per_batch, section_key: "base")
     assert_record_open!
     per_batch = per_batch.to_i
     raise "Parts per batch must be at least 1" if per_batch < 1
@@ -520,26 +523,28 @@ class WorksOrder < ApplicationRecord
       raise "#{per_batch} per batch on #{record_quantity} parts gives #{count} batches (max #{MAX_BATCHES})"
     end
 
-    highest_used = highest_recorded_batch
+    section = find_section!(section_key)
+    highest_used = section_highest_recorded_batch(section)
     raise "Batch #{highest_used} already has records; cannot reduce to #{count} batches" if count < highest_used
 
     # Refuse rather than reconcile: a signed batch's quantity is part of what
     # the sign-off certified.
-    clashes = signed_batch_numbers.select { |n| derived[n].to_s != process_batch_qty(n).to_s }
+    clashes = section_signed_batch_numbers(section).select { |n| derived[n].to_s != section_batch_qty(section, n).to_s }
     if clashes.any?
       raise "Batch #{clashes.join(', ')} already signed off at a different quantity; " \
             "re-batching would rewrite the record"
     end
 
     freeze_operations!
-    batches = customised_process_data["batches"] ||= []
+    data = find_section!(section_key)["data"] # re-resolve after freeze
+    batches = data["batches"] ||= []
     derived.each do |n, qty|
       entry = batches.find { |b| b["number"] == n } || (batches << { "number" => n }).last
       entry["qty"] = qty.to_s
     end
     batches.reject! { |b| b["number"].to_i > count }
-    customised_process_data["batch_count"] = count
-    customised_process_data["parts_per_batch"] = per_batch
+    data["batch_count"] = count
+    data["parts_per_batch"] = per_batch
     customised_process_data_will_change!
     save!
   end
@@ -792,19 +797,25 @@ class WorksOrder < ApplicationRecord
 
   # qtys: { "1" => "20", "2" => "13" } - parts per batch, recorded like the
   # route card's Qty column. Editable; the sign-offs are the immutable record.
-  def set_batch_count!(count, qtys = {})
+  # section_key: "base" or a fork's from_position. This is the escape hatch
+  # that lets a fork GROW after its first batch is signed - the everyday case
+  # being "fork at 1 x N, correct B1 to what actually fit on the rack, sign it,
+  # then need B2, B3...". Without a section-aware count that WO was stranded:
+  # add_fork! sets the count once and remove_fork! refuses once records exist.
+  def set_batch_count!(count, qtys = {}, section_key: "base")
     assert_record_open!
     count = count.to_i
     raise "Batch count must be between 1 and #{MAX_BATCHES}" unless (1..MAX_BATCHES).cover?(count)
 
-    highest_used = highest_recorded_batch
+    highest_used = section_highest_recorded_batch(find_section!(section_key))
     raise "Batch #{highest_used} already has records; cannot reduce below it" if count < highest_used
 
     freeze_operations!
-    customised_process_data["batch_count"] = count
+    data = find_section!(section_key)["data"] # re-resolve after freeze
+    data["batch_count"] = count
     # A hand-set count no longer follows from a parts-per-batch figure.
-    customised_process_data.delete("parts_per_batch")
-    batches = customised_process_data["batches"] ||= []
+    data.delete("parts_per_batch")
+    batches = data["batches"] ||= []
     (qtys || {}).each do |number, qty|
       n = number.to_i
       next unless (1..count).cover?(n)

@@ -315,12 +315,13 @@ class WorksOrdersController < ApplicationController
   # size and let the count and the remainder batch fall out.
   def set_parts_per_batch
     return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
-    @works_order.set_parts_per_batch!(params[:parts_per_batch])
-    count = @works_order.process_batch_count
-    redirect_to works_order_path(@works_order),
+    section_key = params[:section].presence || "base"
+    @works_order.set_parts_per_batch!(params[:parts_per_batch], section_key: section_key)
+    count = @works_order.section_batch_count(@works_order.find_section!(section_key))
+    redirect_to works_order_path(@works_order, batch: return_base_batch, fb: fork_batch_params.presence),
                 notice: "Batched at #{params[:parts_per_batch]} per batch: #{count} batch#{'es' unless count == 1}."
   rescue => e
-    redirect_to works_order_path(@works_order), alert: e.message
+    redirect_to works_order_path(@works_order, batch: return_base_batch, fb: fork_batch_params.presence), alert: e.message
   end
 
   # Paperless process record: correct a single batch's quantity (short load,
@@ -356,10 +357,12 @@ class WorksOrdersController < ApplicationController
 
   def set_batch_count
     return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
-    @works_order.set_batch_count!(params[:batch_count], params.fetch(:batch_qtys, {}).permit!.to_h)
-    redirect_to works_order_path(@works_order), notice: "Batch count set to #{params[:batch_count]}."
+    @works_order.set_batch_count!(params[:batch_count], params.fetch(:batch_qtys, {}).permit!.to_h,
+                                  section_key: params[:section].presence || "base")
+    redirect_to works_order_path(@works_order, batch: return_base_batch, fb: fork_batch_params.presence),
+                notice: "Batch count set to #{params[:batch_count]}."
   rescue => e
-    redirect_to works_order_path(@works_order), alert: e.message
+    redirect_to works_order_path(@works_order, batch: return_base_batch, fb: fork_batch_params.presence), alert: e.message
   end
 
   private
