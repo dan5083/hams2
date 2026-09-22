@@ -1646,11 +1646,9 @@ class WorksOrder < ApplicationRecord
 
     # update_column also bypasses the after_update auto-close, which is why
     # fully-released WOs sat open forever with stale customer-order counts.
-    # Close here and refresh the order's counter cache directly.
-    if fully_released? && is_open? && !voided?
-      update_column(:is_open, false)
-      update_customer_order_counts
-    end
+    # Sync here (close on full release, reopen if a voided RN leaves parts
+    # unreleased) and refresh the order's counter cache directly.
+    sync_open_status!
   end
 
   # Route card information for shop floor
@@ -1841,13 +1839,32 @@ class WorksOrder < ApplicationRecord
     part_id_changed?
   end
 
+  # after_update: is_open tracks fully_released? in BOTH directions. Closing on
+  # full release is the obvious half. Reopening matters for rework: a customer
+  # sends parts back on the original PO, the WO quantity gets +1, and the WO
+  # is under-released again - but it was closed by the earlier release, and a
+  # closed WO's process record is read-only (assert_record_open!). For a
+  # process group member that read-only'd the whole bar ("PGnn is complete")
+  # so the rework batch could never be signed. Reopening on the quantity bump
+  # reopens the record; the rework goes on as a new batch.
+  #
+  # NB attribute_changed? is always false inside after_* callbacks (Rails 5.1+
+  # applies changes first), so the old `voided_changed?` guard never fired.
+  # Voiding is a separate path (void!/unvoid!) and sync_open_status! leaves a
+  # voided WO alone.
   def update_open_status
-    return if voided_changed? # Don't auto-update if manually voided
+    return if saved_change_to_voided? # Don't auto-update if manually voided
+    sync_open_status!
+  end
 
-    # Close if fully released
-    if fully_released? && is_open?
-      update_column(:is_open, false)
-    end
+  # is_open mirrors "parts still to release", unless voided. update_column
+  # bypasses callbacks, so refresh the customer-order counts ourselves.
+  def sync_open_status!
+    return if voided?
+    want_open = !fully_released?
+    return if is_open? == want_open
+    update_column(:is_open, want_open)
+    update_customer_order_counts
   end
 
   def leave_process_group
