@@ -833,6 +833,20 @@ class WorksOrder < ApplicationRecord
     save!
   end
 
+  # Append ONE batch to a section, leaving every existing batch exactly as it
+  # is. This is the everyday way a record grows: how many loads a job takes
+  # is only known once the earlier loads have been signed at whatever fitted
+  # on the rack, so "set the count up front" is unanswerable. Optional qty
+  # for the new batch. Drops parts_per_batch - the structure is hand-built
+  # from here. Returns the new batch number.
+  def add_batch!(section_key: "base", qty: nil)
+    section = find_section!(section_key)
+    n = section_batch_count(section) + 1
+    raise "#{display_name} already has #{MAX_BATCHES} batches in this section" if n > MAX_BATCHES
+    set_batch_count!(n, { n.to_s => qty }, section_key: section_key)
+    n
+  end
+
   # Correct one batch's quantity without disturbing the rest of the structure -
   # short loads, scrapped parts, a batch split across two racks.
   #

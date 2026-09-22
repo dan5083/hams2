@@ -80,6 +80,7 @@ Rails.application.routes.draw do
       patch :undo_sign_off
       patch :save_ocv
       patch :set_batch_count
+      patch :add_batch
       patch :set_parts_per_batch
       patch :set_batch_qty
       patch :add_operation_note

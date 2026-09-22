@@ -524,6 +524,14 @@
                 <% end %>
               <% end %>
 
+              <%= form_with url: add_batch_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex items-center gap-1" do %>
+                <%= hidden_field_tag :section, "base", id: nil %>
+                <%= hidden_field_tag :base_batch, active_batch, id: nil %>
+                <% active_fb.each do |k, v| %><%= hidden_field_tag "fb[#{k}]", v, id: nil %><% end %>
+                <%= number_field_tag :qty, nil, min: 1, placeholder: "qty", id: nil,
+                    class: "border border-gray-300 rounded px-1 py-1 text-sm w-16" %>
+                <%= submit_tag "+ Add batch", class: "bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-2 py-1 rounded" %>
+              <% end %>
               <div class="ml-auto flex items-center gap-1">
                 <% if active_batch > 1 %>
                   <%= link_to "‹ B#{active_batch - 1}", works_order_path(@works_order, batch: active_batch - 1, fb: active_fb.presence),
@@ -729,6 +737,14 @@
                         <% end %>
                         <%= submit_tag "Set", class: "bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium px-2 py-1 rounded" %>
                       <% end %>
+                    <% end %>
+                    <%= form_with url: add_batch_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex items-center gap-1" do %>
+                      <%= hidden_field_tag :section, f_key, id: nil %>
+                      <%= hidden_field_tag :base_batch, active_batch, id: nil %>
+                      <% active_fb.each do |k, v| %><%= hidden_field_tag "fb[#{k}]", v, id: nil %><% end %>
+                      <%= number_field_tag :qty, nil, min: 1, placeholder: "qty", id: nil,
+                          class: "border border-gray-300 rounded px-1 py-1 text-sm w-16" %>
+                      <%= submit_tag "+ Add batch", class: "bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-2 py-1 rounded" %>
                     <% end %>
                     <div class="ml-auto flex items-center gap-1">
                       <% if f_active > 1 %>
