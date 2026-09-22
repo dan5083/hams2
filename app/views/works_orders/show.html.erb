@@ -506,6 +506,20 @@
                   <span class="text-xs text-gray-500">Qty</span>
                   <%= number_field_tag :qty, active_entry["qty"], min: 1,
                       class: "border border-gray-300 rounded px-1 py-1 text-sm w-16" %>
+                  <% if @works_order.process_lead? %>
+                    <%# Which members' parts are on this batch. Blank sentinel
+                        keeps wos[] in the params when nothing is ticked, which
+                        set_batch_qty! reads as "the whole bar". %>
+                    <%= hidden_field_tag "wos[]", "", id: nil %>
+                    <% on_batch = @works_order.section_batch_wos(wo_sections.first, active_batch) %>
+                    <span class="text-xs text-gray-500 ml-1">on bar:</span>
+                    <% @works_order.process_group.members.where(voided: false).each do |m| %>
+                      <label class="text-xs text-gray-700 inline-flex items-center gap-1">
+                        <%= check_box_tag "wos[]", m.display_name, (on_batch.empty? || on_batch.include?(m.display_name)), id: nil, class: "rounded border-gray-300" %>
+                        <%= m.display_name %>
+                      </label>
+                    <% end %>
+                  <% end %>
                   <%= submit_tag "Set", class: "bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium px-2 py-1 rounded" %>
                 <% end %>
               <% end %>
@@ -699,6 +713,20 @@
                         <span class="text-xs text-gray-500">Qty</span>
                         <%= number_field_tag :qty, f_entry["qty"], min: 1,
                             class: "border border-gray-300 rounded px-1 py-1 text-sm w-16" %>
+                        <% if @works_order.process_lead? %>
+                          <%# Which members' parts are on this batch. Blank sentinel
+                              keeps wos[] in the params when nothing is ticked, which
+                              set_batch_qty! reads as "the whole bar". %>
+                          <%= hidden_field_tag "wos[]", "", id: nil %>
+                          <% on_batch = @works_order.section_batch_wos(fork_sec, f_active) %>
+                          <span class="text-xs text-gray-500 ml-1">on bar:</span>
+                          <% @works_order.process_group.members.where(voided: false).each do |m| %>
+                            <label class="text-xs text-gray-700 inline-flex items-center gap-1">
+                              <%= check_box_tag "wos[]", m.display_name, (on_batch.empty? || on_batch.include?(m.display_name)), id: nil, class: "rounded border-gray-300" %>
+                              <%= m.display_name %>
+                            </label>
+                          <% end %>
+                        <% end %>
                         <%= submit_tag "Set", class: "bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium px-2 py-1 rounded" %>
                       <% end %>
                     <% end %>
@@ -713,6 +741,34 @@
                       <% end %>
                     </div>
                   </div>
+                  <!-- Restructure THIS fork's batches - same two controls as the
+                       base card, posting section=<from_position>. Growing the
+                       count is the escape hatch once B1 is signed (a fork
+                       can't be removed by then). -->
+                  <details class="text-xs">
+                    <summary class="cursor-pointer select-none text-gray-500 hover:text-gray-700">Set batches for this fork</summary>
+                    <div class="flex flex-wrap items-center gap-4 mt-2">
+                      <%= form_with url: set_parts_per_batch_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex items-center gap-2" do %>
+                        <%= hidden_field_tag :section, f_key %>
+                        <%= hidden_field_tag :base_batch, active_batch %>
+                        <% active_fb.each do |k, v| %><%= hidden_field_tag "fb[#{k}]", v %><% end %>
+                        <span class="text-gray-500">Parts per batch</span>
+                        <%= number_field_tag :parts_per_batch, @works_order.section_parts_per_batch(fork_sec) || @works_order.record_quantity, min: 1, max: @works_order.record_quantity,
+                            id: nil, class: "border border-gray-300 rounded px-2 py-1 text-sm w-20" %>
+                        <%= submit_tag "Set batches", class: "bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium px-2 py-1 rounded" %>
+                      <% end %>
+                      <%= form_with url: set_batch_count_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex items-center gap-2" do %>
+                        <%= hidden_field_tag :section, f_key %>
+                        <%= hidden_field_tag :base_batch, active_batch %>
+                        <% active_fb.each do |k, v| %><%= hidden_field_tag "fb[#{k}]", v %><% end %>
+                        <span class="text-gray-500">Batches</span>
+                        <%= number_field_tag :batch_count, f_count, min: 1, max: WorksOrder::MAX_BATCHES,
+                            id: nil, class: "border border-gray-300 rounded px-2 py-1 text-sm w-20" %>
+                        <%= submit_tag "Update", class: "bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium px-2 py-1 rounded" %>
+                        <span class="text-gray-400">Quantities are then set per batch above.</span>
+                      <% end %>
+                    </div>
+                  </details>
                 </div>
               <% elsif fork_by_from[position.to_i] %>
                 <% current_sec = fork_by_from[position.to_i] %>
@@ -928,7 +984,7 @@
                                 <%= render "works_orders/film_thickness_field",
                                     op: eop, ops: ops_for_display, position: position,
                                     active_key: active_key, field: thickness_field, row: row,
-                                    locked: locked, section_batch: sec_active,
+                                    locked: locked, section_batch: sec_active, section: current_sec,
                                     nadcap: @works_order.nadcap_for_op?(eop),
                                     parts_per_batch: @works_order.section_batch_qty(current_sec, active_key),
                                     foil_fields: foil_fields,

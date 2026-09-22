@@ -11,14 +11,17 @@
 
   Locals:
     op, ops, position, active_key, field, row, locked, nadcap, parts_per_batch,
-    section_batch (integer batch number for labels), form_id,
+    section_batch (integer batch number for labels), section (optional; the
+    batch section hash, used to scope per-WO member rows), form_id,
     foil_fields (foil verification check fields to draw inside the card, [] for none)
 %>
 <%
   raw           = row[field]
   enp           = (field == FilmThickness::ENP_FIELD)
   per_wo        = !enp && @works_order.thickness_per_works_order?
-  members       = per_wo ? @works_order.thickness_member_labels : []
+  # Scoped to the WOs actually on this batch (a rework batch on a group lead
+  # may carry one member's single part); nil section = whole bar as before.
+  members       = per_wo ? @works_order.thickness_member_labels(section: local_assigns[:section], batch: section_batch) : []
   target        = film_thickness_target_for(ops, op)
   display_name  = film_thickness_display_name(ops, op)
   input_name    = "readings[#{active_key}][#{field}]"

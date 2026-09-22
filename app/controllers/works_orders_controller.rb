@@ -328,7 +328,10 @@ class WorksOrdersController < ApplicationController
   # scrapped part) without re-deriving the whole structure.
   def set_batch_qty
     return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
-    @works_order.set_batch_qty!(params[:batch], params[:qty], section_key: params[:section].presence || "base")
+    # wos[] arrives only from a group lead's form (with a blank sentinel so
+    # "none ticked" still posts the key); absent means don't touch the list.
+    wos = params.key?(:wos) ? Array(params[:wos]) : nil
+    @works_order.set_batch_qty!(params[:batch], params[:qty], section_key: params[:section].presence || "base", wos: wos)
     redirect_to works_order_path(@works_order, batch: return_base_batch, fb: fork_batch_params.presence),
                 notice: "Batch #{params[:batch]} quantity updated."
   rescue => e

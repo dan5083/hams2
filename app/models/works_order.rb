@@ -616,6 +616,13 @@ class WorksOrder < ApplicationRecord
     section_batches(section).find { |b| b["number"] == batch_number.to_i }&.dig("date")
   end
 
+  # Which works orders' parts are on this batch, by display name - only ever
+  # set on a process group lead. Absent/empty means "every member of the bar"
+  # (the whole-load default, and every batch recorded before this existed).
+  def section_batch_wos(section, batch_number)
+    Array(section_batches(section).find { |b| b["number"] == batch_number.to_i }&.dig("wos")).reject(&:blank?)
+  end
+
   # Operation positions a section covers: from its fork point up to the next
   # fork (exclusive), or the end of the card.
   def section_position_range(section)
@@ -828,7 +835,11 @@ class WorksOrder < ApplicationRecord
 
   # Correct one batch's quantity without disturbing the rest of the structure -
   # short loads, scrapped parts, a batch split across two racks.
-  def set_batch_qty!(batch_number, qty, section_key: "base")
+  #
+  # wos: (group lead only) display names of the members whose parts are on
+  # this batch; nil leaves the stored list alone, [] clears it back to "the
+  # whole bar". Names not on the group are ignored.
+  def set_batch_qty!(batch_number, qty, section_key: "base", wos: nil)
     assert_record_open!
     freeze_operations!
     section = find_section!(section_key)
@@ -838,6 +849,11 @@ class WorksOrder < ApplicationRecord
     batches = (section["data"]["batches"] ||= [])
     entry = batches.find { |b| b["number"] == n } || (batches << { "number" => n }).last
     qty.to_s.strip.empty? ? entry.delete("qty") : entry["qty"] = qty.to_s.strip
+    if !wos.nil? && process_lead?
+      valid = process_group.members.pluck(:number).map { |num| "WO#{num}" }
+      chosen = Array(wos).map(&:to_s).reject(&:blank?) & valid
+      chosen.empty? ? entry.delete("wos") : entry["wos"] = chosen
+    end
     customised_process_data_will_change!
     save!
   end
@@ -924,9 +940,18 @@ class WorksOrder < ApplicationRecord
 
   # Works orders a per-WO thickness set must cover: the bar's members for a
   # grouped record, otherwise just this one. [{ wo:, label: }]
-  def thickness_member_labels
+  #
+  # section/batch: narrow to the WOs recorded as being ON that batch
+  # (section_batch_wos). A rework batch on a fully-released bar carries one
+  # member's single part, not the whole manifest - it must not demand 8
+  # readings from every WO on the group.
+  def thickness_member_labels(section: nil, batch: nil)
     owner = process_record_owner
-    members = owner.grouped? ? owner.process_group.members.where(voided: false) : [owner]
+    members = owner.grouped? ? owner.process_group.members.where(voided: false).to_a : [owner]
+    if section && batch
+      on_batch = owner.section_batch_wos(section, batch)
+      members = members.select { |w| on_batch.include?(w.display_name) } if on_batch.any?
+    end
     members.map { |w| { wo: w.display_name, label: "#{w.display_name} · #{w.part_number}" } }
   end
 
@@ -1113,7 +1138,7 @@ class WorksOrder < ApplicationRecord
           eop, row,
           parts_per_batch: (wo_scoped ? nil : section_batch_qty(section, key)),
           nadcap: nadcap_for_op?(op),
-          per_wo: (thickness_per_works_order? ? thickness_member_labels.map { |m| m[:wo] } : nil)
+          per_wo: (thickness_per_works_order? ? thickness_member_labels(section: section, batch: key).map { |m| m[:wo] } : nil)
         )
         if problems.any?
           raise "Film thickness for batch #{key} is incomplete: #{problems.first} (operation #{position})"
