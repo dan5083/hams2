@@ -22,6 +22,12 @@ class PurchaseOrderService
     { quality: "auto:eco" }
   ].freeze
 
+  # First-page thumbnail for the order page card — same size and crop as the
+  # drawing thumbnails on the works order page. Built at attach time and
+  # stored in po_document["thumbnail_url"], because that's the only moment
+  # we know what the asset actually is (a PDF page vs a scanned image).
+  THUMBNAIL_TRANSFORMATION = { width: 224, height: 288, crop: "fill", gravity: "north", quality: "auto" }.freeze
+
   # ---------------------------------------------------------------------------
   # Called from the AI assistant (via execute_query) after it creates a
   # CustomerOrder from an uploaded PO.
@@ -101,21 +107,25 @@ class PurchaseOrderService
     raise PurchaseOrderError, "No file given" if file.blank?
 
     tempfile = file.respond_to?(:tempfile) ? file.tempfile : file
-    resource_type = file.content_type.to_s.start_with?("image/") ? "image" : "raw"
 
+    # PDFs go up as resource_type "image" (not "raw"): Cloudinary delivers
+    # them identically, but only image-type assets can be page-transformed,
+    # which is what the pg_1 thumbnail needs. (Raw would work for delivery
+    # alone — that's how it used to be — but leaves no way to preview.)
     uploaded = Cloudinary::Uploader.upload(
       tempfile.path,
       public_id: "#{folder_path(customer_order)}/#{file_prefix(customer_order)}",
-      resource_type: resource_type,
+      resource_type: "image",
       overwrite: true,
       unique_filename: false
     )
 
     result = {
-      public_id:  uploaded["public_id"],
-      secure_url: uploaded["secure_url"],
-      format:     uploaded["format"],
-      bytes:      uploaded["bytes"]
+      public_id:     uploaded["public_id"],
+      secure_url:    uploaded["secure_url"],
+      format:        uploaded["format"],
+      bytes:         uploaded["bytes"],
+      thumbnail_url: page_thumbnail_url(uploaded["public_id"])
     }
 
     store!(customer_order, result, source: "upload")
@@ -129,13 +139,14 @@ class PurchaseOrderService
       uploaded = Cloudinary::Uploader.upload(
         tempfile.path,
         public_id: "#{folder_path(customer_order)}/#{file_prefix(customer_order)}",
-        resource_type: "raw",
+        resource_type: "image", # see attach_upload — enables the page-1 thumbnail
         overwrite: true,
         unique_filename: false
       )
 
       { public_id: uploaded["public_id"], secure_url: uploaded["secure_url"],
-        format: "pdf", bytes: uploaded["bytes"] }
+        format: "pdf", bytes: uploaded["bytes"],
+        thumbnail_url: page_thumbnail_url(uploaded["public_id"]) }
     end
   end
   private_class_method :upload_pdf
@@ -165,17 +176,19 @@ class PurchaseOrderService
       transformation: IMAGE_CLEANUP_TRANSFORMATION
     )
 
-    # The combined PDF is its own stored asset (type "multi"), so the raw page
-    # originals are just dead weight once it exists. Best-effort — a failure
-    # here shouldn't lose the PO attachment.
+    # The combined PDF is its own stored asset (type "multi"), so the page
+    # originals are dead weight once it exists — except page 1, which is kept
+    # as the source of the order page thumbnail (a multi asset can't be
+    # page-transformed). Best-effort — a failure here shouldn't lose the PO.
     begin
-      Cloudinary::Api.delete_resources(page_ids) if page_ids.any?
+      Cloudinary::Api.delete_resources(page_ids.drop(1)) if page_ids.length > 1
     rescue => e
       Rails.logger.warn "[PurchaseOrderService] page cleanup failed for #{tag}: #{e.message}"
     end
 
     { public_id: combined["public_id"], secure_url: combined["secure_url"],
-      format: "pdf", bytes: combined["bytes"] }
+      format: "pdf", bytes: combined["bytes"],
+      thumbnail_url: scan_thumbnail_url(page_ids.first) }
   end
   private_class_method :upload_images_as_pdf
 
@@ -189,16 +202,39 @@ class PurchaseOrderService
   end
   private_class_method :with_tempfile
 
+  # Page 1 of an image-type PDF asset as a JPEG.
+  def self.page_thumbnail_url(public_id)
+    Cloudinary::Utils.cloudinary_url(
+      public_id,
+      resource_type: "image", format: "jpg", secure: true,
+      transformation: [{ page: 1 }, THUMBNAIL_TRANSFORMATION]
+    )
+  end
+  private_class_method :page_thumbnail_url
+
+  # The kept first-page scan, cleaned the same way the PDF pages were, then
+  # thumbnailed — so the card matches the document it opens.
+  def self.scan_thumbnail_url(page_public_id)
+    return if page_public_id.blank?
+    Cloudinary::Utils.cloudinary_url(
+      page_public_id,
+      resource_type: "image", format: "jpg", secure: true,
+      transformation: IMAGE_CLEANUP_TRANSFORMATION + [THUMBNAIL_TRANSFORMATION]
+    )
+  end
+  private_class_method :scan_thumbnail_url
+
   def self.store!(customer_order, result, source:)
     customer_order.update!(
       po_document: {
-        "public_id"   => result[:public_id],
-        "secure_url"  => result[:secure_url],
-        "format"      => result[:format],
-        "bytes"       => result[:bytes],
-        "source"      => source,
-        "attached_at" => Time.current.iso8601
-      }
+        "public_id"     => result[:public_id],
+        "secure_url"    => result[:secure_url],
+        "format"        => result[:format],
+        "bytes"         => result[:bytes],
+        "thumbnail_url" => result[:thumbnail_url],
+        "source"        => source,
+        "attached_at"   => Time.current.iso8601
+      }.compact
     )
   end
   private_class_method :store!

@@ -158,14 +158,20 @@ class CustomerOrder < ApplicationRecord
     po_document&.dig("secure_url")
   end
 
-  # Cloudinary first-page thumbnail of the PO PDF, for the order page card.
-  # Same shape as the drawing thumbnails on the works order page — if
-  # Part#file_thumbnail_url uses a different transformation string, mirror
-  # it here so the two look alike.
+  # First-page thumbnail for the order page card. PurchaseOrderService
+  # stores one at attach time (po_document["thumbnail_url"]). POs attached
+  # before that existed fall back to a Cloudinary FETCH of the finished PDF
+  # rendered at page 1 — works for both the old raw uploads and the
+  # multi-generated scans, but relies on fetch delivery being enabled on
+  # the account. Backfill and drop the fallback when convenient.
+  PO_THUMB = "pg_1,w_224,h_288,c_fill,g_north,f_jpg,q_auto".freeze
+
   def po_thumbnail_url
-    url = po_document_url
-    return unless url&.include?("/upload/")
-    url.sub("/upload/", "/upload/pg_1,w_224,h_288,c_fill,g_north,f_jpg,q_auto/").sub(/\.\w+\z/, ".jpg")
+    stored = po_document&.dig("thumbnail_url")
+    return stored if stored.present?
+    url = po_document_url.to_s
+    return unless (m = url.match(%r{\Ahttps://res\.cloudinary\.com/([^/]+)/}))
+    "https://res.cloudinary.com/#{m[1]}/image/fetch/#{PO_THUMB}/#{url}"
   end
 
   # Same document with a Content-Disposition: attachment flag.
