@@ -61,7 +61,8 @@ Rails.application.routes.draw do
     member do
       patch :void
       patch :invoice_to_date
-      post  :bookout          # quick bookout of all certified, unreleased qtys
+      get   :release, action: :new_bookout  # bulk release form: one row per WO
+      post  :bookout                        # creates the release notes
       get   :collection_pack  # advice note + every CofC, one compiled PDF
     end
     collection do

@@ -160,39 +160,55 @@ class CustomerOrder < ApplicationRecord
 
 
   # ---------------------------------------------------------------------------
-  # Quick bookout — release everything the process records currently certify,
-  # for the whole order, in one go.
+  # Bulk release ("bookout") — the release note form for a whole order:
+  # one row per works order, prefilled with everything the process record
+  # certifies but hasn't released, editable down (rejections, short
+  # releases), never up. See customer_orders/bookout.html.erb.
   #
-  # A works order is auto-bookable only when HAMS itself can vouch for the
-  # quantity: a paperless process record whose thickness (if required) is
-  # captured in-line. Everything else is listed with a reason and released
-  # manually through the normal form:
-  #   :paper_record      — sign-offs live on the paper route card; HAMS can't
-  #                        verify them, and (for measurable parts) thickness
-  #                        readings have to be typed in anyway.
-  #   :manual_thickness  — paperless record, but thickness is form-captured
-  #                        (WO frozen before the in-line field existed).
-  #   :awaiting_sign_off — paperless + in-line, but the certified through-line
-  #                        is already fully released; nothing new signed off.
+  # A works order is bookable when HAMS itself can vouch for the quantity: a
+  # process record (its own, or the group lead's) whose thickness, if
+  # required, is captured in-line. Everything else is listed with a reason:
+  #   :no_record         — the record owner has no open paperless record
+  #                        (record closed, or a part not yet paperless).
+  #   :manual_thickness  — thickness is form-captured (WO frozen before the
+  #                        in-line field existed); release via the WO form.
+  #   :awaiting_sign_off — the certified through-line is already fully
+  #                        released; nothing new signed off.
   #
-  # Certified headroom is tracked PER PROCESS RECORD OWNER, not per works
-  # order: a grouped bar's record certifies the whole tank load, so booking
-  # several members of one group must share the same width. Candidates are
-  # walked in WO-number order and each allocation is deducted before the next
-  # member is sized, so the numbers shown in the modal are exactly what
-  # quick_bookout! will create (validate_process_record_coverage remains the
-  # backstop at save time).
+  # Headroom comes from WorksOrder#certified_unreleased_quantity:
+  #   * split record  — the lead's batches say how many of THIS WO's parts
+  #                     went through, so the figure is per works order and
+  #                     members don't compete for it.
+  #   * unsplit/solo  — the record certifies the bar as one number; members
+  #                     share it. Candidates are walked in WO-number order and
+  #                     each allocation is deducted before the next member is
+  #                     sized, so the modal shows exactly what quick_bookout!
+  #                     will create (validate_process_record_coverage remains
+  #                     the backstop at save time). This is a guess at who
+  #                     gets what — split the batches on the lead to avoid it.
   # ---------------------------------------------------------------------------
-  BookoutCandidate = Struct.new(:works_order, :quantity, :reason, keyword_init: true)
+  BookoutCandidate = Struct.new(:works_order, :quantity, :reason, :pooled, keyword_init: true)
+
+  # Works orders the record certifies parts for that nobody has released:
+  # the gap a Proof of Collection printed right now would paper over. The
+  # collection pack and the lead RN's PoC refuse to print while this is
+  # non-empty (see CustomerOrdersController#collection_pack).
+  def releasable_candidates
+    return [] if voided?
+    bookout_candidates.select { |c| c.reason.nil? && c.quantity.positive? }
+  end
 
   def bookout_candidates
-    headroom = {} # process record owner id => certified width not yet released/allocated
+    pooled = {} # record owner id => unsplit certified width not yet released/allocated
 
     works_orders.active.where(is_open: true).order(:number).filter_map do |wo|
       next nil if wo.quantity_remaining <= 0
 
-      unless wo.paperless_record?
-        next BookoutCandidate.new(works_order: wo, quantity: 0, reason: :paper_record)
+      # Resolve through the owner: a grouped member's own paperless_record?
+      # is false by design (its page renders no record UI), but its parts
+      # are certified by the lead's record all the same.
+      unless wo.process_record_owner.paperless_record?
+        next BookoutCandidate.new(works_order: wo, quantity: 0, reason: :no_record)
       end
 
       # Ask an unsaved RN, so the answer uses exactly the rules create will.
@@ -201,52 +217,80 @@ class CustomerOrder < ApplicationRecord
         next BookoutCandidate.new(works_order: wo, quantity: 0, reason: :manual_thickness)
       end
 
-      owner_id = wo.process_record_owner.id
-      headroom[owner_id] ||= wo.signed_off_quantity - wo.released_quantity_against_record
-      qty = [wo.quantity_remaining, headroom[owner_id]].min
+      if wo.split_record?
+        available = wo.certified_unreleased_quantity
+        is_pooled = false
+      else
+        owner_id = wo.process_record_owner.id
+        pooled[owner_id] ||= wo.certified_unreleased_quantity
+        available = pooled[owner_id]
+        is_pooled = wo.grouped?
+      end
+      qty = [wo.quantity_remaining, available].min
 
       if qty <= 0
-        BookoutCandidate.new(works_order: wo, quantity: 0, reason: :awaiting_sign_off)
+        BookoutCandidate.new(works_order: wo, quantity: 0, reason: :awaiting_sign_off, pooled: is_pooled)
       else
-        headroom[owner_id] -= qty
-        BookoutCandidate.new(works_order: wo, quantity: qty, reason: nil)
+        pooled[owner_id] -= qty unless wo.split_record?
+        BookoutCandidate.new(works_order: wo, quantity: qty, reason: nil, pooled: is_pooled)
       end
     end
   end
 
-  # Create one release note per selected bookable works order, everything as
-  # accepted (rejections go through the manual form — they need remarks and
-  # usually an NCR anyway). Quantities are recomputed server-side from
-  # bookout_candidates, never taken from the client. All-or-nothing: any
-  # validation failure rolls the whole bookout back.
+  # Bulk release: one release note per works order in `rows`, with the
+  # operator's accepted / rejected quantities and (optional) statement.
+  #
+  #   rows: { works_order_id => { "accepted" => "48", "rejected" => "2", "remarks" => "" } }
+  #
+  # The quantities are the operator's, but they are checked against
+  # bookout_candidates recomputed NOW: a row may release at most what the
+  # process record certifies for that works order (its own share on a split
+  # record, its allocation of the pooled width otherwise), so the record
+  # stays the ceiling even though the form is editable. Rows totalling zero
+  # are ignored. All-or-nothing: any over-release or validation failure
+  # rolls the whole bookout back.
   #
   # Returns [created_release_notes, skipped_display_names] — skipped covers
-  # ids that were requested but are no longer bookable (someone released or
-  # signed off in between).
-  def quick_bookout!(works_order_ids, user)
-    # UUID primary keys — compare as strings. (map(&:to_i) here previously
-    # truncated "4461ba80-…" to 4461, so no posted id ever matched a
-    # candidate and every bookout reported "no longer bookable".)
-    ids     = Array(works_order_ids).map(&:to_s).reject(&:blank?)
+  # ids that were posted but are no longer bookable (someone released,
+  # signed off or voided in between) or that asked for more than is
+  # certified.
+  def quick_bookout!(rows, user)
+    rows    = (rows || {}).to_h.transform_keys(&:to_s)
     created = []
     skipped = []
 
     transaction do
-      candidates = bookout_candidates
-      requested  = candidates.select { |c| ids.include?(c.works_order.id.to_s) }
-      bookable   = requested.select { |c| c.reason.nil? && c.quantity.positive? }
-      skipped    = (requested - bookable).map { |c| c.works_order.display_name }
-      # Ids posted but not among current candidates (voided/closed/released
-      # since the page loaded). Truncate — a full UUID makes an ugly label.
-      skipped   += (ids - requested.map { |c| c.works_order.id.to_s })
-                     .map { |id| "WO##{id[0, 8]}…" }
+      candidates = bookout_candidates.index_by { |c| c.works_order.id.to_s }
 
-      bookable.each do |c|
+      rows.each do |wo_id, attrs|
+        attrs    = (attrs || {}).to_h.transform_keys(&:to_s)
+        accepted = attrs["accepted"].to_i
+        rejected = attrs["rejected"].to_i
+        next if accepted <= 0 && rejected <= 0
+        raise "Quantities cannot be negative" if accepted < 0 || rejected < 0
+
+        c = candidates[wo_id]
+        if c.nil?
+          # Voided/closed/fully released since the page loaded. Truncate —
+          # a full UUID makes an ugly label.
+          skipped << "WO##{wo_id[0, 8]}…"
+          next
+        end
+        if c.reason || c.quantity <= 0
+          skipped << c.works_order.display_name
+          next
+        end
+        if accepted + rejected > c.quantity
+          raise "#{c.works_order.display_name}: asked to release #{accepted + rejected} but the process " \
+                "record only certifies #{c.quantity} unreleased part(s)#{c.pooled ? ' (pooled across the group)' : ''}"
+        end
+
         created << c.works_order.release_notes.create!(
           date: Date.current,
           issued_by: user,
-          quantity_accepted: c.quantity,
-          quantity_rejected: 0
+          quantity_accepted: accepted,
+          quantity_rejected: rejected,
+          remarks: attrs["remarks"].presence # nil => standard CofC statement
         )
       end
     end

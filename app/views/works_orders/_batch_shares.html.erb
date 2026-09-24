@@ -1,0 +1,36 @@
+<%# app/views/works_orders/_batch_shares.html.erb
+    Per-member split of one batch on a process group lead's record: how many
+    of each works order's parts are on this load. Rendered inside the
+    set_batch_qty form, so the inputs post as shares[WO1234]=40 alongside
+    :qty and :batch. Every member posts a field (blank = none of theirs on
+    this batch); all blank = unsplit, the batch certifies the bar as a
+    whole. The sum is echoed live against the batch qty so a mismatch is
+    seen before Set is pressed; set_batch_qty! rejects it server-side too.
+
+    Locals: section (hash), batch (number/string), qty_input_id (the id of
+    the batch qty field in the same form, for the live sum). %>
+<% shares  = @works_order.section_batch_shares(section, batch) || {} %>
+<% members = @works_order.process_group.members.where(voided: false) %>
+<% uid     = "shares_#{section['key'].to_s.parameterize}_#{batch}" %>
+<span class="text-xs text-gray-500 ml-1">split:</span>
+<span class="inline-flex items-center gap-2" data-batch-shares="<%= uid %>">
+  <% members.each do |m| %>
+    <label class="text-xs text-gray-700 inline-flex items-center gap-1"
+           title="<%= m.display_name %> · <%= m.part_number %> (qty <%= m.quantity %>)">
+      <%= m.display_name %>
+      <%= number_field_tag "shares[#{m.display_name}]", shares[m.display_name], min: 0, id: nil,
+          placeholder: "0",
+          oninput: "hamsBatchShareSum('#{uid}', '#{qty_input_id}')",
+          class: "border border-gray-300 rounded px-1 py-1 text-sm w-14" %>
+    </label>
+  <% end %>
+  <span class="text-xs" id="<%= uid %>_sum"
+        title="Split total vs batch qty. Leave every box blank to record the load as one figure (unsplit).">
+    <% total = shares.values.sum %>
+    <% if shares.empty? %>
+      <span class="text-gray-400">unsplit</span>
+    <% else %>
+      = <%= total %>
+    <% end %>
+  </span>
+</span>

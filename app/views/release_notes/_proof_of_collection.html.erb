@@ -36,10 +36,26 @@
         </div>
 
         <h2>Customer Order Summary</h2>
-        <%# ---- One row per works order on this customer order. Driven from
-            works orders (not release notes) so the document is complete even
-            when later release notes haven't been raised yet at print time. ---- %>
-        <% order_works_orders = customer_order.works_orders.active.includes(:part).order(:number).to_a %>
+        <%# ---- One row per works order that has something RELEASED on it.
+            Driven from active release notes, not from the works orders: the
+            driver signs for what has actually been booked out, and the
+            quantity is the released count, never the ordered one. Works
+            orders on the order with nothing released yet are listed under
+            the table so the sheet says on its face that it is partial.
+            (This used to print every WO at its ordered quantity — so a
+            300-part order with 100 released got signed for as 300, and the
+            other 200 left without a release note or an invoice.) ---- %>
+        <%
+          released_by_wo = customer_order.delivery_release_notes
+                                         .group_by(&:works_order_id)
+                                         .transform_values { |rns|
+                                           { accepted: rns.sum(&:quantity_accepted), rejected: rns.sum(&:quantity_rejected) }
+                                         }
+          order_works_orders = customer_order.works_orders.active.includes(:part).order(:number).to_a
+          on_collection      = order_works_orders.select { |wo| released_by_wo.key?(wo.id) }
+          not_released       = order_works_orders - on_collection
+          any_rejected       = released_by_wo.values.any? { |v| v[:rejected] > 0 }
+        %>
         <table class="summary-table">
           <thead>
             <tr>
@@ -48,11 +64,14 @@
               <th>Issue</th>
               <th>Description</th>
               <th>Specification</th>
-              <th class="num">Quantity</th>
+              <th class="num">Ordered</th>
+              <th class="num">Released</th>
+              <% if any_rejected %><th class="num">Rejected</th><% end %>
             </tr>
           </thead>
           <tbody>
-            <% order_works_orders.each do |wo| %>
+            <% on_collection.each do |wo| %>
+              <% r = released_by_wo[wo.id] %>
               <tr>
                 <td>WO<%= wo.number %></td>
                 <td><%= wo.part_number %></td>
@@ -60,16 +79,27 @@
                 <td><%= wo.part_description %></td>
                 <td><%= wo.specification %></td>
                 <td class="num"><%= wo.quantity %></td>
+                <td class="num"><%= r[:accepted] %></td>
+                <% if any_rejected %><td class="num"><%= r[:rejected] %></td><% end %>
               </tr>
             <% end %>
           </tbody>
           <tfoot>
             <tr>
-              <th colspan="5" style="text-align:right;">Total Quantity</th>
-              <td class="num"><%= order_works_orders.sum(&:quantity) %></td>
+              <th colspan="5" style="text-align:right;">Total</th>
+              <td class="num"><%= on_collection.sum(&:quantity) %></td>
+              <td class="num"><%= on_collection.sum { |wo| released_by_wo[wo.id][:accepted] } %></td>
+              <% if any_rejected %><td class="num"><%= on_collection.sum { |wo| released_by_wo[wo.id][:rejected] } %></td><% end %>
             </tr>
           </tfoot>
         </table>
+
+        <% if not_released.any? %>
+          <p style="font-size:0.85em; margin-top:0.5em;">
+            <strong>Not included in this collection</strong> (nothing released yet):
+            <%= not_released.map { |wo| "WO#{wo.number} #{wo.part_number} (#{wo.quantity} ordered)" }.join("; ") %>.
+          </p>
+        <% end %>
 
         <table class="signature-table">
           <tbody>

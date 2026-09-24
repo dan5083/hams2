@@ -35,10 +35,22 @@ class ReleaseNotesController < ApplicationController
   def show
   end
 
+  # The release note form for a works order is the ORDER's bulk release
+  # page (customer_orders#new_bookout), with this WO's row focused - the
+  # operator is shown everything on the order that is certified and
+  # unreleased, so one release note per collection can't quietly become the
+  # habit. The per-WO form survives for the legacy case where thickness is
+  # captured on the form itself (WO frozen before the in-line field
+  # existed) and as an explicit escape hatch (?manual=1).
   def new
     @release_note = @works_order.release_notes.build
     @release_note.issued_by = Current.user
     @release_note.date = Date.current
+
+    needs_form_thickness = @release_note.requires_thickness_measurements? && !@works_order.inline_thickness_record?
+    if !needs_form_thickness && params[:manual].blank? && @works_order.customer_order && !@works_order.customer_order.voided
+      redirect_to release_customer_order_path(@works_order.customer_order, focus: @works_order.id)
+    end
   end
 
   def create
@@ -115,6 +127,17 @@ class ReleaseNotesController < ApplicationController
   end
 
   def pdf
+    # The lead release note carries the Proof of Collection (see pdf.html.erb),
+    # so it's a collection document too: same guard as the collection pack.
+    # Non-lead RNs are just a CofC and print regardless.
+    co = @release_note.works_order.customer_order
+    if params[:force].blank? && co.lead_release_note&.id == @release_note.id && (gap = co.releasable_candidates).any?
+      redirect_to release_customer_order_path(co),
+                  alert: "#{@release_note.display_name} carries the Proof of Collection for #{co.number}, but " \
+                         "#{gap.sum(&:quantity)} certified part(s) on #{gap.map { |c| c.works_order.display_name }.join(', ')} " \
+                         "haven't been released. Release them first, or add ?force=1 to print anyway."
+      return
+    end
     @company_name    = "Hard Anodising Surface Treatments Ltd"
     @trading_address = "Firs Industrial Estate, Rickets Close\nKidderminster, DY11 7QN"
 

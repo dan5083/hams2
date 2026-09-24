@@ -877,12 +877,23 @@ class ReleaseNote < ApplicationRecord
     # the lead's record - the coverage rule applies to every member.
     owner = works_order&.process_record_owner
     return unless owner&.paperless_record?
-    certified = works_order.signed_off_quantity
-    released  = works_order.released_quantity_against_record(except: self) + total_quantity
+
+    # Split record: the lead's batches say how many of THIS WO's parts went
+    # through, so the check is this WO's own share vs its own releases.
+    # Unsplit (or solo): the bar as a whole, as before.
+    if (own = works_order.own_signed_off_quantity)
+      certified = own
+      released  = works_order.own_released_quantity(except: self) + total_quantity
+      scope     = "certifies #{certified} of #{works_order.display_name}'s part(s) end to end"
+    else
+      certified = works_order.signed_off_quantity
+      released  = works_order.released_quantity_against_record(except: self) + total_quantity
+      scope     = "certifies #{certified} part(s) end to end"
+    end
     return if certified >= released
 
     errors.add(:base,
-      "The process record certifies #{certified} part(s) end to end, but #{released} would have " \
+      "The process record #{scope}, but #{released} would have " \
       "been released against it. Sign off the remaining operation(s)/batch(es) on " \
       "WO#{owner.number}#{works_order.grouped? ? " (#{works_order.process_group.display_name})" : ''} before releasing.")
   end

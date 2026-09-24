@@ -1,6 +1,6 @@
 class CustomerOrdersController < ApplicationController
   before_action :set_customer_order, only: [:show, :edit, :update, :destroy, :void,
-                                            :invoice_to_date, :bookout, :collection_pack]
+                                            :invoice_to_date, :new_bookout, :bookout, :collection_pack]
 
   def index
     @customer_orders = CustomerOrder.includes(:customer, :works_orders)
@@ -149,29 +149,44 @@ class CustomerOrdersController < ApplicationController
     redirect_to return_path, alert: "❌ Failed to stage invoice: #{e.message}"
   end
 
-  # Quick bookout: create a release note per selected works order for every
-  # part the process record certifies but hasn't yet released — everything as
-  # accepted, rejections via the normal form. Quantities are recomputed
-  # server-side (CustomerOrder#quick_bookout!), so the posted ids are only a
-  # selection, never amounts. All-or-nothing.
+  # Bulk release form for the whole order. This IS the release note form:
+  # WorksOrder "new release note" links land here with ?focus=<wo id> so the
+  # operator sees every works order on the order, not just the one they
+  # clicked, and releases them together. Redirects home to the CO page,
+  # where the collection pack lives.
+  def new_bookout
+    if @customer_order.voided
+      redirect_to @customer_order, alert: "This order is voided."
+      return
+    end
+    @candidates = @customer_order.bookout_candidates
+    @focus_wo_id = params[:focus].to_s.presence
+  end
+
+  # Create one release note per works order row with a non-zero quantity.
+  # Quantities are the operator's but capped server-side at what the process
+  # record certifies (CustomerOrder#quick_bookout!). All-or-nothing.
   def bookout
-    created, skipped = @customer_order.quick_bookout!(params[:works_order_ids], Current.user)
+    rows = params[:releases].respond_to?(:to_unsafe_h) ? params[:releases].to_unsafe_h : {}
+    created, skipped = @customer_order.quick_bookout!(rows, Current.user)
 
     if created.any?
-      notice = "✅ Booked out #{created.sum(&:quantity_accepted)} part(s) on " \
-               "#{created.count} release note(s): #{created.map(&:display_name).join(', ')}."
+      notice = "✅ Released #{created.sum(&:quantity_accepted)} part(s)" \
+               "#{created.sum(&:quantity_rejected) > 0 ? " (#{created.sum(&:quantity_rejected)} rejected)" : ''} on " \
+               "#{created.count} release note(s): #{created.map(&:display_name).join(', ')}. " \
+               "Print the Collection Pack when the parts are ready to go."
       notice += " Skipped (changed since the page loaded): #{skipped.join(', ')}." if skipped.any?
       redirect_to @customer_order, notice: notice
     else
-      redirect_to @customer_order,
-                  alert: "Nothing was booked out#{skipped.any? ? " — no longer bookable: #{skipped.join(', ')}" : ''}."
+      redirect_to release_customer_order_path(@customer_order),
+                  alert: "Nothing was released#{skipped.any? ? " — no longer bookable: #{skipped.join(', ')}" : ' — enter a quantity on at least one row'}."
     end
   rescue ActiveRecord::RecordInvalid => e
-    redirect_to @customer_order,
-                alert: "❌ Bookout rolled back — #{e.record.works_order&.display_name}: #{e.record.errors.full_messages.join('; ')}"
+    redirect_to release_customer_order_path(@customer_order),
+                alert: "❌ Release rolled back — #{e.record.works_order&.display_name}: #{e.record.errors.full_messages.join('; ')}"
   rescue StandardError => e
     Rails.logger.error "bookout (CO #{@customer_order.id}) failed: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
-    redirect_to @customer_order, alert: "❌ Bookout failed: #{e.message}"
+    redirect_to release_customer_order_path(@customer_order), alert: "❌ Release rolled back: #{e.message}"
   end
 
   # The full paperwork set handed over at collection, in one PDF: the
@@ -182,6 +197,18 @@ class CustomerOrdersController < ApplicationController
   def collection_pack
     if @customer_order.delivery_release_notes.empty?
       redirect_to @customer_order, alert: "No release notes on this order yet — nothing to compile."
+      return
+    end
+
+    # The PoC is what the driver signs for. If the process record certifies
+    # parts nobody has released, they will leave the building on this
+    # signature and never be invoiced — so release them first. ?force=1 is
+    # the escape hatch for a genuinely partial collection.
+    if params[:force].blank? && (gap = @customer_order.releasable_candidates).any?
+      redirect_to release_customer_order_path(@customer_order),
+                  alert: "Collection pack not printed — #{gap.sum(&:quantity)} certified part(s) on " \
+                         "#{gap.map { |c| c.works_order.display_name }.join(', ')} haven't been released. " \
+                         "Release them here first, or add ?force=1 to the pack link for a partial collection."
       return
     end
 

@@ -1,0 +1,192 @@
+<%# app/views/customer_orders/bookout.html.erb
+    The release note form for a whole customer order. One row per open works
+    order: what's ordered, what's already released, what the process record
+    certifies and hasn't released yet (prefilled as accepted), plus rejected
+    qty and an optional statement. Rows the record can't vouch for are listed
+    underneath with the reason. Submits to customer_orders#bookout, which
+    creates one release note per non-zero row and lands back on the order
+    page where the Collection Pack lives.
+
+    @candidates  - CustomerOrder#bookout_candidates (recomputed on submit)
+    @focus_wo_id - the works order the operator came from, if any %>
+<% provide :title, "Release #{@customer_order.number}" %>
+<% bookable = @candidates.select { |c| c.reason.nil? && c.quantity.positive? } %>
+<% blocked  = @candidates.reject { |c| c.reason.nil? && c.quantity.positive? } %>
+
+<div class="container mx-auto px-4 py-6 max-w-5xl">
+  <div class="flex justify-between items-start mb-6">
+    <div>
+      <h1 class="text-3xl font-bold text-gray-900">Release — <%= @customer_order.number %></h1>
+      <p class="text-sm text-gray-600 mt-1"><%= @customer_order.customer.name %></p>
+    </div>
+    <%= link_to "← Back to order", customer_order_path(@customer_order),
+        class: "text-sm text-blue-600 hover:text-blue-900" %>
+  </div>
+
+  <% if bookable.any? %>
+    <%= form_with url: bookout_customer_order_path(@customer_order), method: :post, local: true, data: { turbo: false } do %>
+      <p class="text-sm text-gray-600 mb-3">
+        Each row becomes one release note. Accepted is prefilled with everything the
+        process record certifies but hasn't yet released; reduce it for a short release,
+        move some into Rejected, or clear both to leave that works order alone.
+        You can't release more than the record certifies.
+      </p>
+
+      <div class="bg-white shadow rounded-lg overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Works Order</th>
+              <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Part</th>
+              <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ordered</th>
+              <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Released</th>
+              <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider" title="Certified by the process record and not yet released">Certified</th>
+              <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Accepted</th>
+              <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Rejected</th>
+              <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statement</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200">
+            <% bookable.each do |c| %>
+              <% wo = c.works_order %>
+              <% focused = @focus_wo_id.present? && wo.id.to_s == @focus_wo_id %>
+              <% rid = "rel_#{wo.id}" %>
+              <tr class="<%= 'bg-blue-50' if focused %>" data-release-row="<%= rid %>" data-max="<%= c.quantity %>">
+                <td class="px-3 py-2 text-sm font-medium text-gray-900 whitespace-nowrap">
+                  <%= link_to wo.display_name, works_order_path(wo), class: "hover:text-blue-700", target: "_blank" %>
+                  <% if wo.grouped? %>
+                    <span class="text-xs text-indigo-600 ml-1"><%= wo.process_group.display_name %></span>
+                  <% end %>
+                </td>
+                <td class="px-3 py-2 text-sm text-gray-700">
+                  <%= wo.part_number %> <span class="text-gray-400">iss <%= wo.part_issue %></span>
+                  <div class="text-xs text-gray-500 truncate max-w-xs" title="<%= wo.part_description %>"><%= wo.part_description %></div>
+                </td>
+                <td class="px-3 py-2 text-sm text-right text-gray-700"><%= wo.quantity %></td>
+                <td class="px-3 py-2 text-sm text-right text-gray-700"><%= wo.quantity_released %></td>
+                <td class="px-3 py-2 text-sm text-right font-semibold text-green-700">
+                  <%= c.quantity %>
+                  <% if c.pooled %>
+                    <span class="block text-xs font-normal text-amber-600"
+                          title="This group's batches aren't split per works order, so the certified width is shared out in WO order. Split the batches on the group lead's record to make it exact.">pooled</span>
+                  <% end %>
+                </td>
+                <td class="px-3 py-2 text-right">
+                  <%= number_field_tag "releases[#{wo.id}][accepted]", c.quantity, min: 0, max: c.quantity,
+                      id: "#{rid}_acc", autofocus: focused,
+                      oninput: "hamsReleaseRowCheck('#{rid}')",
+                      class: "border border-gray-300 rounded px-2 py-1 text-sm w-20 text-right" %>
+                </td>
+                <td class="px-3 py-2 text-right">
+                  <%= number_field_tag "releases[#{wo.id}][rejected]", 0, min: 0, max: c.quantity,
+                      id: "#{rid}_rej",
+                      oninput: "hamsReleaseRowCheck('#{rid}')",
+                      class: "border border-gray-300 rounded px-2 py-1 text-sm w-20 text-right" %>
+                  <div id="<%= rid %>_warn" class="text-xs text-red-600 mt-1 hidden">over certified</div>
+                </td>
+                <td class="px-3 py-2">
+                  <%= text_area_tag "releases[#{wo.id}][remarks]", nil, rows: 1, id: "#{rid}_rem",
+                      placeholder: "Standard CofC statement",
+                      class: "border border-gray-300 rounded px-2 py-1 text-sm w-56" %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+          <tfoot>
+            <tr class="bg-gray-50">
+              <td colspan="4" class="px-3 py-2 text-sm font-semibold text-right">Total</td>
+              <td class="px-3 py-2 text-sm text-right font-bold"><%= bookable.sum(&:quantity) %></td>
+              <td class="px-3 py-2 text-sm text-right font-bold" id="rel_total_acc"><%= bookable.sum(&:quantity) %></td>
+              <td class="px-3 py-2 text-sm text-right font-bold" id="rel_total_rej">0</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="flex justify-between items-center mt-4">
+        <p class="text-xs text-gray-500">
+          Rejected parts count against the record (they went through the tanks) but not against the invoice.
+          Leave Statement blank for the standard certificate of conformity wording.
+        </p>
+        <div class="flex space-x-2">
+          <%= link_to "Cancel", customer_order_path(@customer_order),
+              class: "bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded" %>
+          <button type="submit" id="rel_submit"
+                  class="bg-blue-600 hover:bg-blue-800 text-white font-bold py-2 px-4 rounded"
+                  data-disable-with="Releasing…">
+            Release
+          </button>
+        </div>
+      </div>
+    <% end %>
+  <% else %>
+    <div class="bg-white shadow rounded-lg p-6 text-sm text-gray-600">
+      Nothing on this order is certified and unreleased right now
+      <%= "— see below for why." if blocked.any? %>
+    </div>
+  <% end %>
+
+  <% if blocked.any? %>
+    <div class="mt-6 bg-white shadow rounded-lg p-4">
+      <h3 class="text-sm font-semibold text-gray-700 mb-2">Not releasable yet</h3>
+      <ul class="space-y-1 text-sm text-gray-600">
+        <% blocked.each do |c| %>
+          <li class="flex justify-between items-center">
+            <span>
+              <span class="font-medium text-gray-900"><%= c.works_order.display_name %></span>
+              · <%= c.works_order.part_number %> ·
+              <% case c.reason %>
+              <% when :awaiting_sign_off %>
+                nothing new signed off on the process record<%= c.pooled ? " (group width already released)" : "" %>
+              <% when :manual_thickness %>
+                thickness readings are captured on the release form
+              <% when :no_record %>
+                no open process record for this works order
+              <% else %>
+                nothing certified
+              <% end %>
+            </span>
+            <% if c.reason == :manual_thickness %>
+              <%= link_to "Release via WO form", new_works_order_release_note_path(c.works_order, manual: 1),
+                  class: "text-blue-600 hover:text-blue-900 ml-3 whitespace-nowrap" %>
+            <% else %>
+              <%= link_to "Open #{c.works_order.grouped? ? c.works_order.process_record_owner.display_name : 'WO'}",
+                  works_order_path(c.works_order.process_record_owner),
+                  class: "text-blue-600 hover:text-blue-900 ml-3 whitespace-nowrap" %>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+</div>
+
+<script>
+// Keep accepted + rejected within what the record certifies for the row,
+// and roll the totals up. Server-side quick_bookout! is the real check.
+function hamsReleaseRowCheck(rid) {
+  var row  = document.querySelector('[data-release-row="' + rid + '"]');
+  if (!row) return;
+  var max  = parseInt(row.dataset.max, 10);
+  var acc  = parseInt(document.getElementById(rid + '_acc').value, 10) || 0;
+  var rej  = parseInt(document.getElementById(rid + '_rej').value, 10) || 0;
+  var warn = document.getElementById(rid + '_warn');
+  var over = acc + rej > max;
+  warn.classList.toggle('hidden', !over);
+  row.classList.toggle('bg-red-50', over);
+  if (over) row.classList.remove('bg-blue-50');
+
+  var tAcc = 0, tRej = 0, anyOver = false;
+  document.querySelectorAll('[data-release-row]').forEach(function (r) {
+    var id = r.dataset.releaseRow;
+    var a = parseInt(document.getElementById(id + '_acc').value, 10) || 0;
+    var j = parseInt(document.getElementById(id + '_rej').value, 10) || 0;
+    tAcc += a; tRej += j;
+    if (a + j > parseInt(r.dataset.max, 10)) anyOver = true;
+  });
+  document.getElementById('rel_total_acc').textContent = tAcc;
+  document.getElementById('rel_total_rej').textContent = tRej;
+  document.getElementById('rel_submit').disabled = anyOver;
+}
+</script>

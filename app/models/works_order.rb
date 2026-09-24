@@ -616,10 +616,26 @@ class WorksOrder < ApplicationRecord
     section_batches(section).find { |b| b["number"] == batch_number.to_i }&.dig("date")
   end
 
-  # Which works orders' parts are on this batch, by display name - only ever
-  # set on a process group lead. Absent/empty means "every member of the bar"
-  # (the whole-load default, and every batch recorded before this existed).
+  # How many of each member's parts are on this batch - only ever set on a
+  # process group lead: { "WO1234" => 40, "WO1235" => 20 }, summing to the
+  # batch qty. nil means the batch is UNSPLIT: the load is recorded as a
+  # single figure and certifies the bar as a whole (pooled headroom, see
+  # #own_signed_off_quantity). Every batch recorded before shares existed is
+  # unsplit; so is any batch the operator leaves blank.
+  def section_batch_shares(section, batch_number)
+    raw = section_batches(section).find { |b| b["number"] == batch_number.to_i }&.dig("shares")
+    return nil unless raw.is_a?(Hash)
+    shares = raw.transform_values(&:to_i).reject { |_, q| q <= 0 }
+    shares.empty? ? nil : shares
+  end
+
+  # Which works orders' parts are on this batch, by display name. Derived from
+  # the shares when the batch is split; falls back to the legacy "wos" tick
+  # list for batches recorded before shares existed. Empty means "every
+  # member of the bar". Consumers (thickness_member_labels) want names only.
   def section_batch_wos(section, batch_number)
+    shares = section_batch_shares(section, batch_number)
+    return shares.keys if shares
     Array(section_batches(section).find { |b| b["number"] == batch_number.to_i }&.dig("wos")).reject(&:blank?)
   end
 
@@ -850,10 +866,13 @@ class WorksOrder < ApplicationRecord
   # Correct one batch's quantity without disturbing the rest of the structure -
   # short loads, scrapped parts, a batch split across two racks.
   #
-  # wos: (group lead only) display names of the members whose parts are on
-  # this batch; nil leaves the stored list alone, [] clears it back to "the
-  # whole bar". Names not on the group are ignored.
-  def set_batch_qty!(batch_number, qty, section_key: "base", wos: nil)
+  # shares: (group lead only) { "WO1234" => "40", "WO1235" => "20" } - how
+  # many of each member's parts are on this batch. nil leaves the stored
+  # split alone; all-blank/zero clears it (the batch goes back to unsplit,
+  # pooled). When any share is given the split must account for the whole
+  # batch: shares sum to qty. Names not on the group are ignored. Replaces
+  # the old "wos" tick list, which is dropped from the entry on write.
+  def set_batch_qty!(batch_number, qty, section_key: "base", shares: nil)
     assert_record_open!
     freeze_operations!
     section = find_section!(section_key)
@@ -863,10 +882,24 @@ class WorksOrder < ApplicationRecord
     batches = (section["data"]["batches"] ||= [])
     entry = batches.find { |b| b["number"] == n } || (batches << { "number" => n }).last
     qty.to_s.strip.empty? ? entry.delete("qty") : entry["qty"] = qty.to_s.strip
-    if !wos.nil? && process_lead?
-      valid = process_group.members.pluck(:number).map { |num| "WO#{num}" }
-      chosen = Array(wos).map(&:to_s).reject(&:blank?) & valid
-      chosen.empty? ? entry.delete("wos") : entry["wos"] = chosen
+
+    if !shares.nil? && process_lead?
+      valid  = process_group.members.where(voided: false).pluck(:number).map { |num| "WO#{num}" }
+      split  = shares.to_h.each_with_object({}) do |(wo, q), h|
+        next unless valid.include?(wo.to_s)
+        h[wo.to_s] = q.to_i if q.to_i > 0
+      end
+      entry.delete("wos") # legacy tick list superseded
+      if split.empty?
+        entry.delete("shares")
+      else
+        total = split.values.sum
+        if entry["qty"].present? && total != entry["qty"].to_i
+          raise "Batch #{n}: the split (#{split.map { |w, q| "#{w} #{q}" }.join(', ')} = #{total}) " \
+                "must add up to the batch qty (#{entry['qty']})"
+        end
+        entry["shares"] = split
+      end
     end
     customised_process_data_will_change!
     save!
@@ -891,7 +924,8 @@ class WorksOrder < ApplicationRecord
   # finished the ones before it). Reads go through the record OWNER: a
   # grouped member's record lives on the lead and certifies the whole bar.
 
-  # Batches of a section signed on EVERY batch-scoped op in it, with qty.
+  # Batches of a section signed on EVERY batch-scoped op in it, with qty and
+  # (on a split batch) the per-member shares.
   def completed_section_batches(section)
     owner = process_record_owner
     ops   = owner.section_ops(section)
@@ -899,18 +933,52 @@ class WorksOrder < ApplicationRecord
     (1..owner.section_batch_count(section)).filter_map do |n|
       key = n.to_s
       next nil unless ops.all? { |op| (op["sign_offs"] || {}).key?(key) }
-      { batch: key, qty: owner.section_batch_qty(section, key).to_i }
+      { batch: key, qty: owner.section_batch_qty(section, key).to_i, shares: owner.section_batch_shares(section, key) }
     end
   end
 
-  # Width of the sign-off through-line: parts certified end to end.
-  def signed_off_quantity
+  # Every WO-scoped op (contract review, incoming inspection...) signed.
+  # Nothing is certified until these are.
+  def wo_scoped_ops_signed?
     owner = process_record_owner
     ops   = owner.operations_for_display || []
-    return 0 if ops.empty?
-    wo_ops = ops.select { |op| owner.wo_scoped_operation?(op) }
-    return 0 unless wo_ops.all? { |op| (op["sign_offs"] || {}).key?("wo") }
-    owner.sections.map { |section| completed_section_batches(section).sum { |b| b[:qty] } }.min || 0
+    return false if ops.empty?
+    ops.select { |op| owner.wo_scoped_operation?(op) }
+       .all? { |op| (op["sign_offs"] || {}).key?("wo") }
+  end
+
+  # Width of the sign-off through-line: parts certified end to end, for the
+  # BAR (the whole tank load on a grouped record).
+  def signed_off_quantity
+    return 0 unless wo_scoped_ops_signed?
+    process_record_owner.sections.map { |section| completed_section_batches(section).sum { |b| b[:qty] } }.min || 0
+  end
+
+  # This works order's OWN certified width on a grouped record, or nil when
+  # the record can't say.
+  #
+  # A grouped bar's record certifies the load; whether it can certify each
+  # member separately depends on the operator having recorded how many of
+  # whose parts went into each batch (section_batch_shares). The answer is
+  # per-WO only when EVERY completed batch in EVERY section is split - one
+  # unsplit batch and the through-line can't be traced to a member, so the
+  # record falls back to pooled headroom (signed_off_quantity minus the whole
+  # bar's releases, shared out at release time). Solo WOs return nil too:
+  # the bar IS the WO, pooled and own are the same number.
+  def own_signed_off_quantity
+    return nil unless grouped?
+    return 0 unless wo_scoped_ops_signed?
+    widths = process_record_owner.sections.map do |section|
+      batches = completed_section_batches(section)
+      return nil if batches.any? { |b| b[:shares].nil? }
+      batches.sum { |b| b[:shares][display_name].to_i }
+    end
+    widths.min || 0
+  end
+
+  # True when the record can vouch for this WO's parts on their own.
+  def split_record?
+    !own_signed_off_quantity.nil?
   end
 
   # Quantity already released against this record by active RNs - across the
@@ -920,6 +988,28 @@ class WorksOrder < ApplicationRecord
     scope = scope.active
     scope = scope.where.not(id: except.id) if except&.persisted?
     scope.sum(:quantity_accepted) + scope.sum(:quantity_rejected)
+  end
+
+  # This WO's own active releases (rejected count - they went through the
+  # tanks regardless).
+  def own_released_quantity(except: nil)
+    scope = release_notes.active
+    scope = scope.where.not(id: except.id) if except&.persisted?
+    scope.sum(:quantity_accepted) + scope.sum(:quantity_rejected)
+  end
+
+  # What the record will let this WO release right now. Per-WO when the
+  # record is split (own share minus own releases); otherwise the pooled
+  # figure for the whole bar - in which case a caller sizing several members
+  # of one group must deduct each allocation before sizing the next (see
+  # CustomerOrder#bookout_candidates).
+  def certified_unreleased_quantity(except: nil)
+    own = own_signed_off_quantity
+    if own
+      own - own_released_quantity(except: except)
+    else
+      signed_off_quantity - released_quantity_against_record(except: except)
+    end
   end
 
   # ============================================================================

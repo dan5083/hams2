@@ -504,21 +504,16 @@
                   <%= hidden_field_tag :batch, active_batch %>
                   <% active_fb.each do |k, v| %><%= hidden_field_tag "fb[#{k}]", v %><% end %>
                   <span class="text-xs text-gray-500">Qty</span>
-                  <%= number_field_tag :qty, active_entry["qty"], min: 1,
+                  <% base_qty_id = "batch_qty_base_#{active_batch}" %>
+                  <%= number_field_tag :qty, active_entry["qty"], min: 1, id: base_qty_id,
+                      oninput: (@works_order.process_lead? ? "hamsBatchShareSum('shares_base_#{active_batch}', '#{base_qty_id}')" : nil),
                       class: "border border-gray-300 rounded px-1 py-1 text-sm w-16" %>
                   <% if @works_order.process_lead? %>
-                    <%# Which members' parts are on this batch. Blank sentinel
-                        keeps wos[] in the params when nothing is ticked, which
-                        set_batch_qty! reads as "the whole bar". %>
-                    <%= hidden_field_tag "wos[]", "", id: nil %>
-                    <% on_batch = @works_order.section_batch_wos(wo_sections.first, active_batch) %>
-                    <span class="text-xs text-gray-500 ml-1">on bar:</span>
-                    <% @works_order.process_group.members.where(voided: false).each do |m| %>
-                      <label class="text-xs text-gray-700 inline-flex items-center gap-1">
-                        <%= check_box_tag "wos[]", m.display_name, (on_batch.empty? || on_batch.include?(m.display_name)), id: nil, class: "rounded border-gray-300" %>
-                        <%= m.display_name %>
-                      </label>
-                    <% end %>
+                    <%# How many of each member's parts are on this batch -
+                        the split is what lets a member release its own
+                        parts (WorksOrder#own_signed_off_quantity). %>
+                    <%= render "works_orders/batch_shares",
+                        section: wo_sections.first, batch: active_batch, qty_input_id: base_qty_id %>
                   <% end %>
                   <%= submit_tag "Set", class: "bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium px-2 py-1 rounded" %>
                 <% end %>
@@ -719,21 +714,13 @@
                         <%= hidden_field_tag :base_batch, active_batch %>
                         <% active_fb.each do |k, v| %><%= hidden_field_tag "fb[#{k}]", v %><% end %>
                         <span class="text-xs text-gray-500">Qty</span>
-                        <%= number_field_tag :qty, f_entry["qty"], min: 1,
+                        <% fork_qty_id = "batch_qty_#{f_key.to_s.parameterize}_#{f_active}" %>
+                        <%= number_field_tag :qty, f_entry["qty"], min: 1, id: fork_qty_id,
+                            oninput: (@works_order.process_lead? ? "hamsBatchShareSum('shares_#{f_key.to_s.parameterize}_#{f_active}', '#{fork_qty_id}')" : nil),
                             class: "border border-gray-300 rounded px-1 py-1 text-sm w-16" %>
                         <% if @works_order.process_lead? %>
-                          <%# Which members' parts are on this batch. Blank sentinel
-                              keeps wos[] in the params when nothing is ticked, which
-                              set_batch_qty! reads as "the whole bar". %>
-                          <%= hidden_field_tag "wos[]", "", id: nil %>
-                          <% on_batch = @works_order.section_batch_wos(fork_sec, f_active) %>
-                          <span class="text-xs text-gray-500 ml-1">on bar:</span>
-                          <% @works_order.process_group.members.where(voided: false).each do |m| %>
-                            <label class="text-xs text-gray-700 inline-flex items-center gap-1">
-                              <%= check_box_tag "wos[]", m.display_name, (on_batch.empty? || on_batch.include?(m.display_name)), id: nil, class: "rounded border-gray-300" %>
-                              <%= m.display_name %>
-                            </label>
-                          <% end %>
+                          <%= render "works_orders/batch_shares",
+                              section: fork_sec, batch: f_active, qty_input_id: fork_qty_id %>
                         <% end %>
                         <%= submit_tag "Set", class: "bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium px-2 py-1 rounded" %>
                       <% end %>
@@ -1226,6 +1213,26 @@
 </div>
 
 <script>
+// Batch split (group lead): echo the per-member share total against the
+// batch qty as it's typed. Server-side set_batch_qty! is the real check;
+// this just stops the operator pressing Set on 40 + 20 = 60 for a qty of 50.
+function hamsBatchShareSum(uid, qtyInputId) {
+  var wrap = document.querySelector('[data-batch-shares="' + uid + '"]');
+  var out  = document.getElementById(uid + '_sum');
+  if (!wrap || !out) return;
+  var total = 0, any = false;
+  wrap.querySelectorAll('input[type=number]').forEach(function (el) {
+    var v = parseInt(el.value, 10);
+    if (!isNaN(v) && v > 0) { total += v; any = true; }
+  });
+  if (!any) { out.innerHTML = '<span class="text-gray-400">unsplit</span>'; return; }
+  var qtyEl = document.getElementById(qtyInputId);
+  var qty   = qtyEl ? parseInt(qtyEl.value, 10) : NaN;
+  var ok    = isNaN(qty) || qty === total;
+  out.className = 'text-xs ' + (ok ? 'text-gray-700' : 'text-red-600 font-medium');
+  out.textContent = '= ' + total + (ok ? '' : ' ≠ ' + qty);
+}
+
 // Live preview of the batch structure. The point is that the operator sees
 // "3000 batches" BEFORE submitting, not after the page tries to render it.
 (function () {
