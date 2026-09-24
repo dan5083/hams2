@@ -57,6 +57,27 @@ module OperationLibrary
       build(names, batching: batching, basis: basis, **rules)
     end
 
+    # Matches a dye op by library id ("BLACK_DYE") or wording ("**Black dye**").
+    # Anchored on the id so "Rinse after dye" style ops never match: the
+    # haystack fallback_for builds starts with the op id.
+    DYE_OP = /\A[A-Z]+_DYE\b|\*\*[A-Za-z]+ dye\*\*/
+
+    # The paper monitoring block dye ops used to carry in their text
+    # ("**Monitoring:**" plus three "Batch ___: Time ___ Temp ___°C" rows).
+    # Trailing only - the instruction line before it is kept verbatim. Ops
+    # that are NOTHING but blank rows (the old standalone "OCV Check" op)
+    # have no header and deliberately don't match; they are removed from
+    # the part, not stripped.
+    LEGACY_MONITORING_BLOCK =
+      /\s*\*\*Monitoring:\*\*\s*(?:Batch ___:\s*Time ___\s*Temp ___°C\s*)+\z/
+
+    # Text with the legacy block removed; unchanged text when there is none.
+    # Applied at freeze time (WorksOrder#operation_snapshot) so already-locked
+    # parts freeze clean, and by hams:repair_legacy_dye_ops on stored data.
+    def self.strip_legacy_blanks(text)
+      text.to_s.sub(LEGACY_MONITORING_BLOCK, "")
+    end
+
     # Pattern fallback for aero/defence ops that carry no explicit spec, so
     # renamed library ids and custom static ops still capture OCV rather than
     # silently going record-less. Matched against the op's id and wording.
@@ -96,6 +117,10 @@ module OperationLibrary
       # ElectrolessNickelPlate.operations. Matched on the library ids and
       # the bath names so a copied ENP op keeps the same shape.
       [/electroless\s+nickel\s+plat|vandalloy|nicklad/i, -> { enp_plate }],
+      # Dye on aero/defence work: time/temp per batch. Matched on library id
+      # or wording so a copied/manual dye op resolves the same spec the
+      # library one (Dye.operations) now declares explicitly.
+      [DYE_OP, -> { time_temp }],
       [/OCV\s+monitoring/i, -> { time_temp }]
     ].freeze
 

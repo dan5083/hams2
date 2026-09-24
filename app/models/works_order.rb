@@ -1502,7 +1502,10 @@ class WorksOrder < ApplicationRecord
       "position" => position,
       "id" => op.id,
       "display_name" => (op.respond_to?(:display_name) ? op.display_name : op.id),
-      "operation_text" => op.operation_text,
+      # Legacy paper blanks ("**Monitoring:** Batch ___: Time ___ Temp ___°C")
+      # never freeze into a record: capture is the OCV spec's job. Text
+      # without the block passes through untouched.
+      "operation_text" => OperationLibrary::OcvSpecs.strip_legacy_blanks(op.operation_text),
       "process_type" => (op.respond_to?(:process_type) ? op.process_type : nil),
       "target_thickness" => (op.respond_to?(:target_thickness) ? op.target_thickness : nil),
       "vat_numbers" => (op.respond_to?(:vat_numbers) ? (op.vat_numbers || []) : []),
@@ -1524,7 +1527,7 @@ class WorksOrder < ApplicationRecord
         {
           "id" => a["id"],
           "display_name" => a["display_name"],
-          "operation_text" => a["operation_text"],
+          "operation_text" => OperationLibrary::OcvSpecs.strip_legacy_blanks(a["operation_text"]),
           "vat_numbers" => a["vat_numbers"] || [],
           "process_type" => a["process_type"],
           "target_thickness" => a["target_thickness"],
