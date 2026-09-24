@@ -38,12 +38,6 @@
           <pre class="text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-80 overflow-y-auto"><%= @quote.enquiry %></pre>
         </div>
       <% end %>
-      <% if @quote.proposed? && p["reasoning"].present? %>
-        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
-          <h3 class="text-xs font-semibold text-amber-800 uppercase mb-2">How the assistant read it</h3>
-          <p class="text-sm text-amber-900 whitespace-pre-line"><%= p["reasoning"] %></p>
-        </div>
-      <% end %>
     </div>
 
     <%# ── Main: status or the proposal form ───────────────────────────── %>
@@ -74,6 +68,9 @@
 
       <% else %>
         <%= form_with url: finalise_quote_path(@quote), method: :post, local: true, data: { turbo: false }, id: "workbench-form", class: "space-y-6" do %>
+          <% if p["reasoning"].present? %>
+            <p class="text-sm text-gray-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3"><%= p["reasoning"] %></p>
+          <% end %>
           <%# Header %>
           <div class="bg-white shadow rounded-lg p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
             <div class="md:col-span-2">
@@ -106,9 +103,17 @@
                 <% @quote.proposal_questions.each do |q| %>
                   <div>
                     <label class="block text-sm font-medium text-blue-900"><%= q["question"] %></label>
-                    <% if q["why"].present? %><p class="text-xs text-blue-700 mb-1"><%= q["why"] %></p><% end %>
-                    <%= text_field_tag "answers[#{q['key']}]", @quote.answers[q["key"]].presence || q["suggested_answer"],
-                        class: "border border-blue-300 rounded px-2 py-1 w-full text-sm bg-white", placeholder: "your answer" %>
+                    <div class="flex items-center gap-2 mt-1">
+                      <%= text_field_tag "answers[#{q['key']}]", @quote.answers[q["key"]],
+                          id: "ans_#{q['key'].to_s.parameterize}",
+                          class: "border border-blue-300 rounded px-2 py-1 w-full text-sm bg-white", placeholder: "your answer" %>
+                      <% if q["suggested_answer"].present? %>
+                        <button type="button" class="text-xs whitespace-nowrap px-2 py-1 rounded bg-white border border-blue-300 text-blue-800 hover:bg-blue-100"
+                                title="Use the assistant's suggestion"
+                                onclick="document.getElementById('ans_<%= q['key'].to_s.parameterize %>').value = this.dataset.s"
+                                data-s="<%= q['suggested_answer'] %>">↳ <%= q["suggested_answer"].truncate(40) %></button>
+                      <% end %>
+                    </div>
                   </div>
                 <% end %>
               </div>
@@ -138,8 +143,8 @@
               <%= hidden_field_tag "form[parts][#{k}][existing_part_id]", part["existing_part_id"] %>
               <%= hidden_field_tag "form[parts][#{k}][operation_selection_extra]", (part["operation_selection_extra"] || {}).to_json %>
 
-              <div class="p-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div class="lg:col-span-2 grid grid-cols-2 gap-3">
+              <div class="p-4">
+                <div class="grid grid-cols-2 gap-3">
                   <% { part_number: "Part number", part_issue: "Issue", description: "Description", specification: "Specification",
                        material: "Material", specified_thicknesses: "Specified thickness(es)", process_type: "Process type" }.each do |field, label| %>
                     <div class="<%= %w[description specification].include?(field.to_s) ? 'col-span-2' : '' %>">
@@ -186,11 +191,9 @@
                     </details>
                   </div>
                 </div>
-
-                <div class="bg-amber-50 border border-amber-200 rounded p-3">
-                  <h4 class="text-xs font-semibold text-amber-800 uppercase mb-1">Why this configuration</h4>
-                  <p class="text-sm text-amber-900 whitespace-pre-line"><%= part["reasoning"] %></p>
-                </div>
+                <% if part["reasoning"].present? %>
+                  <p class="mt-3 text-xs text-gray-600 border-t border-gray-100 pt-2"><span class="font-medium text-gray-700">Configuration:</span> <%= part["reasoning"] %></p>
+                <% end %>
               </div>
             </div>
           <% end %>

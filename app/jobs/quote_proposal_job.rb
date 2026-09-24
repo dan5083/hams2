@@ -26,8 +26,8 @@ class QuoteProposalJob < AiAssistantJob
         summary:        { type: "string", description: "One line: process, spec, thickness. Printed on the quote." },
         enquirer_name:  { type: "string" },
         enquirer_email: { type: "string" },
-        notes:          { type: "string", description: "Anything the customer should read on the quote (assumptions, exclusions, lead time)." },
-        reasoning:      { type: "string", description: "How you read the drawing/enquiry and why you priced it this way. Plain English, for the person reviewing." },
+        notes:          { type: "string", description: "Customer-facing, printed on the quote: exclusions, assumptions, lead time. One or two sentences. NO arithmetic." },
+        reasoning:      { type: "string", description: "Two or three sentences: what the drawing is, what process/spec you identified, and any doubt about that reading. No template names, no pricing, no numbers — those belong on the part and the lines." },
         parts: {
           type: "array",
           items: {
@@ -51,7 +51,7 @@ class QuoteProposalJob < AiAssistantJob
               jig_type:         { type: "string", description: "Your suggested selected_jig_type, if confident" },
               dimensions_mm:    { type: "object", properties: { l: { type: "number" }, w: { type: "number" }, h: { type: "number" } } },
               surface_area_sqft: { type: "number" },
-              reasoning:        { type: "string", description: "Why this configuration: which template, what you changed and why, how you got the area." }
+              reasoning:        { type: "string", description: "Configuration only: which template part you copied (part number, customer) and exactly what you changed. Two sentences. No pricing, no area — that goes on the line." }
             }
           }
         },
@@ -65,21 +65,20 @@ class QuoteProposalJob < AiAssistantJob
               description: { type: "string" },
               quantity:    { type: "integer" },
               unit_amount: { type: "number", description: "GBP ex VAT per unit (or the MOC as a single line with quantity 1)" },
-              reasoning:   { type: "string", description: "rate × sqft, add-ons, MOC comparison — show the arithmetic" }
+              reasoning:   { type: "string", description: "The arithmetic for THIS line, once, compactly: dims → sqft, rate (+ add-ons), × qty, MOC comparison. This is the only place numbers are shown." }
             }
           }
         },
         questions: {
           type: "array",
-          description: "Things you could not settle from the drawing or enquiry. Jigging location and jig type go here when not obvious.",
+          description: "Decisions you could not settle from the drawing or enquiry and that change the configuration or price. Jigging location and jig type go here when not obvious.",
           items: {
             type: "object",
             required: %w[key question],
             properties: {
               key:              { type: "string" },
-              question:         { type: "string" },
-              suggested_answer: { type: "string" },
-              why:              { type: "string" }
+              question:         { type: "string", description: "Self-contained, one sentence, answerable in a few words. Say what you'd do either way if it matters." },
+              suggested_answer: { type: "string", description: "A short CANDIDATE ANSWER the reviewer can accept as-is (e.g. 'Mask the bore, £1.50/min'), or omit. Never restate the question or describe the drawing here." }
             }
           }
         }
@@ -191,8 +190,24 @@ class QuoteProposalJob < AiAssistantJob
          shows an obvious hanging feature (tapped hole, bore, edge that can
          carry a mark) propose jigging_location and jig_type; if not, leave them
          empty and put a question in `questions` describing the options you see.
-      6. Anything else you had to assume (alloy, masking, thread protection,
-         spec ambiguity) is a question too, with your suggested_answer.
+      6. Anything else you had to assume that changes the configuration or the
+         price (alloy, masking, thread protection, spec ambiguity) is a question
+         too, with a short suggested_answer the reviewer can accept as-is.
+
+      DO NOT ASK ABOUT:
+      - The company in the drawing's title block vs the customer. The prime/OEM
+        on the drawing (Williams, Airbus, Leonardo...) is routinely NOT the
+        customer — the customer is a subcontractor. That is normal and needs no
+        question. aerospace_defense follows the CUSTOMER's status, not the drawing.
+      - Lead time, QA paperwork, or anything that doesn't change the config or price.
+
+      ENQUIRER: fill enquirer_name/email ONLY from the enquiry text. Never use the
+      HAMS user. Leave blank if the enquiry doesn't give them.
+
+      SAY EACH THING ONCE. The reviewer sees overall reasoning, the part card and
+      the price lines side by side. Overall = what the drawing is and the process
+      read. Part = template and changes. Line = the arithmetic. Do not repeat the
+      surface-area calculation or the MOC comparison outside the line's working.
 
       When the user message contains PREVIOUS PROPOSAL and ANSWERS, this is a
       re-run: keep everything the reviewer didn't question, apply their answers,
