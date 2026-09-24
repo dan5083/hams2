@@ -158,6 +158,21 @@ class CustomerOrder < ApplicationRecord
     po_document&.dig("secure_url")
   end
 
+  # Cloudinary first-page thumbnail of the PO PDF, for the order page card.
+  # Same shape as the drawing thumbnails on the works order page — if
+  # Part#file_thumbnail_url uses a different transformation string, mirror
+  # it here so the two look alike.
+  def po_thumbnail_url
+    url = po_document_url
+    return unless url&.include?("/upload/")
+    url.sub("/upload/", "/upload/pg_1,w_224,h_288,c_fill,g_north,f_jpg,q_auto/").sub(/\.\w+\z/, ".jpg")
+  end
+
+  # Same document with a Content-Disposition: attachment flag.
+  def po_download_url
+    po_document_url&.sub("/upload/", "/upload/fl_attachment/")
+  end
+
 
   # ---------------------------------------------------------------------------
   # Bulk release ("bookout") — the release note form for a whole order:

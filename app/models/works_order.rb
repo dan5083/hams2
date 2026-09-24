@@ -478,75 +478,19 @@ class WorksOrder < ApplicationRecord
     customised_process_data&.dig("parts_per_batch")
   end
 
-  # The normal way to batch a works order: state how many parts go through
-  # together and let the count fall out. Batches 1..n-1 take the full load;
-  # the last takes the remainder - UNLESS the remainder is a runt. A final
-  # load more than 25% short of capacity is never run in practice (101 parts
-  # at 10 per load is not ten full loads plus a lone part down the line), so
-  # the last TWO loads split their combined parts as evenly as possible
-  # instead: 101 at 10 => 9 x 10, then 6 + 5. 100 at 30 => 2 x 30, then
-  # 20 + 20. Capacity is never exceeded - half of (per_batch + runt) is
-  # always <= per_batch. Only the last two quantities differ from the naive
-  # derivation, so re-deriving stays compatible with any earlier batches
-  # already signed off at the full load. 48 at 1 => 48 x 1, unchanged.
-  # Individual quantities stay editable afterwards for the cases where
-  # physical reality diverges.
+  # Naive derivation for a fork's initial structure (add_fork!): batches
+  # 1..n-1 take the full load, the last takes the remainder. The base
+  # section is no longer derived at all - it is built one batch at a time
+  # with add_batch! and quantities set per batch. (The old "runt" rule that
+  # rebalanced a short final load across the last two batches is gone; it
+  # was never how the shop actually loaded, and the per-batch qty is
+  # editable anyway.)
   def derive_batch_quantities(per_batch, total = record_quantity)
     per_batch = per_batch.to_i
     total = total.to_i
     return {} if per_batch < 1 || total < 1
-
     count = (total.to_f / per_batch).ceil
-    qtys = (1..count).index_with { |n| n < count ? per_batch : total - (per_batch * (count - 1)) }
-
-    if count > 1 && qtys[count] < per_batch * 0.75
-      combined = qtys[count - 1] + qtys[count]
-      qtys[count - 1] = (combined / 2.0).ceil
-      qtys[count] = combined - qtys[count - 1]
-    end
-
-    qtys
-  end
-
-  # section_key: "base" (default) or a fork's from_position - every batch
-  # section, not just the WO's own, can be re-derived. Earlier this was
-  # base-only, so a fork's structure was fixed at add_fork! for life.
-  def set_parts_per_batch!(per_batch, section_key: "base")
-    assert_record_open!
-    per_batch = per_batch.to_i
-    raise "Parts per batch must be at least 1" if per_batch < 1
-    raise "Parts per batch cannot exceed the order quantity (#{record_quantity})" if per_batch > record_quantity
-
-    derived = derive_batch_quantities(per_batch)
-    count = derived.length
-    if count > MAX_BATCHES
-      raise "#{per_batch} per batch on #{record_quantity} parts gives #{count} batches (max #{MAX_BATCHES})"
-    end
-
-    section = find_section!(section_key)
-    highest_used = section_highest_recorded_batch(section)
-    raise "Batch #{highest_used} already has records; cannot reduce to #{count} batches" if count < highest_used
-
-    # Refuse rather than reconcile: a signed batch's quantity is part of what
-    # the sign-off certified.
-    clashes = section_signed_batch_numbers(section).select { |n| derived[n].to_s != section_batch_qty(section, n).to_s }
-    if clashes.any?
-      raise "Batch #{clashes.join(', ')} already signed off at a different quantity; " \
-            "re-batching would rewrite the record"
-    end
-
-    freeze_operations!
-    data = find_section!(section_key)["data"] # re-resolve after freeze
-    batches = data["batches"] ||= []
-    derived.each do |n, qty|
-      entry = batches.find { |b| b["number"] == n } || (batches << { "number" => n }).last
-      entry["qty"] = qty.to_s
-    end
-    batches.reject! { |b| b["number"].to_i > count }
-    data["batch_count"] = count
-    data["parts_per_batch"] = per_batch
-    customised_process_data_will_change!
-    save!
+    (1..count).index_with { |n| n < count ? per_batch : total - (per_batch * (count - 1)) }
   end
 
   # ==========================================================================
@@ -696,8 +640,7 @@ class WorksOrder < ApplicationRecord
   end
 
   # Add a fork: from this operation onward the parts run in a new batch
-  # structure derived from per_batch, exactly as set_parts_per_batch! derives
-  # the base one. Refused while any operation in the affected stretch carries
+  # structure derived from per_batch (derive_batch_quantities). Refused while any operation in the affected stretch carries
   # a record - a fork renumbers the batches those records were keyed against.
   def add_fork!(from_position, per_batch)
     assert_record_open!
@@ -804,6 +747,27 @@ class WorksOrder < ApplicationRecord
   def signed_count_for(op)
     keys = sign_off_keys_for(op)
     (op["sign_offs"] || {}).count { |k, v| keys.include?(k) && v.present? }
+  end
+
+  # Whole-record progress in sign-off units: a batch-scoped op contributes
+  # one per batch in ITS section, a WO-scoped op contributes one. Resolved
+  # through the record owner, so a grouped member reports the lead's bar.
+  # partial = readings entered, sign-off pending. next_op = the first op
+  # with something left to sign, for "where is it" at a glance.
+  #   { total:, signed:, partial:, remaining:, next_op: "Hard anodise…" | nil }
+  def sign_off_progress
+    owner = process_record_owner
+    ops   = owner.operations_for_display || []
+    total = signed = partial = 0
+    next_op = nil
+    ops.each do |o|
+      keys = owner.sign_off_keys_for(o)
+      done = owner.signed_count_for(o)
+      pend = (o["ocv_readings"] || {}).count { |k, v| keys.include?(k) && v.present? && (o["sign_offs"] || {})[k].blank? }
+      total += keys.length; signed += done; partial += pend
+      next_op ||= o["operation_text"].to_s.gsub(/\*+/, "").strip.truncate(40) if done < keys.length
+    end
+    { total: total, signed: signed, partial: partial, remaining: total - signed - partial, next_op: next_op }
   end
 
   def process_batches

@@ -59,9 +59,12 @@ class CustomerOrdersController < ApplicationController
   end
 
   def show
+    # Oldest first: works orders are booked in PO line order, so row 1 is
+    # PO line 1. (Newest-first read upside down against the customer's
+    # paperwork.) The view numbers the rows.
     @works_orders = @customer_order.works_orders
                                    .includes(:part, :process_group)
-                                   .order(created_at: :desc)
+                                   .order(:created_at, :number)
 
     # Headline process facts per row and for the order-level Process card,
     # read the same way the shop-floor boards read them (ShopSectionBoard::Job

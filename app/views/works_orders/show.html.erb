@@ -456,32 +456,10 @@
 
           <div class="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-3">
 
-            <!-- Batching: parts per batch derives the count and the remainder -->
+            <!-- Batching is hand-built, one load at a time: "+ Add batch"
+                 appends a batch and lands on it; its quantity is set there.
+                 The page renders one batch at a time. -->
             <div class="flex flex-wrap items-center gap-3">
-              <%= form_with url: set_parts_per_batch_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex flex-wrap items-center gap-2" do %>
-                <label class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Parts per batch</label>
-                <%# Unset batching prefills the full order quantity - the
-                    commonest case is everything through in one load, so the
-                    initial state is "1 × N", one Apply away. %>
-                <%= number_field_tag :parts_per_batch, @works_order.parts_per_batch || @works_order.record_quantity, min: 1, max: @works_order.record_quantity,
-                    id: "parts-per-batch",
-                    data: { quantity: @works_order.record_quantity, max_batches: WorksOrder::MAX_BATCHES, keyflow: "ppb" },
-                    class: "border border-gray-300 rounded px-2 py-1 text-sm w-20" %>
-                <%= submit_tag "Set batches", class: "bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium px-2 py-1.5 rounded" %>
-                <span id="batch-preview" class="text-xs text-gray-500"></span>
-              <% end %>
-
-              <span class="text-xs <%= qty_total == @works_order.record_quantity ? 'text-gray-400' : 'text-orange-600 font-medium' %>">
-                <% if qty_total == @works_order.record_quantity %>
-                  <%= batch_count %> batch<%= 'es' unless batch_count == 1 %> · <%= qty_total %> parts
-                <% else %>
-                  ⚠️ Batch quantities total <%= qty_total %>, <%= @works_order.process_lead? ? "tank load" : "order" %> is <%= @works_order.record_quantity %>
-                <% end %>
-              </span>
-            </div>
-
-            <!-- Active batch: the page renders one batch at a time -->
-            <div class="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-200">
               <label class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Batch</label>
               <%= form_with url: works_order_path(@works_order), method: :get, local: true, data: { turbo: false }, class: "flex items-center gap-2" do %>
                 <% active_fb.each do |k, v| %><%= hidden_field_tag "fb[#{k}]", v %><% end %>
@@ -523,11 +501,17 @@
                 <%= hidden_field_tag :section, "base", id: nil %>
                 <%= hidden_field_tag :base_batch, active_batch, id: nil %>
                 <% active_fb.each do |k, v| %><%= hidden_field_tag "fb[#{k}]", v, id: nil %><% end %>
-                <%= number_field_tag :qty, nil, min: 1, placeholder: "qty", id: nil,
-                    class: "border border-gray-300 rounded px-1 py-1 text-sm w-16" %>
-                <%= submit_tag "+ Add batch", class: "bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-2 py-1 rounded" %>
+                <%= submit_tag "+ Add batch", class: "bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-2 py-1 rounded",
+                    title: "Append a batch; you set its quantity next" %>
               <% end %>
-              <div class="ml-auto flex items-center gap-1">
+              <div class="ml-auto flex items-center gap-3">
+              <span class="text-xs <%= qty_total == @works_order.record_quantity ? 'text-gray-400' : 'text-orange-600 font-medium' %>">
+                <% if qty_total == @works_order.record_quantity %>
+                  <%= batch_count %> batch<%= 'es' unless batch_count == 1 %> · <%= qty_total %> parts
+                <% else %>
+                  ⚠️ Batch quantities total <%= qty_total %>, <%= @works_order.process_lead? ? "tank load" : "order" %> is <%= @works_order.record_quantity %>
+                <% end %>
+              </span>
                 <% if active_batch > 1 %>
                   <%= link_to "‹ B#{active_batch - 1}", works_order_path(@works_order, batch: active_batch - 1, fb: active_fb.presence),
                       class: "text-xs text-blue-600 hover:text-blue-900 px-2 py-1" %>
@@ -545,18 +529,9 @@
                  ITS section, a WO-scoped op contributes one). The bar is full
                  exactly when the record is completely signed, which is what
                  release validation will require. -->
-            <%
-              total_units  = ops_for_display.sum { |o| @works_order.sign_off_keys_for(o).length }
-              signed_units = ops_for_display.sum { |o| @works_order.signed_count_for(o) }
-              # Recorded-but-unsigned units: readings entered, sign-off pending
-              partial_units = ops_for_display.sum do |o|
-                keys = @works_order.sign_off_keys_for(o)
-                (o["ocv_readings"] || {}).count do |k, v|
-                  keys.include?(k) && v.present? && (o["sign_offs"] || {})[k].blank?
-                end
-              end
-              remaining_units = total_units - signed_units - partial_units
-            %>
+            <% prog = @works_order.sign_off_progress
+               total_units = prog[:total]; signed_units = prog[:signed]
+               partial_units = prog[:partial]; remaining_units = prog[:remaining] %>
             <div>
               <div class="flex gap-px h-2 rounded overflow-hidden">
                 <% if signed_units > 0 %><div class="bg-green-500" style="flex: <%= signed_units %>"></div><% end %>
@@ -729,8 +704,6 @@
                       <%= hidden_field_tag :section, f_key, id: nil %>
                       <%= hidden_field_tag :base_batch, active_batch, id: nil %>
                       <% active_fb.each do |k, v| %><%= hidden_field_tag "fb[#{k}]", v, id: nil %><% end %>
-                      <%= number_field_tag :qty, nil, min: 1, placeholder: "qty", id: nil,
-                          class: "border border-gray-300 rounded px-1 py-1 text-sm w-16" %>
                       <%= submit_tag "+ Add batch", class: "bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-2 py-1 rounded" %>
                     <% end %>
                     <div class="ml-auto flex items-center gap-1">
@@ -751,15 +724,6 @@
                   <details class="text-xs">
                     <summary class="cursor-pointer select-none text-gray-500 hover:text-gray-700">Set batches for this fork</summary>
                     <div class="flex flex-wrap items-center gap-4 mt-2">
-                      <%= form_with url: set_parts_per_batch_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex items-center gap-2" do %>
-                        <%= hidden_field_tag :section, f_key %>
-                        <%= hidden_field_tag :base_batch, active_batch %>
-                        <% active_fb.each do |k, v| %><%= hidden_field_tag "fb[#{k}]", v %><% end %>
-                        <span class="text-gray-500">Parts per batch</span>
-                        <%= number_field_tag :parts_per_batch, @works_order.section_parts_per_batch(fork_sec) || @works_order.record_quantity, min: 1, max: @works_order.record_quantity,
-                            id: nil, class: "border border-gray-300 rounded px-2 py-1 text-sm w-20" %>
-                        <%= submit_tag "Set batches", class: "bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium px-2 py-1 rounded" %>
-                      <% end %>
                       <%= form_with url: set_batch_count_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex items-center gap-2" do %>
                         <%= hidden_field_tag :section, f_key %>
                         <%= hidden_field_tag :base_batch, active_batch %>
@@ -1233,52 +1197,6 @@ function hamsBatchShareSum(uid, qtyInputId) {
   out.textContent = '= ' + total + (ok ? '' : ' ≠ ' + qty);
 }
 
-// Live preview of the batch structure. The point is that the operator sees
-// "3000 batches" BEFORE submitting, not after the page tries to render it.
-(function () {
-  var input = document.getElementById('parts-per-batch');
-  var out = document.getElementById('batch-preview');
-
-  // Shared formatter, mirroring WorksOrder#derive_batch_quantities exactly,
-  // runt rule included: a final load more than 25% short of capacity
-  // balances with the penultimate load (101 at 10 => 9 × 10, then 6 + 5).
-  // The keyflow dropdown labels its parts-per-batch suggestions with the
-  // same text, so the two can never drift.
-  window.__hamsBatchStructure = function (per, total, max) {
-    if (!per || per < 1 || !total) return null;
-    if (per > total) return { text: 'More than the order quantity (' + total + ')', warn: true };
-    var count = Math.ceil(total / per);
-    var remainder = total - per * (count - 1);
-    if (count > max) return { text: count + ' batches — over the limit of ' + max, warn: true };
-    var text;
-    if (remainder === per) {
-      text = count + ' × ' + per;
-    } else if (count > 1 && remainder < per * 0.75) {
-      var combined = per + remainder;
-      var a = Math.ceil(combined / 2), b = combined - a;
-      var full = count - 2;
-      text = (full > 0 ? full + ' × ' + per + ', then ' : '') + a + ' + ' + b + ' (last two balanced)';
-    } else {
-      text = (count - 1) + ' × ' + per + ' + 1 × ' + remainder;
-    }
-    return { text: text, warn: false };
-  };
-
-  if (!input || !out) return;
-  function preview() {
-    var s = window.__hamsBatchStructure(
-      parseInt(input.value, 10),
-      parseInt(input.dataset.quantity, 10),
-      parseInt(input.dataset.maxBatches, 10)
-    );
-    if (!s) { out.textContent = ''; out.className = 'text-xs text-gray-500'; return; }
-    out.textContent = s.text;
-    out.className = s.warn ? 'text-xs text-orange-600 font-medium' : 'text-xs text-gray-500';
-  }
-  input.addEventListener('input', preview);
-  preview();
-})();
-
 // Keep the operation you acted on under your finger. Turbo preserves the pixel
 // scroll offset across a morph, which is not the same thing: signing off
 // contract review collapses a 17-item checklist, the page above the viewport
@@ -1468,8 +1386,8 @@ function hamsBatchShareSum(uid, qtyInputId) {
     // the operator to batching; the reload after "Set batches" walks
     // straight on to the next op.
     if (document.querySelector('[data-needs-qty]')) {
-      var ppb = document.getElementById('parts-per-batch');
-      if (ppb) { ppb.focus({ preventScroll: true }); ppb.scrollIntoView({ block: 'center' }); }
+      var q = document.querySelector('input[id^="batch_qty_base_"]');
+      if (q) { q.focus({ preventScroll: true }); q.scrollIntoView({ block: 'center' }); }
     }
   }
   function moveRow(fromEl, dir) {
@@ -1509,12 +1427,6 @@ function hamsBatchShareSum(uid, qtyInputId) {
     ddItems = items; ddFor = input;
     if (q) {
       ddIndex = 0;
-    } else if (input.dataset.keyflow === 'ppb') {
-      // Highlight the option matching the (prefilled) value - the full
-      // quantity on a fresh works order - falling back to the top.
-      var cur = parseInt(input.value, 10);
-      var m = items.findIndex(function (it) { return parseInt(it.v, 10) === cur; });
-      ddIndex = m >= 0 ? m : 0;
     } else {
       ddIndex = Math.floor((items.length - 1) / 2);
     }
@@ -1574,7 +1486,7 @@ function hamsBatchShareSum(uid, qtyInputId) {
       return;
     }
 
-    if (t.dataset.keyflow === 'ocv' || t.dataset.keyflow === 'ppb') {
+    if (t.dataset.keyflow === 'ocv') {
       if (dd && ddFor === t) {
         if (e.key === 'ArrowDown') { e.preventDefault(); highlight(ddIndex + 1); return; }
         if (e.key === 'ArrowUp')   { e.preventDefault(); highlight(ddIndex - 1); return; }
@@ -1583,16 +1495,11 @@ function hamsBatchShareSum(uid, qtyInputId) {
           e.preventDefault();
           if (ddIndex >= 0) t.value = ddItems[ddIndex].v;
           closeDD();
-          if (t.dataset.keyflow === 'ppb') {
-            if (t.form) (t.form.requestSubmit ? t.form.requestSubmit() : t.form.submit());
-          } else {
-            advance(t);
-          }
+          advance(t);
           return;
         }
         return; // typing refilters via the input listener
       }
-      if (t.dataset.keyflow === 'ppb') return; // dropdown closed: native Enter submits the form
       if (e.key === 'Escape') { e.preventDefault(); moveRow(t, 1); return; }
       if (e.key !== 'Enter') return; // normal typing
       e.preventDefault();            // never implicitly submit a partial form
@@ -1607,33 +1514,11 @@ function hamsBatchShareSum(uid, qtyInputId) {
     refreshGates(t.closest("[id^='op-']"));
   });
 
-  // Parts-per-batch suggestions: the full quantity (one batch of the lot)
-  // plus even 2..5-way splits, each labelled with the exact structure the
-  // server will derive - via the shared formatter, so label and outcome
-  // can never disagree.
-  function ppbSuggestions(input) {
-    if (input.__sugg) return;
-    var total = parseInt(input.dataset.quantity, 10);
-    var max = parseInt(input.dataset.maxBatches, 10);
-    if (!total) return;
-    var seen = {}, items = [];
-    [1, 2, 3, 4, 5].forEach(function (ways) {
-      var per = Math.ceil(total / ways);
-      if (per < 1 || seen[per]) return;
-      var s = window.__hamsBatchStructure ? window.__hamsBatchStructure(per, total, max) : null;
-      if (!s || s.warn) return;
-      seen[per] = 1;
-      items.push({ v: per, label: per + ' per batch — ' + s.text });
-    });
-    if (items.length) input.__sugg = items;
-  }
-
   document.addEventListener('focusin', function (e) {
     var t = e.target;
     if (t && t.dataset && t.dataset.keyflow) {
       ring(t.closest("[id^='op-']"));
       if (t.dataset.keyflow === 'ocv' && t.__sugg && !t.value) openDD(t);
-      if (t.dataset.keyflow === 'ppb') { ppbSuggestions(t); if (t.__sugg) { t.select(); openDD(t); } }
     } else {
       // Working elsewhere. If it's still inside an op (thickness card,
       // notes), keep that op ringed so the walk visibly follows the
@@ -1743,112 +1628,5 @@ function printRouteCard(url) {
 </script>
 
 <% if @works_order.part&.has_previewable_files? %>
-  <%# Drawing preview modal (filled from the clicked thumbnail's data attributes in Basic Details) %>
-  <div id="part-file-modal" class="fixed inset-0 z-50 hidden" role="dialog" aria-modal="true" aria-labelledby="part-file-modal-title">
-    <div class="absolute inset-0" style="background: rgba(17, 24, 39, 0.85);" data-modal-close></div>
-
-    <div class="relative flex flex-col h-full w-full max-w-6xl mx-auto p-4">
-      <div class="flex items-center justify-between mb-3 text-white">
-        <h3 id="part-file-modal-title" class="text-sm font-medium truncate pr-4"></h3>
-        <div class="flex items-center space-x-2 flex-shrink-0">
-          <a id="part-file-modal-download" href="#"
-             class="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md bg-white text-gray-800 hover:bg-gray-100">
-            Download
-          </a>
-          <button type="button" data-modal-close
-                  class="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md bg-gray-700 text-white hover:bg-gray-600"
-                  aria-label="Close">
-            Close
-          </button>
-        </div>
-      </div>
-
-      <div class="flex-1 min-h-0 flex items-center justify-center">
-        <img id="part-file-modal-image" src="" alt="" class="hidden max-w-full max-h-full object-contain rounded shadow-lg bg-white">
-        <iframe id="part-file-modal-frame" src="about:blank" title="Drawing" class="hidden w-full h-full rounded shadow-lg bg-white"></iframe>
-      </div>
-    </div>
-  </div>
-
-  <style>
-    .part-doc-thumb { position: relative; transition: transform 150ms ease, box-shadow 150ms ease; cursor: zoom-in; }
-    .part-doc-thumb:hover,
-    .part-doc-thumb:focus-visible {
-      transform: scale(1.15);
-      z-index: 30;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
-    }
-  </style>
-
-  <script>
-    (function () {
-      // Delegated listeners on document survive Turbo morphs; the flag stops
-      // them being bound twice when the page is re-rendered.
-      if (window.__partFileModalBound) return;
-      window.__partFileModalBound = true;
-
-      function els() {
-        return {
-          modal: document.getElementById('part-file-modal'),
-          title: document.getElementById('part-file-modal-title'),
-          download: document.getElementById('part-file-modal-download'),
-          image: document.getElementById('part-file-modal-image'),
-          frame: document.getElementById('part-file-modal-frame')
-        };
-      }
-
-      function openModal(button) {
-        var e = els();
-        if (!e.modal) return;
-
-        var url = button.dataset.previewUrl;
-        var kind = button.dataset.previewKind;
-
-        e.title.textContent = button.dataset.previewTitle || '';
-        e.download.href = button.dataset.downloadUrl || '#';
-
-        if (kind === 'pdf') {
-          e.image.classList.add('hidden');
-          e.image.src = '';
-          e.frame.src = url;
-          e.frame.classList.remove('hidden');
-        } else {
-          e.frame.classList.add('hidden');
-          e.frame.src = 'about:blank';
-          e.image.src = url;
-          e.image.alt = button.dataset.previewTitle || '';
-          e.image.classList.remove('hidden');
-        }
-
-        e.modal.classList.remove('hidden');
-        document.body.style.overflow = 'hidden';
-      }
-
-      function closeModal() {
-        var e = els();
-        if (!e.modal || e.modal.classList.contains('hidden')) return;
-
-        e.modal.classList.add('hidden');
-        e.image.src = '';
-        e.frame.src = 'about:blank';
-        document.body.style.overflow = '';
-      }
-
-      document.addEventListener('click', function (event) {
-        var thumb = event.target.closest('[data-part-file-preview]');
-        if (thumb) {
-          event.preventDefault();
-          openModal(thumb);
-          return;
-        }
-        if (event.target.closest('[data-modal-close]')) {
-          closeModal();
-        }
-      });
-
-      document.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape') closeModal();
-      });
-    })();
-  </script>
+  <%= render "shared/file_preview_modal" %>
 <% end %>

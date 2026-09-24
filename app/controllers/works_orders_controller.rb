@@ -1,13 +1,13 @@
 # app/controllers/works_orders_controller.rb - Fixed pricing parameter handling and route card operations with RBAC
 class WorksOrdersController < ApplicationController
-  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :invoice_to_date, :void, :unvoid, :sign_off_operation, :undo_sign_off, :save_ocv, :add_operation_note, :set_batch_count, :set_parts_per_batch, :set_batch_qty, :add_batch, :add_fork, :remove_fork, :discard_process_record, :choose_alternate]
+  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :invoice_to_date, :void, :unvoid, :sign_off_operation, :undo_sign_off, :save_ocv, :add_operation_note, :set_batch_count, :set_batch_qty, :add_batch, :add_fork, :remove_fork, :discard_process_record, :choose_alternate]
 
   # Marks on a process record are attributed to Current.actor - the operator
   # unlocked with a PIN if there is one, otherwise the account holder. That
   # keeps today's behaviour intact while sub-users bed in. Uncomment to make a
   # named operator mandatory before anything can be signed or re-batched.
   #
-  # require_sub_user only: [:sign_off_operation, :save_ocv, :set_parts_per_batch,
+  # require_sub_user only: [:sign_off_operation, :save_ocv,
   #                         :set_batch_qty, :set_batch_count, :add_fork, :remove_fork]
 
  def index
@@ -311,19 +311,6 @@ class WorksOrdersController < ApplicationController
     redirect_to works_order_path(@works_order), alert: e.message
   end
 
-  # Paperless process record: the normal way to batch a WO - state the load
-  # size and let the count and the remainder batch fall out.
-  def set_parts_per_batch
-    return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
-    section_key = params[:section].presence || "base"
-    @works_order.set_parts_per_batch!(params[:parts_per_batch], section_key: section_key)
-    count = @works_order.section_batch_count(@works_order.find_section!(section_key))
-    redirect_to works_order_path(@works_order, batch: return_base_batch, fb: fork_batch_params.presence),
-                notice: "Batched at #{params[:parts_per_batch]} per batch: #{count} batch#{'es' unless count == 1}."
-  rescue => e
-    redirect_to works_order_path(@works_order, batch: return_base_batch, fb: fork_batch_params.presence), alert: e.message
-  end
-
   # Paperless process record: correct a single batch's quantity (short load,
   # scrapped part) without re-deriving the whole structure.
   def set_batch_qty
@@ -339,7 +326,7 @@ class WorksOrdersController < ApplicationController
   end
 
   # Paperless process record: how many batches this WO runs. Manual escape
-  # hatch; set_parts_per_batch is the everyday path.
+  # hatch; add_batch is the everyday path.
   def add_fork
     fork = @works_order.add_fork!(params[:from_position], params[:parts_per_batch])
     redirect_to works_order_path(@works_order, batch: return_base_batch, fb: fork_batch_params.presence),
