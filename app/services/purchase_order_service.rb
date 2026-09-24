@@ -173,7 +173,7 @@ class PurchaseOrderService
     combined = Cloudinary::Uploader.multi(
       tag,
       format: "pdf",
-      transformation: IMAGE_CLEANUP_TRANSFORMATION
+      transformation: IMAGE_CLEANUP_TRANSFORMATION.map(&:dup)
     )
 
     # The combined PDF is its own stored asset (type "multi"), so the page
@@ -203,11 +203,14 @@ class PurchaseOrderService
   private_class_method :with_tempfile
 
   # Page 1 of an image-type PDF asset as a JPEG.
+  # Cloudinary::Utils.cloudinary_url MUTATES the transformation hashes it is
+  # given (it deletes keys as it consumes them), so the frozen constants must
+  # be deep-copied on every call — "can't modify frozen Hash" otherwise.
   def self.page_thumbnail_url(public_id)
     Cloudinary::Utils.cloudinary_url(
       public_id,
       resource_type: "image", format: "jpg", secure: true,
-      transformation: [{ page: 1 }, THUMBNAIL_TRANSFORMATION]
+      transformation: [{ page: 1 }, THUMBNAIL_TRANSFORMATION.dup]
     )
   end
   private_class_method :page_thumbnail_url
@@ -219,7 +222,7 @@ class PurchaseOrderService
     Cloudinary::Utils.cloudinary_url(
       page_public_id,
       resource_type: "image", format: "jpg", secure: true,
-      transformation: IMAGE_CLEANUP_TRANSFORMATION + [THUMBNAIL_TRANSFORMATION]
+      transformation: IMAGE_CLEANUP_TRANSFORMATION.map(&:dup) + [THUMBNAIL_TRANSFORMATION.dup]
     )
   end
   private_class_method :scan_thumbnail_url
