@@ -1,0 +1,88 @@
+<%# app/views/quote_mailer/quote_email.html.erb — matches the order
+    acknowledgement / order_ready style. The full quote is the attached PDF;
+    this body is a readable summary plus the line items. HTML only. %>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
+    .header { border-bottom: 3px solid #2563eb; padding-bottom: 20px; margin-bottom: 30px; }
+    .header img { max-width: 300px; height: auto; margin-bottom: 15px; }
+    .header h1 { color: #1e40af; margin: 0 0 10px 0; font-size: 28px; }
+    .order-details { background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
+    .order-details table { width: 100%; border-collapse: collapse; }
+    .order-details td { padding: 8px 0; }
+    .order-details td:first-child { font-weight: bold; width: 180px; color: #4b5563; }
+    .items-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+    .items-table thead { background-color: #2563eb; color: white; }
+    .items-table th { padding: 12px; text-align: left; font-weight: 600; }
+    .items-table td { padding: 12px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    .items-table .num { text-align: right; white-space: nowrap; }
+    .items-table tfoot td { font-weight: bold; border-top: 2px solid #2563eb; border-bottom: none; }
+    .terms { font-size: 13px; color: #4b5563; }
+    .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 13px; color: #6b7280; }
+    .footer p { margin: 5px 0; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <% if attachments['logo.png'] %>
+      <img src="<%= attachments['logo.png'].url %>" alt="Hard Anodising Surface Treatments Ltd">
+    <% end %>
+    <h1>Quotation <%= @quote.display_name %></h1>
+    <% if @quote.title.present? %><p style="margin:0; font-size:16px; color:#4b5563;"><%= @quote.title %></p><% end %>
+  </div>
+
+  <p>Dear <%= @quote.enquirer_name.presence || "Sir/Madam" %>,</p>
+  <p>Thank you for your enquiry. Please find our quotation below and attached as a PDF<%= ", together with the drawing#{'s' if @quote.attachable_part_files.length > 1} we have quoted against" if @quote.attachable_part_files.any? %>.</p>
+
+  <div class="order-details">
+    <table>
+      <tr><td>Quote number</td><td><%= @quote.display_name %></td></tr>
+      <tr><td>Date</td><td><%= @quote.created_at.strftime("%d/%m/%Y") %></td></tr>
+      <tr><td>Valid until</td><td><%= @quote.valid_until&.strftime("%d/%m/%Y") %></td></tr>
+      <tr><td>Customer</td><td><%= @customer.name %></td></tr>
+      <% if @quote.summary.present? %><tr><td>Process</td><td><%= @quote.summary %></td></tr><% end %>
+    </table>
+  </div>
+
+  <table class="items-table">
+    <thead>
+      <tr><th>Description</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Line total</th></tr>
+    </thead>
+    <tbody>
+      <% @items.each do |item| %>
+        <tr>
+          <td><%= simple_format(item.description, {}, wrapper_tag: "div") %></td>
+          <td class="num"><%= item.quantity %></td>
+          <td class="num">£<%= '%.2f' % item.unit_amount %></td>
+          <td class="num">£<%= '%.2f' % item.line_total %></td>
+        </tr>
+      <% end %>
+    </tbody>
+    <tfoot>
+      <tr><td colspan="3" class="num">Total (ex VAT)</td><td class="num">£<%= '%.2f' % @quote.total_ex_tax %></td></tr>
+    </tfoot>
+  </table>
+
+  <% if @quote.notes.present? %>
+    <p><%= simple_format(@quote.notes) %></p>
+  <% end %>
+
+  <p class="terms">
+    Prices are in GBP, exclusive of VAT and carriage, and subject to our standard terms and conditions.
+    Where a minimum order charge applies it is shown as a line above. Please quote <%= @quote.display_name %> on your purchase order.
+  </p>
+
+  <p>Kind regards,</p>
+  <p><strong><%= @sender&.display_name || "Hard Anodising Surface Treatments Ltd" %></strong><% if @sender&.email_address.present? %><br><a href="mailto:<%= @sender.email_address %>" style="color:#2563eb; text-decoration:none;"><%= @sender.email_address %></a><% end %></p>
+
+  <div class="footer">
+    <p><strong>Hard Anodising Surface Treatments Ltd</strong></p>
+    <p>Firs Industrial Estate, Rickets Close, Kidderminster DY11 7QN</p>
+    <p>Tel: 01562 747100 | <a href="http://www.hard-anodising.co.uk" style="color: #2563eb; text-decoration: none;">www.hard-anodising.co.uk</a></p>
+  </div>
+</body>
+</html>

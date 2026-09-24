@@ -623,41 +623,56 @@ class AiAssistantJob < ApplicationJob
       - 1,000+: 15% off
       Present each quantity as a separate line item in the quote.
 
-      PUSHING QUOTES TO XERO:
-      After presenting the price breakdown, ask if the user wants to create a draft
-      quote in Xero. If yes, call:
+      RAISING THE QUOTE IN HAMS (quotes are NOT pushed to Xero any more):
+      After presenting the price breakdown, ask if the user wants to raise the
+      quote. If yes, IN THIS SAME RUN (the drawings are only available now):
 
-        XeroQuoteService.create_draft_quote(
-          customer_name: "Exact Customer Name",
-          title: "PART_NUMBER — Part Description",
-          summary: "Hard Anodising 50µm, Hot Water Seal, DEF-STAN 03-25",
-          reference: "enquirer@email.com",
-          line_items: [
-            { description: "Hard Anodising 50µm — PN123, Part Desc", quantity: 10, unit_amount: 4.50 }
+        QuoteService.create_from_request(
+          customer_name:  "Exact Customer Name",
+          title:          "PD67711-00 — Door Upper Hinge Insert",
+          summary:        "Hard Anodising 50µm, Hot Water Seal, DEF-STAN 03-25",
+          enquirer_email: "buyer@customer.com",     # from the enquiry; omit if unknown
+          enquirer_name:  "Jane Buyer",             # optional
+          items: [
+            { part_number: "PD67711-00", part_issue: "A",
+              description: "Hard Anodising 50µm, DEF-STAN 03-25 — PD67711-00, Door Upper Hinge Insert",
+              quantity: 10, unit_amount: 4.50,
+              part: { ...only when the part is NOT already in HAMS... },
+              attachment_indexes: [0] }            # which uploaded file(s) are this part's drawing; omit = all
           ],
-          request_id: @request_id   # ALWAYS pass this — attaches any drawings from this conversation
+          request_id: @request_id                   # ALWAYS
         )
 
-      Field mapping:
-      - title: Part number + description (e.g. "PD67711-00 — Door Upper Hinge Insert")
-      - summary: Process type and spec (e.g. "Standard Anodising Type II DEF-STAN 03-25, 10–15µm")
-      - reference: The enquirer's email address if provided, otherwise leave blank
-      - customer_name: Use the EXACT name as it appears in HAMS, not an abbreviation
-      - line_items: Put the actual quantity in the quantity field and the per-unit
-        price in unit_amount. Do NOT put quantities in the description.
-        The description should be: process + spec + part number + part description.
-        For quantity breaks, create one line per qty tier.
+      PARTS AT QUOTE TIME — this is the point of quoting in HAMS: the part exists,
+      configured, with its drawing attached, before the PO arrives.
+      - First check: Part.matching(customer_id: org.id, part_number: "...", part_issue: "...").first
+        If it exists, omit `part:` and the quote line links to it.
+      - If it doesn't, supply `part:` with the full configuration exactly as the
+        part form would save it. Copy the shape from a similar existing part:
+          Part.where(customer: org).order(created_at: :desc).first&.customisation_data&.dig("operation_selection")
+        and set: description, specification, material, specified_thicknesses,
+        process_type ("anodising" | "enp" | ...), aerospace_defense (true/false),
+        jigging_location (REQUIRED — free text: where and how the part hangs,
+        which surfaces may carry a jig mark; ask the user if the drawing doesn't
+        make it obvious), and operation_selection: { "treatments" => [ ... ] }
+        where every treatment has an operation_id from the operation library and
+        a selected_jig_type. Part validation is enforced: a badly configured part
+        fails the whole call with the reason — fix and retry, don't skip it.
+      - unit_amount is written to the part as each_price.
+      - One line per quantity break, all pointing at the same part.
 
-      The service returns the Xero quote number and quote_id on success.
-      If it fails with a Xero connection error, tell the user to reconnect via
-      Settings > Xero and try again.
+      The result gives the quote number, a HAMS link (/quotes/<id>), which parts
+      were created vs reused, and how many drawings attached. Report all of it.
+      The quote is NOT emailed yet.
 
-      ATTACHING DRAWINGS TO QUOTES:
-      Handled by create_draft_quote when you pass request_id: @request_id —
-      always pass it. The result includes an `attachments` key telling you
-      how many files were attached (or why it failed); report that. Only call
-      XeroQuoteService.attach_from_request(quote_id:, request_id: @request_id)
-      separately if the user asks to attach a file to a quote that already exists.
+      SENDING THE QUOTE:
+      Show the user the summary and ask "send it to <email>?". Only on an explicit
+      yes:
+        QuoteService.send!(quote_id: "<id>")            # or to: "other@address" to override
+      This emails the enquirer the PDF plus the parts' drawings, cc's the user and
+      QUOTES_CC, and marks the quote sent. Report who it went to and the
+      attachment list. Sending can be done on a later turn — it reads the
+      drawings from the parts, not from this run.
     PROMPT
   end
 

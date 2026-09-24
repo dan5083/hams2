@@ -1,0 +1,85 @@
+<%# app/views/quotes/pdf.html.erb — the quotation as a one-page A4 PDF.
+    Rendered by QuoteMailer#quote_pdf and QuotesController#show (format
+    :pdf). Same styles partial and logo helper as the release note PDFs. %>
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <%= render "release_notes/pdf_styles" %>
+    <style>
+      .quote { padding: 0; }
+      .quote h1 { font-size: 16pt; margin: 0.5rem 0 0.75rem; }
+      .quote .terms { font-size: 8pt; color: #333; margin-top: 1rem; line-height: 1.35; }
+      .quote .title { font-size: 11pt; font-weight: bold; margin: 0.25rem 0 0.5rem; }
+      .quote .summary-table td.desc { white-space: pre-line; }
+    </style>
+  </head>
+  <body>
+    <div class="quote">
+      <div class="logo-header">
+        <img src="<%= pdf_logo_data_uri %>" alt="Hard Anodising Surface Treatments Ltd">
+        <div class="company-contact">
+          Firs Industrial Estate, Rickets Close, Kidderminster DY11 7QN<br/>
+          Tel: 01562 747100 | <a href="https://www.hard-anodising.co.uk/">www.hard-anodising.co.uk</a>
+        </div>
+      </div>
+
+      <h1>Quotation <%= @quote.display_name %></h1>
+
+      <table class="header-table">
+        <tbody>
+          <tr><th>Date</th><td><%= @quote.created_at.strftime("%d/%m/%Y") %></td></tr>
+          <tr><th>Valid until</th><td><%= @quote.valid_until&.strftime("%d/%m/%Y") %></td></tr>
+          <% if @quote.enquirer_name.present? || @quote.enquirer_email.present? %>
+            <tr><th>For the attention of</th><td><%= [@quote.enquirer_name, @quote.enquirer_email].compact_blank.join(" · ") %></td></tr>
+          <% end %>
+        </tbody>
+      </table>
+
+      <div class="customer-block">
+        <div class="customer-name"><%= @quote.customer.display_name %></div>
+        <%= simple_format(@quote.customer.pdf_address) %>
+      </div>
+
+      <% if @quote.title.present? %><div class="title"><%= @quote.title %></div><% end %>
+      <% if @quote.summary.present? %><p><%= @quote.summary %></p><% end %>
+
+      <table class="summary-table">
+        <thead>
+          <tr>
+            <th>Part</th>
+            <th>Description</th>
+            <th class="num">Qty</th>
+            <th class="num">Unit (£)</th>
+            <th class="num">Total (£)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @quote.quote_items.each do |item| %>
+            <tr>
+              <td><%= item.part&.display_name %></td>
+              <td class="desc"><%= item.description %></td>
+              <td class="num"><%= item.quantity %></td>
+              <td class="num"><%= '%.2f' % item.unit_amount %></td>
+              <td class="num"><%= '%.2f' % item.line_total %></td>
+            </tr>
+          <% end %>
+        </tbody>
+        <tfoot>
+          <tr>
+            <th colspan="4" style="text-align:right;">Total ex VAT</th>
+            <td class="num"><%= '%.2f' % @quote.total_ex_tax %></td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <% if @quote.notes.present? %><p style="white-space: pre-line;"><%= @quote.notes %></p><% end %>
+
+      <div class="terms">
+        Prices are in GBP, exclusive of VAT and carriage, and subject to our standard terms and conditions.
+        Where a minimum order charge applies it is shown as a line above. Lead times are quoted from receipt of
+        parts and drawing approval. Please quote <%= @quote.display_name %> on your purchase order.
+      </div>
+    </div>
+  </body>
+</html>

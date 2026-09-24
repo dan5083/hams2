@@ -45,6 +45,7 @@
           <% end %>
         </span>
         <%= link_to "Release Notes", release_notes_path, class: "#{link_base} #{nav_active if current_page?(release_notes_path)}" %>
+        <%= link_to "Quotes", quotes_path, class: "#{link_base} #{nav_active if request.path.start_with?("/quotes")}" %>
         <%= link_to "Parts", parts_path, class: "#{link_base} #{nav_active if current_page?(parts_path)}" %>
 
         <!-- NCRs - visible to all except Judy -->

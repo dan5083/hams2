@@ -157,6 +157,14 @@ Rails.application.routes.draw do
     resources :invoice_items, except: [:index, :show]
   end
 
+  # Quotes — raised by the assistant (QuoteService), emailed to the enquirer
+  resources :quotes, only: [:index, :show] do
+    member do
+      post  :send_email
+      patch :update_status
+    end
+  end
+
   # Xero invoice sync routes
   resources :xero_invoices, only: [] do
     member do
