@@ -25,6 +25,7 @@ class AiAssistantJob < ApplicationJob
   SERVICE_ENTRY_PATTERNS = [
     /\bPurchaseOrderService\./,
     /\bProofOfCollectionService\./,
+    /\bQuoteService\./,
     /\bXero\w*Service\./,
     /\bInvoice\.stage_to_date\b/,
     /\bInvoice\.create_from_release_notes\b/,
@@ -141,7 +142,7 @@ class AiAssistantJob < ApplicationJob
       max_tokens:    4096,
       cache_control: { type: "ephemeral" },
       system:        build_system_prompt,
-      tools:         TOOLS,
+      tools:         tools,
       messages:      messages
     }.to_json
 
@@ -172,6 +173,11 @@ class AiAssistantJob < ApplicationJob
         raise "Anthropic API error #{res.code}: #{res.body}"
       end
     end
+  end
+
+  # Tool list for this run. A subclass (QuoteProposalJob) swaps in its own.
+  def tools
+    TOOLS
   end
 
   # ── System prompt (sectioned) ──────────────────────────────────────────
@@ -624,6 +630,11 @@ class AiAssistantJob < ApplicationJob
       Present each quantity as a separate line item in the quote.
 
       RAISING THE QUOTE IN HAMS (quotes are NOT pushed to Xero any more):
+      The preferred route is the quote workbench: tell the user to open /quotes/new,
+      attach the drawing and paste the enquiry — they get an editable proposal with
+      your reasoning, jigging questions and prices before anything is saved or
+      sent. Only raise a quote from THIS chat if the user explicitly asks you to,
+      and then:
       After presenting the price breakdown, ask if the user wants to raise the
       quote. If yes, IN THIS SAME RUN (the drawings are only available now):
 

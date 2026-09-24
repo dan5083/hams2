@@ -133,6 +133,101 @@ class QuoteService
   end
 
   # ---------------------------------------------------------------------------
+  # Workbench: turn the REVIEWED form into parts + quote items. `form` is the
+  # params hash from quotes/build: parts keyed by proposal key, lines, and
+  # header fields. Drawings uploaded to the quote are copied onto every part
+  # created here (same Cloudinary asset, referenced from the part's file
+  # list — nothing is re-uploaded). All-or-nothing.
+  # ---------------------------------------------------------------------------
+  def self.finalise!(quote, form)
+    form  = form.to_h.deep_stringify_keys
+    parts = (form["parts"] || {})
+    lines = (form["lines"] || {}).values.sort_by { |l| l["position"].to_i }
+    raise Error, "No price lines to save" if lines.empty?
+
+    created = []
+    Quote.transaction do
+      quote.assign_attributes(
+        title: form["title"], summary: form["summary"], notes: form["notes"],
+        enquirer_name: form["enquirer_name"].presence, enquirer_email: form["enquirer_email"].presence
+      )
+      quote.save!
+
+      part_by_key = {}
+      parts.each do |key, spec|
+        next if spec["skip"] == "1"
+        item = {
+          part_id:     spec["existing_part_id"].presence,
+          part_number: spec["part_number"], part_issue: spec["part_issue"],
+          unit_amount: spec["each_price"],
+          part: spec.slice("description", "specification", "material", "specified_thicknesses",
+                           "special_instructions", "process_type", "aerospace_defense", "jigging_location")
+                    .merge("operation_selection" => operation_selection_from(spec))
+        }
+        item[:part]["aerospace_defense"] = ActiveModel::Type::Boolean.new.cast(spec["aerospace_defense"])
+        part = resolve_part!(quote.customer, item, created)
+        part_by_key[key] = part
+      end
+
+      created.each { |p| share_drawings!(quote, p) }
+
+      quote.quote_items.destroy_all
+      lines.each_with_index do |l, idx|
+        next if l["skip"] == "1"
+        quote.quote_items.create!(
+          part: part_by_key[l["part_key"]], position: idx,
+          description: l["description"], quantity: l["quantity"].to_i.nonzero? || 1,
+          unit_amount: l["unit_amount"].to_f.round(2)
+        )
+      end
+      quote.update!(status: "draft")
+    end
+
+    { success: true, quote: quote, parts_created: created }
+  end
+
+  # Build operation_selection from the form: treatments come back as a JSON
+  # string (the workbench edits them as JSON), jig type is applied to every
+  # treatment that lacks one, extras are whatever the proposal copied from
+  # the template.
+  def self.operation_selection_from(spec)
+    treatments = spec["treatments"]
+    treatments = JSON.parse(treatments) if treatments.is_a?(String) && treatments.present?
+    treatments = Array(treatments).map { |t| t.to_h.deep_stringify_keys }
+    if spec["jig_type"].present?
+      treatments.each { |t| t["selected_jig_type"] = spec["jig_type"] if t["selected_jig_type"].blank? }
+    end
+    extra = spec["operation_selection_extra"]
+    extra = JSON.parse(extra) if extra.is_a?(String) && extra.present?
+    (extra.to_h rescue {}).merge("treatments" => treatments)
+  end
+  private_class_method :operation_selection_from
+
+  # Reference the quote's uploaded drawings from the part's file list (the
+  # shape Part#upload_file writes), without re-uploading.
+  def self.share_drawings!(quote, part)
+    return if quote.drawings.blank?
+    data  = (part.customisation_data || {}).deep_dup
+    files = data["files"] || []
+    have  = files.map { |f| f["cloudinary_public_id"] }
+    quote.drawings.each do |d|
+      next if have.include?(d["cloudinary_public_id"])
+      files << {
+        "cloudinary_public_id" => d["cloudinary_public_id"],
+        "cloudinary_url"       => d["cloudinary_url"],
+        "original_filename"    => d["original_filename"],
+        "file_size_bytes"      => d["file_size_bytes"],
+        "content_type"         => d["content_type"],
+        "uploaded_at"          => d["uploaded_at"] || Time.current.iso8601,
+        "source"               => "quote:#{quote.display_name}"
+      }
+    end
+    data["files"] = files
+    part.update!(customisation_data: data)
+  end
+  private_class_method :share_drawings!
+
+  # ---------------------------------------------------------------------------
 
   def self.resolve_part!(customer, item, created_parts)
     if item[:part_id].present?

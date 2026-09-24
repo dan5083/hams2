@@ -158,8 +158,11 @@ Rails.application.routes.draw do
   end
 
   # Quotes — raised by the assistant (QuoteService), emailed to the enquirer
-  resources :quotes, only: [:index, :show] do
+  resources :quotes, only: [:index, :show, :new, :create] do
     member do
+      get   :build      # workbench: review/edit the assistant's proposal
+      post  :rerun      # re-run the assistant with answers/edits
+      post  :finalise   # create parts + items from the reviewed form
       post  :send_email
       patch :update_status
     end

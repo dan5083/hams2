@@ -1,0 +1,54 @@
+<%# app/views/quotes/new.html.erb — start a quote: customer, drawings, enquiry.
+    Submitting uploads the files and kicks off the assistant; the reviewer
+    lands on the build page while it works. %>
+<div class="container mx-auto px-4 py-6 max-w-3xl">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold text-gray-900">New Quote</h1>
+    <%= link_to "Back to Quotes", quotes_path, class: "text-sm text-blue-600 hover:text-blue-900" %>
+  </div>
+
+  <% if @quote.errors.any? %>
+    <div class="bg-red-50 border border-red-200 text-red-800 rounded p-3 mb-4 text-sm">
+      <%= @quote.errors.full_messages.join("; ") %>
+    </div>
+  <% end %>
+
+  <%= form_with model: @quote, url: quotes_path, local: true, multipart: true, data: { turbo: false }, class: "bg-white shadow rounded-lg p-6 space-y-5" do |f| %>
+    <div>
+      <%= f.label :customer_id, "Customer", class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= f.collection_select :customer_id, @customers, :id, :name, { prompt: "Select customer" }, required: true,
+          class: "border border-gray-300 rounded px-3 py-2 w-full" %>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <%= f.label :enquirer_name, "Enquirer name", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.text_field :enquirer_name, class: "border border-gray-300 rounded px-3 py-2 w-full", placeholder: "optional" %>
+      </div>
+      <div>
+        <%= f.label :enquirer_email, "Enquirer email", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.email_field :enquirer_email, class: "border border-gray-300 rounded px-3 py-2 w-full", placeholder: "needed to send, can add later" %>
+      </div>
+    </div>
+
+    <div>
+      <%= f.label :drawings, "Drawings / enquiry documents (PDF, JPG, PNG)", class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= f.file_field :drawings, multiple: true, accept: "application/pdf,image/*", required: true,
+          class: "block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-blue-50 file:text-blue-700" %>
+      <p class="text-xs text-gray-500 mt-1">These are attached to the part(s) created when you save, and go out with the quote email.</p>
+    </div>
+
+    <div>
+      <%= f.label :enquiry, "Enquiry text", class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= f.text_area :enquiry, rows: 8, class: "border border-gray-300 rounded px-3 py-2 w-full font-mono text-sm",
+          placeholder: "Paste the customer's email / RFQ here — quantities, spec, deadline, anything they said." %>
+    </div>
+
+    <div class="flex justify-end space-x-2 pt-2">
+      <%= link_to "Cancel", quotes_path, class: "bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded" %>
+      <button type="submit" class="bg-blue-600 hover:bg-blue-800 text-white font-bold py-2 px-4 rounded" data-disable-with="Uploading…">
+        Analyse &amp; propose
+      </button>
+    </div>
+  <% end %>
+</div>

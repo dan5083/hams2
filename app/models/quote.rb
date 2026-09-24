@@ -6,10 +6,15 @@
 # (or found) at quote time with the drawing already attached — so when the
 # PO arrives, booking in is a lookup, not a data-entry job.
 #
-# Status: draft -> sent -> won | lost. "won" is set by hand (or later, by
-# the order-booking flow when a CO references the quote).
+# Status:
+#   proposing        — workbench: QuoteProposalJob is running
+#   proposed         — workbench: proposal ready for review (or re-run)
+#   proposal_failed  — workbench: job errored; proposal_error says why
+#   draft            — saved: parts + items exist, nothing sent
+#   sent -> won | lost
 class Quote < ApplicationRecord
-  STATUSES = %w[draft sent won lost].freeze
+  STATUSES          = %w[proposing proposed proposal_failed draft sent won lost].freeze
+  WORKBENCH_STATUSES = %w[proposing proposed proposal_failed].freeze
 
   belongs_to :customer, class_name: "Organization"
   belongs_to :created_by, class_name: "User", optional: true
@@ -26,6 +31,14 @@ class Quote < ApplicationRecord
 
   scope :recent, -> { order(created_at: :desc) }
   scope :open,   -> { where(status: %w[draft sent]) }
+
+  def in_workbench? = WORKBENCH_STATUSES.include?(status)
+  def proposing?    = status == "proposing"
+  def proposed?     = status == "proposed"
+
+  def proposal_questions = Array(proposal&.dig("questions"))
+  def proposal_parts     = Array(proposal&.dig("parts"))
+  def proposal_lines     = Array(proposal&.dig("lines"))
 
   def self.next_number
     Sequence.next_value("quote_number")

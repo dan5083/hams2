@@ -1,11 +1,17 @@
 # app/controllers/quotes_controller.rb
 #
-# Quotes are raised by the assistant (QuoteService.create_from_request); this
-# controller lists them, shows one (HTML or the PDF the customer gets), and
-# offers the same send / status actions as the assistant's send! step, for
-# when someone wants to re-send or close one off by hand.
+# Quotes have two halves:
+#
+#   Workbench (new → create → build → rerun → finalise): upload drawings and
+#   the enquiry, the assistant proposes part configuration + prices +
+#   questions (QuoteProposalJob), the reviewer edits/answers on the build
+#   page and either re-runs with answers or saves. Nothing exists in HAMS
+#   beyond the Quote row until Save.
+#
+#   Saved quote (show / send_email / update_status): parts + items exist;
+#   send emails the PDF and drawings; won/lost by hand.
 class QuotesController < ApplicationController
-  before_action :set_quote, only: [:show, :send_email, :update_status]
+  before_action :set_quote, only: [:show, :build, :rerun, :finalise, :send_email, :update_status]
 
   def index
     @quotes = Quote.includes(:customer, :created_by).recent
@@ -16,6 +22,7 @@ class QuotesController < ApplicationController
   end
 
   def show
+    redirect_to build_quote_path(@quote) and return if @quote.in_workbench?
     respond_to do |format|
       format.html
       format.pdf do
@@ -27,23 +34,71 @@ class QuotesController < ApplicationController
     end
   end
 
-  # Re-send (or first send, if the assistant stopped short). Optional `to`
-  # overrides the enquirer address.
+  # ── Workbench ──────────────────────────────────────────────────────────
+
+  def new
+    @quote = Quote.new(valid_until: Date.current + 30.days)
+    @customers = Organization.enabled.order(:name)
+  end
+
+  def create
+    customer = Organization.find(params.dig(:quote, :customer_id))
+    files    = Array(params.dig(:quote, :drawings)).reject(&:blank?)
+    if files.empty?
+      @quote = Quote.new(quote_params); @customers = Organization.enabled.order(:name)
+      @quote.errors.add(:base, "Attach at least one drawing or enquiry document.")
+      render :new, status: :unprocessable_entity and return
+    end
+
+    @quote = Quote.new(quote_params.merge(customer: customer, status: "proposing", created_by: Current.user))
+    @quote.drawings = files.map { |f| upload_drawing(f, customer) }
+    @quote.save!
+    QuoteProposalJob.perform_later(@quote.id)
+    redirect_to build_quote_path(@quote)
+  rescue => e
+    Rails.logger.error "quotes#create failed: #{e.message}"
+    @quote ||= Quote.new(quote_params); @customers = Organization.enabled.order(:name)
+    @quote.errors.add(:base, e.message)
+    render :new, status: :unprocessable_entity
+  end
+
+  def build
+    respond_to do |format|
+      format.html do
+        redirect_to @quote and return unless @quote.in_workbench?
+        @jig_types = known_jig_types
+      end
+      format.json { render json: { status: @quote.status, error: @quote.proposal_error, updated_at: @quote.updated_at } }
+    end
+  end
+
+  # Post the reviewer's answers (and any edits) back to the assistant.
+  def rerun
+    @quote.update!(answers: (params[:answers] || {}).to_unsafe_h.reject { |_, v| v.blank? },
+                   proposal: merged_proposal, status: "proposing", proposal_error: nil)
+    QuoteProposalJob.perform_later(@quote.id)
+    redirect_to build_quote_path(@quote)
+  end
+
+  # Create parts + items from the reviewed form.
+  def finalise
+    result = QuoteService.finalise!(@quote, params.require(:form))
+    created = result[:parts_created]
+    redirect_to @quote, notice: "✅ #{@quote.display_name} saved#{created.any? ? " — created #{created.map(&:display_name).join(', ')} with #{@quote.drawings.length} drawing(s) attached" : ''}. Send it from here when you're happy."
+  rescue => e
+    redirect_to build_quote_path(@quote), alert: "❌ Not saved: #{e.message}"
+  end
+
+  # ── Saved quote ────────────────────────────────────────────────────────
+
   def send_email
     result = QuoteService.send!(quote_id: @quote.id, to: params[:to].presence)
-    if result[:success]
-      redirect_to @quote, notice: "✅ #{result[:message]}"
-    else
-      redirect_to @quote, alert: "❌ #{result[:error]}"
-    end
+    redirect_to @quote, result[:success] ? { notice: "✅ #{result[:message]}" } : { alert: "❌ #{result[:error]}" }
   end
 
   def update_status
     status = params[:status].to_s
-    unless Quote::STATUSES.include?(status)
-      redirect_to @quote, alert: "Unknown status."
-      return
-    end
+    redirect_to @quote, alert: "Unknown status." and return unless %w[draft sent won lost].include?(status)
     @quote.update!(status: status)
     redirect_to @quote, notice: "#{@quote.display_name} marked #{status}."
   end
@@ -52,5 +107,51 @@ class QuotesController < ApplicationController
 
   def set_quote
     @quote = Quote.includes(quote_items: :part).find(params[:id])
+  end
+
+  def quote_params
+    params.require(:quote).permit(:customer_id, :enquirer_name, :enquirer_email, :enquiry, :valid_until)
+  end
+
+  def upload_drawing(file, customer)
+    r = CloudinaryService.upload_file(file, "quotes/#{customer.name.parameterize}", filename_prefix: "qt")
+    {
+      "cloudinary_public_id" => r[:public_id], "cloudinary_url" => r[:secure_url],
+      "original_filename" => r[:filename], "file_size_bytes" => r[:size],
+      "content_type" => r[:content_type], "uploaded_at" => Time.current.iso8601
+    }
+  end
+
+  # On re-run, carry the reviewer's edits into the proposal so the model
+  # refines what they left rather than its own earlier draft.
+  def merged_proposal
+    form = (params[:form] || {}).to_unsafe_h.deep_stringify_keys
+    prop = (@quote.proposal || {}).deep_dup
+    %w[title summary notes enquirer_name enquirer_email].each { |k| prop[k] = form[k] if form.key?(k) }
+    if form["parts"].is_a?(Hash)
+      prop["parts"] = Array(prop["parts"]).map do |p|
+        f = form["parts"][p["key"]] or next p
+        p.merge(f.slice("part_number", "part_issue", "description", "specification", "material", "specified_thicknesses",
+                        "process_type", "jigging_location", "jig_type", "existing_part_id"))
+         .merge("treatments" => (JSON.parse(f["treatments"]) rescue p["treatments"]))
+      end
+    end
+    if form["lines"].is_a?(Hash)
+      prop["lines"] = form["lines"].values.sort_by { |l| l["position"].to_i }.map { |l|
+        l.slice("part_key", "description", "reasoning").merge("quantity" => l["quantity"].to_i, "unit_amount" => l["unit_amount"].to_f)
+      }
+    end
+    prop
+  end
+
+  # selected_jig_type values in use across recent parts, for the datalist.
+  def known_jig_types
+    Part.order(updated_at: :desc).limit(400).pluck(:customisation_data).flat_map { |cd|
+      t = cd&.dig("operation_selection", "treatments")
+      t = JSON.parse(t) if t.is_a?(String)
+      Array(t).map { |x| x["selected_jig_type"] }
+    }.compact_blank.tally.sort_by { |_, n| -n }.map(&:first).first(20)
+  rescue
+    []
   end
 end

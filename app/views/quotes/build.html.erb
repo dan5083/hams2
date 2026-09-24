@@ -1,0 +1,250 @@
+<%# app/views/quotes/build.html.erb — the quote workbench.
+    While the assistant runs: a status panel that polls build.json.
+    Once proposed: an editable form — header, one card per part (config +
+    reasoning + jigging), the price lines, and the assistant's questions.
+    Two submits: "Re-run with answers" (rerun) and "Save quote" (finalise).
+    Every field posts under form[...] so both actions see the same edits. %>
+<% provide :title, "Build #{@quote.display_name}" %>
+<% p = @quote.proposal || {} %>
+<div class="container mx-auto px-4 py-6 max-w-6xl">
+  <div class="flex justify-between items-start mb-6">
+    <div>
+      <h1 class="text-3xl font-bold text-gray-900">Quote <%= @quote.display_name %> <span class="text-lg font-normal text-gray-500">— workbench</span></h1>
+      <p class="text-sm text-gray-600 mt-1"><%= @quote.customer.name %><%= " · raised by #{@quote.created_by.display_name}" if @quote.created_by %></p>
+    </div>
+    <%= link_to "Back to Quotes", quotes_path, class: "text-sm text-blue-600 hover:text-blue-900" %>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+    <%# ── Left rail: inputs ───────────────────────────────────────────── %>
+    <div class="space-y-4">
+      <div class="bg-white shadow rounded-lg p-4">
+        <h3 class="text-xs font-semibold text-gray-500 uppercase mb-2">Drawings</h3>
+        <div class="flex flex-wrap gap-2">
+          <% @quote.drawings.each_with_index do |d, i| %>
+            <% pdf = d["content_type"].to_s == "application/pdf" %>
+            <% thumb = pdf ? d["cloudinary_url"].to_s.sub("/image/upload/", "/image/upload/pg_1,w_224,h_288,c_fill,g_north,f_jpg,q_auto/").sub(/\.\w+\z/, ".jpg") : d["cloudinary_url"].to_s.sub("/image/upload/", "/image/upload/w_224,h_288,c_fill,g_north,q_auto/") %>
+            <button type="button" class="part-doc-thumb w-14 bg-white border border-gray-200 rounded shadow-sm overflow-hidden" style="height:4.5rem;"
+                    data-part-file-preview data-preview-url="<%= d['cloudinary_url'] %>" data-preview-kind="<%= pdf ? 'pdf' : 'image' %>"
+                    data-preview-title="<%= d['original_filename'] %>" data-download-url="<%= d['cloudinary_url'] %>" title="<%= d['original_filename'] %>">
+              <img src="<%= thumb %>" alt="" class="w-full h-full object-cover pointer-events-none" loading="lazy">
+            </button>
+          <% end %>
+        </div>
+      </div>
+      <% if @quote.enquiry.present? %>
+        <div class="bg-white shadow rounded-lg p-4">
+          <h3 class="text-xs font-semibold text-gray-500 uppercase mb-2">Enquiry</h3>
+          <pre class="text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-80 overflow-y-auto"><%= @quote.enquiry %></pre>
+        </div>
+      <% end %>
+      <% if @quote.proposed? && p["reasoning"].present? %>
+        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <h3 class="text-xs font-semibold text-amber-800 uppercase mb-2">How the assistant read it</h3>
+          <p class="text-sm text-amber-900 whitespace-pre-line"><%= p["reasoning"] %></p>
+        </div>
+      <% end %>
+    </div>
+
+    <%# ── Main: status or the proposal form ───────────────────────────── %>
+    <div class="lg:col-span-3">
+      <% if @quote.proposing? %>
+        <div id="proposal-status" class="bg-white shadow rounded-lg p-8 text-center">
+          <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-3"></div>
+          <p class="text-gray-700 font-medium">Reading the drawing, finding a template part, pricing…</p>
+          <p class="text-xs text-gray-500 mt-1">Usually 30–90 seconds. This page will refresh itself.</p>
+        </div>
+        <script>
+          (function poll() {
+            setTimeout(function () {
+              fetch('<%= build_quote_path(@quote, format: :json) %>', { headers: { 'Accept': 'application/json' } })
+                .then(function (r) { return r.json(); })
+                .then(function (j) { if (j.status !== 'proposing') { location.reload(); } else { poll(); } })
+                .catch(poll);
+            }, 3000);
+          })();
+        </script>
+
+      <% elsif @quote.status == "proposal_failed" %>
+        <div class="bg-red-50 border border-red-200 rounded-lg p-6">
+          <h3 class="font-semibold text-red-800 mb-1">The assistant couldn't produce a proposal</h3>
+          <p class="text-sm text-red-700 whitespace-pre-line"><%= @quote.proposal_error %></p>
+          <%= button_to "Try again", rerun_quote_path(@quote), method: :post, class: "mt-3 bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-4 rounded" %>
+        </div>
+
+      <% else %>
+        <%= form_with url: finalise_quote_path(@quote), method: :post, local: true, data: { turbo: false }, id: "workbench-form", class: "space-y-6" do %>
+          <%# Header %>
+          <div class="bg-white shadow rounded-lg p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div class="md:col-span-2">
+              <label class="block text-xs font-medium text-gray-500">Title</label>
+              <%= text_field_tag "form[title]", p["title"].presence || @quote.title, class: "border border-gray-300 rounded px-2 py-1 w-full" %>
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-xs font-medium text-gray-500">Summary (printed on the quote)</label>
+              <%= text_field_tag "form[summary]", p["summary"].presence || @quote.summary, class: "border border-gray-300 rounded px-2 py-1 w-full" %>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500">Enquirer name</label>
+              <%= text_field_tag "form[enquirer_name]", @quote.enquirer_name.presence || p["enquirer_name"], class: "border border-gray-300 rounded px-2 py-1 w-full" %>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500">Enquirer email</label>
+              <%= email_field_tag "form[enquirer_email]", @quote.enquirer_email.presence || p["enquirer_email"], class: "border border-gray-300 rounded px-2 py-1 w-full" %>
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-xs font-medium text-gray-500">Notes to customer (printed on the quote)</label>
+              <%= text_area_tag "form[notes]", p["notes"].presence || @quote.notes, rows: 2, class: "border border-gray-300 rounded px-2 py-1 w-full text-sm" %>
+            </div>
+          </div>
+
+          <%# Questions %>
+          <% if @quote.proposal_questions.any? %>
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h3 class="font-semibold text-blue-900 mb-2">The assistant needs to know</h3>
+              <div class="space-y-3">
+                <% @quote.proposal_questions.each do |q| %>
+                  <div>
+                    <label class="block text-sm font-medium text-blue-900"><%= q["question"] %></label>
+                    <% if q["why"].present? %><p class="text-xs text-blue-700 mb-1"><%= q["why"] %></p><% end %>
+                    <%= text_field_tag "answers[#{q['key']}]", @quote.answers[q["key"]].presence || q["suggested_answer"],
+                        class: "border border-blue-300 rounded px-2 py-1 w-full text-sm bg-white", placeholder: "your answer" %>
+                  </div>
+                <% end %>
+              </div>
+              <p class="text-xs text-blue-700 mt-3">Answer these and press <strong>Re-run with answers</strong>, or edit the part cards directly and just Save.</p>
+            </div>
+          <% end %>
+
+          <%# Parts %>
+          <% @quote.proposal_parts.each do |part| %>
+            <% k = part["key"] %>
+            <% existing = part["existing_part_id"].present? ? Part.find_by(id: part["existing_part_id"]) : nil %>
+            <div class="bg-white shadow rounded-lg overflow-hidden">
+              <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                <h3 class="font-semibold text-gray-900">
+                  Part <%= part["part_number"] %>-<%= part["part_issue"] %>
+                  <% if existing %>
+                    <span class="ml-2 inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">exists in HAMS</span>
+                    <%= link_to "open", existing, target: "_blank", class: "ml-1 text-xs text-blue-600" %>
+                  <% else %>
+                    <span class="ml-2 inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">will be created</span>
+                  <% end %>
+                </h3>
+                <label class="text-xs text-gray-500 inline-flex items-center gap-1">
+                  <%= check_box_tag "form[parts][#{k}][skip]", "1", false, class: "rounded border-gray-300" %> leave this part out
+                </label>
+              </div>
+              <%= hidden_field_tag "form[parts][#{k}][existing_part_id]", part["existing_part_id"] %>
+              <%= hidden_field_tag "form[parts][#{k}][operation_selection_extra]", (part["operation_selection_extra"] || {}).to_json %>
+
+              <div class="p-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div class="lg:col-span-2 grid grid-cols-2 gap-3">
+                  <% { part_number: "Part number", part_issue: "Issue", description: "Description", specification: "Specification",
+                       material: "Material", specified_thicknesses: "Specified thickness(es)", process_type: "Process type" }.each do |field, label| %>
+                    <div class="<%= %w[description specification].include?(field.to_s) ? 'col-span-2' : '' %>">
+                      <label class="block text-xs font-medium text-gray-500"><%= label %></label>
+                      <%= text_field_tag "form[parts][#{k}][#{field}]", part[field.to_s], class: "border border-gray-300 rounded px-2 py-1 w-full text-sm", disabled: existing.present? %>
+                    </div>
+                  <% end %>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500">Aerospace / defence</label>
+                    <%= select_tag "form[parts][#{k}][aerospace_defense]", options_for_select([["No", "false"], ["Yes", "true"]], part["aerospace_defense"] ? "true" : "false"),
+                        class: "border border-gray-300 rounded px-2 py-1 w-full text-sm", disabled: existing.present? %>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-500">Each price (saved on the part)</label>
+                    <% first_line = @quote.proposal_lines.find { |l| l["part_key"] == k } %>
+                    <%= number_field_tag "form[parts][#{k}][each_price]", first_line&.dig("unit_amount") || existing&.each_price, step: 0.01, min: 0, class: "border border-gray-300 rounded px-2 py-1 w-full text-sm" %>
+                  </div>
+
+                  <div class="col-span-2 border-t border-gray-100 pt-3 grid grid-cols-2 gap-3">
+                    <div class="col-span-2">
+                      <label class="block text-xs font-medium text-gray-700">Jigging location <span class="text-red-600">*</span> <span class="font-normal text-gray-500">— where it hangs, which surfaces may carry a mark</span></label>
+                      <%= text_field_tag "form[parts][#{k}][jigging_location]", part["jigging_location"], required: existing.nil?,
+                          class: "border border-gray-300 rounded px-2 py-1 w-full text-sm", placeholder: "e.g. M6 tapped hole on the boss; no contact on the sealing face" %>
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-gray-700">Jig type</label>
+                      <%= text_field_tag "form[parts][#{k}][jig_type]", part["jig_type"], list: "jig-types", class: "border border-gray-300 rounded px-2 py-1 w-full text-sm", placeholder: "applied to treatments without one" %>
+                    </div>
+                    <div class="text-xs text-gray-500 self-end pb-1">
+                      <% dims = part["dimensions_mm"] || {} %>
+                      <% if dims.values.compact.any? %>Bounding box <%= [dims["l"], dims["w"], dims["h"]].compact.join(" × ") %> mm<% end %>
+                      <% if part["surface_area_sqft"] %> · <%= part["surface_area_sqft"] %> sqft<% end %>
+                    </div>
+                  </div>
+
+                  <div class="col-span-2">
+                    <details>
+                      <summary class="text-xs font-medium text-gray-700 cursor-pointer">Treatments (operation_selection) — <%= Array(part["treatments"]).map { |t| t["type"] }.compact.join(", ").presence || "none" %><%= " · from template #{part['template_part_id'][0, 8]}…" if part["template_part_id"].present? %></summary>
+                      <%= text_area_tag "form[parts][#{k}][treatments]", JSON.pretty_generate(Array(part["treatments"])), rows: 12,
+                          class: "mt-1 border border-gray-300 rounded px-2 py-1 w-full font-mono text-xs", disabled: existing.present? %>
+                      <% if part["template_part_id"].present? %>
+                        <%= link_to "Open template part", part_path(part["template_part_id"]), target: "_blank", class: "text-xs text-blue-600" %>
+                      <% end %>
+                    </details>
+                  </div>
+                </div>
+
+                <div class="bg-amber-50 border border-amber-200 rounded p-3">
+                  <h4 class="text-xs font-semibold text-amber-800 uppercase mb-1">Why this configuration</h4>
+                  <p class="text-sm text-amber-900 whitespace-pre-line"><%= part["reasoning"] %></p>
+                </div>
+              </div>
+            </div>
+          <% end %>
+
+          <%# Lines %>
+          <div class="bg-white shadow rounded-lg overflow-hidden">
+            <div class="px-4 py-3 bg-gray-50 border-b border-gray-200"><h3 class="font-semibold text-gray-900">Price lines</h3></div>
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Part</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                  <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qty</th>
+                  <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Unit £</th>
+                  <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Working</th>
+                  <th class="px-3 py-2"></th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-200">
+                <% @quote.proposal_lines.each_with_index do |l, i| %>
+                  <tr>
+                    <td class="px-3 py-2 align-top">
+                      <%= hidden_field_tag "form[lines][#{i}][position]", i %>
+                      <%= select_tag "form[lines][#{i}][part_key]", options_for_select(@quote.proposal_parts.map { |pp| ["#{pp['part_number']}-#{pp['part_issue']}", pp["key"]] }, l["part_key"]),
+                          class: "border border-gray-300 rounded px-1 py-1 text-xs" %>
+                    </td>
+                    <td class="px-3 py-2 align-top"><%= text_area_tag "form[lines][#{i}][description]", l["description"], rows: 2, class: "border border-gray-300 rounded px-2 py-1 w-64 text-sm" %></td>
+                    <td class="px-3 py-2 align-top"><%= number_field_tag "form[lines][#{i}][quantity]", l["quantity"], min: 1, class: "border border-gray-300 rounded px-2 py-1 w-20 text-sm text-right" %></td>
+                    <td class="px-3 py-2 align-top"><%= number_field_tag "form[lines][#{i}][unit_amount]", l["unit_amount"], step: 0.01, min: 0, class: "border border-gray-300 rounded px-2 py-1 w-24 text-sm text-right" %></td>
+                    <td class="px-3 py-2 align-top text-xs text-gray-600 whitespace-pre-line max-w-xs"><%= l["reasoning"] %><%= hidden_field_tag "form[lines][#{i}][reasoning]", l["reasoning"] %></td>
+                    <td class="px-3 py-2 align-top"><label class="text-xs text-gray-500 inline-flex items-center gap-1"><%= check_box_tag "form[lines][#{i}][skip]", "1", false, class: "rounded border-gray-300" %> drop</label></td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="flex justify-between items-center">
+            <p class="text-xs text-gray-500">Save creates the part(s) with the drawings attached and the quote as a draft. Nothing is emailed until you press Send on the saved quote.</p>
+            <div class="flex space-x-2">
+              <button type="submit" formaction="<%= rerun_quote_path(@quote) %>" formnovalidate
+                      class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded" data-disable-with="Re-running…">
+                Re-run with answers
+              </button>
+              <button type="submit" class="bg-blue-600 hover:bg-blue-800 text-white font-bold py-2 px-4 rounded" data-disable-with="Saving…">
+                Save quote
+              </button>
+            </div>
+          </div>
+        <% end %>
+        <datalist id="jig-types"><% @jig_types.each do |j| %><option value="<%= j %>"><% end %></datalist>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%= render "shared/file_preview_modal" %>

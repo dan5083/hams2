@@ -1,7 +1,7 @@
 <div class="container mx-auto px-4 py-6">
   <div class="flex justify-between items-center mb-6">
     <h1 class="text-3xl font-bold text-gray-900">Quotes</h1>
-    <p class="text-sm text-gray-500">Raised via the HAMS Assistant from drawings and enquiries.</p>
+    <%= link_to "New Quote", new_quote_path, class: "bg-blue-600 hover:bg-blue-800 text-white font-bold py-2 px-4 rounded" %>
   </div>
 
   <%= form_with url: quotes_path, method: :get, local: true, class: "flex flex-wrap gap-2 mb-4 items-center" do %>
@@ -23,12 +23,12 @@
       <tbody class="divide-y divide-gray-200">
         <% @quotes.each do |q| %>
           <tr class="hover:bg-gray-50">
-            <td class="px-4 py-3 text-sm font-medium"><%= link_to q.display_name, q, class: "text-blue-600 hover:text-blue-900" %></td>
+            <td class="px-4 py-3 text-sm font-medium"><%= link_to q.display_name, (q.in_workbench? ? build_quote_path(q) : quote_path(q)), class: "text-blue-600 hover:text-blue-900" %></td>
             <td class="px-4 py-3 text-sm text-gray-900"><%= q.customer.name %></td>
             <td class="px-4 py-3 text-sm text-gray-700 max-w-md truncate" title="<%= q.title %>"><%= q.title %></td>
             <td class="px-4 py-3 text-sm text-right tabular-nums">£<%= '%.2f' % q.total_ex_tax %></td>
             <td class="px-4 py-3 text-sm">
-              <% colour = { "draft" => "bg-gray-100 text-gray-800", "sent" => "bg-blue-100 text-blue-800", "won" => "bg-green-100 text-green-800", "lost" => "bg-red-100 text-red-800" }[q.status] %>
+              <% colour = { "proposing" => "bg-purple-100 text-purple-800", "proposed" => "bg-purple-100 text-purple-800", "proposal_failed" => "bg-red-100 text-red-800", "draft" => "bg-gray-100 text-gray-800", "sent" => "bg-blue-100 text-blue-800", "won" => "bg-green-100 text-green-800", "lost" => "bg-red-100 text-red-800" }[q.status] %>
               <span class="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full <%= colour %>"><%= q.status.titleize %></span>
             </td>
             <td class="px-4 py-3 text-sm text-gray-500 whitespace-nowrap"><%= q.created_at.strftime("%d/%m/%Y") %><%= " · #{q.created_by.display_name}" if q.created_by %></td>

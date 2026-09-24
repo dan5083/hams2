@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_09_04_075157) do
+ActiveRecord::Schema[8.0].define(version: 2026_09_24_143409) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -269,6 +269,47 @@ ActiveRecord::Schema[8.0].define(version: 2026_09_04_075157) do
     t.index ["document_type", "code"], name: "index_quality_documents_on_document_type_and_code", unique: true
   end
 
+  create_table "quote_items", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "quote_id", null: false
+    t.uuid "part_id"
+    t.integer "position", default: 0, null: false
+    t.text "description", null: false
+    t.integer "quantity", default: 1, null: false
+    t.decimal "unit_amount", precision: 10, scale: 2, default: "0.0", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["part_id"], name: "index_quote_items_on_part_id"
+    t.index ["quote_id"], name: "index_quote_items_on_quote_id"
+  end
+
+  create_table "quotes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.integer "number", null: false
+    t.uuid "customer_id", null: false
+    t.uuid "created_by_id"
+    t.string "status", default: "draft", null: false
+    t.string "title"
+    t.text "summary"
+    t.string "enquirer_name"
+    t.string "enquirer_email"
+    t.date "valid_until"
+    t.datetime "sent_at"
+    t.string "sent_to", default: [], array: true
+    t.text "notes"
+    t.string "ai_request_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.text "enquiry"
+    t.jsonb "drawings", default: [], null: false
+    t.jsonb "proposal"
+    t.jsonb "answers", default: {}, null: false
+    t.text "proposal_error"
+    t.datetime "proposed_at"
+    t.index ["created_by_id"], name: "index_quotes_on_created_by_id"
+    t.index ["customer_id"], name: "index_quotes_on_customer_id"
+    t.index ["number"], name: "index_quotes_on_number", unique: true
+    t.index ["status"], name: "index_quotes_on_status"
+  end
+
   create_table "release_notes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.integer "number", null: false
     t.uuid "works_order_id", null: false
@@ -456,6 +497,10 @@ ActiveRecord::Schema[8.0].define(version: 2026_09_04_075157) do
   add_foreign_key "parts", "organizations", column: "customer_id"
   add_foreign_key "parts", "parts", column: "replaces_id"
   add_foreign_key "quality_document_revisions", "quality_documents"
+  add_foreign_key "quote_items", "parts"
+  add_foreign_key "quote_items", "quotes"
+  add_foreign_key "quotes", "organizations", column: "customer_id"
+  add_foreign_key "quotes", "users", column: "created_by_id"
   add_foreign_key "release_notes", "users", column: "issued_by_id"
   add_foreign_key "release_notes", "works_orders"
   add_foreign_key "sessions", "sub_users"

@@ -87,7 +87,7 @@
           </button>
         <% end %>
         <div class="flex gap-2 pt-2 border-t border-gray-200">
-          <% (Quote::STATUSES - [@quote.status]).each do |s| %>
+          <% (%w[draft sent won lost] - [@quote.status]).each do |s| %>
             <%= button_to "Mark #{s}", update_status_quote_path(@quote, status: s), method: :patch,
                 class: "flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-medium py-1.5 px-2 rounded" %>
           <% end %>
