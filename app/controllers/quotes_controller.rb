@@ -66,7 +66,6 @@ class QuotesController < ApplicationController
     respond_to do |format|
       format.html do
         redirect_to @quote and return unless @quote.in_workbench?
-        @jig_types = known_jig_types
       end
       format.json { render json: { status: @quote.status, error: @quote.proposal_error, updated_at: @quote.updated_at } }
     end
@@ -82,10 +81,14 @@ class QuotesController < ApplicationController
 
   # Create parts + items from the reviewed form.
   def finalise
-    result = QuoteService.finalise!(@quote, params.require(:form))
+    # The form is free-shaped (parts keyed by proposal key, arbitrary
+    # treatment JSON), so it can't be strong-params-permitted field by field;
+    # QuoteService.finalise! is the validation layer.
+    result = QuoteService.finalise!(@quote, params.require(:form).to_unsafe_h)
     created = result[:parts_created]
     redirect_to @quote, notice: "✅ #{@quote.display_name} saved#{created.any? ? " — created #{created.map(&:display_name).join(', ')} with #{@quote.drawings.length} drawing(s) attached" : ''}. Send it from here when you're happy."
   rescue => e
+    Rails.logger.error "quotes#finalise (#{@quote.display_name}) failed: #{e.class}: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
     redirect_to build_quote_path(@quote), alert: "❌ Not saved: #{e.message}"
   end
 
@@ -142,16 +145,5 @@ class QuotesController < ApplicationController
       }
     end
     prop
-  end
-
-  # selected_jig_type values in use across recent parts, for the datalist.
-  def known_jig_types
-    Part.order(updated_at: :desc).limit(400).pluck(:customisation_data).flat_map { |cd|
-      t = cd&.dig("operation_selection", "treatments")
-      t = JSON.parse(t) if t.is_a?(String)
-      Array(t).map { |x| x["selected_jig_type"] }
-    }.compact_blank.tally.sort_by { |_, n| -n }.map(&:first).first(20)
-  rescue
-    []
   end
 end
