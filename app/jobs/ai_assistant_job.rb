@@ -375,12 +375,51 @@ class AiAssistantJob < ApplicationJob
       holes and the hard anodise target is 30µm or more, masking is REQUIRED
       and must be priced as its own line, not folded into the MOC comparison
       and not left as a question. Masking is rubber lacquer: brushing on,
-      curing, delacquering and cleaning. Estimate minutes per part from the
-      feature count — typically 10 min (£15) for a few holes or one face,
-      15 min (£22.50) for several faces or bores, more for large areas — and
-      price at the masking rate above. Show it as "Masking (rubber lacquer),
-      ~N min/part" with a per-part price. The MOC applies to the anodising;
+      curing, delacquering and cleaning. ESTIMATE THE MINUTES PER PART WITH THIS
+      MODEL, per masked feature, and show the working:
+
+          minutes = Σ features ( 0.75 + 0.2 × A + 0.2 × P )
+
+        A = area to be lacquered, cm²  (a bore: π·d·depth + the end face if
+            blind; a face: its area; a hole: π·d·depth)
+        P = masking BOUNDARY length, cm — the edge where lacquer meets bare
+            metal that has to be trimmed clean (a blind bore: one rim, π·d;
+            a through-hole: two rims; a face: its perimeter)
+        0.75 = handling per feature; 0.2/cm² = brush-on + strip rate;
+        0.2/cm = edge-trimming rate. Minimum 5 min per part; round up.
+
+      Worked example (steering-wheel flange, R4.003): Ø30×28 blind bore with
+      Ø33 step → A ≈ 35 cm², P ≈ 10 cm → 9.8 min; 2× M2.5 tapped → 1.0 min
+      each; 3× Ø5.3 through mount holes → 1.5 min each; total 16.4 → 17 min
+      → £25.50/part.
+
+      Write it in the line's working as "bore 35cm²/10cm 9.8 + 2 holes 1.0 +
+      3 holes 1.5 = 16.4 → 17 min", then price at the masking rate above as
+      "Masking (rubber lacquer), ~N min/part" with a per-part price. The MOC applies to the anodising;
       masking is on top of it. Below 30µm tapped holes need no masking.
+
+      JIG SELECTION — pick from the shop's real jigs:
+      #{OperationLibrary::JigUnjig::JIG_TYPES.map { |j| "        - #{j}" }.join("\n")}
+      Choose by the feature the part can hang from, on a non-critical surface:
+        - tapped hole: the matching M-jig (M6 Jig (Metric)/(UNC), Thin- or
+          Thick-stem M8 Jig) — M6 is the workhorse for M5–M8 holes
+        - plain bore that isn't a critical fit: Expanding Jig (Large Aluminum
+          Expanding Jig for big bores); a critical/gauged bore is NOT a jig point
+        - flat plate/flange with through holes: 3 or 4 Prong Jig (Flat variants
+          for thin plates)
+        - small, light, non-cosmetic parts: Wire (aluminium) / aluminium hooks
+        - the rest are shape-specific (Rotor, Piston, Wheel Nut, Monobloc...)
+      Always name a jig from the list; say which feature it uses and why the
+      alternative was rejected. If the drawing gives no usable feature, say so
+      and ask — but still propose the least-bad option.
+
+      CROSS-CHECK THE PAPERWORK AGAINST THE DRAWING:
+      Before pricing, compare every document you were given: purchase order or
+      enquiry vs drawing vs spec. Flag as a question, with your recommended
+      resolution, any mismatch in: drawing revision (PO says Rev B, drawing is
+      Rev C), part number, quantity (enquiry vs PO line), spec number/issue,
+      or a spec thickness that differs from the drawing. Silence on these is a
+      mistake; the reviewer relies on you to have looked.
 
       QUOTING WORKFLOW:
       1. Identify the process(es) from the drawing/spec.
