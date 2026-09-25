@@ -221,14 +221,34 @@
                           class: "border border-gray-300 rounded px-1 py-1 text-xs" %>
                     </td>
                     <td class="px-3 py-2 align-top"><%= text_area_tag "form[lines][#{i}][description]", l["description"], rows: 2, class: "border border-gray-300 rounded px-2 py-1 w-64 text-sm" %></td>
-                    <td class="px-3 py-2 align-top"><%= number_field_tag "form[lines][#{i}][quantity]", l["quantity"], min: 1, class: "border border-gray-300 rounded px-2 py-1 w-20 text-sm text-right" %></td>
-                    <td class="px-3 py-2 align-top"><%= number_field_tag "form[lines][#{i}][unit_amount]", l["unit_amount"], step: 0.01, min: 0, class: "border border-gray-300 rounded px-2 py-1 w-24 text-sm text-right" %></td>
+                    <td class="px-3 py-2 align-top"><%= number_field_tag "form[lines][#{i}][quantity]", l["quantity"], min: 1, class: "border border-gray-300 rounded px-2 py-1 w-20 text-sm text-right", oninput: "hamsQuoteTotal()", data: { qty: i } %></td>
+                    <td class="px-3 py-2 align-top"><%= number_field_tag "form[lines][#{i}][unit_amount]", l["unit_amount"], step: 0.01, min: 0, class: "border border-gray-300 rounded px-2 py-1 w-24 text-sm text-right", oninput: "hamsQuoteTotal()", data: { unit: i } %></td>
                     <td class="px-3 py-2 align-top text-xs text-gray-600 whitespace-pre-line max-w-xs"><%= l["reasoning"] %><%= hidden_field_tag "form[lines][#{i}][reasoning]", l["reasoning"] %></td>
-                    <td class="px-3 py-2 align-top"><label class="text-xs text-gray-500 inline-flex items-center gap-1"><%= check_box_tag "form[lines][#{i}][skip]", "1", false, class: "rounded border-gray-300" %> drop</label></td>
+                    <td class="px-3 py-2 align-top"><label class="text-xs text-gray-500 inline-flex items-center gap-1"><%= check_box_tag "form[lines][#{i}][skip]", "1", false, class: "rounded border-gray-300", onchange: "hamsQuoteTotal()", data: { skip: i } %> drop</label></td>
                   </tr>
                 <% end %>
               </tbody>
+              <tfoot class="bg-gray-50">
+                <tr>
+                  <td colspan="3" class="px-3 py-2 text-sm font-semibold text-right">Total ex VAT</td>
+                  <td class="px-3 py-2 text-sm font-bold text-right tabular-nums" id="quote-total">£<%= '%.2f' % @quote.proposal_lines.sum { |l| l["quantity"].to_i * l["unit_amount"].to_f } %></td>
+                  <td colspan="2" class="px-3 py-2 text-xs text-gray-500">qty × unit, summed; dropped lines excluded</td>
+                </tr>
+              </tfoot>
             </table>
+            <script>
+              function hamsQuoteTotal() {
+                var t = 0;
+                document.querySelectorAll('[data-qty]').forEach(function (q) {
+                  var i = q.dataset.qty;
+                  var skip = document.querySelector('[data-skip="' + i + '"]');
+                  if (skip && skip.checked) return;
+                  var u = document.querySelector('[data-unit="' + i + '"]');
+                  t += (parseFloat(q.value) || 0) * (parseFloat(u.value) || 0);
+                });
+                document.getElementById('quote-total').textContent = '£' + t.toFixed(2);
+              }
+            </script>
           </div>
 
           <div class="flex justify-between items-center">
@@ -244,7 +264,7 @@
             </div>
           </div>
         <% end %>
-        <datalist id="jig-types"><% @jig_types.each do |j| %><option value="<%= j %>"><% end %></datalist>
+        <datalist id="jig-types"><% OperationLibrary::JigUnjig::JIG_TYPES.each do |j| %><option value="<%= j %>"><% end %></datalist>
       <% end %>
     </div>
   </div>
