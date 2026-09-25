@@ -269,7 +269,7 @@ Rails.application.routes.draw do
 
   # Shop-floor section boards (ENP, anodisers, jiggers, Factory 2, contract review)
   get "sections/:section", to: "sections#show", as: :section,
-      constraints: { section: /enp|shop1_anodisers|shop2_anodisers|shop1_jiggers|shop2_jiggers|factory2|contract_review/ }
+      constraints: { section: Regexp.union(ShopSectionBoard::SECTIONS.keys) }
 
   # Artifacts management
   get 'artifacts', to: 'artifacts#index'

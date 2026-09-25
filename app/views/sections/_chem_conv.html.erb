@@ -1,0 +1,84 @@
+<%# app/views/sections/_chem_conv.html.erb
+    Chemical conversion work with batches not yet signed, grouped by
+    chemistry (one group per tank). Green batch = preceding op is signed,
+    so the parts are pretreated and this tank is next. Amber = still
+    upstream. Conversion ops carry no vat number, so this board does not
+    use the jig/vat pipeline the anodiser boards do. %>
+<% groups = @board.chem_conv_groups %>
+
+<% if groups.empty? %>
+  <div class="bg-white rounded-lg shadow p-8 text-center text-gray-500">Nothing waiting for chemical conversion.</div>
+<% else %>
+  <% groups.each do |group| %>
+    <h2 class="text-lg font-bold text-gray-700 mt-6 mb-3 first:mt-0">
+      <%= group[:label] %>
+      <span class="ml-2 text-sm font-medium text-gray-400"><%= pluralize(group[:rows].size, "job") %></span>
+    </h2>
+
+    <!-- Desktop -->
+    <div class="hidden lg:block bg-white shadow overflow-hidden sm:rounded-lg">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <% ["WO", "Part", "Batches", "Temp", "Time", "Spec"].each do |h| %>
+              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"><%= h %></th>
+            <% end %>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          <% group[:rows].each do |row| %>
+            <tr class="hover:bg-gray-50">
+              <td class="px-4 py-3 whitespace-nowrap">
+                <%= link_to row[:job].display_name, works_order_path(row[:job].wo), class: "font-bold text-blue-700 hover:underline" %>
+              </td>
+              <td class="px-4 py-3">
+                <div class="text-sm text-gray-900"><%= row[:job].part_number %></div>
+                <div class="text-xs text-gray-400"><%= row[:job].customer_name %></div>
+              </td>
+              <td class="px-4 py-3 whitespace-nowrap">
+                <% row[:batches].each do |b| %>
+                  <% ready = row[:ready].include?(b) %>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold mr-1 <%= ready ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800' %>"
+                        title="<%= ready ? 'Pretreated — ready for the tank' : 'Still upstream' %>">
+                    B<%= b %><%= " · #{row[:batch_qtys][b]}" if row[:batch_qtys][b].present? %>
+                  </span>
+                <% end %>
+              </td>
+              <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900"><%= row[:temp] || "—" %></td>
+              <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900">
+                <%= row[:time] || (row[:temp] ? "—" : "multi-stage · see route card") %>
+              </td>
+              <td class="px-4 py-3 text-xs text-gray-600"><%= row[:spec]&.truncate(60) || "—" %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Mobile cards -->
+    <div class="lg:hidden space-y-3">
+      <% group[:rows].each do |row| %>
+        <%= link_to works_order_path(row[:job].wo), class: "block bg-white rounded-lg shadow p-4" do %>
+          <div class="flex justify-between items-baseline">
+            <span class="font-bold text-blue-700"><%= row[:job].display_name %></span>
+            <span class="text-sm font-bold text-gray-900">
+              <%= [row[:temp], row[:time]].compact.join(" · ").presence || "see route card" %>
+            </span>
+          </div>
+          <div class="text-sm text-gray-700 mt-1"><%= row[:job].part_number %> · <%= row[:job].customer_name %></div>
+          <% if row[:spec] %>
+            <div class="text-xs text-gray-500 mt-1 truncate"><%= row[:spec] %></div>
+          <% end %>
+          <div class="mt-2">
+            <% row[:batches].each do |b| %>
+              <% ready = row[:ready].include?(b) %>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold mr-1 <%= ready ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800' %>">
+                B<%= b %><%= " · #{row[:batch_qtys][b]}" if row[:batch_qtys][b].present? %>
+              </span>
+            <% end %>
+          </div>
+        <% end %>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>

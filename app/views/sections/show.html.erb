@@ -30,6 +30,15 @@
 
     <h2 class="text-lg font-bold text-gray-700 mt-8 mb-3">Jigged — ready for the vat</h2>
     <%= render "anodisers", shop: "factory2" %>
+  <% elsif @section == "chromic" %>
+    <%# Chromic is Vat 10 only; same jig -> vat pipeline as Factory 2, one page. %>
+    <h2 class="text-lg font-bold text-gray-700 mb-3">Jigging queue</h2>
+    <%= render "jiggers", shop: "chromic" %>
+
+    <h2 class="text-lg font-bold text-gray-700 mt-8 mb-3">Jigged — ready for Vat 10</h2>
+    <%= render "anodisers", shop: "chromic" %>
+  <% elsif @section == "chem_conv" %>
+    <%= render "chem_conv" %>
   <% else %>
     <%# A key in SECTIONS with no branch here would otherwise render a silent
         blank page. Fail loudly instead. %>

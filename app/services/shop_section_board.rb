@@ -24,6 +24,11 @@ class ShopSectionBoard
     "shop1"    => [1, 2, 3],
     "shop2"    => [5, 6],
     "factory2" => [9, 12],
+    # Chromic runs in Vat 10 only. Kept as its own "shop" so the board is
+    # just the standard jig -> vat pipeline pointed at one vat; if chromic
+    # work is actually jigged by Shop 1's jiggers, add 10 to shop1's list
+    # instead and drop the jigging half of the chromic view.
+    "chromic"  => [10],
   }.freeze
 
   SECTIONS = {
@@ -33,8 +38,25 @@ class ShopSectionBoard
     "shop1_jiggers"   => "Shop 1 · Jiggers",
     "shop2_jiggers"   => "Shop 2 · Jiggers",
     "factory2"        => "Factory 2",
+    "chromic"         => "Chromic",
+    "chem_conv"       => "Chemical Conversion",
     "contract_review" => "Contract Review",
   }.freeze
+
+  # Chemical conversion chemistries, keyed by the library op id prefix
+  # (survives freezing). Order is display order on the board. The label is
+  # what the operator reads, so it names the tank they walk to.
+  CHEM_CONV_LABELS = {
+    "ALOCHROM_1200_CLASS_1A" => "Alochrom 1200 · Class 1A (corrosion)",
+    "ALOCHROM_1200_CLASS_3"  => "Alochrom 1200 · Class 3 (conductivity)",
+    "IRIDITE_NCP"            => "Iridite NCP",
+    "IRIDITE_TCP"            => "Iridite TCP",
+    "IRIDITE_15"             => "Iridite 15 + Keycote",
+    "SURTEC_650V"            => "SurTec 650V",
+    "unknown"                => "Other / unclassified",
+  }.freeze
+
+  CHEM_CONV_ORDER = CHEM_CONV_LABELS.keys.freeze
 
   # Navbar badge cache. Busted by WorksOrder's after_commit; the TTL is only
   # a backstop against a missed invalidation.
@@ -136,6 +158,23 @@ class ShopSectionBoard
          .sort_by { |r| r[:job].number }
   end
 
+  # -- Chemical conversion board ---------------------------------------------
+  # Conversion ops carry no vat number, so they can't ride the vat-keyed
+  # jig/anodise pipeline. Instead: one row per conversion op with batches
+  # still unsigned, grouped by chemistry (one group per tank). A batch is
+  # "ready" when the op immediately before the conversion is signed for it -
+  # the pretreatment is done and the next thing that happens to those parts
+  # is the tank.
+  # [{ chemistry:, label:, rows: [..WO number asc..] }]
+  def chem_conv_groups
+    rows = @jobs.flat_map(&:chem_conv_rows)
+    CHEM_CONV_ORDER.filter_map do |chem|
+      group = rows.select { |r| r[:chemistry] == chem }.sort_by { |r| r[:job].number }
+      next if group.empty?
+      { chemistry: chem, label: CHEM_CONV_LABELS[chem], rows: group }
+    end
+  end
+
   # ==========================================================================
   # One works order, with everything the boards need parsed out of its ops.
   # Grouped members defer to the lead's record for sign-offs (the record IS
@@ -175,6 +214,12 @@ class ShopSectionBoard
     def enp_op?(op)
       return true if op["process_type"] == "electroless_nickel_plating"
       op["process_type"] == "manual" && op["operation_text"].to_s.match?(/electroless\s+nickel/i)
+    end
+
+    def chem_conv_op?(op)
+      return true if op["process_type"] == "chemical_conversion"
+      op["process_type"] == "manual" &&
+        op["operation_text"].to_s.match?(/\b(iridite|alochrom|surtec|chromate\s+convert|convert\s+in)\b/i)
     end
 
     def jig_op?(op)
@@ -236,14 +281,71 @@ class ShopSectionBoard
       op["operation_text"].to_s[/vats? ([\d,\s]+)/i, 1].to_s.scan(/\d+/).map(&:to_i)
     end
 
+    # Chromic ramps are written in the parenthesised grammar the chromic
+    # library uses ("0-40V (over 10 minutes), 40V (hold for 20 minutes)").
+    # Parsed into ordered segments; hard/standard ops don't use this grammar
+    # and yield none, so they fall through to the single-figure parsers.
+    RAMP_SEGMENT = /(?:(\d+(?:\.\d+)?)\s*V?\s*-\s*)?(\d+(?:\.\d+)?)\s*V\s*\(\s*(?:over|hold(?:\s+(?:for|over))?)\s+(\d+)\s*min[^)]*\)/i
+
+    def ramp_segments(op)
+      op["operation_text"].to_s.scan(RAMP_SEGMENT).map do |from, to, mins|
+        { from: (from || to).to_f, to: to.to_f, mins: mins.to_i }
+      end
+    end
+
     # "16V", "20 V" or "20V↗️45V" from the op text, normalised for display.
+    # A ramped op reads as its waypoints: "0→40→50V" - the single-figure
+    # regex would otherwise report a chromic cycle as a flat "40V".
     def voltage_for(op)
+      segs = ramp_segments(op)
+      if segs.size > 1
+        points = ([segs.first[:from]] + segs.map { |s| s[:to] }).chunk_while(&:==).map(&:first)
+        return points.map { |v| v == v.to_i ? v.to_i : v }.join("→") + "V"
+      end
       m = op["operation_text"].to_s[/(\d+(?:\.\d+)?\s*V(?:\s*↗️\s*\d+(?:\.\d+)?\s*V)?)\b/, 1]
       m&.gsub(/\s+/, "")
     end
 
+    # Whole-cycle minutes. A ramped op is the sum of its segments; "over 10
+    # minutes" alone would report only the first leg of a 40-minute chromic.
     def minutes_for(op)
+      segs = ramp_segments(op)
+      return segs.sum { |s| s[:mins] } if segs.any?
       op["operation_text"].to_s[/over (\d+) minutes/, 1]&.to_i
+    end
+
+    # ---- Chemical conversion parsing ---------------------------------------
+
+    # Chemistry from the op id (survives freezing); text as fallback for
+    # copied/manual ops.
+    def chem_conv_type(op)
+      id = op["id"].to_s
+      text = op["operation_text"].to_s
+      (CHEM_CONV_ORDER - ["unknown"]).find { |k| id.start_with?(k) } ||
+        (text.match?(/alochrom\s*1200/i) && text.match?(/class\s*3|conductiv/i) ? "ALOCHROM_1200_CLASS_3" : nil) ||
+        (text.match?(/alochrom\s*1200/i) ? "ALOCHROM_1200_CLASS_1A" : nil) ||
+        (text.match?(/iridite\s*ncp/i) ? "IRIDITE_NCP" : nil) ||
+        (text.match?(/iridite\s*tcp/i) ? "IRIDITE_TCP" : nil) ||
+        (text.match?(/iridite\s*15/i) ? "IRIDITE_15" : nil) ||
+        (text.match?(/surtec/i) ? "SURTEC_650V" : nil) ||
+        "unknown"
+    end
+
+    # Multi-stage ops (Iridite 15) state several windows; a single pair would
+    # mislead, so those read as nil and the view says "see route card".
+    def chem_conv_multistage?(op)
+      op["operation_text"].to_s.lines.count { |l| l.strip.present? } > 1
+    end
+
+    def chem_conv_temp(op)
+      return nil if chem_conv_multistage?(op)
+      op["operation_text"].to_s[/(\d+\s*-\s*\d+)\s*°C/, 1]&.gsub(/\s+/, "")&.concat("°C")
+    end
+
+    def chem_conv_time(op)
+      return nil if chem_conv_multistage?(op)
+      m = op["operation_text"].to_s.match(/for\s+(\d+(?:\s*(?:-|to)\s*\d+)?)\s*(mins?|secs?)/i)
+      m && "#{m[1].gsub(/\s+/, '')} #{m[2]}"
     end
 
     # Dye for THIS cycle: the first dye op after the anodising op, before the
@@ -359,6 +461,43 @@ class ShopSectionBoard
         }
       end
       rows
+    end
+
+    # ---- Chemical conversion: op outstanding for some batch ----------------
+    # Gated on contract review like the jiggers boards (so also frozen, so
+    # batch counts exist). Every unsigned batch is listed; the ones whose
+    # preceding op is signed are flagged ready. Contract review and any
+    # WO-scoped op are skipped when finding the predecessor - they sign under
+    # "wo", not per batch.
+    def chem_conv_rows
+      return [] unless contract_reviewed?
+      owner = @wo.process_record_owner
+      rows = []
+      ops.each_with_index do |op, i|
+        next unless chem_conv_op?(op)
+        total = owner.section_batch_count(owner.section_for_op(op)).to_i
+        next if total.zero?
+        signed = signed_keys(op)
+        pending = (1..total).map(&:to_s) - signed
+        next if pending.empty?
+
+        prev = ops[0...i].reverse.find { |o| o["process_type"] != "contract_review" && o["id"] != "CONTRACT_REVIEW" }
+        ready = prev ? (pending & signed_keys(prev)) : pending
+
+        rows << {
+          job: self, op: op,
+          chemistry: chem_conv_type(op),
+          temp: chem_conv_temp(op), time: chem_conv_time(op),
+          spec: op["specifications"].to_s.presence,
+          batches: pending.sort_by(&:to_i),
+          ready: ready.sort_by(&:to_i),
+          batch_qtys: batch_qtys(op, pending),
+        }
+      end
+      rows
+    rescue => e
+      Rails.logger.error "SectionBoard: chem conv rows failed for WO#{number}: #{e.message}"
+      []
     end
 
     # ---- Order page: headline facts per treatment, sign-off state ignored --
