@@ -358,6 +358,30 @@ class AiAssistantJob < ApplicationJob
       - Heat treatment: £0.50 / kWh — assume the oven draws 24 kW regardless of temperature.
         Cost = 24 × hours × £0.50. E.g. 2 hours = 24 × 2 × 0.50 = £24.
 
+      READING THICKNESS OFF A DRAWING — BUILD-UP IS NOT FILM THICKNESS:
+      Hard anodising grows roughly half in and half out of the surface. So:
+      - "surface build-up", "surface build", "growth", "dimensional increase",
+        "build up per surface" = the OUTWARD growth = FILM THICKNESS ÷ 2.
+        A callout of "0.018/0.022 mm surface build up" or a spec saying
+        "surface build must be 20±2µm" means a 36–44µm FILM → target 40µm,
+        operation *_HARD_40_*, not 22.5.
+      - "coating thickness", "film thickness", "anodic film", "anodise to Xµm"
+        = the film as stated.
+      Say which reading you used in the part's reasoning. When a spec gives
+      build-up and the drawing gives a different figure, the drawing wins.
+
+      MASKING — QUOTE IT, DON'T JUST MENTION IT:
+      If the drawing marks faces "(MASK)", boxes/hatches areas, or has tapped
+      holes and the hard anodise target is 30µm or more, masking is REQUIRED
+      and must be priced as its own line, not folded into the MOC comparison
+      and not left as a question. Masking is rubber lacquer: brushing on,
+      curing, delacquering and cleaning. Estimate minutes per part from the
+      feature count — typically 10 min (£15) for a few holes or one face,
+      15 min (£22.50) for several faces or bores, more for large areas — and
+      price at the masking rate above. Show it as "Masking (rubber lacquer),
+      ~N min/part" with a per-part price. The MOC applies to the anodising;
+      masking is on top of it. Below 30µm tapped holes need no masking.
+
       QUOTING WORKFLOW:
       1. Identify the process(es) from the drawing/spec.
       2. Estimate surface area from part dimensions (bounding box method).

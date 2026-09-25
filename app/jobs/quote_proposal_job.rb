@@ -186,6 +186,14 @@ class QuoteProposalJob < AiAssistantJob
          price with the rate card. Show the arithmetic in each line's reasoning.
          One line per quantity break requested; if none, quote the MOC and a
          per-unit price as two lines.
+      4b. MASKING: apply the masking rule from the rate card. If the drawing
+         marks masked faces or has tapped holes at ≥30µm, add a "Masking
+         (rubber lacquer), ~N min/part" line with its own price, and add the
+         masking operation to the part's treatments. The question, if any, is
+         about WHICH features — never whether to quote it.
+      4c. THICKNESS: apply the build-up rule from the rate card before choosing
+         the operation. Say in the part reasoning whether the drawing gave
+         film thickness or surface build-up and what film you targeted.
       5. JIGGING: the shop wants jigging decided at quote time. If the drawing
          shows an obvious hanging feature (tapped hole, bore, edge that can
          carry a mark) propose jigging_location and jig_type; if not, leave them
