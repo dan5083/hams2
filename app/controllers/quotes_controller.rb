@@ -37,7 +37,7 @@ class QuotesController < ApplicationController
   # ── Workbench ──────────────────────────────────────────────────────────
 
   def new
-    @quote = Quote.new(valid_until: Date.current + 30.days)
+    @quote = Quote.new(valid_until: Date.current + Quote::VALIDITY_DAYS.days)
     @customers = Organization.enabled.order(:name)
   end
 

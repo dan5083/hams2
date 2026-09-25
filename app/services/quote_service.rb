@@ -50,7 +50,7 @@ class QuoteService
   end
 
   def self.create_from_request(customer_name:, items:, request_id:, title: nil, summary: nil,
-                               enquirer_email: nil, enquirer_name: nil, valid_days: 30, notes: nil)
+                               enquirer_email: nil, enquirer_name: nil, valid_days: Quote::VALIDITY_DAYS, notes: nil)
     customer = find_customer(customer_name) or raise Error, "Customer '#{customer_name}' not found in HAMS. Check the exact name."
     raise Error, "At least one line item is required" if items.blank?
 

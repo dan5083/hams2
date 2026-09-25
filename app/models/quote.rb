@@ -26,7 +26,8 @@ class Quote < ApplicationRecord
   validates :enquirer_email, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_blank: true
 
   before_validation :assign_next_number, if: :new_record?
-  before_validation -> { self.valid_until ||= Date.current + 30.days }, if: :new_record?
+  VALIDITY_DAYS = 90
+  before_validation -> { self.valid_until ||= Date.current + VALIDITY_DAYS.days }, if: :new_record?
   before_create -> { self.created_by ||= Current.user }
 
   scope :recent, -> { order(created_at: :desc) }
