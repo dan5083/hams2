@@ -48,7 +48,7 @@ class QuoteProposalJob < AiAssistantJob
               treatments:       { type: "array", items: { type: "object" }, description: "operation_selection.treatments exactly as stored on the template, tweaked for this part (type, operation_id, selected_jig_type, selected_alloy, target_thickness, sealing_method, dye_color, masking...)." },
               operation_selection_extra: { type: "object", description: "Other operation_selection keys copied from the template (selected_enp_heat_treatment etc.)" },
               jigging_location: { type: "string", description: "Where/how the part hangs and which surfaces may carry a jig mark. Leave empty if the drawing doesn't say — and ask." },
-              jig_type:         { type: "string", description: "Your suggested selected_jig_type, if confident" },
+              jig_type:         { type: "string", description: "One of the shop's jig types, exactly as listed in JIG SELECTION. Always propose one." },
               dimensions_mm:    { type: "object", properties: { l: { type: "number" }, w: { type: "number" }, h: { type: "number" } } },
               surface_area_sqft: { type: "number" },
               reasoning:        { type: "string", description: "Configuration only: which template part you copied (part number, customer) and exactly what you changed. Two sentences. No pricing, no area — that goes on the line." }
@@ -187,20 +187,35 @@ class QuoteProposalJob < AiAssistantJob
          One line per quantity break requested; if none, quote the MOC and a
          per-unit price as two lines.
       4b. MASKING: apply the masking rule from the rate card. If the drawing
-         marks masked faces or has tapped holes at ≥30µm, add a "Masking
-         (rubber lacquer), ~N min/part" line with its own price, and add the
-         masking operation to the part's treatments. The question, if any, is
+         marks masked faces or has tapped holes at ≥30µm, add a masking line
+         with its own price per method (lacquer/tape by minutes, bungs per
+         bung), and set masking_methods on the treatment with the CORRECT
+         keys from MASKING METHODS — lacquered features under
+         "45_stopping_off_lacquer", never under "bungs". The question, if any, is
          about WHICH features — never whether to quote it.
       4c. THICKNESS: apply the build-up rule from the rate card before choosing
          the operation. Say in the part reasoning whether the drawing gave
          film thickness or surface build-up and what film you targeted.
-      5. JIGGING: the shop wants jigging decided at quote time. If the drawing
-         shows an obvious hanging feature (tapped hole, bore, edge that can
-         carry a mark) propose jigging_location and jig_type; if not, leave them
-         empty and put a question in `questions` describing the options you see.
+      5. JIGGING: the shop wants jigging decided at quote time. Apply JIG
+         SELECTION from the rate card: ALWAYS fill jig_type with one of the
+         listed jigs and jigging_location with the feature it uses. A tapped
+         hole the drawing excludes from the coating is the answer whenever
+         one exists — no question needed. If you had
+         to guess, also raise a question naming the alternative you rejected —
+         but the fields are still filled with your best answer.
+      5b. Apply CROSS-CHECK THE PAPERWORK: revision, part number, quantity,
+         spec — mismatches become questions with a recommended resolution.
       6. Anything else you had to assume that changes the configuration or the
          price (alloy, masking, thread protection, spec ambiguity) is a question
          too, with a short suggested_answer the reviewer can accept as-is.
+
+      NEVER ASK WHAT YOU HAVE BEEN TOLD. Before writing a question, check the
+      enquiry text and any reviewer answers: if they state the masking scope,
+      the price to allow for it, the jig, the quantity, the revision to use,
+      or anything else — that is the answer. Use it as given, say "per the
+      enquiry" in the working, and do not raise a question about it. A
+      question the enquiry already answers wastes the reviewer's time and
+      makes you look like you didn't read it.
 
       DO NOT ASK ABOUT:
       - The company in the drawing's title block vs the customer. The prime/OEM

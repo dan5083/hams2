@@ -171,7 +171,10 @@
                     </div>
                     <div>
                       <label class="block text-xs font-medium text-gray-700">Jig type</label>
-                      <%= text_field_tag "form[parts][#{k}][jig_type]", part["jig_type"], list: "jig-types", class: "border border-gray-300 rounded px-2 py-1 w-full text-sm", placeholder: "applied to treatments without one" %>
+                      <% jigs = OperationLibrary::JigUnjig::JIG_TYPES.to_a %>
+                      <% jigs = [part["jig_type"]] + jigs if part["jig_type"].present? && !jigs.include?(part["jig_type"]) %>
+                      <%= select_tag "form[parts][#{k}][jig_type]", options_for_select([["— choose —", ""]] + jigs.map { |j| [j, j] }, part["jig_type"]),
+                          class: "border border-gray-300 rounded px-2 py-1 w-full text-sm", title: "Applied to every treatment that doesn't already name a jig" %>
                     </div>
                     <div class="text-xs text-gray-500 self-end pb-1">
                       <% dims = part["dimensions_mm"] || {} %>
@@ -266,7 +269,6 @@
             </div>
           </div>
         <% end %>
-        <datalist id="jig-types"><% OperationLibrary::JigUnjig::JIG_TYPES.each do |j| %><option value="<%= j %>"><% end %></datalist>
       <% end %>
     </div>
   </div>

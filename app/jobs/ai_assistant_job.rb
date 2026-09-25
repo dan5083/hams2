@@ -395,14 +395,42 @@ class AiAssistantJob < ApplicationJob
 
       Write it in the line's working as "bore 35cm²/10cm 9.8 + 2 holes 1.0 +
       3 holes 1.5 = 16.4 → 17 min", then price at the masking rate above as
-      "Masking (rubber lacquer), ~N min/part" with a per-part price. The MOC applies to the anodising;
+      "Masking (rubber lacquer), ~N min/part" with a per-part price.
+
+      MASKING METHODS — the part config must name the RIGHT one. The
+      treatment's masking_methods hash takes these keys only, each with the
+      location as its value; use more than one when the part needs it:
+        "45_stopping_off_lacquer" — RUBBER LACQUER. Bores, internal diameters,
+             grooves, splines, small tapped holes, any face or feature a bung
+             or tape can't do. "Rubber lacquer" / "lacquer" / "stop-off" in an
+             enquiry always means this. Priced by the time model above.
+        "pc21_polyester_tape"     — flat faces, pads, large plain areas.
+             Priced at the taping rate per minute (same time model, edge term
+             dominates).
+        "bungs"                   — plain or tapped holes a bung fits (about
+             Ø4mm and up). Priced per bung, NOT per minute; one line
+             "Bungs × n" at the bung rate.
+      Lacquer and tape add delacquer + check operations to the route; bungs
+      alone do not. A part with lacquered bores configured as "bungs" is
+      wrong even if the text says lacquer — the route would have no
+      removal step. Example for the flange above:
+        "masking_methods" => { "45_stopping_off_lacquer" => "Ø30 bore and Ø33 step",
+                               "bungs" => "3× Ø5.3 mount holes" } The MOC applies to the anodising;
       masking is on top of it. Below 30µm tapped holes need no masking.
 
       JIG SELECTION — pick from the shop's real jigs:
       #{OperationLibrary::JigUnjig::JIG_TYPES.map { |j| "        - #{j}" }.join("\n")}
       Choose by the feature the part can hang from, on a non-critical surface:
-        - tapped hole: the matching M-jig (M6 Jig (Metric)/(UNC), Thin- or
-          Thick-stem M8 Jig) — M6 is the workhorse for M5–M8 holes
+        - TAPPED HOLE FIRST. Nearly every hard anodise drawing says "all over
+          except threaded holes" — the threads are excluded from the coating,
+          so a jig screwed into one leaves its mark where there is no coating
+          to spoil. When the drawing excludes threaded holes and there is one,
+          that IS the jigging location; use the matching M-jig (M6 Jig
+          (Metric)/(UNC) for M5–M8, Thin-/Thick-stem M8 Jig for M8+, wire
+          through anything smaller than M5) and don't ask.
+        - "a secure titanium-to-part assy" is the generic fallback for parts
+          with no usable feature. Never propose it when a tapped hole, bore or
+          flange is available.
         - plain bore that isn't a critical fit: Expanding Jig (Large Aluminum
           Expanding Jig for big bores); a critical/gauged bore is NOT a jig point
         - flat plate/flange with through holes: 3 or 4 Prong Jig (Flat variants
