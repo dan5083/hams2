@@ -81,9 +81,14 @@ class QuotesController < ApplicationController
 
   # Create parts + items from the reviewed form.
   def finalise
+    return rerun if params[:intent] == "rerun" # same form, same CSRF token — see build.html.erb
+
     # The form is free-shaped (parts keyed by proposal key, arbitrary
     # treatment JSON), so it can't be strong-params-permitted field by field;
     # QuoteService.finalise! is the validation layer.
+    # Keep the answers on record even though Save doesn't act on them (only
+    # Re-run does) — they explain the cards to whoever reads the quote later.
+    @quote.update!(answers: (params[:answers] || {}).to_unsafe_h.reject { |_, v| v.blank? }) if params[:answers].present?
     result = QuoteService.finalise!(@quote, params.require(:form).to_unsafe_h)
     created = result[:parts_created]
     redirect_to @quote, notice: "✅ #{@quote.display_name} saved#{created.any? ? " — created #{created.map(&:display_name).join(', ')} with #{@quote.drawings.length} drawing(s) attached" : ''}. Send it from here when you're happy."

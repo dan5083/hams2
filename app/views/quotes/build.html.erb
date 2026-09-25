@@ -117,7 +117,7 @@
                   </div>
                 <% end %>
               </div>
-              <p class="text-xs text-blue-700 mt-3">Answer these and press <strong>Re-run with answers</strong>, or edit the part cards directly and just Save.</p>
+              <p class="text-xs text-blue-700 mt-3"><strong>Answers only reach the assistant via Re-run</strong> — it rewrites the cards below from them, then you review and Save. If you'd rather, skip the questions and edit the cards yourself; Save uses whatever the cards say.</p>
             </div>
           <% end %>
 
@@ -252,13 +252,15 @@
           </div>
 
           <div class="flex justify-between items-center">
-            <p class="text-xs text-gray-500">Save creates the part(s) with the drawings attached and the quote as a draft. Nothing is emailed until you press Send on the saved quote.</p>
+            <p class="text-xs text-gray-500">Save creates the part(s) from the cards above, with the drawings attached, and the quote as a draft. Nothing is emailed until you press Send on the saved quote.</p>
             <div class="flex space-x-2">
-              <button type="submit" formaction="<%= rerun_quote_path(@quote) %>" formnovalidate
+              <%# Both buttons post to finalise: Rails' per-form CSRF token is bound to
+                  the form's action, so a formaction pointing elsewhere gets a 422. %>
+              <button type="submit" name="intent" value="rerun" formnovalidate
                       class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded" data-disable-with="Re-running…">
                 Re-run with answers
               </button>
-              <button type="submit" class="bg-blue-600 hover:bg-blue-800 text-white font-bold py-2 px-4 rounded" data-disable-with="Saving…">
+              <button type="submit" name="intent" value="save" class="bg-blue-600 hover:bg-blue-800 text-white font-bold py-2 px-4 rounded" data-disable-with="Saving…">
                 Save quote
               </button>
             </div>
