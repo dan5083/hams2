@@ -261,6 +261,11 @@ Rails.application.routes.draw do
   post '/ai_assistant/chat', to: 'ai_assistant#chat'
   get  '/ai_assistant/status/:id', to: 'ai_assistant#status', as: :ai_assistant_status
 
+  # orders@ PO intake — Mailgun store-and-notify webhook (signed; no session)
+  namespace :inbound do
+    post 'purchase_orders', to: 'purchase_orders#create'
+  end
+
   # Root route - Dashboard for authenticated users, login for unauthenticated
   root "dashboard#index"
 

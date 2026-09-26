@@ -132,6 +132,67 @@ class PurchaseOrderService
     result
   end
 
+
+  # ---------------------------------------------------------------------------
+  # Email path — the PO arrived at orders@ and PoIntakeJob has already parked
+  # the attachments in Cloudinary under inbound_purchase_orders/<id>/. Unlike
+  # attach_from_request this can run any time later (review page, console),
+  # because it reads from Cloudinary, not from the assistant request.
+  #
+  # Which attachment: `attachment_index` if given, else the assistant's
+  # po_attachment_index, else the first PDF, else all images combined.
+  # ---------------------------------------------------------------------------
+  def self.attach_from_inbound(customer_order:, inbound_purchase_order:, attachment_index: nil)
+    ipo   = inbound_purchase_order
+    index = attachment_index || ipo.proposal["po_attachment_index"]
+    chosen = index.present? ? ipo.attachments.find { |a| a["index"] == index.to_i } : nil
+    chosen ||= ipo.pdf_attachments.first
+
+    result =
+      if chosen
+        raise PurchaseOrderError, "Attachment #{chosen['name']} was never parked in Cloudinary" if chosen["public_id"].blank?
+        chosen["content_type"] == "application/pdf" ? adopt_pdf(chosen, customer_order) : adopt_images([chosen], customer_order)
+      elsif ipo.image_attachments.any?
+        adopt_images(ipo.image_attachments, customer_order)
+      else
+        raise PurchaseOrderError, "No PDF or image attachment on inbound PO #{ipo.id}"
+      end
+
+    store!(customer_order, result, source: "email")
+    result
+  end
+
+  # Move the parked PDF into the customer's purchase_orders folder. rename is
+  # a metadata operation — no re-upload.
+  def self.adopt_pdf(att, customer_order)
+    new_id  = "#{folder_path(customer_order)}/#{file_prefix(customer_order)}"
+    renamed = Cloudinary::Uploader.rename(att["public_id"], new_id, resource_type: "image", overwrite: true)
+
+    { public_id: renamed["public_id"], secure_url: renamed["secure_url"],
+      format: "pdf", bytes: renamed["bytes"],
+      thumbnail_url: page_thumbnail_url(renamed["public_id"]) }
+  end
+  private_class_method :adopt_pdf
+
+  # Parked photos → cleaned multi-page PDF, same as upload_images_as_pdf but
+  # tagging the assets that already exist instead of uploading them again.
+  def self.adopt_images(atts, customer_order)
+    tag      = "po_#{customer_order.id}_#{SecureRandom.hex(4)}"
+    page_ids = atts.map { |a| a["public_id"] }
+    Cloudinary::Uploader.add_tag(tag, page_ids, resource_type: "image")
+
+    combined = Cloudinary::Uploader.multi(
+      tag,
+      format: "pdf",
+      transformation: IMAGE_CLEANUP_TRANSFORMATION.map(&:dup)
+    )
+
+    { public_id: combined["public_id"], secure_url: combined["secure_url"],
+      format: "pdf", bytes: combined["bytes"],
+      thumbnail_url: scan_thumbnail_url(page_ids.first) }
+  end
+  private_class_method :adopt_images
+
   # ---------------------------------------------------------------------------
 
   def self.upload_pdf(base64_data, customer_order)
