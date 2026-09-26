@@ -194,6 +194,110 @@ class PurchaseOrderService
   private_class_method :adopt_images
 
   # ---------------------------------------------------------------------------
+  # Book the PO's line items in as works orders. The structured `lines` come
+  # from the intake assistant's proposal (or a reviewer's edits):
+  #
+  #   [{ "part_id" => uuid | nil, "part_number" => "...", "part_issue" => "...",
+  #      "quantity" => 10, "unit_price" => 4.5 | nil, "customer_reference" => "..." }, ...]
+  #
+  # One transaction — either every line books or none do, and the error says
+  # which line and why. Pricing follows the same rules the chat assistant and
+  # the WO form apply: PO price if stated, else the part's each_price, with
+  # the MOC as a floor; no price at all → lot at the MOC.
+  #
+  # Sends the order acknowledgement exactly as WorksOrdersController#create_bulk
+  # does (inline, best-effort), unless acknowledge: false.
+  # ---------------------------------------------------------------------------
+  MOC_STANDARD            = 250.to_d
+  MOC_CHEMICAL_CONVERSION = 125.to_d
+
+  def self.book_lines!(customer_order:, lines:, issued_by: nil, acknowledge: true)
+    lines = Array(lines).map { |l| l.to_h.stringify_keys }
+    raise PurchaseOrderError, "No lines to book" if lines.empty?
+
+    created = []
+    CustomerOrder.transaction do
+      lines.each_with_index do |line, i|
+        label = "line #{i + 1} (#{line['part_number']}#{line['part_issue'].present? ? "/#{line['part_issue']}" : ''})"
+        part  = resolve_part!(customer_order, line, label)
+        qty   = line["quantity"].to_i
+        raise PurchaseOrderError, "#{label}: quantity must be positive" unless qty.positive?
+
+        wo = WorksOrder.new(
+          customer_order:     customer_order,
+          part:               part,
+          quantity:           qty,
+          customer_reference: line["customer_reference"].to_s.first(100).presence,
+          issued_by:          issued_by,
+          **price_attributes(part, qty, line["unit_price"])
+        )
+        wo.save! # raises with the WorksOrder's own validation messages
+        created << wo
+      end
+    end
+
+    if acknowledge && customer_order.customer.buyer_emails.any?
+      begin
+        OrderAcknowledgementMailer.order_confirmation(customer_order, created).deliver_now
+      rescue => e
+        Rails.logger.error "[PurchaseOrderService] acknowledgement failed for order #{customer_order.number}: #{e.message}"
+      end
+    end
+
+    created
+  end
+
+  # Exactly one enabled, fully configured part — by id if the proposal has
+  # one, else by Part.matching. Anything else raises with a reason a
+  # reviewer can act on.
+  def self.resolve_part!(customer_order, line, label)
+    part =
+      if line["part_id"].present?
+        Part.find_by(id: line["part_id"])
+      else
+        matches = Part.matching(customer_id: customer_order.customer_id,
+                                part_number: line["part_number"].to_s,
+                                part_issue:  line["part_issue"].to_s).to_a
+        raise PurchaseOrderError, "#{label}: #{matches.size} parts match — ambiguous" if matches.size > 1
+        matches.first
+      end
+
+    raise PurchaseOrderError, "#{label}: part not found for #{customer_order.customer.name}" unless part
+    raise PurchaseOrderError, "#{label}: #{part.display_name} belongs to #{part.customer&.name}, not #{customer_order.customer.name}" if part.customer_id != customer_order.customer_id
+    raise PurchaseOrderError, "#{label}: #{part.display_name} is disabled" if part.respond_to?(:enabled) && part.enabled == false
+    if part.customisation_data.blank? || part.customisation_data.dig("operation_selection", "treatments").blank?
+      raise PurchaseOrderError, "#{label}: #{part.display_name} has no processing instructions configured"
+    end
+    part
+  end
+  private_class_method :resolve_part!
+
+  def self.price_attributes(part, qty, po_unit_price)
+    moc  = moc_for(part)
+    each = po_unit_price.present? && po_unit_price.to_d.positive? ? po_unit_price.to_d : part.each_price&.to_d
+
+    if each&.positive?
+      total = (each * qty).round(2)
+      if total < moc
+        { price_type: "lot", lot_price: moc }
+      else
+        { price_type: "each", each_price: each, lot_price: total }
+      end
+    else
+      { price_type: "lot", lot_price: moc }
+    end
+  end
+  private_class_method :price_attributes
+
+  # £125 MOC when the part is chemical conversion only; £250 otherwise.
+  def self.moc_for(part)
+    raw   = part.customisation_data.dig("operation_selection", "treatments")
+    types = (raw.is_a?(String) ? JSON.parse(raw) : Array(raw)).map { |t| t["type"] }.compact.uniq rescue []
+    types == ["chemical_conversion"] ? MOC_CHEMICAL_CONVERSION : MOC_STANDARD
+  end
+  private_class_method :moc_for
+
+  # ---------------------------------------------------------------------------
 
   def self.upload_pdf(base64_data, customer_order)
     with_tempfile("po", ".pdf", base64_data) do |tempfile|

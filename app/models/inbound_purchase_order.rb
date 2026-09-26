@@ -3,8 +3,8 @@
 # One row per email that arrived at orders@ (via a Mailgun forward() route).
 # The controller records it and parks the attachments in Cloudinary,
 # PoIntakeJob asks the assistant to read the PO, and the outcome lands in
-# `proposal` / `status` for a human to act on. Nothing is booked into HAMS
-# until someone calls #create_order! (console for now, review page later).
+# `proposal` / `status`. A clean proposal is booked on the spot by
+# #create_order!; the rest wait for a reviewer to call it.
 class InboundPurchaseOrder < ApplicationRecord
   belongs_to :ai_assistant_request, optional: true
   belongs_to :customer_order,       optional: true
@@ -43,42 +43,47 @@ class InboundPurchaseOrder < ApplicationRecord
   end
 
   # ---------------------------------------------------------------------------
-  # Human approval: turn the assistant's proposal into a CustomerOrder and
-  # attach the PO document. Works orders are NOT created here yet — that's
-  # the next step once the review flow has proven itself.
+  # Book it in: CustomerOrder (or the existing one the proposal points at),
+  # PO document attached, one WorksOrder per line. Called by the assistant
+  # itself when the proposal is clean, or by a reviewer (console / review
+  # page) for the ones that parked. Works orders then surface on the
+  # Contract Review board like any other — that's the human check.
   #
-  #   ipo.create_order!(reviewed_by: User.find_by(email_address: "julia@..."))
+  #   ipo.create_order!(reviewed_by: user)
   #
-  # Pass overrides if the assistant misread something:
-  #   ipo.create_order!(reviewed_by: u, customer_id: 42, number: "PO-1234")
+  # Overrides if the assistant misread something:
+  #   ipo.create_order!(reviewed_by: u, customer_id: "…", number: "PO-1234",
+  #                     lines: [{ "part_number" => "…", "part_issue" => "A", "quantity" => 5 }])
+  #   ipo.create_order!(reviewed_by: u, lines: [])   # order + PO only, no works orders
   # ---------------------------------------------------------------------------
-  def create_order!(reviewed_by:, customer_id: nil, number: nil, date_received: nil, attachment_index: nil)
-    raise "Already linked to CustomerOrder #{customer_order_id}" if customer_order_id.present?
+  def create_order!(reviewed_by:, customer_id: nil, number: nil, date_received: nil, attachment_index: nil, lines: nil)
+    raise "Already linked to CustomerOrder #{customer_order_id}" if status == "booked"
 
     customer_id ||= proposal["customer_id"]
     number      ||= proposal["po_number"]
+    lines         = lines.nil? ? Array(proposal["lines"]) : Array(lines)
     raise "No customer_id — pass one explicitly" if customer_id.blank?
     raise "No PO number — pass one explicitly"   if number.blank?
 
-    date_received ||= proposal["order_date"].presence && Date.parse(proposal["order_date"]) rescue nil
+    date_received ||= (Date.parse(proposal["order_date"]) rescue nil) if proposal["order_date"].present?
 
     transaction do
-      co = CustomerOrder.find_by(customer_id: customer_id, number: number)
-      if co&.po_attached?
-        raise "CustomerOrder #{co.id} already exists with a PO attached"
+      co = CustomerOrder.find_by(id: proposal["existing_customer_order_id"]) if proposal["existing_customer_order_id"].present?
+      co ||= CustomerOrder.find_by(customer_id: customer_id, number: number)
+
+      if co.nil?
+        co = CustomerOrder.create!({ customer_id: customer_id, number: number, date_received: date_received, created_by: reviewed_by }.compact)
+      elsif co.po_attached? && co.works_orders.active.exists?
+        raise "CustomerOrder #{co.number} already has a PO and works orders — treat as amendment"
       end
 
-      co ||= CustomerOrder.create!(
-        { customer_id: customer_id, number: number, date_received: date_received }.compact
-      )
+      PurchaseOrderService.attach_from_inbound(customer_order: co, inbound_purchase_order: self,
+                                               attachment_index: attachment_index) unless co.po_attached?
 
-      PurchaseOrderService.attach_from_inbound(
-        customer_order: co,
-        inbound_purchase_order: self,
-        attachment_index: attachment_index
-      )
+      wos = lines.any? ? PurchaseOrderService.book_lines!(customer_order: co, lines: lines, issued_by: reviewed_by) : []
 
-      update!(customer_order: co, status: "booked", reviewed_by: reviewed_by, reviewed_at: Time.current)
+      update!(customer_order: co, status: "booked", reviewed_by: reviewed_by, reviewed_at: Time.current,
+              summary: "Booked as #{co.display_name}" + (wos.any? ? " — #{wos.map(&:display_name).join(', ')}" : " (no works orders)"))
       co
     end
   end
