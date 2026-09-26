@@ -170,6 +170,15 @@ class PoIntakeAssistantJob < AiAssistantJob
       "needs_human" with the details in notes — amendments are not booked
       automatically.
 
+      WHAT IS NOT A REASON TO PARK:
+      Special instructions, warnings, "DO NOT …" notes, polishing/etching
+      prohibitions, delivery dates, cert requirements, packaging notes, truncated or
+      partly legible text — these are all normal on a PO. Put them in notes for the
+      contract reviewer (who has the PO document in front of them) and BOOK IT. The
+      only reasons to use "needs_human" are: customer not uniquely identifiable, PO
+      number unreadable, quantity unreadable, an amendment/cancellation, or a line
+      whose part you could neither match nor create.
+
       STEP 2 — Identify the customer:
         Organization.where("name ILIKE ?", "%fragment%").where(is_customer: true)
       Also try the sender's email domain against the Organizations you find.
