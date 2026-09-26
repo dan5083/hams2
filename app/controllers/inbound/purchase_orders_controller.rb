@@ -34,6 +34,12 @@ module Inbound
     MAX_ATTACHMENT_BYTES = 20.megabytes
 
     def create
+      # TEMP diagnostics — remove once intake is proven.
+      Rails.logger.info "[Inbound] content_type=#{request.content_type.inspect} " \
+                        "keys=#{params.keys.inspect} " \
+                        "attachment-count=#{params['attachment-count'].inspect} " \
+                        "files=#{params.to_unsafe_h.select { |_, v| v.respond_to?(:tempfile) }.keys.inspect}"
+
       return head :not_acceptable unless valid_signature?
 
       message_id = params["Message-Id"].presence || header_hash["Message-Id"].presence
