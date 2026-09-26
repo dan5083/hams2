@@ -55,8 +55,8 @@ module Inbound
         from_header:   params["from"],
         recipient:     params["recipient"],
         subject:       params["subject"].to_s.first(500),
-        body_plain:    params["body-plain"],
-        stripped_text: params["stripped-text"],
+        body_plain:    params["body-plain"].presence || html_to_text(params["body-html"]),
+        stripped_text: params["stripped-text"].presence || html_to_text(params["stripped-html"]),
         received_at:   received_at,
         headers:       header_hash,
         status:        "receiving"
@@ -133,6 +133,13 @@ module Inbound
 
         att.merge("public_id" => uploaded["public_id"], "secure_url" => uploaded["secure_url"], "bytes" => uploaded["bytes"])
       end
+    end
+
+    # Outlook-composed mail often arrives HTML-only; keep a readable text copy.
+    def html_to_text(html)
+      return nil if html.blank?
+      ActionController::Base.helpers.strip_tags(html.to_s.gsub(%r{<br\s*/?>|</p>|</div>}i, "\n"))
+                            .gsub(/[ \t]+\n/, "\n").gsub(/\n{3,}/, "\n\n").strip.first(20_000)
     end
 
     def received_at
