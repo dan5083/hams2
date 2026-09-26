@@ -2,22 +2,20 @@
 #
 # Stage 1 of intake. Runs once per InboundPurchaseOrder:
 #   1. drop obvious noise (auto-replies, no usable attachment)
-#   2. pull each PDF/image from Mailgun and park it in Cloudinary under
-#      inbound_purchase_orders/<id>/ — Mailgun only keeps it 3 days, and the
-#      assistant request strips base64 once it finishes, so this is the
-#      durable copy that #create_order! attaches later
+#   2. read each parked PDF/image back from Cloudinary (the controller parked
+#      them at inbound_purchase_orders/<id>/ — that's the durable copy that
+#      #create_order! attaches later; the assistant request strips base64
+#      once it finishes)
 #   3. build an AiAssistantRequest (files + email context) for the system
 #      user and hand off to PoIntakeAssistantJob
 require "net/http"
 require "uri"
 require "base64"
-require "tempfile"
 
 class PoIntakeJob < ApplicationJob
   queue_as :default
 
-  MAX_ATTACHMENT_BYTES = 20.megabytes # Anthropic request ceiling is 32MB total
-  SYSTEM_USER_EMAIL    = ENV.fetch("PO_INTAKE_USER_EMAIL", "orders@hardanodisingstl.com")
+  SYSTEM_USER_EMAIL = ENV.fetch("PO_INTAKE_USER_EMAIL", "orders@hardanodisingstl.com")
 
   def perform(inbound_id)
     ipo = InboundPurchaseOrder.find(inbound_id)
@@ -27,7 +25,7 @@ class PoIntakeJob < ApplicationJob
       return ipo.update!(status: "ignored", summary: "Auto-reply / bounce / notification — not processed")
     end
 
-    usable = ipo.usable_attachments
+    usable = ipo.usable_attachments.select { |a| a["secure_url"].present? }
     if usable.empty?
       return ipo.update!(status: "needs_review",
                          summary: "No PDF or image attachment — PO may be in the email body, or this isn't a PO")
@@ -35,9 +33,7 @@ class PoIntakeJob < ApplicationJob
 
     ipo.update!(status: "fetching")
 
-    files  = usable.map { |att| fetch_and_park(ipo, att) }
-    parked = files.map { |f| f.except("base64") } # base64 is only for the API request, never persisted
-    ipo.update!(attachments: ipo.attachments.map { |a| parked.find { |p| p["index"] == a["index"] } || a })
+    files = usable.map { |att| att.merge("base64" => Base64.strict_encode64(fetch(att["secure_url"]))) }
 
     request = AiAssistantRequest.create!(
       user:     system_user,
@@ -58,38 +54,10 @@ class PoIntakeJob < ApplicationJob
       raise "PO intake system user #{SYSTEM_USER_EMAIL} not found — create it (see README)"
   end
 
-  # Returns the attachment hash with base64 + Cloudinary fields added.
-  def fetch_and_park(ipo, att)
-    bytes = fetch_from_mailgun(att["mailgun_url"])
-    raise "Attachment #{att['name']} is #{bytes.bytesize} bytes — over the #{MAX_ATTACHMENT_BYTES} limit" if bytes.bytesize > MAX_ATTACHMENT_BYTES
-
-    ext = att["content_type"] == "application/pdf" ? ".pdf" : File.extname(att["name"]).presence || ".jpg"
-    uploaded = Tempfile.create(["inbound_po", ext], binmode: true) do |tf|
-      tf.write(bytes)
-      tf.flush
-      Cloudinary::Uploader.upload(
-        tf.path,
-        public_id:     "inbound_purchase_orders/#{ipo.id}/#{att['index']}_#{File.basename(att['name'], '.*').parameterize.presence || 'attachment'}",
-        resource_type: "image", # PDFs as image-type so they can be page-transformed later (see PurchaseOrderService)
-        overwrite:     true,
-        unique_filename: false
-      )
-    end
-
-    att.merge(
-      "public_id"  => uploaded["public_id"],
-      "secure_url" => uploaded["secure_url"],
-      "bytes"      => uploaded["bytes"],
-      "base64"     => Base64.strict_encode64(bytes) # transient — stripped before persisting
-    )
-  end
-
-  def fetch_from_mailgun(url)
+  def fetch(url)
     uri = URI(url)
-    req = Net::HTTP::Get.new(uri)
-    req.basic_auth("api", ENV.fetch("MAILGUN_API_KEY"))
-    res = Net::HTTP.start(uri.host, uri.port, use_ssl: true, read_timeout: 60) { |http| http.request(req) }
-    raise "Mailgun attachment fetch failed #{res.code}: #{res.body.to_s.first(200)}" unless res.is_a?(Net::HTTPSuccess)
+    res = Net::HTTP.start(uri.host, uri.port, use_ssl: true, read_timeout: 60) { |http| http.get(uri.request_uri) }
+    raise "Cloudinary fetch failed #{res.code} for #{url}" unless res.is_a?(Net::HTTPSuccess)
     res.body
   end
 

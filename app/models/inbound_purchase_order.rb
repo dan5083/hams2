@@ -1,8 +1,8 @@
 # app/models/inbound_purchase_order.rb
 #
-# One row per email that arrived at orders@ (via Mailgun store-and-notify).
-# The controller records it, PoIntakeJob fetches the attachments into
-# Cloudinary and asks the assistant to read the PO, and the outcome lands in
+# One row per email that arrived at orders@ (via a Mailgun forward() route).
+# The controller records it and parks the attachments in Cloudinary,
+# PoIntakeJob asks the assistant to read the PO, and the outcome lands in
 # `proposal` / `status` for a human to act on. Nothing is booked into HAMS
 # until someone calls #create_order! (console for now, review page later).
 class InboundPurchaseOrder < ApplicationRecord
@@ -10,11 +10,11 @@ class InboundPurchaseOrder < ApplicationRecord
   belongs_to :customer_order,       optional: true
   belongs_to :reviewed_by, class_name: "User", optional: true
 
-  STATUSES = %w[received fetching analysing needs_review already_on_file ignored error booked dismissed].freeze
+  STATUSES = %w[receiving received fetching analysing needs_review already_on_file ignored error booked dismissed].freeze
   validates :status, inclusion: { in: STATUSES }
   validates :mailgun_message_id, presence: true, uniqueness: true
 
-  scope :open,   -> { where(status: %w[received fetching analysing needs_review]) }
+  scope :open,   -> { where(status: %w[receiving received fetching analysing needs_review]) }
   scope :recent, -> { order(received_at: :desc) }
 
   USABLE_CONTENT_TYPES = %w[application/pdf image/jpeg image/png image/webp image/gif].freeze
