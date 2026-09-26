@@ -20,7 +20,7 @@ class InboundPurchaseOrder < ApplicationRecord
   USABLE_CONTENT_TYPES = %w[application/pdf image/jpeg image/png image/webp image/gif].freeze
 
   def usable_attachments
-    attachments.select { |a| USABLE_CONTENT_TYPES.include?(a["content_type"].to_s.downcase) }
+    attachments.reject { |a| a["inline"] }.select { |a| USABLE_CONTENT_TYPES.include?(a["content_type"].to_s.downcase) }
   end
 
   def pdf_attachments
@@ -28,7 +28,7 @@ class InboundPurchaseOrder < ApplicationRecord
   end
 
   def image_attachments
-    attachments.select { |a| a["content_type"].to_s.downcase.start_with?("image/") }
+    attachments.reject { |a| a["inline"] }.select { |a| a["content_type"].to_s.downcase.start_with?("image/") }
   end
 
   # Out-of-office, bounces, read receipts, mailing-list noise. Cheap header /
@@ -80,7 +80,7 @@ class InboundPurchaseOrder < ApplicationRecord
       PurchaseOrderService.attach_from_inbound(customer_order: co, inbound_purchase_order: self,
                                                attachment_index: attachment_index) unless co.po_attached?
 
-      wos = lines.any? ? PurchaseOrderService.book_lines!(customer_order: co, lines: lines, issued_by: reviewed_by) : []
+      wos = lines.any? ? PurchaseOrderService.book_lines!(customer_order: co, lines: lines) : []
 
       update!(customer_order: co, status: "booked", reviewed_by: reviewed_by, reviewed_at: Time.current,
               summary: "Booked as #{co.display_name}" + (wos.any? ? " — #{wos.map(&:display_name).join(', ')}" : " (no works orders)"))

@@ -211,7 +211,7 @@ class PurchaseOrderService
   MOC_STANDARD            = 250.to_d
   MOC_CHEMICAL_CONVERSION = 125.to_d
 
-  def self.book_lines!(customer_order:, lines:, issued_by: nil, acknowledge: true)
+  def self.book_lines!(customer_order:, lines:, acknowledge: true)
     lines = Array(lines).map { |l| l.to_h.stringify_keys }
     raise PurchaseOrderError, "No lines to book" if lines.empty?
 
@@ -228,7 +228,6 @@ class PurchaseOrderService
           part:               part,
           quantity:           qty,
           customer_reference: line["customer_reference"].to_s.first(100).presence,
-          issued_by:          issued_by,
           **price_attributes(part, qty, line["unit_price"])
         )
         wo.save! # raises with the WorksOrder's own validation messages

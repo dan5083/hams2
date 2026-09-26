@@ -99,19 +99,20 @@ module Inbound
       end
     end
 
-    # Uploaded files arrive as attachment-1 .. attachment-N.
-    def uploaded_attachments
-      params.to_unsafe_h
-            .select { |k, v| k.to_s.match?(/\Aattachment-\d+\z/) && v.respond_to?(:tempfile) }
-            .sort_by { |k, _| k.to_s[/\d+/].to_i }
-            .map(&:last)
+    # Inline images (signature logos, banners) are referenced from the HTML by
+    # Content-ID; Mailgun lists them in content-id-map as {"<cid>": "attachment-N"}.
+    def inline_attachment_keys
+      @inline_attachment_keys ||= JSON.parse(params["content-id-map"].presence || "{}").values.map(&:to_s).to_set
+    rescue JSON::ParserError
+      Set.new
     end
 
-    # Every attachment gets a record; only PDFs/images get parked in
-    # Cloudinary (the job decides what's usable, the reviewer can see the rest
-    # was there).
     def park_attachments(ipo)
-      uploaded_attachments.each_with_index.map do |file, i|
+      files = params.to_unsafe_h
+                    .select { |k, v| k.to_s.match?(/\Aattachment-\d+\z/) && v.respond_to?(:tempfile) }
+                    .sort_by { |k, _| k.to_s[/\d+/].to_i }
+
+      files.each_with_index.map do |(key, file), i|
         content_type = file.content_type.to_s.downcase
         att = {
           "index"        => i,
@@ -120,6 +121,7 @@ module Inbound
           "size"         => file.size.to_i
         }
 
+        next att.merge("inline" => true) if inline_attachment_keys.include?(key.to_s)
         next att unless InboundPurchaseOrder::USABLE_CONTENT_TYPES.include?(content_type)
         next att.merge("skipped" => "over #{MAX_ATTACHMENT_BYTES} bytes") if file.size.to_i > MAX_ATTACHMENT_BYTES
 
