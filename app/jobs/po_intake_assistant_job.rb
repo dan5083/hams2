@@ -24,12 +24,12 @@ class PoIntakeAssistantJob < AiAssistantJob
           enum: %w[proposal already_on_file not_a_po needs_human],
           description: "proposal = a PO you could read; already_on_file = a CustomerOrder with this number already has a PO attached; not_a_po = acknowledgement/query/spam/drawing-only; needs_human = something you couldn't resolve (customer ambiguous, unreadable, amendment to an existing order, etc)"
         },
-        customer_id:          { type: "integer", description: "Organization id, if uniquely matched" },
+        customer_id:          { type: "string", description: "Organization id (uuid), if uniquely matched" },
         customer_name:        { type: "string" },
         po_number:            { type: "string" },
         order_date:           { type: "string", description: "ISO 8601 date if on the PO" },
         po_attachment_index:  { type: "integer", description: "Which attachment index is the PO itself (not drawings/T&Cs)" },
-        existing_customer_order_id: { type: "integer", description: "For already_on_file, or when an order exists without a PO attached" },
+        existing_customer_order_id: { type: "string", description: "For already_on_file, or when an order exists without a PO attached" },
         lines: {
           type: "array",
           items: {
@@ -41,7 +41,7 @@ class PoIntakeAssistantJob < AiAssistantJob
               quantity:           { type: "number" },
               unit_price:         { type: "number" },
               customer_reference: { type: "string", description: "Line-level reference, e.g. Lufthansa CS-Order/SerialNo" },
-              part_id:            { type: "integer", description: "Matching Part id in HAMS, if found" },
+              part_id:            { type: "string", description: "Matching Part id (uuid) in HAMS, if found" },
               part_status:        { type: "string", enum: %w[matched not_found ambiguous], description: "Result of Part.matching for this line" },
               price_note:         { type: "string", description: "e.g. 'PO £4.50 vs HAMS each_price £4.20'" }
             }
