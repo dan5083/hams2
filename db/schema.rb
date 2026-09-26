@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_09_24_143409) do
+ActiveRecord::Schema[8.0].define(version: 2026_09_26_094128) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -151,6 +151,35 @@ ActiveRecord::Schema[8.0].define(version: 2026_09_24_143409) do
     t.index ["status"], name: "index_external_ncrs_on_status"
     t.check_constraint "hal_ncr_number > 0", name: "check_positive_ncr_number"
     t.check_constraint "status::text = ANY (ARRAY['draft'::character varying, 'in_progress'::character varying, 'completed'::character varying]::text[])", name: "check_valid_status"
+  end
+
+  create_table "inbound_purchase_orders", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "mailgun_message_id", null: false
+    t.string "message_url"
+    t.string "sender"
+    t.string "from_header"
+    t.string "recipient"
+    t.string "subject"
+    t.text "body_plain"
+    t.text "stripped_text"
+    t.datetime "received_at"
+    t.jsonb "headers", default: {}, null: false
+    t.jsonb "attachments", default: [], null: false
+    t.string "status", default: "received", null: false
+    t.jsonb "proposal", default: {}, null: false
+    t.text "summary"
+    t.text "error"
+    t.uuid "ai_assistant_request_id"
+    t.uuid "customer_order_id"
+    t.uuid "reviewed_by_id"
+    t.datetime "reviewed_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["ai_assistant_request_id"], name: "index_inbound_purchase_orders_on_ai_assistant_request_id"
+    t.index ["customer_order_id"], name: "index_inbound_purchase_orders_on_customer_order_id"
+    t.index ["mailgun_message_id"], name: "index_inbound_purchase_orders_on_mailgun_message_id", unique: true
+    t.index ["reviewed_by_id"], name: "index_inbound_purchase_orders_on_reviewed_by_id"
+    t.index ["status"], name: "index_inbound_purchase_orders_on_status"
   end
 
   create_table "invoice_items", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -490,6 +519,9 @@ ActiveRecord::Schema[8.0].define(version: 2026_09_24_143409) do
   add_foreign_key "external_ncrs", "release_notes"
   add_foreign_key "external_ncrs", "users", column: "assigned_to_id"
   add_foreign_key "external_ncrs", "users", column: "created_by_id"
+  add_foreign_key "inbound_purchase_orders", "ai_assistant_requests"
+  add_foreign_key "inbound_purchase_orders", "customer_orders"
+  add_foreign_key "inbound_purchase_orders", "users", column: "reviewed_by_id"
   add_foreign_key "invoice_items", "invoices"
   add_foreign_key "invoice_items", "release_notes"
   add_foreign_key "invoices", "organizations", column: "customer_id"
