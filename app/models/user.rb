@@ -1,5 +1,6 @@
 class User < ApplicationRecord
-  KIOSK_EMAIL = "kiosk@hardanodisingstl.com".freeze
+  KIOSK_EMAIL     = "kiosk@hardanodisingstl.com".freeze
+  PO_INTAKE_EMAIL = "orders@hardanodisingstl.com".freeze
 
   has_secure_password
   has_many :sessions, dependent: :destroy
@@ -44,11 +45,18 @@ class User < ApplicationRecord
     email_address == KIOSK_EMAIL
   end
 
+  # Non-person logins: the shared kiosk, and the account that owns unattended
+  # PO-intake assistant runs (orders@). Neither gets an operator identity and
+  # neither may sign anything off.
+  def system_account?
+    email_address.in?([KIOSK_EMAIL, PO_INTAKE_EMAIL])
+  end
+
   # Whether a mark on a process record may be attributed to this account when
   # no operator is unlocked. The kiosk is a shared login with no name of its
-  # own, so never.
+  # own, and orders@ is not a person, so never.
   def can_sign_off?
-    !kiosk?
+    !system_account?
   end
 
   # Creates (or claims, by exact name match) this user's operator row. Safe to
@@ -56,7 +64,7 @@ class User < ApplicationRecord
   # existing floor operator avoids two rows for one person, but check the dry
   # run - two different people with the same full name would bind wrongly.
   def ensure_sub_user!
-    return if kiosk?
+    return if system_account?
     return if sub_user.present?
 
     existing = SubUser.floor.find_by(name: full_name)
