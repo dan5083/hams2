@@ -49,9 +49,8 @@ class ShopSectionBoard
   SECTIONS = {
     "enp"             => "ENP",
     "shop1_anodisers" => "Shop 1 · Anodisers",
-    "shop2_anodisers" => "Shop 2 · Anodisers",
     "shop1_jiggers"   => "Shop 1 · Jiggers",
-    "shop2_jiggers"   => "Shop 2 · Jiggers",
+    "shop2"           => "Shop 2",
     "factory2"        => "Factory 2",
     "chromic"         => "Chromic",
     "chem_conv"       => "Chemical Conversion",
@@ -140,7 +139,7 @@ class ShopSectionBoard
     pending = @jobs.select { |j| paperless.include?(j.wo.id) && j.awaiting_contract_review? }
     pending.group_by { |j| j.wo.process_record_owner.id }
            .map { |owner_id, js| js.find { |j| j.wo.id == owner_id } || js.first }
-           .sort_by(&:number)
+           .sort_by { |j| [j.promise_sort, j.number] }
   end
 
   # For the navbar badge. The cache is load-bearing here: paperless_ids runs
@@ -161,14 +160,14 @@ class ShopSectionBoard
   # (anodising op, batches) pair - a two-treatment WO can appear twice.
   def anodise_ready(shop)
     @jobs.flat_map { |j| j.anodise_ready_rows(shop) }
-         .sort_by { |r| [r[:vats].min || 99, r[:job].number] }
+         .sort_by { |r| [r[:job].promise_sort, r[:vats].min || 99, r[:job].number] }
   end
 
   # -- Jiggers boards --------------------------------------------------------
   # Work whose next jig (for this shop's processes) hasn't been signed yet.
   def jigging_queue(shop)
     @jobs.flat_map { |j| j.jig_queue_rows(shop) }
-         .sort_by { |r| r[:job].number }
+         .sort_by { |r| [r[:job].promise_sort, r[:job].number] }
   end
 
   # -- Chemical conversion board ---------------------------------------------
@@ -182,7 +181,7 @@ class ShopSectionBoard
   def chem_conv_groups
     rows = @jobs.flat_map(&:chem_conv_rows)
     CHEM_CONV_ORDER.filter_map do |chem|
-      group = rows.select { |r| r[:chemistry] == chem }.sort_by { |r| r[:job].number }
+      group = rows.select { |r| r[:chemistry] == chem }.sort_by { |r| [r[:job].promise_sort, r[:job].number] }
       next if group.empty?
       { chemistry: chem, label: CHEM_CONV_LABELS[chem], rows: group }
     end
@@ -200,6 +199,20 @@ class ShopSectionBoard
 
     def initialize(wo)
       @wo = wo
+    end
+
+    # ---- Promises ------------------------------------------------------------
+    # The earliest open promise on this WO, if any. Works off the preloaded
+    # promises + release_notes associations, so no queries per row.
+
+    def promise
+      return @promise if defined?(@promise)
+      @promise = @wo.promises.select(&:open?).min_by { |p| [p.due_on, p.created_at] }
+    end
+
+    # Sort key: promised work first, soonest due first; unpromised after.
+    def promise_sort
+      promise ? [0, promise.due_on.jd] : [1, 0]
     end
 
     def ops

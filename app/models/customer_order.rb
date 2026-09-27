@@ -5,6 +5,7 @@ class CustomerOrder < ApplicationRecord
   belongs_to :updated_by, class_name: 'User', optional: true
   has_many :works_orders, dependent: :restrict_with_error
   has_many :release_notes, through: :works_orders
+  has_many :promises, through: :works_orders
 
   validates :number, presence: true
   validates :number, uniqueness: { scope: :customer_id }
@@ -143,6 +144,25 @@ class CustomerOrder < ApplicationRecord
 
   def can_be_deleted?
     works_orders.empty?
+  end
+
+  # ---------------------------------------------------------------------------
+  # Promises ("can we collect the lot on Thursday?") - one Promise per live
+  # works order for everything still unreleased. Returns the promises made;
+  # works orders with nothing left to release are skipped. Console use for
+  # now; the order page gets a form later.
+  # ---------------------------------------------------------------------------
+  def promise_all!(due_on:, note: nil, user: Current.user)
+    transaction do
+      works_orders.active.where(is_open: true).order(:number).filter_map do |wo|
+        next if wo.unreleased_quantity <= 0
+        wo.promises.create!(quantity: wo.unreleased_quantity, due_on: due_on, note: note, promised_by: user)
+      end
+    end
+  end
+
+  def open_promises
+    promises.active.by_due.select(&:open?)
   end
 
   # ---------------------------------------------------------------------------

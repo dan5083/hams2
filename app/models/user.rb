@@ -33,6 +33,16 @@ class User < ApplicationRecord
   scope :enabled, -> { where(enabled: true) }
   scope :disabled, -> { where(enabled: false) }
 
+  # Section heads land on their board instead of the dashboard (the
+  # dashboard is invoicing/OTD - nothing on it is for the shop floor). A
+  # ShopSectionBoard::SECTIONS key; anything else is treated as unset.
+  # Set from the console: User.find_by(username: "Brian").update!(home_section: "shop1_jiggers")
+  validates :home_section, inclusion: { in: ->(_) { ShopSectionBoard::SECTIONS.keys } }, allow_blank: true
+
+  def home_section_key
+    home_section.presence if ShopSectionBoard::SECTIONS.key?(home_section.to_s)
+  end
+
   def display_name
     full_name.present? ? full_name : username
   end

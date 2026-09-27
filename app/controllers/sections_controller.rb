@@ -16,7 +16,7 @@ class SectionsController < ApplicationController
     # members ride through on their lead's record inside the board.
     works_orders = WorksOrder.open
                              .with_unreleased_quantity
-                             .includes(:process_group, :release_notes, part: [], customer_order: :customer)
+                             .includes(:process_group, :release_notes, :promises, part: [], customer_order: :customer)
 
     @board = ShopSectionBoard.new(works_orders)
   end

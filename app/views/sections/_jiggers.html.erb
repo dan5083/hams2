@@ -7,17 +7,57 @@
 <% if rows.empty? %>
   <div class="bg-white rounded-lg shadow p-8 text-center text-gray-500">Nothing waiting to be jigged.</div>
 <% else %>
-  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+  <!-- Desktop -->
+  <div class="hidden lg:block bg-white shadow overflow-hidden sm:rounded-lg">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <% ["WO", "Part", "Qty", "Batches to jig", "Vat", "Next"].each do |h| %>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"><%= h %></th>
+          <% end %>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        <% rows.each do |row| %>
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 whitespace-nowrap">
+              <%= link_to row[:job].display_name, works_order_path(row[:job].wo), class: "font-bold text-blue-700 hover:underline" %>
+            </td>
+            <td class="px-4 py-3">
+              <div class="text-sm text-gray-900"><%= row[:job].part_number %></div>
+              <div class="text-xs text-gray-400"><%= row[:job].customer_name %></div>
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900"><%= row[:job].quantity %></td>
+            <td class="px-4 py-3 whitespace-nowrap">
+              <% if row[:batches].any? %>
+                <% row[:batches].each do |b| %>
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 mr-1">B<%= b %></span>
+                <% end %>
+              <% else %>
+                <span class="text-gray-400">—</span>
+              <% end %>
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900">
+              <%= row[:vats].map { |v| "Vat #{v}" }.join(" / ").presence || "—" %>
+            </td>
+            <td class="px-4 py-3 text-xs text-gray-600">
+              <%= row[:next_op]["operation_text"].to_s.gsub(/\*+/, "").lines.first.to_s.strip.truncate(90) %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Mobile cards -->
+  <div class="lg:hidden space-y-3">
     <% rows.each do |row| %>
-      <%= link_to works_order_path(row[:job].wo), class: "block bg-white rounded-lg shadow p-4 hover:shadow-md" do %>
+      <%= link_to works_order_path(row[:job].wo), class: "block bg-white rounded-lg shadow p-4" do %>
         <div class="flex justify-between items-baseline">
           <span class="font-bold text-blue-700"><%= row[:job].display_name %></span>
-          <span class="text-sm font-bold text-gray-900">
-            <%= row[:vats].map { |v| "Vat #{v}" }.join(" / ") %>
-          </span>
+          <span class="text-sm font-bold text-gray-900"><%= row[:vats].map { |v| "Vat #{v}" }.join(" / ").presence || "—" %></span>
         </div>
-        <div class="text-sm text-gray-700 mt-1 truncate"><%= row[:job].part_number %></div>
-        <div class="text-xs text-gray-400 truncate"><%= row[:job].customer_name %></div>
+        <div class="text-sm text-gray-700 mt-1"><%= row[:job].part_number %> · <%= row[:job].customer_name %></div>
         <div class="text-xs text-gray-500 mt-2 line-clamp-2">
           Next: <%= row[:next_op]["operation_text"].to_s.gsub(/\*+/, "").truncate(90) %>
         </div>

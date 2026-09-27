@@ -100,6 +100,11 @@ Rails.application.routes.draw do
         get :pdf
       end
     end
+
+    # Promises - "n parts by <date>" - made on the WO page, withdrawn by id
+    resources :promises, only: [:create], shallow: true do
+      member { patch :cancel }
+    end
   end
 
   # 3.5 Process groups - several works orders sharing one process record

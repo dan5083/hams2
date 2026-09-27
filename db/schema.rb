@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_09_26_094128) do
+ActiveRecord::Schema[8.0].define(version: 2026_09_27_113441) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -253,12 +253,14 @@ ActiveRecord::Schema[8.0].define(version: 2026_09_26_094128) do
     t.decimal "each_price", precision: 10, scale: 2
     t.string "file_cloudinary_ids", default: [], array: true
     t.string "file_filenames", default: [], array: true
+    t.string "home_sections", default: [], null: false, array: true
     t.index ["customer_id", "enabled"], name: "index_parts_on_customer_id_and_enabled"
     t.index ["customer_id", "part_number", "part_issue"], name: "index_parts_on_customer_and_part_number_and_issue", unique: true
     t.index ["customer_id"], name: "index_parts_on_customer_id"
     t.index ["customisation_data"], name: "index_parts_on_customisation_data", using: :gin
     t.index ["enabled"], name: "index_parts_on_enabled"
     t.index ["file_cloudinary_ids"], name: "index_parts_on_file_cloudinary_ids"
+    t.index ["home_sections"], name: "index_parts_on_home_sections", using: :gin
     t.index ["part_number"], name: "index_parts_on_part_number"
     t.index ["process_type"], name: "index_parts_on_process_type"
     t.index ["replaces_id"], name: "index_parts_on_replaces_id"
@@ -272,6 +274,21 @@ ActiveRecord::Schema[8.0].define(version: 2026_09_26_094128) do
     t.uuid "lead_works_order_id"
     t.index ["lead_works_order_id"], name: "index_process_groups_on_lead_works_order_id"
     t.index ["number"], name: "index_process_groups_on_number", unique: true
+  end
+
+  create_table "promises", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "works_order_id", null: false
+    t.integer "quantity", null: false
+    t.date "due_on", null: false
+    t.string "note"
+    t.uuid "promised_by_id"
+    t.datetime "cancelled_at"
+    t.uuid "cancelled_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["due_on", "cancelled_at"], name: "index_promises_on_due_on_and_cancelled_at"
+    t.index ["works_order_id"], name: "index_promises_on_works_order_id"
+    t.check_constraint "quantity > 0", name: "check_promise_quantity_positive"
   end
 
   create_table "quality_document_revisions", force: :cascade do |t|
@@ -436,6 +453,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_09_26_094128) do
     t.datetime "updated_at", null: false
     t.string "magic_link_token"
     t.datetime "magic_link_expires_at"
+    t.string "home_section"
     t.index ["email_address"], name: "index_users_on_email_address", unique: true
     t.index ["magic_link_expires_at"], name: "index_users_on_magic_link_expires_at"
     t.index ["magic_link_token"], name: "index_users_on_magic_link_token", unique: true, where: "(magic_link_token IS NOT NULL)"
@@ -528,6 +546,9 @@ ActiveRecord::Schema[8.0].define(version: 2026_09_26_094128) do
   add_foreign_key "organizations", "xero_contacts"
   add_foreign_key "parts", "organizations", column: "customer_id"
   add_foreign_key "parts", "parts", column: "replaces_id"
+  add_foreign_key "promises", "users", column: "cancelled_by_id"
+  add_foreign_key "promises", "users", column: "promised_by_id"
+  add_foreign_key "promises", "works_orders"
   add_foreign_key "quality_document_revisions", "quality_documents"
   add_foreign_key "quote_items", "parts"
   add_foreign_key "quote_items", "quotes"

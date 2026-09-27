@@ -1,16 +1,33 @@
-<%# app/views/sections/_enp_strip.html.erb — locals: jobs (thickness-ordered) %>
-<div class="flex gap-3 overflow-x-auto pb-1">
-  <% jobs.each do |job| %>
-    <%= link_to works_order_path(job.wo), class: "shrink-0 w-44 border border-gray-200 rounded-lg p-3 hover:border-blue-400 hover:shadow" do %>
-      <div class="flex justify-between items-baseline">
-        <span class="font-bold text-blue-700"><%= job.display_name %></span>
-        <span class="text-sm font-bold text-gray-900">
-          <%= job.enp_thickness ? "#{job.enp_thickness % 1 == 0 ? job.enp_thickness.to_i : job.enp_thickness}μm" : "—" %>
-        </span>
-      </div>
-      <div class="text-xs text-gray-600 truncate mt-1"><%= job.part_number %></div>
-      <div class="text-xs text-gray-400 truncate"><%= job.customer_name %></div>
-      <div class="text-xs text-gray-500 mt-1">Qty <%= job.quantity %></div>
-    <% end %>
-  <% end %>
+<%# app/views/sections/_enp_strip.html.erb — locals: jobs (thickness-ordered)
+    One row per WO, thinnest first. Rendered inside a type card (and inside
+    each pretreatment sub-card when the split toggle is on), so it carries
+    its own table rather than the page-level shadow box. %>
+<div class="overflow-x-auto">
+  <table class="min-w-full divide-y divide-gray-200">
+    <thead class="bg-gray-50">
+      <tr>
+        <% %w[WO Part Thickness Qty].each do |h| %>
+          <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"><%= h %></th>
+        <% end %>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-200">
+      <% jobs.each do |job| %>
+        <tr class="hover:bg-gray-50 <%= promise_row_class(job.promise) %>">
+          <td class="px-4 py-2 whitespace-nowrap">
+            <%= link_to job.display_name, works_order_path(job.wo), class: "font-bold text-blue-700 hover:underline" %>
+            <% if job.promise %><div class="mt-1"><%= promise_pill(job.promise) %></div><% end %>
+          </td>
+          <td class="px-4 py-2">
+            <div class="text-sm text-gray-900"><%= job.part_number %></div>
+            <div class="text-xs text-gray-400"><%= job.customer_name %></div>
+          </td>
+          <td class="px-4 py-2 whitespace-nowrap text-sm font-bold text-gray-900">
+            <%= job.enp_thickness ? "#{job.enp_thickness % 1 == 0 ? job.enp_thickness.to_i : job.enp_thickness}μm" : "—" %>
+          </td>
+          <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700"><%= job.quantity %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
 </div>

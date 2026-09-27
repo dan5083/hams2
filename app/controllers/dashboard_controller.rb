@@ -3,6 +3,11 @@ class DashboardController < ApplicationController
   before_action :require_xero_access, only: [:push_selected_to_xero]
 
   def index
+    # Section heads go straight to their board - see User#home_section.
+    if (section = Current.user&.home_section_key)
+      redirect_to section_path(section) and return
+    end
+
     # Xero connection/data loaded for everyone; Xero gates access on its own side
     @xero_connected = xero_connected?
     @pending_invoices = Invoice.draft.includes(:customer)
@@ -141,11 +146,10 @@ class DashboardController < ApplicationController
     }
   end
 
-  # Mon–Fri working days between two dates (inclusive). Weekends excluded.
+  # Mon–Fri working days between two dates (inclusive). Shared with
+  # promises so the two calendars can't drift.
   def working_days_between(start_date, end_date)
-    return 0 if start_date.nil? || end_date.nil?
-    return 0 if end_date < start_date
-    (start_date..end_date).count { |d| d.wday.between?(1, 5) }
+    WorkingDays.between(start_date, end_date)
   end
 
   # --- Released but not yet invoiced -------------------------------------------

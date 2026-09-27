@@ -23,9 +23,10 @@
       </thead>
       <tbody class="divide-y divide-gray-200">
         <% rows.each do |job| %>
-          <tr class="hover:bg-gray-50">
+          <tr class="hover:bg-gray-50 <%= promise_row_class(job.promise) %>">
             <td class="px-4 py-3 whitespace-nowrap">
               <%= link_to job.display_name, works_order_path(job.wo), class: "font-bold text-blue-700 hover:underline" %>
+              <% if job.promise %><div class="mt-1"><%= promise_pill(job.promise) %></div><% end %>
               <% if job.wo.grouped? %>
                 <div class="text-xs text-gray-400">Group <%= job.wo.process_group.display_name %></div>
               <% end %>
@@ -52,11 +53,12 @@
   <!-- Mobile cards -->
   <div class="lg:hidden space-y-3">
     <% rows.each do |job| %>
-      <%= link_to works_order_path(job.wo), class: "block bg-white rounded-lg shadow p-4" do %>
+      <%= link_to works_order_path(job.wo), class: "block bg-white rounded-lg shadow p-4 #{promise_row_class(job.promise)}" do %>
         <div class="flex justify-between items-baseline">
           <span class="font-bold text-blue-700"><%= job.display_name %></span>
           <span class="text-sm font-bold text-gray-900">Qty <%= job.quantity %></span>
         </div>
+        <% if job.promise %><div class="mt-1"><%= promise_pill(job.promise) %></div><% end %>
         <div class="text-sm text-gray-700 mt-1"><%= job.part_number %> · <%= job.customer_name %></div>
         <% if job.wo.grouped? %>
           <div class="text-xs text-gray-400 mt-0.5">Group <%= job.wo.process_group.display_name %></div>
