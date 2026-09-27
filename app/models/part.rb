@@ -1243,6 +1243,15 @@ def has_previewable_files?
   previewable_file_indexes.any?
 end
 
+# The file to show when there's room for one: the LAST previewable upload.
+# Convention, not schema - the office puts the photo/thumbnail on after the
+# drawings, so "most recent" is "the one meant to be seen". Section boards
+# use this; the works order page shows the whole stack newest-first, so it
+# leads with the same file.
+def thumbnail_file_index
+  previewable_file_indexes.last
+end
+
 # Small padded JPG of the file (page 1 for PDFs) for the tilted thumbnail.
 def file_thumbnail_url(index, width: 240)
   return nil unless file_previewable?(index)

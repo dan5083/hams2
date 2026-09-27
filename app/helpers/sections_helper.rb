@@ -1,11 +1,12 @@
 # app/helpers/sections_helper.rb
 module SectionsHelper
-  # Thumbnail of the part's first drawing (Part#file_thumbnail_url, page 1
-  # for PDFs), linking to the full preview in a new tab. Nothing when the
-  # part has no previewable file, so the cell just collapses to the text.
+  # Thumbnail of the part's designated file (Part#thumbnail_file_index - the
+  # last previewable upload; page 1 for PDFs), linking to the full preview
+  # in a new tab. Nothing when the part has no previewable file, so the
+  # cell just collapses to the text.
   def part_thumb(part, width: 44)
     return if part.nil?
-    idx = part.previewable_file_indexes.first
+    idx = part.thumbnail_file_index
     return if idx.nil?
     thumb = part.file_thumbnail_url(idx, width: width)
     return if thumb.blank?
