@@ -31,6 +31,21 @@ class ShopSectionBoard
     "chromic"  => [10],
   }.freeze
 
+  # Section heads. A part's shop is whichever of these has released it the
+  # most (Part#releaser_shop); that beats the vat numbers in the op text,
+  # which list every vat the process can run in. users.id => SHOP_VATS key.
+  RELEASER_SHOPS = {
+    "81e929de-794a-488e-bad9-e456980347e9" => "shop1",     # Brian Benton
+    "3d412856-f676-4e35-af17-47bc61c1b853" => "shop2",     # Gary Rickets
+    "be34abee-6273-4580-b1cb-c517cc593efb" => "factory2",  # Ben Mcgowan
+  }.freeze
+
+  # The only work the releaser rule routes. ENP, chromic and conversions jig
+  # for themselves on their own boards and never appear on a shop board,
+  # however the part is homed.
+  SHOP_ROUTED_VATS = SHOP_VATS.values_at("shop1", "shop2", "factory2").flatten.freeze
+  SHOP_ROUTED_TREATMENTS = %w[hard_anodising standard_anodising].freeze
+
   SECTIONS = {
     "enp"             => "ENP",
     "shop1_anodisers" => "Shop 1 · Anodisers",
@@ -145,16 +160,14 @@ class ShopSectionBoard
   # Jigged, awaiting anodise in this shop's vats. One row per ready
   # (anodising op, batches) pair - a two-treatment WO can appear twice.
   def anodise_ready(shop)
-    vats = SHOP_VATS.fetch(shop)
-    @jobs.flat_map { |j| j.anodise_ready_rows(vats) }
+    @jobs.flat_map { |j| j.anodise_ready_rows(shop) }
          .sort_by { |r| [r[:vats].min || 99, r[:job].number] }
   end
 
   # -- Jiggers boards --------------------------------------------------------
   # Work whose next jig (for this shop's processes) hasn't been signed yet.
   def jigging_queue(shop)
-    vats = SHOP_VATS.fetch(shop)
-    @jobs.flat_map { |j| j.jig_queue_rows(vats) }
+    @jobs.flat_map { |j| j.jig_queue_rows(shop) }
          .sort_by { |r| r[:job].number }
   end
 
@@ -275,6 +288,22 @@ class ShopSectionBoard
       "Unspecified"
     end
 
+    # ---- Board membership --------------------------------------------------
+
+    def home_sections
+      @home_sections ||= Array(@wo.part&.home_sections)
+    end
+
+    # Does an op (or the op a jig feeds) with these vats belong on this
+    # board? A homed part shows on exactly the shop boards named in its
+    # home_sections, whatever vats its op text lists - but only its
+    # hard/standard cycles: ENP and chromic ops stay on their own boards.
+    # The chromic board and unhomed parts route by vat number as before.
+    def op_on_board?(shop, vats)
+      return (vats & SHOP_VATS.fetch(shop)).any? if shop == "chromic" || home_sections.empty?
+      home_sections.include?(shop) && (vats & SHOP_ROUTED_VATS).any?
+    end
+
     # ---- Parsing shared by anodiser / jigger boards ------------------------
 
     def vats_for(op)
@@ -384,12 +413,12 @@ class ShopSectionBoard
 
     # ---- Anodisers: jigged, anodise outstanding ----------------------------
 
-    def anodise_ready_rows(shop_vats)
+    def anodise_ready_rows(shop)
       rows = []
       ops.each_with_index do |op, i|
         next unless anodising_op?(op)
         vats = vats_for(op)
-        next if shop_vats.any? && (vats & shop_vats).empty?
+        next unless op_on_board?(shop, vats)
 
         jig = jig_before(i)
         next unless jig
@@ -440,14 +469,14 @@ class ShopSectionBoard
       !contract_reviewed? && @wo.release_notes.empty?
     end
 
-    def jig_queue_rows(shop_vats)
+    def jig_queue_rows(shop)
       return [] unless contract_reviewed?
       rows = []
       ops.each_with_index do |op, i|
         next unless jig_op?(op)
         nxt = ops[(i + 1)..].find { |o| vats_for(o).any? }
         next unless nxt
-        next if shop_vats.any? && (vats_for(nxt) & shop_vats).empty?
+        next unless op_on_board?(shop, vats_for(nxt))
 
         owner = @wo.process_record_owner
         total = frozen? ? owner.section_batch_count(owner.section_for_op(op)) : 1

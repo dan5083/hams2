@@ -45,6 +45,10 @@ class ReleaseNote < ApplicationRecord
   after_save :update_customer_order_uninvoiced_count, if: :saved_change_to_invoicing_status?
   after_destroy :update_customer_order_uninvoiced_count
 
+  # Releasing is the signal for which shop board a part lives on - see
+  # Part#computed_home_sections. Create, edit and void all move the count.
+  after_commit :rehome_part
+
   # Process types that can have thickness measurements
   MEASURABLE_PROCESS_TYPES = %w[
     chromic_anodising
@@ -896,6 +900,12 @@ class ReleaseNote < ApplicationRecord
       "The process record #{scope}, but #{released} would have " \
       "been released against it. Sign off the remaining operation(s)/batch(es) on " \
       "WO#{owner.number}#{works_order.grouped? ? " (#{works_order.process_group.display_name})" : ''} before releasing.")
+  end
+
+  def rehome_part
+    works_order&.part&.rehome_from_releases!
+  rescue => e
+    Rails.logger.error "ReleaseNote #{number}: rehome failed: #{e.message}"
   end
 
   def update_works_order_quantity_released

@@ -554,6 +554,54 @@ class Part < ApplicationRecord
     enp_high_phosphorous
   ].freeze
 
+  # ---------------------------------------------------------------------------
+  # Shop-floor home sections (parts.home_sections, string[]).
+  #
+  # Which section boards this part's work is shown on. Two ingredients:
+  #   - derived tags from the treatments: ENP, chromic and conversion work
+  #     lives on its own self-contained board (each jigs for itself);
+  #   - for hard/standard anodise work only, the shop of whichever section
+  #     head (ShopSectionBoard::RELEASER_SHOPS) has released this part the
+  #     most - ties go to the most recent release. That overrides the vat
+  #     numbers in the op text, which list every vat the process CAN run in
+  #     and so put one job on every shop's board.
+  # An empty shop (nobody in RELEASER_SHOPS has released it yet) leaves the
+  # boards on vat routing. Recomputed by ReleaseNote's after_commit.
+  # ---------------------------------------------------------------------------
+  SECTION_TAGS_BY_TREATMENT = {
+    "chromic_anodising"          => "chromic",
+    "chemical_conversion"        => "chem_conv",
+    "electroless_nickel_plating" => "enp",
+    "enp_medium_phosphorous"     => "enp",
+    "enp_high_phosphorous"       => "enp",
+  }.freeze
+
+  def computed_home_sections
+    types = parse_treatments_data.map { |t| t["type"] }
+    tags  = types.filter_map { |t| SECTION_TAGS_BY_TREATMENT[t] }.uniq
+    shop  = releaser_shop if (types & ShopSectionBoard::SHOP_ROUTED_TREATMENTS).any?
+    (tags + [shop]).compact.uniq
+  end
+
+  def releaser_shop
+    scope  = ReleaseNote.active.joins(:works_order)
+                        .where(works_orders: { part_id: id },
+                               issued_by_id: ShopSectionBoard::RELEASER_SHOPS.keys)
+    counts = scope.group(:issued_by_id).count
+    return nil if counts.empty?
+    latest = scope.group(:issued_by_id).maximum(:number)
+    top    = counts.max_by { |uid, n| [n, latest[uid].to_i] }.first
+    ShopSectionBoard::RELEASER_SHOPS[top]
+  end
+
+  # update_column on purpose: derived state, not an edit - must not run
+  # validations or trip the operations lock. Returns the sections.
+  def rehome_from_releases!
+    sections = computed_home_sections
+    update_column(:home_sections, sections) if sections != Array(home_sections)
+    sections
+  end
+
   def requires_adhesion_bend_test?
     return false unless aerospace_defense?
     parse_treatments_data.any? do |t|
