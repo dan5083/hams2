@@ -14,6 +14,7 @@ class WorksOrder < ApplicationRecord
   belongs_to :process_group, optional: true
 
   has_many :release_notes, dependent: :restrict_with_error
+  has_many :promises, dependent: :destroy
   has_one :customer, through: :customer_order
 
   store_accessor :additional_charge_data, :selected_charge_ids, :custom_amounts
