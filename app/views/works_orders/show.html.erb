@@ -33,8 +33,13 @@
           ✈ NADCAP · Aerospace/Defence
         </span>
       <% end %>
+      <% @works_order.promises.select(&:open?).sort_by(&:due_on).each do |p| %>
+        <%= promise_pill(p) %>
+      <% end %>
     </div>
     <div class="flex space-x-2">
+      <%= render "promises", works_order: @works_order %>
+
       <%= link_to "Edit", edit_works_order_path(@works_order),
           class: "bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded" %>
 
