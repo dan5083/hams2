@@ -1,64 +1,102 @@
-<%# app/views/works_orders/_promises.html.erb — locals: works_order
-    Header widget: the "Promise" button (next to Edit) drops down the form
-    and the list of open promises with their withdraw buttons. Open-promise
-    pills are rendered separately in the title row by _promise_pills. %>
-<% promises = works_order.promises.by_due.to_a %>
-<% live = promises.select(&:open?) %>
-<% history = promises - live %>
-<details class="relative" id="promises">
-  <summary class="list-none cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded select-none">
-    🤝 Promise<%= " (#{live.size})" if live.any? %>
-  </summary>
-  <div class="absolute right-0 z-40 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 p-4 space-y-4">
-    <% if live.any? %>
-      <ul class="space-y-2">
-        <% live.each do |p| %>
-          <li class="flex items-start justify-between gap-2 rounded-lg px-3 py-2 <%= promise_row_class(p) %>">
-            <div>
-              <%= promise_pill(p) %>
-              <div class="text-xs text-gray-500 mt-1">
-                <%= p.outstanding %> of <%= p.quantity %> still to release
-                <% if p.promised_by %> · <%= p.promised_by.display_name %><% end %>
-                · <%= p.created_at.strftime("%-d %b") %>
-              </div>
-              <% if p.note.present? %><div class="text-xs text-gray-700 mt-0.5"><%= p.note %></div><% end %>
-            </div>
-            <%= button_to "withdraw", cancel_promise_path(p), method: :patch,
-                  form: { data: { turbo_confirm: "Withdraw this promise?" } },
-                  class: "text-xs text-gray-400 hover:text-red-600 shrink-0" %>
-          </li>
-        <% end %>
-      </ul>
-    <% end %>
+# app/models/promise.rb
+#
+# A promise: "we'll have <quantity> of WO<n> ready for <date>". Made on the
+# phone by whoever answered it, kept by the section the work is homed to.
+#
+# Scope is a QUANTITY of a works order, not the works order: most promises
+# are for a partial ("can we have 50 of the 200 by Thursday"). Promising a
+# whole order is one promise per live works order (CustomerOrder#promise_all!).
+#
+# Whether a promise has been met is DERIVED, never stored: parts accepted on
+# active release notes raised after the promise was made, counted against
+# its quantity. Voiding a release note un-meets it automatically, and there
+# is nothing to keep in sync. A promise the office withdraws is cancelled,
+# not deleted, so the audit trail keeps what was said.
+class Promise < ApplicationRecord
+  belongs_to :works_order
+  belongs_to :promised_by, class_name: "User", optional: true
 
-    <% if works_order.can_be_released? %>
-      <%= form_with model: [works_order, Promise.new], local: true, data: { turbo: false }, class: "space-y-2" do |f| %>
-        <div class="flex items-center gap-2">
-          <%= f.number_field :quantity, value: works_order.unreleased_quantity, min: 1, max: works_order.unreleased_quantity,
-                class: "w-20 rounded border-gray-300 text-sm", title: "Quantity promised" %>
-          <span class="text-sm text-gray-500">by</span>
-          <%= f.date_field :due_on, min: Date.current, required: true, class: "rounded border-gray-300 text-sm" %>
-        </div>
-        <%= f.text_field :note, placeholder: "Note (who asked, why)", class: "w-full rounded border-gray-300 text-sm" %>
-        <%= f.submit "Promise", class: "w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-1.5 px-4 rounded cursor-pointer" %>
-      <% end %>
-    <% else %>
-      <p class="text-xs text-gray-400">Nothing left to release on this works order.</p>
-    <% end %>
+  validates :quantity, presence: true, numericality: { only_integer: true, greater_than: 0 }
+  validates :due_on, presence: true
+  validate  :quantity_within_unreleased, on: :create
+  validate  :due_on_not_in_past, on: :create
 
-    <% if history.any? %>
-      <details>
-        <summary class="text-xs text-gray-400 cursor-pointer">Past promises (<%= history.size %>)</summary>
-        <ul class="mt-2 space-y-1">
-          <% history.each do |p| %>
-            <li class="text-xs text-gray-500">
-              <%= p.quantity %> by <%= p.due_label %> —
-              <%= p.active? ? "met" : "withdrawn #{p.cancelled_at.strftime('%-d %b')}" %>
-              <%= "· #{p.note}" if p.note.present? %>
-            </li>
-          <% end %>
-        </ul>
-      </details>
-    <% end %>
-  </div>
-</details>
+  scope :active,    -> { where(cancelled_at: nil) }
+  scope :cancelled, -> { where.not(cancelled_at: nil) }
+  scope :by_due,    -> { order(:due_on, :created_at) }
+
+  before_create -> { self.promised_by ||= Current.user }
+
+  URGENT_WITHIN = 2 # working days
+
+  def active?
+    cancelled_at.nil?
+  end
+
+  def cancel!(user = nil)
+    update!(cancelled_at: Time.current, cancelled_by_id: user&.id)
+  end
+
+  # Parts accepted on active release notes raised since the promise. Works
+  # off the association so a preloaded works_order.release_notes costs no
+  # query on the boards.
+  def released_since
+    works_order.release_notes.select { |rn| !rn.voided && rn.created_at >= created_at }
+               .sum(&:quantity_accepted)
+  end
+
+  def outstanding
+    [quantity - released_since, 0].max
+  end
+
+  def met?
+    outstanding.zero?
+  end
+
+  def open?
+    active? && !met?
+  end
+
+  # Signed working days to the due date; negative = late.
+  def working_days_left
+    WorkingDays.from_today(due_on)
+  end
+
+  def overdue?
+    working_days_left.negative?
+  end
+
+  # :met / :overdue / :urgent / :ok - what colour the pill is.
+  def status
+    return :met if met?
+    d = working_days_left
+    return :overdue if d.negative?
+    return :urgent  if d <= URGENT_WITHIN
+    :ok
+  end
+
+  # "3 wd" / "today" / "2 wd late"
+  def countdown_label
+    d = working_days_left
+    return "today" if d.zero?
+    d.positive? ? "#{d} wd" : "#{-d} wd late"
+  end
+
+  def due_label
+    due_on.strftime("%a %-d %b")
+  end
+
+  private
+
+  def quantity_within_unreleased
+    return if works_order.nil? || quantity.nil?
+    max = works_order.unreleased_quantity
+    return if quantity <= max
+    errors.add(:quantity, "can't exceed the #{max} part(s) still to release on #{works_order.display_name}")
+  end
+
+  def due_on_not_in_past
+    return if due_on.nil?
+    errors.add(:due_on, "can't be in the past") if due_on < Date.current
+  end
+end
