@@ -19,8 +19,13 @@
             <% if job.promise %><div class="mt-1"><%= promise_pill(job.promise) %></div><% end %>
           </td>
           <td class="px-4 py-2">
-            <div class="text-sm text-gray-900"><%= job.part_number %></div>
-            <div class="text-xs text-gray-400"><%= job.customer_name %></div>
+            <div class="flex items-center gap-3">
+              <%= part_thumb(job.wo.part) %>
+              <div>
+                <div class="text-sm text-gray-900"><%= job.part_number %></div>
+                <div class="text-xs text-gray-400"><%= job.customer_name %></div>
+              </div>
+            </div>
           </td>
           <td class="px-4 py-2 whitespace-nowrap text-sm font-bold text-gray-900">
             <%= job.enp_thickness ? "#{job.enp_thickness % 1 == 0 ? job.enp_thickness.to_i : job.enp_thickness}μm" : "—" %>

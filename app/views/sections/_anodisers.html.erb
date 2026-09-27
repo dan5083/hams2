@@ -21,13 +21,19 @@
       </thead>
       <tbody class="divide-y divide-gray-200">
         <% rows.each do |row| %>
-          <tr class="hover:bg-gray-50">
+          <tr class="hover:bg-gray-50 <%= promise_row_class(row[:job].promise) %>">
             <td class="px-4 py-3 whitespace-nowrap">
               <%= link_to row[:job].display_name, works_order_path(row[:job].wo), class: "font-bold text-blue-700 hover:underline" %>
+              <% if row[:job].promise %><div class="mt-1"><%= promise_pill(row[:job].promise) %></div><% end %>
             </td>
             <td class="px-4 py-3">
-              <div class="text-sm text-gray-900"><%= row[:job].part_number %></div>
-              <div class="text-xs text-gray-400"><%= row[:job].customer_name %></div>
+              <div class="flex items-center gap-3">
+                <%= part_thumb(row[:job].wo.part) %>
+                <div>
+                  <div class="text-sm text-gray-900"><%= row[:job].part_number %></div>
+                  <div class="text-xs text-gray-400"><%= row[:job].customer_name %></div>
+                </div>
+              </div>
             </td>
             <td class="px-4 py-3 whitespace-nowrap">
               <% row[:batches].each do |b| %>
@@ -58,12 +64,16 @@
   <!-- Mobile cards -->
   <div class="lg:hidden space-y-3">
     <% rows.each do |row| %>
-      <%= link_to works_order_path(row[:job].wo), class: "block bg-white rounded-lg shadow p-4" do %>
+      <%= link_to works_order_path(row[:job].wo), class: "block bg-white rounded-lg shadow p-4 #{promise_row_class(row[:job].promise)}" do %>
         <div class="flex justify-between items-baseline">
           <span class="font-bold text-blue-700"><%= row[:job].display_name %></span>
           <span class="text-sm font-bold"><%= row[:vats].map { |v| "Vat #{v}" }.join(" / ").presence || "—" %></span>
         </div>
-        <div class="text-sm text-gray-700 mt-1"><%= row[:job].part_number %> · <%= row[:job].customer_name %></div>
+        <% if row[:job].promise %><div class="mt-1"><%= promise_pill(row[:job].promise) %></div><% end %>
+        <div class="flex items-center gap-3 mt-1">
+          <%= part_thumb(row[:job].wo.part, width: 36) %>
+          <div class="text-sm text-gray-700"><%= row[:job].part_number %> · <%= row[:job].customer_name %></div>
+        </div>
         <div class="text-sm text-gray-900 mt-2 font-bold"><%= row[:voltage] || "—" %> · <%= row[:minutes] ? "#{row[:minutes]} min" : "—" %></div>
         <% if row[:dye] %>
           <div class="mt-1"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800"><%= row[:dye] %></span></div>
