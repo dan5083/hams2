@@ -43,7 +43,8 @@ class ShopSectionBoard
   # The only work the releaser rule routes. ENP, chromic and conversions jig
   # for themselves on their own boards and never appear on a shop board,
   # however the part is homed.
-  SHOP_ROUTED_VATS = SHOP_VATS.values_at("shop1", "shop2", "factory2").flatten.freeze
+  SHOP_ROUTED_SHOPS = %w[shop1 shop2 factory2].freeze
+  SHOP_ROUTED_VATS = SHOP_VATS.values_at(*SHOP_ROUTED_SHOPS).flatten.freeze
   SHOP_ROUTED_TREATMENTS = %w[hard_anodising standard_anodising].freeze
 
   SECTIONS = {
@@ -307,13 +308,21 @@ class ShopSectionBoard
       @home_sections ||= Array(@wo.part&.home_sections)
     end
 
+    # "Homed" means a SHOP is in home_sections. The derived tags (chromic /
+    # chem_conv / enp) are not shops: a chromic+hard part nobody has
+    # released yet is ["chromic"], and its hard cycle must still route by
+    # vat number until a section head releases it.
+    def home_shop?
+      (home_sections & SHOP_ROUTED_SHOPS).any?
+    end
+
     # Does an op (or the op a jig feeds) with these vats belong on this
     # board? A homed part shows on exactly the shop boards named in its
     # home_sections, whatever vats its op text lists - but only its
     # hard/standard cycles: ENP and chromic ops stay on their own boards.
     # The chromic board and unhomed parts route by vat number as before.
     def op_on_board?(shop, vats)
-      return (vats & SHOP_VATS.fetch(shop)).any? if shop == "chromic" || home_sections.empty?
+      return (vats & SHOP_VATS.fetch(shop)).any? if shop == "chromic" || !home_shop?
       home_sections.include?(shop) && (vats & SHOP_ROUTED_VATS).any?
     end
 
