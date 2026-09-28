@@ -899,6 +899,7 @@ class AiAssistantJob < ApplicationJob
   UNRESTRICTED_USERS = %w[
     daniel@hardanodisingstl.com
     tariq@hardanodisingstl.com
+    phil@hardanodisingstl.com
   ].freeze
 
   def unrestricted_user?
