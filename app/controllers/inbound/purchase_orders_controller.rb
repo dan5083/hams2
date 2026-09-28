@@ -99,12 +99,19 @@ module Inbound
       end
     end
 
-    # Inline images (signature logos, banners) are referenced from the HTML by
-    # Content-ID; Mailgun lists them in content-id-map as {"<cid>": "attachment-N"}.
+    # Inline images (signature logos, banners) are referenced from the HTML as
+    # <img src="cid:…">. Mailgun's content-id-map is {"<cid>": "attachment-N"},
+    # but Outlook stamps a Content-ID on every attachment, so an entry in the
+    # map alone proves nothing — the cid has to actually appear in the body.
+    # PDFs are never inline whatever the headers say.
     def inline_attachment_keys
-      @inline_attachment_keys ||= JSON.parse(params["content-id-map"].presence || "{}").values.map(&:to_s).to_set
-    rescue JSON::ParserError
-      Set.new
+      @inline_attachment_keys ||= begin
+        map  = JSON.parse(params["content-id-map"].presence || "{}")
+        html = params["body-html"].to_s
+        map.select { |cid, _| html.include?("cid:#{cid.to_s.delete('<>')}") }.values.map(&:to_s).to_set
+      rescue JSON::ParserError
+        Set.new
+      end
     end
 
     def park_attachments(ipo)
@@ -121,7 +128,7 @@ module Inbound
           "size"         => file.size.to_i
         }
 
-        next att.merge("inline" => true) if inline_attachment_keys.include?(key.to_s)
+        next att.merge("inline" => true) if content_type.start_with?("image/") && inline_attachment_keys.include?(key.to_s)
         next att unless InboundPurchaseOrder::USABLE_CONTENT_TYPES.include?(content_type)
         next att.merge("skipped" => "over #{MAX_ATTACHMENT_BYTES} bytes") if file.size.to_i > MAX_ATTACHMENT_BYTES
 
