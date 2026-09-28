@@ -198,7 +198,12 @@ class PurchaseOrderService
   # from the intake assistant's proposal (or a reviewer's edits):
   #
   #   [{ "part_id" => uuid | nil, "part_number" => "...", "part_issue" => "...",
-  #      "quantity" => 10, "unit_price" => 4.5 | nil, "customer_reference" => "..." }, ...]
+  #      "quantity" => 10, "unit_price" => 4.5 | nil, "customer_reference" => "...",
+  #      "rework" => false, "free_of_charge" => false, "operation_note" => "..." }, ...]
+  #
+  # Rework lines get "REWORK" in the customer reference and, when the PO
+  # prices them at zero, book as a £0 lot without touching the part's
+  # each_price (WorksOrder only writes back `each` prices > 0).
   #
   # One transaction — either every line books or none do, and the error says
   # which line and why. Pricing follows the same rules the chat assistant and
@@ -223,15 +228,32 @@ class PurchaseOrderService
         qty   = line["quantity"].to_i
         raise PurchaseOrderError, "#{label}: quantity must be positive" unless qty.positive?
 
+        rework = ActiveModel::Type::Boolean.new.cast(line["rework"])
+        free   = ActiveModel::Type::Boolean.new.cast(line["free_of_charge"]) || (rework && line["unit_price"].to_d.zero?)
+
+        reference = line["customer_reference"].to_s
+        reference = ["REWORK", reference.presence].compact.join(" — ") if rework && !reference.match?(/rework/i)
+
         wo = WorksOrder.new(
           customer_order:     customer_order,
           part:               part,
           quantity:           qty,
-          customer_reference: line["customer_reference"].to_s.first(100).presence,
-          **price_attributes(part, qty, line["unit_price"])
+          customer_reference: reference.first(100).presence,
+          **(free ? { price_type: "lot", lot_price: 0 } : price_attributes(part, qty, line["unit_price"]))
         )
         wo.save! # raises with the WorksOrder's own validation messages
         created << wo
+
+        # Shop-floor instruction from the PO (strip details, "omit seal on
+        # painted faces", "do not etch") → note on the contract review op.
+        # Freezes the record, as any note does. Best-effort.
+        if line["operation_note"].present?
+          begin
+            add_route_note!(wo, line["operation_note"], note_user)
+          rescue => e
+            Rails.logger.warn "[PurchaseOrderService] route note failed on #{wo.display_name}: #{e.message}"
+          end
+        end
       end
     end
 
@@ -245,6 +267,20 @@ class PurchaseOrderService
 
     created
   end
+
+  # Append the PO's instruction to the contract review operation (position 1
+  # if there isn't one), so it's on the route card before the reviewer signs.
+  def self.add_route_note!(works_order, text, user)
+    works_order.freeze_operations!
+    op = works_order.frozen_operations.find { |o| works_order.wo_scoped_operation?(o) } || works_order.frozen_operations.first
+    works_order.add_operation_note!(op["position"], "From customer PO: #{text}".first(2000), user)
+  end
+  private_class_method :add_route_note!
+
+  def self.note_user
+    User.find_by(email_address: User::PO_INTAKE_EMAIL) || User.enabled.first
+  end
+  private_class_method :note_user
 
   # Exactly one enabled, fully configured part — by id if the proposal has
   # one, else by Part.matching. Anything else raises with a reason a
@@ -295,6 +331,46 @@ class PurchaseOrderService
     types == ["chemical_conversion"] ? MOC_CHEMICAL_CONVERSION : MOC_STANDARD
   end
   private_class_method :moc_for
+
+  # ---------------------------------------------------------------------------
+  # Drawings that arrived alongside the PO → the part's file list, in the
+  # shape Part#upload_file writes (same as QuoteService.share_drawings!). The
+  # parked Cloudinary asset is referenced, not re-uploaded. A file the part
+  # already has by name is skipped, so a customer re-attaching the same
+  # drawing on every order doesn't pile up copies.
+  # ---------------------------------------------------------------------------
+  def self.attach_drawings!(part:, inbound_purchase_order:, indexes:)
+    ipo   = inbound_purchase_order
+    atts  = Array(indexes).map(&:to_i).filter_map { |i| ipo.attachments.find { |a| a["index"] == i } }
+    atts  = atts.select { |a| a["public_id"].present? && !a["inline"] }
+    return [] if atts.empty?
+
+    data  = (part.customisation_data || {}).deep_dup
+    files = data["files"] || []
+    have_ids   = files.map { |f| f["cloudinary_public_id"] }
+    have_names = files.map { |f| f["original_filename"].to_s.downcase }
+    added = []
+
+    atts.each do |a|
+      next if have_ids.include?(a["public_id"]) || have_names.include?(a["name"].to_s.downcase)
+      files << {
+        "cloudinary_public_id" => a["public_id"],
+        "cloudinary_url"       => a["secure_url"],
+        "original_filename"    => a["name"],
+        "file_size_bytes"      => a["bytes"] || a["size"],
+        "content_type"         => a["content_type"],
+        "uploaded_at"          => Time.current.iso8601,
+        "source"               => "po_email:#{ipo.id}"
+      }
+      added << a["name"]
+    end
+
+    if added.any?
+      data["files"] = files
+      part.update!(customisation_data: data)
+    end
+    added
+  end
 
   # ---------------------------------------------------------------------------
 

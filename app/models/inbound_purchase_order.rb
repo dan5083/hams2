@@ -82,8 +82,23 @@ class InboundPurchaseOrder < ApplicationRecord
 
       wos = lines.any? ? PurchaseOrderService.book_lines!(customer_order: co, lines: lines) : []
 
+      # Drawings the email carried for a line → that line's part (created or
+      # pre-existing). Best-effort: a drawing failing to attach must not undo
+      # the booking.
+      drawings = []
+      wos.each_with_index do |wo, i|
+        idx = Array(lines[i].to_h.stringify_keys["drawing_attachment_indexes"])
+        next if idx.empty?
+        begin
+          drawings += PurchaseOrderService.attach_drawings!(part: wo.part, inbound_purchase_order: self, indexes: idx)
+        rescue => e
+          Rails.logger.warn "[InboundPurchaseOrder] drawing attach failed for #{wo.part.display_name}: #{e.message}"
+        end
+      end
+
       update!(customer_order: co, status: "booked", reviewed_by: reviewed_by, reviewed_at: Time.current,
-              summary: "Booked as #{co.display_name}" + (wos.any? ? " — #{wos.map(&:display_name).join(', ')}" : " (no works orders)"))
+              summary: "Booked as #{co.display_name}" + (wos.any? ? " — #{wos.map(&:display_name).join(', ')}" : " (no works orders)") +
+                       (drawings.any? ? "; #{drawings.size} drawing(s) attached" : ""))
       co
     end
   end

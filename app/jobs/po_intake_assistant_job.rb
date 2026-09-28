@@ -47,7 +47,11 @@ class PoIntakeAssistantJob < AiAssistantJob
               customer_reference: { type: "string", description: "Line-level reference, e.g. Lufthansa CS-Order/SerialNo" },
               part_id:            { type: "string", description: "Matching Part id (uuid) in HAMS, if found" },
               part_status:        { type: "string", enum: %w[matched not_found ambiguous], description: "Result of Part.matching for this line" },
-              price_note:         { type: "string", description: "e.g. 'PO £4.50 vs HAMS each_price £4.20'" }
+              price_note:         { type: "string", description: "e.g. 'PO £4.50 vs HAMS each_price £4.20'" },
+              rework:             { type: "boolean", description: "The PO is for rework of parts we previously processed (header says REWORK, or asks to strip and re-process)" },
+              free_of_charge:     { type: "boolean", description: "Book at £0 — the PO prices it at zero AND it's rework/warranty/FOC. Never for an ordinary order with a missing price" },
+              operation_note:     { type: "string", description: "Shop-floor instruction from the PO for the route card: stripping details, masking/seal omissions, 'do not etch', spec called up on the line. Plain text, ≤ 1500 chars" },
+              drawing_attachment_indexes: { type: "array", items: { type: "integer" }, description: "Attachment indexes that are drawings for THIS part (not the PO). Attached to the part on booking, whether the part was created or already existed." }
             }
           }
         },
@@ -213,8 +217,28 @@ class PoIntakeAssistantJob < AiAssistantJob
       A "proposal" with any line not "matched" parks for review; nothing is booked
       until a person resolves it.
 
-      STEP 6 — Which attachment is the PO? Set po_attachment_index. Drawings and
-      T&Cs are noted in notes, not treated as the PO.
+      REWORK ORDERS: A PO headed REWORK (or asking us to strip and re-process
+      parts) books against the SAME part as the original job — don't create a
+      rework variant. Set rework: true. Put the customer's rework/job reference
+      in customer_reference (it gets a REWORK prefix automatically). If the PO
+      prices it at £0.00, set free_of_charge: true — it books as a £0 lot and
+      the part's normal price is left alone. Put the process instructions from
+      the PO (strip details, what to omit, what to do IAW which spec) in
+      operation_note — that lands on the route card for contract review.
+
+      OPERATION NOTES GENERALLY: any processing instruction on a PO line or in
+      the PO's comments ("omit hot water seal from painted surfaces", "do not
+      etch, chemical or electro polish", "mask thread") goes in that line's
+      operation_note as well as in notes. A part number on the PO that differs
+      from the drawing/part number only by a supplier suffix (e.g. "-F1") is
+      the same part.
+
+      STEP 6 — Which attachment is the PO? Set po_attachment_index. For each line,
+      set drawing_attachment_indexes to the attachments that are that part's
+      drawing(s) — match by the part/drawing number in the filename or title
+      block. They are attached to the part on booking, even if the part already
+      existed (many older parts have no drawing on file yet). T&Cs, certs and
+      anything else are noted in notes only.
 
       STEP 7 — record_outcome, then a short summary in your final reply: customer,
       PO number, what was booked (or why it parked), and anything the contract
