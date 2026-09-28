@@ -1546,13 +1546,7 @@ class WorksOrder < ApplicationRecord
   end
 
   def operation_snapshot(op, position)
-    ocv = op.try(:ocv)
-    # Pattern fallback: an aero/defence op with no explicit spec (renamed
-    # library id, custom static op) still captures time/temp rather than
-    # freezing record-less. Never overrides an explicit spec.
-    if ocv.nil? && defined?(OperationLibrary::OcvSpecs)
-      ocv = OperationLibrary::OcvSpecs.fallback_for(op.id, op.operation_text, aerospace_defense: aerospace_defense?)
-    end
+    ocv = resolve_ocv_spec(op.try(:ocv), op.id, op.operation_text)
     snapshot = {
       "position" => position,
       "id" => op.id,
@@ -1575,10 +1569,7 @@ class WorksOrder < ApplicationRecord
     alts = op.try(:alternates)
     if alts.present?
       snapshot["alternates"] = alts.map do |a|
-        a_ocv = a["ocv"]
-        if a_ocv.nil? && defined?(OperationLibrary::OcvSpecs)
-          a_ocv = OperationLibrary::OcvSpecs.fallback_for(a["id"], a["operation_text"], aerospace_defense: aerospace_defense?)
-        end
+        a_ocv = resolve_ocv_spec(a["ocv"], a["id"], a["operation_text"])
         {
           "id" => a["id"],
           "display_name" => a["display_name"],
@@ -1591,6 +1582,37 @@ class WorksOrder < ApplicationRecord
       end
     end
     snapshot
+  end
+
+  # The OCV spec an op freezes with. Three rules, in order:
+  #   1. An explicit spec wins - a part may deliberately declare a nil-field
+  #      or custom shape and that is the instruction.
+  #   2. EXCEPT a stale foil verification spec. Every Lufthansa part is a copy
+  #      of one route, and the copy carried FoilVerification's spec verbatim
+  #      from before the in-line thickness field existed; a library op locked
+  #      then is stale the same way. Frozen as-is, the record has a foil op
+  #      but no thickness op: no card, no Elcometer toolbar, and the release
+  #      note falls back to asking for readings it can no longer trace. The
+  #      current spec is a strict superset of the stale one (meter no, foil
+  #      values and measured foils are its prefix), so upgrading loses
+  #      nothing recorded against it. The parts were repaired in place too;
+  #      this is the guard against the next copy.
+  #   3. No spec at all: the aero/defence pattern fallback, so a renamed
+  #      library id or custom static op still captures rather than freezing
+  #      record-less.
+  def resolve_ocv_spec(ocv, id, text)
+    return OperationLibrary::FoilVerification.ocv_spec if stale_foil_spec?(ocv)
+    return ocv unless ocv.nil?
+    return nil unless defined?(OperationLibrary::OcvSpecs)
+    OperationLibrary::OcvSpecs.fallback_for(id, text, aerospace_defense: aerospace_defense?)
+  end
+
+  # A foil verification capture shape (meter no + foil values) that predates
+  # the in-line film thickness field. Accepts symbol- or string-keyed specs.
+  def stale_foil_spec?(ocv)
+    return false unless ocv.is_a?(Hash)
+    fields = Array(ocv["fields"] || ocv[:fields]).map(&:to_s)
+    fields.include?("meter_no") && !fields.include?(FilmThickness::ANODIC_FIELD)
   end
 
   def normalise_batch!(batch_number, section: nil)
