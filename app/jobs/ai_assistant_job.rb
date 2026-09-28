@@ -135,11 +135,18 @@ class AiAssistantJob < ApplicationJob
     end
   end
 
+  # Output budget and HTTP read timeout per API call. Chat replies fit
+  # comfortably in 4k; jobs that return one large structured tool call (the
+  # quote proposal) override both — a big non-streamed response needs longer
+  # to arrive than a chat turn.
+  def max_tokens   = 4096
+  def read_timeout = 120
+
   def call_anthropic(messages)
     uri  = URI(ANTHROPIC_API_URL)
     body = {
       model:         MODEL,
-      max_tokens:    4096,
+      max_tokens:    max_tokens,
       cache_control: { type: "ephemeral" },
       system:        build_system_prompt,
       tools:         tools,
@@ -152,7 +159,7 @@ class AiAssistantJob < ApplicationJob
     loop do
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl      = true
-      http.read_timeout = 120
+      http.read_timeout = read_timeout
 
       req = Net::HTTP::Post.new(uri)
       req["Content-Type"]      = "application/json"

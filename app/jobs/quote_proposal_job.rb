@@ -131,11 +131,19 @@ class QuoteProposalJob < AiAssistantJob
         return if @proposal
         loop_messages << { role: "assistant", content: content }
         loop_messages << { role: "user", content: [{ type: "text", text: "You have not submitted the proposal. Call propose_quote now with what you have; put anything unresolved in questions." }] }
+      when "max_tokens"
+        raise "The proposal was too large for one response (#{max_tokens} tokens) — " \
+              "fewer parts per quote, or raise QuoteProposalJob#max_tokens"
       else
         raise "Unexpected stop_reason #{response['stop_reason']}"
       end
     end
   end
+
+  # One propose_quote call carrying several fully-configured parts (each with
+  # its copied treatments array) runs well past the 4k chat default.
+  def max_tokens   = 16_000
+  def read_timeout = 600
 
   def dispatch_tool(name, input)
     if name == "propose_quote"
