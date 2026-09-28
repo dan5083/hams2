@@ -554,12 +554,22 @@ class AiAssistantJob < ApplicationJob
           description: "...",
           material: "...",
           specification: "...",
-          special_instructions: "...",
+          special_instructions: nil,   # usually nil — see SPECIAL INSTRUCTIONS
           specified_thicknesses: "...",
           process_type: template.process_type,
           customisation_data: cdata
         )
         "Created \#{part.part_number} with \#{part.customisation_data.dig('operation_selection','locked_operations')&.length} operations"
+
+      SPECIAL INSTRUCTIONS — almost always nil. It is only for things that change
+      how WE process THIS part and that the operations can't carry: masking or
+      plugging a named feature, a customer-dictated jig contact point, "omit seal
+      on painted faces", thickness that differs by face, a strip-and-rework
+      sequence. Never copy drawing/PO boilerplate: cleanliness ("free of oil and
+      grease"), deburr/break edges, material or heat-treat callouts, work done by
+      the customer or others (painting, machining), serial/marking, classification
+      codes, FAI/FIA/UIIL flags, packaging, cert wording, commercial terms. If in
+      doubt leave it nil — a reviewer can add one; nobody notices a wrong one.
 
       TAPPED HOLES:
       If the drawing contains tapped holes AND the hard anodise target thickness is 30μm or greater,

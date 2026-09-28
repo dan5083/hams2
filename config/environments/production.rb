@@ -46,8 +46,9 @@ Rails.application.configure do
   # Don't log any deprecations.
   config.active_support.report_deprecations = false
 
-  # Simpler adapters that work with a single database.
-  config.active_job.queue_adapter = :async
+  # Solid Queue, using the single Heroku Postgres database (the queue tables
+  # live alongside the app's — see CreateSolidQueueTables migration).
+  config.active_job.queue_adapter = :solid_queue
   config.cache_store = :memory_store
 
   # Configure Action Mailer for Mailgun SMTP
@@ -81,13 +82,10 @@ Rails.application.configure do
   config.active_record.attributes_for_inspect = [ :id ]
 
   # Enable DNS rebinding protection and other `Host` header attacks.
-  config.hosts = ["hams-2.co.uk", "hams-2-4d0b0c1dfab4.herokuapp.com"]
-
-  # Enable DNS rebinding protection and other `Host` header attacks.
   config.hosts = [
-  "hams-2.co.uk",
-  "www.hams-2.co.uk",
-  "hams-2-4d0b0c1dfab4.herokuapp.com"
+    "hams-2.co.uk",
+    "www.hams-2.co.uk",
+    "hams-2-4d0b0c1dfab4.herokuapp.com"
   ]
 
   # Redirect Heroku domain to custom domain to fix caching issues
