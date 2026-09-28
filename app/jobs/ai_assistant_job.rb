@@ -377,53 +377,84 @@ class AiAssistantJob < ApplicationJob
       Say which reading you used in the part's reasoning. When a spec gives
       build-up and the drawing gives a different figure, the drawing wins.
 
-      MASKING — QUOTE IT, DON'T JUST MENTION IT:
-      If the drawing marks faces "(MASK)", boxes/hatches areas, or has tapped
-      holes and the hard anodise target is 30µm or more, masking is REQUIRED
-      and must be priced as its own line, not folded into the MOC comparison
-      and not left as a question. Masking is rubber lacquer: brushing on,
-      curing, delacquering and cleaning. ESTIMATE THE MINUTES PER PART WITH THIS
-      MODEL, per masked feature, and show the working:
+      MASKING — HOLES ARE BUNGED, AND BUNGS ARE NORMALLY FREE:
+      Hard anodise at 30µm or more must keep threads and small holes clear.
+      The shop does that with BUNGS, not lacquer: tapped holes, plain holes,
+      counterbores — anything a bung fits (roughly Ø3mm / M3 and up) is
+      bunged. Bunging is quick and is INCLUDED in the anodising price. Do NOT
+      add a masking line, do NOT put minutes against holes, and do NOT raise
+      a question about them. Just configure the part with the bungs and say
+      "bungs included" in the line's working. The only time bungs are
+      charged is a HIGH-VOLUME, LOW-VALUE line: 100 or more per order AND an
+      anodising price under £5/part — then add one line "Bungs × n" at the
+      bung rate (per part), because at that scale the bunging time is a
+      real share of the job. Below 30µm tapped holes need nothing at all.
+
+      RUBBER LACQUER is for features a bung can't do: bores and internal
+      diameters, grooves, splines, faces the drawing marks "(MASK)" or
+      hatches, boxed areas. That IS charged, as its own line, priced by
+      time. ESTIMATE THE MINUTES PER PART WITH THIS MODEL, per lacquered
+      feature, and show the working:
 
           minutes = Σ features ( 0.75 + 0.2 × A + 0.2 × P )
 
         A = area to be lacquered, cm²  (a bore: π·d·depth + the end face if
-            blind; a face: its area; a hole: π·d·depth)
+            blind; a face: its area)
         P = masking BOUNDARY length, cm — the edge where lacquer meets bare
             metal that has to be trimmed clean (a blind bore: one rim, π·d;
-            a through-hole: two rims; a face: its perimeter)
+            a through-bore: two rims; a face: its perimeter)
         0.75 = handling per feature; 0.2/cm² = brush-on + strip rate;
         0.2/cm = edge-trimming rate. Minimum 5 min per part; round up.
 
       Worked example (steering-wheel flange, R4.003): Ø30×28 blind bore with
-      Ø33 step → A ≈ 35 cm², P ≈ 10 cm → 9.8 min; 2× M2.5 tapped → 1.0 min
-      each; 3× Ø5.3 through mount holes → 1.5 min each; total 16.4 → 17 min
-      → £25.50/part.
+      Ø33 step → A ≈ 35 cm², P ≈ 10 cm → 9.8 → 10 min → £15.00/part. The
+      customer-facing line reads "Masking (rubber lacquer) — Ø30 bore and
+      Ø33 step"; the minutes and the arithmetic stay in the working. Its
+      2× M2.5 tapped and 3× Ø5.3 mount holes are bunged, included, no
+      line — qty 12 at £28 each is nowhere near the high-volume threshold.
 
-      Write it in the line's working as "bore 35cm²/10cm 9.8 + 2 holes 1.0 +
-      3 holes 1.5 = 16.4 → 17 min", then price at the masking rate above as
-      "Masking (rubber lacquer), ~N min/part" with a per-part price.
+      HOW TO WRITE THE WORKING. The reviewer is a plater, not a
+      mathematician, and reads it in a small box. Give the inputs and the
+      result per feature, never the substitution:
+        Ø30 bore + step: A 35 cm², P 10 cm → 9.8 min
+        Ø12 through-bore: A 8 cm², P 7.5 cm → 3.9 min
+        Total 13.7 → 14 min × £1.50 = £21.00/part
+      No "π×16×45 = 2262mm²", no formula re-typed per line, no
+      "actually…" — decide, then write. Same for area: "180×60×25 mm → 2.6
+      sqft" is enough; the reviewer can see the bounding box and the sqft
+      and can check either. If you overrode the model because it plainly
+      overstated something, say so in five words ("model 37 min; taken 10 —
+      blind taps"), not a paragraph.
+
+      THE MINUTES ARE OURS, NOT THE CUSTOMER'S. Time estimates, the minute
+      rate, the model above, sqft and rate-card arithmetic are internal
+      working. They never appear in anything the customer reads: line
+      descriptions, the quote summary, the notes, or a chat reply meant to
+      be forwarded. A masking line is described by WHAT is masked, priced
+      as a total per part.
 
       MASKING METHODS — the part config must name the RIGHT one. The
       treatment's masking_methods hash takes these keys only, each with the
       location as its value; use more than one when the part needs it:
+        "bungs"                   — DEFAULT for holes: plain or tapped holes,
+             counterbores, anything a bung fits (about Ø3mm / M3 and up).
+             Normally free; see above for the only case it's priced.
         "45_stopping_off_lacquer" — RUBBER LACQUER. Bores, internal diameters,
-             grooves, splines, small tapped holes, any face or feature a bung
-             or tape can't do. "Rubber lacquer" / "lacquer" / "stop-off" in an
-             enquiry always means this. Priced by the time model above.
+             grooves, splines, marked faces, holes too small or awkward for
+             a bung. "Rubber lacquer" / "lacquer" / "stop-off" in an enquiry
+             always means this. Priced by the time model above.
         "pc21_polyester_tape"     — flat faces, pads, large plain areas.
              Priced at the taping rate per minute (same time model, edge term
              dominates).
-        "bungs"                   — plain or tapped holes a bung fits (about
-             Ø4mm and up). Priced per bung, NOT per minute; one line
-             "Bungs × n" at the bung rate.
       Lacquer and tape add delacquer + check operations to the route; bungs
       alone do not. A part with lacquered bores configured as "bungs" is
       wrong even if the text says lacquer — the route would have no
-      removal step. Example for the flange above:
+      removal step; and a part with tapped holes configured as lacquer is
+      wrong the other way, and overprices the job. Example for the flange
+      above:
         "masking_methods" => { "45_stopping_off_lacquer" => "Ø30 bore and Ø33 step",
-                               "bungs" => "3× Ø5.3 mount holes" } The MOC applies to the anodising;
-      masking is on top of it. Below 30µm tapped holes need no masking.
+                               "bungs" => "2× M2.5 tapped, 3× Ø5.3 mount holes" }
+      The MOC applies to the anodising; lacquer masking is on top of it.
 
       JIG SELECTION — pick from the shop's real jigs:
       #{OperationLibrary::JigUnjig::JIG_TYPES.map { |j| "        - #{j}" }.join("\n")}

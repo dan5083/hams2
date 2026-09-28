@@ -65,7 +65,7 @@ class QuoteProposalJob < AiAssistantJob
               description: { type: "string" },
               quantity:    { type: "integer" },
               unit_amount: { type: "number", description: "GBP ex VAT per unit (or the MOC as a single line with quantity 1)" },
-              reasoning:   { type: "string", description: "The arithmetic for THIS line, once, compactly: dims → sqft, rate (+ add-ons), × qty, MOC comparison. This is the only place numbers are shown." }
+              reasoning:   { type: "string", description: "The working for THIS line, once, readable by a plater in a small box: inputs and results only, one item per feature. 'Ø30 bore: A 35 cm², P 10 cm → 9.8 min' — never the substitution ('π×30×28 = ...'), never the formula re-typed, never 'actually...'. Then: dims → sqft, rate (+ add-ons), × qty, MOC comparison. This is the only place numbers are shown." }
             }
           }
         },
@@ -194,13 +194,15 @@ class QuoteProposalJob < AiAssistantJob
          price with the rate card. Show the arithmetic in each line's reasoning.
          One line per quantity break requested; if none, quote the MOC and a
          per-unit price as two lines.
-      4b. MASKING: apply the masking rule from the rate card. If the drawing
-         marks masked faces or has tapped holes at ≥30µm, add a masking line
-         with its own price per method (lacquer/tape by minutes, bungs per
-         bung), and set masking_methods on the treatment with the CORRECT
-         keys from MASKING METHODS — lacquered features under
-         "45_stopping_off_lacquer", never under "bungs". The question, if any, is
-         about WHICH features — never whether to quote it.
+      4b. MASKING: apply the masking rule from the rate card. Tapped and
+         small holes at ≥30µm are BUNGED and included in the price — set
+         "bungs" in masking_methods, no line, no question, unless the line is
+         high-volume and low-value (rate card says when). Faces the drawing
+         marks for masking, bores, grooves and splines are rubber lacquer:
+         add a masking line priced by minutes and set
+         "45_stopping_off_lacquer" with the features. Never put lacquered
+         features under "bungs" or holes under lacquer. The question, if any,
+         is about WHICH features — never whether to quote it.
       4c. THICKNESS: apply the build-up rule from the rate card before choosing
          the operation. Say in the part reasoning whether the drawing gave
          film thickness or surface build-up and what film you targeted.
@@ -234,6 +236,14 @@ class QuoteProposalJob < AiAssistantJob
 
       ENQUIRER: fill enquirer_name/email ONLY from the enquiry text. Never use the
       HAMS user. Leave blank if the enquiry doesn't give them.
+
+      CUSTOMER-FACING FIELDS: title, summary, notes and every line's
+      description are printed on the quote PDF and emailed to the customer.
+      They carry WHAT is quoted — process, spec, thickness, the features a
+      masking line covers — and never HOW we arrived at it: no minutes, no
+      rates, no sqft, no MOC comparison, no template part numbers, no
+      "assumed" or "estimated". All of that goes in the reasoning fields,
+      which only the reviewer sees.
 
       SAY EACH THING ONCE. The reviewer sees overall reasoning, the part card and
       the price lines side by side. Overall = what the drawing is and the process
