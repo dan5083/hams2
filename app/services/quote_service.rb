@@ -187,7 +187,14 @@ class QuoteService
         part_by_key[key] = part
       end
 
-      created.each { |p| share_drawings!(quote, p) }
+      # Each created part gets ITS drawings (parts[key][drawing_indexes]);
+      # a part with none assigned gets the lot, as before.
+      created.each do |p|
+        key  = part_by_key.key(p)
+        idx  = parts.dig(key, "drawing_indexes")
+        idx  = idx.to_s.split(",") if idx.is_a?(String)
+        share_drawings!(quote, p, Array(idx).map(&:to_i).select { |i| quote.drawings[i] })
+      end
 
       quote.quote_items.destroy_all
       lines.each_with_index do |l, idx|
@@ -223,12 +230,13 @@ class QuoteService
 
   # Reference the quote's uploaded drawings from the part's file list (the
   # shape Part#upload_file writes), without re-uploading.
-  def self.share_drawings!(quote, part)
+  def self.share_drawings!(quote, part, indexes = [])
     return if quote.drawings.blank?
+    chosen = indexes.any? ? indexes.map { |i| quote.drawings[i] }.compact : quote.drawings
     data  = (part.customisation_data || {}).deep_dup
     files = data["files"] || []
     have  = files.map { |f| f["cloudinary_public_id"] }
-    quote.drawings.each do |d|
+    chosen.each do |d|
       next if have.include?(d["cloudinary_public_id"])
       files << {
         "cloudinary_public_id" => d["cloudinary_public_id"],

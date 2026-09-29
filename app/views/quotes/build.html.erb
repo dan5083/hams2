@@ -129,6 +129,15 @@
               <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
                 <h3 class="font-semibold text-gray-900">
                   Part <%= part["part_number"] %>-<%= part["part_issue"] %>
+                  <% idx = Array(part["drawing_indexes"]).map(&:to_i) %>
+                  <span class="ml-2 text-xs font-normal text-gray-500" title="Drawings attached to this part on Save">
+                    <% if idx.any? %>
+                      drawings: <%= idx.map { |i| @quote.drawings[i]&.dig("original_filename") || "file #{i}" }.join(", ") %>
+                    <% else %>
+                      <span class="text-amber-700">no drawing assigned — all quote drawings will be attached</span>
+                    <% end %>
+                  </span>
+                  <%= hidden_field_tag "form[parts][#{k}][drawing_indexes]", idx.join(",") %>
                   <% if existing %>
                     <span class="ml-2 inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">exists in HAMS</span>
                     <%= link_to "open", existing, target: "_blank", class: "ml-1 text-xs text-blue-600" %>

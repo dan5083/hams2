@@ -141,6 +141,7 @@ class QuotesController < ApplicationController
         f = form["parts"][p["key"]] or next p
         p.merge(f.slice("part_number", "part_issue", "description", "specification", "material", "specified_thicknesses",
                         "process_type", "jigging_location", "jig_type", "existing_part_id"))
+         .merge("drawing_indexes" => f["drawing_indexes"].to_s.split(",").map(&:strip).reject(&:blank?).map(&:to_i))
          .merge("treatments" => (JSON.parse(f["treatments"]) rescue p["treatments"]))
       end
     end

@@ -47,6 +47,7 @@ class QuoteProposalJob < AiAssistantJob
               template_part_id: { type: "string", description: "The locked part whose customisation_data you copied the operation set from" },
               treatments:       { type: "array", items: { type: "object" }, description: "operation_selection.treatments exactly as stored on the template, tweaked for this part (type, operation_id, selected_jig_type, selected_alloy, target_thickness, sealing_method, dye_color, masking...)." },
               operation_selection_extra: { type: "object", description: "Other operation_selection keys copied from the template (selected_enp_heat_treatment etc.)" },
+              drawing_indexes:  { type: "array", items: { type: "integer" }, description: "Which of the uploaded files are THIS part's drawing(s), by the 'file N' number shown with each file. Required: a part gets only its own drawings attached, never the whole set. Omit only if the part has no drawing among the files." },
               jigging_location: { type: "string", description: "Where/how the part hangs and which surfaces may carry a jig mark. Leave empty if the drawing doesn't say — and ask." },
               jig_type:         { type: "string", description: "One of the shop's jig types, exactly as listed in JIG SELECTION. Always propose one." },
               dimensions_mm:    { type: "object", properties: { l: { type: "number" }, w: { type: "number" }, h: { type: "number" } } },
@@ -183,7 +184,10 @@ class QuoteProposalJob < AiAssistantJob
       call to propose_quote; prose outside it is discarded.
 
       Work through it like this:
-      1. Read the drawing(s) and enquiry. Identify each distinct part number/issue.
+      1. Read the drawing(s) and enquiry. Identify each distinct part number/issue,
+         and for each part record WHICH files are its drawings (drawing_indexes,
+         by the "file N" label). Three drawings for three parts means each part
+         gets one — match by the part number in the title block or filename.
       2. For each part, check Part.matching(customer_id: ..., part_number: ..., part_issue: ...)
          — if it exists, set existing_part_id and reuse its each_price as a sanity check.
       3. Otherwise find the template part (STEP 1 above) and copy its operation
