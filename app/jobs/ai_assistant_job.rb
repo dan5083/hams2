@@ -529,6 +529,16 @@ class AiAssistantJob < ApplicationJob
       CREATING PARTS:
       Follow these steps exactly — 2 tool calls maximum.
 
+      PART FIELDS — TWO THAT KEEP BEING DONE WRONG:
+      - material is the alloy designation as the shop says it: "6082", "7075-T6",
+        "2024-T3", "LM25". Never "Aluminium 6082", "Al alloy 7075", "Aluminum".
+        HAMS strips those words, so just don't write them.
+      - specified_thicknesses is ALWAYS filled when the process has a thickness:
+        "25±5µm", "36–44µm", "~20µm", "50µm min". Fill it even when the
+        specification text already says it — inspection reads this field, not
+        the spec prose. Blank means "no thickness requirement", which is almost
+        never true.
+
       DUPLICATE PART NUMBERS:
       If you are about to create a part and find that the part number already exists
       under the same customer but with a different issue (e.g. issue 'A' when the

@@ -1809,6 +1809,21 @@ end
   def normalize_part_details
     self.part_number = part_number&.upcase&.strip
     self.part_issue = part_issue&.strip  # Preserve customer's preferred case
+    self.material = self.class.normalize_material(material)
+  end
+
+  # The shop calls an alloy by its designation: "6082", "7075-T6", "2024-T3",
+  # "6061-T6 clad". Strip the "Aluminium / Aluminum / Al / AL alloy" wrapping
+  # people (and the assistant) put around it. Anything that isn't an alloy
+  # designation (steel, brass, "stainless 316") is left alone.
+  def self.normalize_material(value)
+    return value if value.blank?
+    v = value.to_s.strip.gsub(/\s+/, " ")
+    if v.match?(/\A(aluminium|aluminum|alu|al)\b/i) && v.match?(/\b[1-8]\d{3}\b|\bLM\d+\b/i)
+      v = v.sub(/\A(aluminium|aluminum|alu|al)\.?(\s+alloy)?\s*[-:]?\s*/i, "")
+      v = v.sub(/\s+(aluminium|aluminum)(\s+alloy)?\z/i, "")
+    end
+    v.sub(/\A(?:alloy)\s+(?=[1-8]\d{3})/i, "")
   end
 
   def set_defaults
