@@ -111,12 +111,21 @@ class PoIntakeAssistantJob < AiAssistantJob
       customer_order_id: input["existing_customer_order_id"].presence
     )
 
-    return { recorded: true, status: status, booked: false } unless bookable?(input)
+    matched, unmatched = partition_lines(input)
+    return { recorded: true, status: status, booked: false } unless bookable?(input, matched)
 
     begin
-      co = @inbound.create_order!(reviewed_by: @request_user)
-      { recorded: true, status: "booked", booked: true, customer_order_id: co.id,
-        works_orders: co.works_orders.active.map(&:display_name), summary: @inbound.summary }
+      co = @inbound.create_order!(reviewed_by: @request_user, lines: matched)
+      if unmatched.any?
+        # Order, PO and the resolvable lines are in; the rest wait for a
+        # person to set the part up and book them onto the same order.
+        left = unmatched.map { |l| "#{l['part_number']}#{"/#{l['part_issue']}" if l['part_issue'].present?} × #{l['quantity']} (#{l['part_status']})" }
+        @inbound.update!(status: "needs_review",
+                         summary: "#{@inbound.summary}; #{unmatched.size} line(s) still need a part: #{left.join(', ')}")
+      end
+      { recorded: true, status: @inbound.status, booked: true, customer_order_id: co.id,
+        works_orders: co.works_orders.active.map(&:display_name),
+        unbooked_lines: unmatched.map { |l| l["part_number"] }, summary: @inbound.summary }
     rescue => e
       # Booking failed (part config, validation, duplicate...) — keep the
       # proposal, park it with the reason. create_order! is transactional so
@@ -128,11 +137,15 @@ class PoIntakeAssistantJob < AiAssistantJob
     { error: e.class.to_s, detail: e.message }
   end
 
-  def bookable?(input)
-    return false unless input["outcome"] == "proposal"
-    return false if input["customer_id"].blank? || input["po_number"].blank?
-    lines = Array(input["lines"])
-    lines.any? && lines.all? { |l| l["part_status"] == "matched" && l["part_id"].present? && l["quantity"].to_i.positive? }
+  # Lines that can book now vs lines a person has to sort a part for.
+  def partition_lines(input)
+    Array(input["lines"]).partition { |l| l["part_status"] == "matched" && l["part_id"].present? && l["quantity"].to_i.positive? }
+  end
+
+  # Book whatever can be booked: the order needs a customer, a number and at
+  # least one resolvable line. Unresolvable lines park alongside, not instead.
+  def bookable?(input, matched)
+    input["outcome"] == "proposal" && input["customer_id"].present? && input["po_number"].present? && matched.any?
   end
 
   # ── Prompt ─────────────────────────────────────────────────────────────
@@ -168,20 +181,30 @@ class PoIntakeAssistantJob < AiAssistantJob
 
       STEP 1 — Is this actually a PO?
       Acknowledgements of our order confirmations, "please quote", delivery queries,
-      drawings with no PO, spam, and internal forwards with no order on them are
-      outcome "not_a_po". If the subject or body says "amended", "revised", "cancel"
-      or "change", or the PO number already has works orders on it, that is outcome
-      "needs_human" with the details in notes — amendments are not booked
-      automatically.
+      progress chasers, drawings with no PO, spam, and internal forwards with no
+      order on them are outcome "not_a_po".
+
+      AMENDMENTS: an amendment is a PO whose ORDER IS ALREADY IN HAMS with works
+      orders on it. Check by number — the number on the PO and its base without a
+      revision suffix ("PO664895-S-2" → "PO664895", "12345 Rev B" → "12345"):
+        CustomerOrder.where(customer_id: org.id).where("number ILIKE ?", "PO664895%")
+      Found with works orders and the PO differs (quantity, price, lines, "cancel")
+      → "needs_human" with what changed in notes. NOT found → it is simply a new
+      order, whatever the header says ("Updated", "Revised", "Amended", a -2
+      suffix); book it as normal and mention the wording in notes.
 
       WHAT IS NOT A REASON TO PARK:
       Special instructions, warnings, "DO NOT …" notes, polishing/etching
       prohibitions, delivery dates, cert requirements, packaging notes, truncated or
-      partly legible text — these are all normal on a PO. Put them in notes for the
-      contract reviewer (who has the PO document in front of them) and BOOK IT. The
-      only reasons to use "needs_human" are: customer not uniquely identifiable, PO
-      number unreadable, quantity unreadable, an amendment/cancellation, or a line
-      whose part you could neither match nor create.
+      partly legible text, "Updated"/"Revised" wording with no earlier order in
+      HAMS, a line with no spec on it, an internal forward with no original email
+      — these are all normal. Put what matters in notes for the contract reviewer
+      (who has the PO document in front of them) and BOOK IT. The only reasons to
+      use "needs_human" are: customer not uniquely identifiable, PO number
+      unreadable, quantity unreadable, or a genuine amendment/cancellation of an
+      order already in HAMS. A line you cannot match or create does NOT park the
+      order: the other lines book and that line is left "not_found" for a person
+      (see Step 5b).
 
       STEP 2 — Identify the customer:
         Organization.where("name ILIKE ?", "%fragment%").where(is_customer: true)
@@ -211,17 +234,27 @@ class PoIntakeAssistantJob < AiAssistantJob
           charges after booking as separate top-up lines. A PO that shows a
           "minimum charge" line of its own is just confirming that; note it
           in notes, don't book it as a part.
-      5b. No part → try to create one the usual way (CREATING PARTS above) IF the
-          PO gives you the treatment: a spec on the line ("hard anodise 50µm to
-          DEF STAN 03-26", "natural anodise & seal to BS1615 AA10", "Alocrom 1200",
-          "ENP 25µm") or a drawing among the attachments. Same part number under
+      5b. No part → CREATE one (CREATING PARTS above). Same part number under
           this customer with a different issue → follow the DUPLICATE PART NUMBERS
-          rule rather than creating a second part. After creating, set part_id and
-          "matched". If the PO gives you nothing to determine the process from,
-          leave it "not_found" and say so in notes — a person will set the part up.
+          rule rather than creating a second part. Where the treatment comes from,
+          in order:
+            i.  a spec on the line ("hard anodise 50µm to DEF STAN 03-26", "natural
+                anodise & seal to BS1615 AA10", "Alocrom 1200", "ENP 25µm") or a
+                drawing among the attachments — use it;
+            ii. otherwise the customer's CLOSEST EXISTING PART: same part-number
+                stem first (DX-59073-N-001 → other DX-59073-* parts), else a part
+                with the same description family, else the customer's most recent
+                part. Clone its treatments, and put
+                  "PROCESS ASSUMED FROM <that part's number> — CONFIRM AT CONTRACT REVIEW"
+                at the start of operation_note so it is on the route card in front
+                of the reviewer, and say the same in notes;
+            iii. only if the customer has NO parts at all and the PO gives no spec
+                and no drawing, leave it "not_found" with the reason in notes.
+          After creating, set part_id and "matched".
       5c. More than one match → "ambiguous", with the candidates in notes.
-      A "proposal" with any line not "matched" parks for review; nothing is booked
-      until a person resolves it.
+      A "proposal" books every "matched" line straight away: CustomerOrder, PO,
+      works orders. Lines left "not_found"/"ambiguous" park with the order for a
+      person to add — they do not hold up the rest.
 
       REWORK ORDERS: A PO headed REWORK (or asking us to strip and re-process
       parts) books against the SAME part as the original job — don't create a

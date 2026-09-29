@@ -55,9 +55,14 @@ class InboundPurchaseOrder < ApplicationRecord
   #   ipo.create_order!(reviewed_by: u, customer_id: "…", number: "PO-1234",
   #                     lines: [{ "part_number" => "…", "part_issue" => "A", "quantity" => 5 }])
   #   ipo.create_order!(reviewed_by: u, lines: [])   # order + PO only, no works orders
+  #
+  # Partial bookings: the assistant books the lines it could resolve and the
+  # row parks in needs_review, linked to the order, naming the lines still
+  # without a part. Calling create_order! again with just those lines books
+  # them onto the SAME order (no duplicate order, PO not re-attached).
   # ---------------------------------------------------------------------------
   def create_order!(reviewed_by:, customer_id: nil, number: nil, date_received: nil, attachment_index: nil, lines: nil)
-    raise "Already linked to CustomerOrder #{customer_order_id}" if status == "booked"
+    raise "Already booked as CustomerOrder #{customer_order_id}" if status == "booked"
 
     customer_id ||= proposal["customer_id"]
     number      ||= proposal["po_number"]
@@ -68,12 +73,13 @@ class InboundPurchaseOrder < ApplicationRecord
     date_received ||= (Date.parse(proposal["order_date"]) rescue nil) if proposal["order_date"].present?
 
     transaction do
-      co = CustomerOrder.find_by(id: proposal["existing_customer_order_id"]) if proposal["existing_customer_order_id"].present?
+      co   = customer_order # our own, from an earlier partial booking
+      co ||= CustomerOrder.find_by(id: proposal["existing_customer_order_id"]) if proposal["existing_customer_order_id"].present?
       co ||= CustomerOrder.find_by(customer_id: customer_id, number: number)
 
       if co.nil?
         co = CustomerOrder.create!({ customer_id: customer_id, number: number, date_received: date_received, created_by: reviewed_by }.compact)
-      elsif co.po_attached? && co.works_orders.active.exists?
+      elsif co != customer_order && co.po_attached? && co.works_orders.active.exists?
         raise "CustomerOrder #{co.number} already has a PO and works orders — treat as amendment"
       end
 
