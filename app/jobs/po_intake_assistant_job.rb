@@ -34,6 +34,21 @@ class PoIntakeAssistantJob < AiAssistantJob
         order_date:           { type: "string", description: "ISO 8601 date if on the PO" },
         po_attachment_index:  { type: "integer", description: "Which attachment index is the PO itself (not drawings/T&Cs)" },
         existing_customer_order_id: { type: "string", description: "For already_on_file, or when an order exists without a PO attached" },
+        orders: {
+          type: "array",
+          description: "ONLY when the email carries MORE THAN ONE purchase order (two PDFs, two PO numbers). One entry per PO, each with its own po_number, po_attachment_index and lines; leave the top-level po_number/lines empty. A single-PO email uses the top-level fields as normal.",
+          items: {
+            type: "object",
+            required: %w[po_number lines],
+            properties: {
+              po_number:           { type: "string" },
+              order_date:          { type: "string" },
+              po_attachment_index: { type: "integer" },
+              existing_customer_order_id: { type: "string" },
+              lines: { type: "array", items: { type: "object" } }
+            }
+          }
+        },
         lines: {
           type: "array",
           items: {
@@ -111,21 +126,33 @@ class PoIntakeAssistantJob < AiAssistantJob
       customer_order_id: input["existing_customer_order_id"].presence
     )
 
-    matched, unmatched = partition_lines(input)
-    return { recorded: true, status: status, booked: false } unless bookable?(input, matched)
+    orders = orders_in(input)
+    return { recorded: true, status: status, booked: false } unless input["outcome"] == "proposal" && input["customer_id"].present? && orders.any?
 
     begin
-      co = @inbound.create_order!(reviewed_by: @request_user, lines: matched)
-      if unmatched.any?
+      booked, parked = [], []
+      orders.each do |o|
+        matched, unmatched = partition_lines(o)
+        next parked << "#{o['po_number']}: no bookable line" if matched.empty?
+        co = @inbound.book_order!(reviewed_by: @request_user, customer_id: input["customer_id"],
+                                  number: o["po_number"], order_date: o["order_date"],
+                                  attachment_index: o["po_attachment_index"],
+                                  existing_customer_order_id: o["existing_customer_order_id"], lines: matched)
+        booked << co
         # Order, PO and the resolvable lines are in; the rest wait for a
         # person to set the part up and book them onto the same order.
-        left = unmatched.map { |l| "#{l['part_number']}#{"/#{l['part_issue']}" if l['part_issue'].present?} × #{l['quantity']} (#{l['part_status']})" }
-        @inbound.update!(status: "needs_review",
-                         summary: "#{@inbound.summary}; #{unmatched.size} line(s) still need a part: #{left.join(', ')}")
+        unmatched.each { |l| parked << "#{o['po_number']} #{l['part_number']}#{"/#{l['part_issue']}" if l['part_issue'].present?} × #{l['quantity']} (#{l['part_status']})" }
       end
-      { recorded: true, status: @inbound.status, booked: true, customer_order_id: co.id,
-        works_orders: co.works_orders.active.map(&:display_name),
-        unbooked_lines: unmatched.map { |l| l["part_number"] }, summary: @inbound.summary }
+      raise "nothing bookable" if booked.empty?
+
+      summary = "Booked as #{booked.map { |c| "#{c.display_name} — #{c.works_orders.active.map(&:display_name).join(', ')}" }.join('; ')}"
+      summary += " (#{booked.size} POs in one email)" if booked.size > 1
+      summary += "; still need a part: #{parked.join(', ')}" if parked.any?
+      @inbound.update!(customer_order: booked.first, status: parked.any? ? "needs_review" : "booked",
+                       reviewed_by: @request_user, reviewed_at: Time.current, summary: summary)
+      { recorded: true, status: @inbound.status, booked: true,
+        customer_orders: booked.map { |c| { id: c.id, number: c.number, works_orders: c.works_orders.active.map(&:display_name) } },
+        unbooked_lines: parked, summary: summary }
     rescue => e
       # Booking failed (part config, validation, duplicate...) — keep the
       # proposal, park it with the reason. create_order! is transactional so
@@ -137,15 +164,18 @@ class PoIntakeAssistantJob < AiAssistantJob
     { error: e.class.to_s, detail: e.message }
   end
 
-  # Lines that can book now vs lines a person has to sort a part for.
-  def partition_lines(input)
-    Array(input["lines"]).partition { |l| l["part_status"] == "matched" && l["part_id"].present? && l["quantity"].to_i.positive? }
+  # One email, one or more POs. A single-PO proposal uses the top-level
+  # fields; a multi-PO one lists them under orders[]. Either way we book a
+  # list.
+  def orders_in(input)
+    list = Array(input["orders"]).select { |o| o.is_a?(Hash) && o["po_number"].present? }
+    list = [input.slice("po_number", "order_date", "po_attachment_index", "existing_customer_order_id", "lines")] if list.empty? && input["po_number"].present?
+    list
   end
 
-  # Book whatever can be booked: the order needs a customer, a number and at
-  # least one resolvable line. Unresolvable lines park alongside, not instead.
-  def bookable?(input, matched)
-    input["outcome"] == "proposal" && input["customer_id"].present? && input["po_number"].present? && matched.any?
+  # Lines that can book now vs lines a person has to sort a part for.
+  def partition_lines(order)
+    Array(order["lines"]).partition { |l| l["part_status"] == "matched" && l["part_id"].present? && l["quantity"].to_i.positive? }
   end
 
   # ── Prompt ─────────────────────────────────────────────────────────────
@@ -213,6 +243,11 @@ class PoIntakeAssistantJob < AiAssistantJob
 
       STEP 3 — PO number and date. Usually labelled "PO Number", "Purchase Order
       No.", "Order No.". Order date in ISO format if present.
+      MORE THAN ONE PO IN THE EMAIL (two PDFs, two PO numbers — "please see
+      enclosed 2 new orders"): that is normal, not a reason to park. Put each
+      PO under orders[] with its own po_number, po_attachment_index and lines,
+      leave the top-level po_number and lines empty, and HAMS books each as its
+      own customer order.
 
       STEP 4 — Existing order?
         CustomerOrder.find_by(customer_id: ..., number: ...)
@@ -256,9 +291,13 @@ class PoIntakeAssistantJob < AiAssistantJob
       works orders. Lines left "not_found"/"ambiguous" park with the order for a
       person to add — they do not hold up the rest.
 
-      REWORK ORDERS: A PO headed REWORK (or asking us to strip and re-process
-      parts) books against the SAME part as the original job — don't create a
-      rework variant. Set rework: true. Put the customer's rework/job reference
+      REWORK ORDERS: rework means re-doing OUR OWN previous work — a PO headed
+      REWORK, or one that references our earlier works order / release and asks
+      us to strip and redo it. It books against the SAME part as the original
+      job — don't create a rework variant. Set rework: true. It does NOT mean a
+      repair-shop customer (Lufthansa, MRO work) whose standard workscope is
+      strip + re-process: that is the part's normal route, rework stays false
+      and no REWORK prefix is added. Put the customer's rework/job reference
       in customer_reference (it gets a REWORK prefix automatically). If the PO
       prices it at £0.00, set free_of_charge: true — it books as a £0 lot and
       the part's normal price is left alone. Put the process instructions from
@@ -268,7 +307,10 @@ class PoIntakeAssistantJob < AiAssistantJob
       OPERATION NOTES GENERALLY: any processing instruction on a PO line or in
       the PO's comments ("omit hot water seal from painted surfaces", "do not
       etch, chemical or electro polish", "mask thread") goes in that line's
-      operation_note as well as in notes. A part number on the PO that differs
+      operation_note as well as in notes — UNLESS the matched part's
+      specification field already says it (compare before writing). The note
+      is for what the route card would otherwise not carry, not a copy of the
+      PO. A part number on the PO that differs
       from the drawing/part number only by a supplier suffix (e.g. "-F1") is
       the same part.
 

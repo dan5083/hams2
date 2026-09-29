@@ -67,14 +67,33 @@ class InboundPurchaseOrder < ApplicationRecord
     customer_id ||= proposal["customer_id"]
     number      ||= proposal["po_number"]
     lines         = lines.nil? ? Array(proposal["lines"]) : Array(lines)
-    raise "No customer_id — pass one explicitly" if customer_id.blank?
-    raise "No PO number — pass one explicitly"   if number.blank?
-
-    date_received ||= (Date.parse(proposal["order_date"]) rescue nil) if proposal["order_date"].present?
 
     transaction do
-      co   = customer_order # our own, from an earlier partial booking
-      co ||= CustomerOrder.find_by(id: proposal["existing_customer_order_id"]) if proposal["existing_customer_order_id"].present?
+      co = book_order!(reviewed_by: reviewed_by, customer_id: customer_id, number: number,
+                       date_received: date_received, order_date: proposal["order_date"],
+                       attachment_index: attachment_index,
+                       existing_customer_order_id: proposal["existing_customer_order_id"], lines: lines)
+      update!(customer_order: co, status: "booked", reviewed_by: reviewed_by, reviewed_at: Time.current,
+              summary: "Booked as #{co.display_name}" + (co.works_orders.active.any? ? " — #{co.works_orders.active.map(&:display_name).join(', ')}" : " (no works orders)"))
+      co
+    end
+  end
+
+  # Book ONE purchase order from this email: find or create the CustomerOrder,
+  # attach the PO document, book the lines, apply minimum charges, attach
+  # drawings. Does NOT touch this row's status - create_order! (single PO) and
+  # the intake job (one or many POs) do that, so an email carrying two POs
+  # can call this twice.
+  def book_order!(reviewed_by:, customer_id:, number:, lines:, date_received: nil, order_date: nil,
+                  attachment_index: nil, existing_customer_order_id: nil)
+    lines = Array(lines)
+    raise "No customer_id — pass one explicitly" if customer_id.blank?
+    raise "No PO number — pass one explicitly"   if number.blank?
+    date_received ||= (Date.parse(order_date) rescue nil) if order_date.present?
+
+    transaction do
+      co   = customer_order if customer_order&.number == number # our own, from an earlier partial booking
+      co ||= CustomerOrder.find_by(id: existing_customer_order_id) if existing_customer_order_id.present?
       co ||= CustomerOrder.find_by(customer_id: customer_id, number: number)
 
       if co.nil?
@@ -107,11 +126,10 @@ class InboundPurchaseOrder < ApplicationRecord
         end
       end
 
-      update!(customer_order: co, status: "booked", reviewed_by: reviewed_by, reviewed_at: Time.current,
-              summary: "Booked as #{co.display_name}" + (wos.any? ? " — #{wos.map(&:display_name).join(', ')}" : " (no works orders)") +
-                       (drawings.any? ? "; #{drawings.size} drawing(s) attached" : "") +
-                       (minimums[:order_top_up] ? "; MOC top-up £#{'%.2f' % minimums[:order_top_up]}" : "") +
-                       (minimums[:works_order_top_ups].present? ? "; WO minimum top-ups on #{minimums[:works_order_top_ups].keys.join(', ')}" : ""))
+      Rails.logger.info "[InboundPurchaseOrder] booked #{co.display_name}: #{wos.map(&:display_name).join(', ')}" \
+                        "#{"; #{drawings.size} drawing(s)" if drawings.any?}" \
+                        "#{"; MOC top-up £#{'%.2f' % minimums[:order_top_up]}" if minimums[:order_top_up]}" \
+                        "#{"; WO minimums on #{minimums[:works_order_top_ups].keys.join(', ')}" if minimums[:works_order_top_ups].present?}"
       co
     end
   end
