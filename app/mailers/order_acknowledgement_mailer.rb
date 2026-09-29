@@ -1,6 +1,12 @@
 # app/mailers/order_acknowledgement_mailer.rb
+#
+# Sent when contract review is signed off (see WorksOrder#acknowledge_order!),
+# not when the works orders are booked - the acknowledgement means "reviewed
+# and accepted", so it can't go before the review. The account holder who
+# signed the review is cc'd and is the reply-to, so any response lands with
+# the person who actually looked at the job.
 class OrderAcknowledgementMailer < ApplicationMailer
-  def order_confirmation(customer_order, works_orders)
+  def order_confirmation(customer_order, works_orders, cc: nil)
     @customer_order = customer_order
     @works_orders = works_orders
     @customer = customer_order.customer
@@ -17,8 +23,12 @@ class OrderAcknowledgementMailer < ApplicationMailer
 
     attach_inline_logo
 
+    cc_list = Array(cc).map { |e| e.to_s.strip }.reject(&:blank?).uniq - Array(recipient_emails)
+
     mail(
       to: recipient_emails,
+      cc: cc_list.presence,
+      reply_to: cc_list.first.presence,
       subject: "Order Acknowledgement - #{@customer_order.number} - Hard Anodising Surface Treatments Ltd"
     )
   end

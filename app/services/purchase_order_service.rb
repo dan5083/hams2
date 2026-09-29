@@ -206,17 +206,17 @@ class PurchaseOrderService
   # each_price (WorksOrder only writes back `each` prices > 0).
   #
   # One transaction — either every line books or none do, and the error says
-  # which line and why. Pricing follows the same rules the chat assistant and
-  # the WO form apply: PO price if stated, else the part's each_price, with
-  # the MOC as a floor; no price at all → lot at the MOC.
+  # which line and why. A works order carries the TRUE price only: the PO's
+  # if stated, else the part's each_price, else a £0 lot for contract review
+  # to fix. Minimum charges are NOT applied here — the caller runs
+  # MinimumCharges.apply!(customer_order) once every line is booked, which
+  # puts the customer's per-order / per-WO minimums on as top-up charges.
   #
-  # Sends the order acknowledgement exactly as WorksOrdersController#create_bulk
-  # does (inline, best-effort), unless acknowledge: false.
+  # No acknowledgement is sent here either: it goes out when contract review
+  # is signed off (WorksOrder#acknowledge_order!). The acknowledge: keyword is
+  # accepted and ignored so older callers keep working.
   # ---------------------------------------------------------------------------
-  MOC_STANDARD            = 250.to_d
-  MOC_CHEMICAL_CONVERSION = 125.to_d
-
-  def self.book_lines!(customer_order:, lines:, acknowledge: true)
+  def self.book_lines!(customer_order:, lines:, acknowledge: nil)
     lines = Array(lines).map { |l| l.to_h.stringify_keys }
     raise PurchaseOrderError, "No lines to book" if lines.empty?
 
@@ -254,14 +254,6 @@ class PurchaseOrderService
             Rails.logger.warn "[PurchaseOrderService] route note failed on #{wo.display_name}: #{e.message}"
           end
         end
-      end
-    end
-
-    if acknowledge && customer_order.customer.buyer_emails.any?
-      begin
-        OrderAcknowledgementMailer.order_confirmation(customer_order, created).deliver_now
-      rescue => e
-        Rails.logger.error "[PurchaseOrderService] acknowledgement failed for order #{customer_order.number}: #{e.message}"
       end
     end
 
@@ -307,30 +299,17 @@ class PurchaseOrderService
   end
   private_class_method :resolve_part!
 
+  # PO price if stated, else the part's each_price, else £0 (lot) — the
+  # reviewer sees a £0 line and prices it. No minimum-charge floor here.
   def self.price_attributes(part, qty, po_unit_price)
-    moc  = moc_for(part)
     each = po_unit_price.present? && po_unit_price.to_d.positive? ? po_unit_price.to_d : part.each_price&.to_d
-
     if each&.positive?
-      total = (each * qty).round(2)
-      if total < moc
-        { price_type: "lot", lot_price: moc }
-      else
-        { price_type: "each", each_price: each, lot_price: total }
-      end
+      { price_type: "each", each_price: each, lot_price: (each * qty).round(2) }
     else
-      { price_type: "lot", lot_price: moc }
+      { price_type: "lot", lot_price: 0 }
     end
   end
   private_class_method :price_attributes
-
-  # £125 MOC when the part is chemical conversion only; £250 otherwise.
-  def self.moc_for(part)
-    raw   = part.customisation_data.dig("operation_selection", "treatments")
-    types = (raw.is_a?(String) ? JSON.parse(raw) : Array(raw)).map { |t| t["type"] }.compact.uniq rescue []
-    types == ["chemical_conversion"] ? MOC_CHEMICAL_CONVERSION : MOC_STANDARD
-  end
-  private_class_method :moc_for
 
   # ---------------------------------------------------------------------------
   # Drawings that arrived alongside the PO → the part's file list, in the

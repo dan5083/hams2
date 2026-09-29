@@ -205,6 +205,12 @@ class PoIntakeAssistantJob < AiAssistantJob
       5a. Exactly one enabled part with treatments configured → part_id, "matched".
           If a matched part has each_price and the PO states a different price, put
           both in price_note (the PO price is used; the part's price is updated).
+          unit_price is the PO's per-part price, or nothing. Do NOT invent a
+          price, do NOT put a minimum order charge in as a price, and do NOT
+          adjust a line to reach £250 — HAMS applies the customer's minimum
+          charges after booking as separate top-up lines. A PO that shows a
+          "minimum charge" line of its own is just confirming that; note it
+          in notes, don't book it as a part.
       5b. No part → try to create one the usual way (CREATING PARTS above) IF the
           PO gives you the treatment: a spec on the line ("hard anodise 50µm to
           DEF STAN 03-26", "natural anodise & seal to BS1615 AA10", "Alocrom 1200",

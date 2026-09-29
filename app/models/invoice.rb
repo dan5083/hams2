@@ -112,16 +112,22 @@ class Invoice < ApplicationRecord
   # Stage an invoice for whatever release notes still require invoicing in the
   # given relation/array ("to date" semantics — partial orders are fine).
   #
-  # Courier (additional) charges are billed ONE PER RELEASE NOTE — each release
-  # is a dispatch, so n releases on a WO produce n courier lines. Idempotency is
-  # structural: the batch is always requires_invoicing release notes (no main
-  # line item yet), and once invoiced they leave that scope permanently, so a
-  # release note's part line AND its courier line are each billed exactly once.
+  # Additional charges come in two kinds, told apart by
+  # AdditionalChargePreset#carriage?:
   #
-  # The courier amount comes from the works order's custom_amounts entry, so
-  # every release on a WO bills the SAME (flat) carriage figure. If carriage
-  # ever needs to vary per dispatch, that amount has to move onto the release
-  # note itself.
+  #   Carriage is billed ONE PER RELEASE NOTE — each release is a dispatch, so
+  #   n releases on a WO produce n courier lines. Idempotency is structural:
+  #   the batch is always requires_invoicing release notes (no main line item
+  #   yet), and once invoiced they leave that scope permanently, so a release
+  #   note's part line AND its courier line are each billed exactly once. The
+  #   amount comes from the WO's custom_amounts entry, so every release bills
+  #   the SAME flat figure; if carriage ever needs to vary per dispatch it has
+  #   to move onto the release note.
+  #
+  #   Everything else (minimum-charge top-ups, rework, masking...) is a ONE-OFF
+  #   per works order, billed with the WO's FIRST invoiced release note only:
+  #   skipped if an earlier release of the WO has already been invoiced, and
+  #   within one batch attached to the first release of that WO.
   #
   # Returns the Invoice, or nil if there was nothing left to invoice.
   # ---------------------------------------------------------------------------
@@ -134,7 +140,8 @@ class Invoice < ApplicationRecord
       invoice  = create_from_release_notes(release_notes, customer, user)
       raise StandardError, "Invoice failed to save" if invoice.nil?
 
-      # One courier charge per release note in this batch.
+      one_off_done = Set.new # WO ids whose one-off charges are on this invoice
+      batch_ids    = release_notes.map(&:id)
       release_notes.each do |rn|
         wo = rn.works_order
         next if wo.nil? || wo.selected_charge_ids.blank?
@@ -142,8 +149,15 @@ class Invoice < ApplicationRecord
         custom_amounts = wo.custom_amounts || {}
         wo.selected_charge_ids.reject(&:blank?).each do |charge_id|
           charge = AdditionalChargePreset.find(charge_id)
-          InvoiceItem.create_from_additional_charge(charge, invoice, custom_amounts[charge_id], rn)
+          if charge.carriage?
+            InvoiceItem.create_from_additional_charge(charge, invoice, custom_amounts[charge_id], rn)
+          else
+            next if one_off_done.include?(wo.id)
+            next if InvoiceItem.main_items.where(release_note_id: wo.release_notes.where.not(id: batch_ids).select(:id)).exists?
+            InvoiceItem.create_from_additional_charge(charge, invoice, custom_amounts[charge_id], nil)
+          end
         end
+        one_off_done << wo.id
       end
 
       invoice.calculate_totals!

@@ -234,9 +234,10 @@ class WorksOrdersController < ApplicationController
   def sign_off_operation
     return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
     @works_order.sign_off_operation!(params[:position], params[:batch], Current.actor)
+    notice = "Operation #{params[:position]} batch #{params[:batch]} signed off."
+    notice += acknowledgement_notice(params[:position])
     redirect_to process_record_path(params[:position].to_i, advance_from: params[:batch]),
-                notice: "Operation #{params[:position]} batch #{params[:batch]} signed off.",
-                status: :see_other
+                notice: notice, status: :see_other
   rescue => e
     redirect_to process_record_path(params[:position]), alert: e.message, status: :see_other
   end
@@ -265,6 +266,7 @@ class WorksOrdersController < ApplicationController
     if params[:sign_off_batch].present?
       @works_order.sign_off_operation!(params[:position], params[:sign_off_batch], Current.actor)
       notice = "Readings saved; operation #{params[:position]} batch #{params[:sign_off_batch]} signed off."
+      notice += acknowledgement_notice(params[:position])
       target = process_record_path(params[:position].to_i, advance_from: params[:sign_off_batch])
     else
       notice = "OCV readings saved for operation #{params[:position]}."
@@ -380,6 +382,25 @@ class WorksOrdersController < ApplicationController
   # anchor - an anchor scrolls the page, which is the thing being avoided. Only
   # when the batch has nothing outstanding does the URL change, moving to the
   # next incomplete batch; that one is a real navigation and renders normally.
+  # After a sign-off: if it was the contract review, try to send the order
+  # acknowledgement. Cc is the logged-in ACCOUNT (Current.user), not the PIN
+  # sub-user - the sub-user has no mailbox and the account holder is who the
+  # customer should be replying to.
+  def acknowledgement_notice(position)
+    op = @works_order.find_frozen_operation!(position)
+    return "" unless op["process_type"] == "contract_review" || op["id"] == "CONTRACT_REVIEW"
+    case @works_order.acknowledge_order!(cc_user: Current.user)
+    when :sent          then " Order acknowledgement emailed to #{@works_order.customer_order.customer.buyer_emails.join(', ')}."
+    when :pending       then " Order acknowledgement will go once every WO on this order is reviewed."
+    when :no_recipients then " No buyer email on #{@works_order.customer_order.customer.name} — acknowledgement not sent."
+    when :failed        then " Order acknowledgement could NOT be sent — see the log."
+    else ""
+    end
+  rescue => e
+    Rails.logger.error "acknowledgement_notice: #{e.message}"
+    ""
+  end
+
   def process_record_path(position, advance_from: nil)
     fb = fork_batch_params
     base = params[:base_batch].presence || params[:batch].presence || params[:sign_off_batch].presence
@@ -457,23 +478,10 @@ class WorksOrdersController < ApplicationController
       end
     end
 
-    # Send one order acknowledgement email per customer order covered by this batch.
-    # Sent inline (deliver_now): the production queue adapter is :async (in-process,
-    # non-durable), so deliver_later jobs can be lost on dyno restart/deploy. The
-    # rescue keeps a mail failure from failing the order-creation request.
-    # Recipients come from Organization#buyer_emails: enabled buyers if configured,
-    # otherwise the Xero primary contact email.
-    created_works_orders.group_by(&:customer_order).each do |customer_order, wos|
-      next unless customer_order && customer_order.customer.buyer_emails.any?
-
-      begin
-        OrderAcknowledgementMailer.order_confirmation(customer_order, wos).deliver_now
-        Rails.logger.info "Order acknowledgement email sent for #{customer_order.customer.name} (Order #{customer_order.number}) to #{customer_order.customer.buyer_emails.join(', ')}"
-      rescue => e
-        Rails.logger.error "Failed to send order acknowledgement email for Order #{customer_order.number}: #{e.message}"
-        Rails.logger.error e.backtrace.first(3).join("\n")
-      end
-    end
+    # The order acknowledgement is NOT sent here. It goes out when contract
+    # review is signed off on the WO show page (WorksOrder#acknowledge_order!),
+    # so the customer only ever receives an acknowledgement for an order that
+    # has actually been reviewed.
 
     customer_order_id = works_orders_params.first[:customer_order_id]
     render json: {

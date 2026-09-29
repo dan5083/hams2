@@ -302,15 +302,18 @@ class AiAssistantJob < ApplicationJob
 
   def pricing_rules
     <<~PROMPT
-      PRICING:
-      When creating WorksOrders and no prices are given on the PO or by the user:
-      1. Check if the Part record has an each_price saved (part.each_price > 0).
-         If yes, calculate: lot_price = each_price × quantity.
-         If that total is less than £250 (or £125 for chemical conversion), use
-         the MOC instead.
-         Set price_type: "each" and each_price: part.each_price on the WorksOrder.
-      2. If the Part has no each_price (nil or 0), set lot_price: 250 and
-         price_type: "lot". Do not use 0.
+      PRICING WORKS ORDERS — TRUE PRICE ONLY, NEVER THE MOC:
+      A works order carries what the parts actually cost: the PO's price if it
+      states one, otherwise the part's saved each_price (price_type "each",
+      lot_price = each_price × quantity). Never write a minimum order charge
+      into a works order price — not as lot_price 250, not spread across lines.
+      Minimum charges are applied by HAMS after booking (MinimumCharges), per
+      CUSTOMER ORDER not per works order — £250, or £125 for chemical
+      conversion only — plus any per-WO minimum the customer has agreed
+      (Organization#minimum_works_order_charge), as separate top-up lines the
+      reviewer can see. If neither the PO nor the
+      part gives a price, book it at £0 and say so in price_note / notes —
+      contract review fixes the price, and the MOC top-up still applies.
 
       QUOTING — RATE CARD:
       Use these constants when asked to quote a job. All prices are GBP ex-VAT.

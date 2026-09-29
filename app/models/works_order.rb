@@ -1539,6 +1539,47 @@ class WorksOrder < ApplicationRecord
     op
   end
 
+  # ── Order acknowledgement ──────────────────────────────────────────────
+
+  def contract_review_operation
+    frozen_operations&.find { |o| o["process_type"] == "contract_review" || o["id"] == "CONTRACT_REVIEW" }
+  end
+
+  # A grouped member has no record of its own - its contract review is the
+  # lead's, so it reads the lead's sign-off.
+  def contract_review_signed?
+    op = process_record_owner.contract_review_operation
+    op.present? && op.dig("sign_offs", "wo").present?
+  end
+
+  # Send the customer's order acknowledgement once every live works order on
+  # this customer order has passed contract review. One email covers every
+  # WO on the order not yet acknowledged; a WO booked onto the order later
+  # gets its own when its review is signed. acknowledged_at makes this
+  # idempotent, so it's safe to call from every contract-review sign-off.
+  #
+  # Returns :sent, or a symbol saying why nothing went. Never raises: a mail
+  # failure must not undo a sign-off.
+  def acknowledge_order!(cc_user: nil)
+    order = customer_order
+    live  = order.works_orders.active.to_a
+    return :pending       unless live.all?(&:contract_review_signed?)
+    unsent = live.reject(&:acknowledged_at)
+    return :already_sent  if unsent.empty?
+    return :no_recipients unless order.customer.buyer_emails.any?
+
+    cc = cc_user.respond_to?(:email_address) ? cc_user.email_address : nil
+    OrderAcknowledgementMailer.order_confirmation(order, unsent, cc: cc).deliver_now
+    WorksOrder.where(id: unsent.map(&:id)).update_all(acknowledged_at: Time.current)
+    Rails.logger.info "Order acknowledgement sent for #{order.customer.name} (Order #{order.number}) " \
+                      "covering #{unsent.map(&:display_name).join(', ')} to #{order.customer.buyer_emails.join(', ')}#{" cc #{cc}" if cc}"
+    :sent
+  rescue => e
+    Rails.logger.error "Order acknowledgement failed for Order #{customer_order&.number}: #{e.class}: #{e.message}"
+    Rails.logger.error e.backtrace.first(3).join("\n")
+    :failed
+  end
+
   private
 
   def expire_contract_review_count

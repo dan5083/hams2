@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_09_28_150020) do
+ActiveRecord::Schema[8.0].define(version: 2026_09_29_071310) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -229,6 +229,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_09_28_150020) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.jsonb "address_data", default: {}
+    t.decimal "minimum_works_order_charge", precision: 10, scale: 2
     t.index ["address_data"], name: "index_organizations_on_address_data", using: :gin
     t.index ["is_customer"], name: "index_organizations_on_is_customer", where: "(is_customer = true)"
     t.index ["xero_contact_id"], name: "index_organizations_on_xero_contact_id"
@@ -604,6 +605,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_09_28_150020) do
     t.string "customer_reference"
     t.boolean "is_fully_released", default: false, null: false
     t.bigint "process_group_id"
+    t.datetime "acknowledged_at"
     t.index ["additional_charge_data"], name: "index_works_orders_on_additional_charge_data", using: :gin
     t.index ["customer_order_id"], name: "index_works_orders_on_customer_order_id"
     t.index ["customer_reference"], name: "index_works_orders_on_customer_reference"

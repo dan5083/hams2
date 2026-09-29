@@ -82,6 +82,11 @@ class InboundPurchaseOrder < ApplicationRecord
 
       wos = lines.any? ? PurchaseOrderService.book_lines!(customer_order: co, lines: lines) : []
 
+      # Works orders carry the true price; the customer's minimum charges go
+      # on as additional-charge top-ups (see MinimumCharges). Recomputed over
+      # the whole order, so lines added to an existing order are covered too.
+      minimums = wos.any? ? MinimumCharges.apply!(co) : {}
+
       # Drawings the email carried for a line → that line's part (created or
       # pre-existing). Best-effort: a drawing failing to attach must not undo
       # the booking.
@@ -98,7 +103,9 @@ class InboundPurchaseOrder < ApplicationRecord
 
       update!(customer_order: co, status: "booked", reviewed_by: reviewed_by, reviewed_at: Time.current,
               summary: "Booked as #{co.display_name}" + (wos.any? ? " — #{wos.map(&:display_name).join(', ')}" : " (no works orders)") +
-                       (drawings.any? ? "; #{drawings.size} drawing(s) attached" : ""))
+                       (drawings.any? ? "; #{drawings.size} drawing(s) attached" : "") +
+                       (minimums[:order_top_up] ? "; MOC top-up £#{'%.2f' % minimums[:order_top_up]}" : "") +
+                       (minimums[:works_order_top_ups].present? ? "; WO minimum top-ups on #{minimums[:works_order_top_ups].keys.join(', ')}" : ""))
       co
     end
   end
