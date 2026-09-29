@@ -234,15 +234,27 @@ class PurchaseOrderService
         reference = line["customer_reference"].to_s
         reference = ["REWORK", reference.presence].compact.join(" — ") if rework && !reference.match?(/rework/i)
 
+        pricing = free ? { price_type: "lot", lot_price: 0 } : price_attributes(part, qty, line["unit_price"])
         wo = WorksOrder.new(
           customer_order:     customer_order,
           part:               part,
           quantity:           qty,
           customer_reference: reference.first(100).presence,
-          **(free ? { price_type: "lot", lot_price: 0 } : price_attributes(part, qty, line["unit_price"]))
+          **pricing
         )
         wo.save! # raises with the WorksOrder's own validation messages
         created << wo
+
+        # No price from the PO and none on the part: the WO is £0 and the
+        # minimum charge will be applied on top blindly. Shout on the
+        # contract review op so nobody signs it through as priced.
+        if !free && pricing[:lot_price].to_d.zero?
+          begin
+            add_route_note!(wo, UNPRICED_WARNING, note_user, verbatim: true)
+          rescue => e
+            Rails.logger.warn "[PurchaseOrderService] unpriced warning failed on #{wo.display_name}: #{e.message}"
+          end
+        end
 
         # Shop-floor instruction from the PO (strip details, "omit seal on
         # painted faces", "do not etch") → note on the contract review op.
@@ -260,12 +272,17 @@ class PurchaseOrderService
     created
   end
 
-  # Append the PO's instruction to the contract review operation (position 1
-  # if there isn't one), so it's on the route card before the reviewer signs.
-  def self.add_route_note!(works_order, text, user)
+  UNPRICED_WARNING = "** DO NOT SIGN-OFF CONTRACT REVIEW UNTIL YOU REVIEW THE UNIT PRICE/LOT PRICE; " \
+                     "MOC BLINDLY APPLIED. ORDER CONFIRMATION NOT YET SENT (HAPPENS AT CR SIGN-OFF) **".freeze
+
+  # Append a note to the contract review operation (position 1 if there
+  # isn't one), so it's on the route card before the reviewer signs. PO
+  # instructions are prefixed "From customer PO:"; verbatim: true posts the
+  # text as given (HAMS's own warnings).
+  def self.add_route_note!(works_order, text, user, verbatim: false)
     works_order.freeze_operations!
     op = works_order.frozen_operations.find { |o| works_order.wo_scoped_operation?(o) } || works_order.frozen_operations.first
-    works_order.add_operation_note!(op["position"], "From customer PO: #{text}".first(2000), user)
+    works_order.add_operation_note!(op["position"], (verbatim ? text : "From customer PO: #{text}").first(2000), user)
   end
   private_class_method :add_route_note!
 
