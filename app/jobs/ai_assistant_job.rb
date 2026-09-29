@@ -325,7 +325,11 @@ class AiAssistantJob < ApplicationJob
 
       MINIMUM ORDER CHARGES (MOC):
       All processes: £250 MOC, EXCEPT chemical conversion: £125 MOC.
-      If the calculated price is below MOC, use the MOC.
+      The MOC is on the job total (every per-piece line × quantity). If that
+      total is below the MOC the shortfall is its own line, "Minimum order
+      charge" — the per-piece prices are quoted true and never rounded up to
+      reach it, because the each price is what gets saved on the part and
+      used when the PO arrives for a different quantity.
 
       LARGE ITEMS:
       A part is "large" if it weighs over 100 kg OR is longer than 2.5 m.
@@ -457,7 +461,10 @@ class AiAssistantJob < ApplicationJob
       above:
         "masking_methods" => { "45_stopping_off_lacquer" => "Ø30 bore and Ø33 step",
                                "bungs" => "2× M2.5 tapped, 3× Ø5.3 mount holes" }
-      The MOC applies to the anodising; lacquer masking is on top of it.
+      The MOC applies to the JOB TOTAL — process plus any masking lines,
+      all per piece × quantity. If that total is under the MOC, the
+      difference is a separate "Minimum order charge" line; the per-piece
+      prices are never inflated to reach it.
 
       JIG SELECTION — pick from the shop's real jigs:
       #{OperationLibrary::JigUnjig::JIG_TYPES.map { |j| "        - #{j}" }.join("\n")}

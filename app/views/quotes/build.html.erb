@@ -158,9 +158,9 @@
                         class: "border border-gray-300 rounded px-2 py-1 w-full text-sm", disabled: existing.present? %>
                   </div>
                   <div>
-                    <label class="block text-xs font-medium text-gray-500">Each price (saved on the part)</label>
-                    <% first_line = @quote.proposal_lines.find { |l| l["part_key"] == k } %>
-                    <%= number_field_tag "form[parts][#{k}][each_price]", first_line&.dig("unit_amount") || existing&.each_price, step: 0.01, min: 0, class: "border border-gray-300 rounded px-2 py-1 w-full text-sm" %>
+                    <label class="block text-xs font-medium text-gray-500">Each price (saved on the part) <span class="font-normal">— sum of this part's per-piece lines; blank = use that</span></label>
+                    <% quoted_each = @quote.proposal_lines.select { |l| l["part_key"] == k }.sum { |l| l["unit_amount"].to_f } %>
+                    <%= number_field_tag "form[parts][#{k}][each_price]", nil, step: 0.01, min: 0, placeholder: ("%.2f" % (quoted_each.positive? ? quoted_each : existing&.each_price.to_f)), class: "border border-gray-300 rounded px-2 py-1 w-full text-sm" %>
                   </div>
 
                   <div class="col-span-2 border-t border-gray-100 pt-3 grid grid-cols-2 gap-3">
@@ -220,7 +220,7 @@
                   <tr>
                     <td class="px-3 py-2 align-top">
                       <%= hidden_field_tag "form[lines][#{i}][position]", i %>
-                      <%= select_tag "form[lines][#{i}][part_key]", options_for_select(@quote.proposal_parts.map { |pp| ["#{pp['part_number']}-#{pp['part_issue']}", pp["key"]] }, l["part_key"]),
+                      <%= select_tag "form[lines][#{i}][part_key]", options_for_select([["— MOC / no part —", ""]] + @quote.proposal_parts.map { |pp| ["#{pp['part_number']}-#{pp['part_issue']}", pp["key"]] }, l["part_key"].to_s),
                           class: "border border-gray-300 rounded px-1 py-1 text-xs" %>
                     </td>
                     <td class="px-3 py-2 align-top"><%= text_area_tag "form[lines][#{i}][description]", l["description"], rows: 2, class: "border border-gray-300 rounded px-2 py-1 w-64 text-sm" %></td>

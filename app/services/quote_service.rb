@@ -24,7 +24,9 @@
 #     summary:        "Hard Anodising 50µm, Hot Water Seal, DEF-STAN 03-25",
 #     enquirer_email: "buyer@customer.com",
 #     enquirer_name:  "Jane Buyer",
-#     items: [
+#     items: [                       # per-piece lines; the MOC shortfall is a
+#                                    # part-less line: { description: "Minimum
+#                                    # order charge", quantity: 1, unit_amount: 205.00 }
 #       { part_number: "PD67711-00", part_issue: "A", quantity: 10, unit_amount: 4.50,
 #         description: "Hard Anodising 50µm — PD67711-00, Door Upper Hinge Insert",
 #         part: {                      # omit when the part already exists in HAMS
@@ -77,7 +79,11 @@ class QuoteService
             f = files[i] or next
             attach!(part, f)
           end
-          part.update!(each_price: item[:unit_amount].to_f) if item[:unit_amount].present?
+        end
+        # unit_amount is the PER-PIECE price and is saved on the part, new or
+        # existing. A minimum-order-charge line has no part and no part_number.
+        if part && item[:unit_amount].to_f.positive? && part.each_price.to_f != item[:unit_amount].to_f
+          part.update!(each_price: item[:unit_amount].to_f)
         end
 
         q.quote_items.create!(
@@ -153,19 +159,31 @@ class QuoteService
       )
       quote.save!
 
+      # A part's each price is what the customer was quoted PER PIECE: the
+      # sum of that part's lines' unit amounts (process + masking...). The
+      # form's each_price overrides it if the reviewer typed one. The MOC
+      # line has no part and never touches a part price.
+      quoted_each = Hash.new(0.to_d)
+      lines.each { |l| quoted_each[l["part_key"]] += l["unit_amount"].to_d if l["skip"] != "1" && l["part_key"].present? }
+
       part_by_key = {}
       parts.each do |key, spec|
         next if spec["skip"] == "1"
         item = {
           part_id:     spec["existing_part_id"].presence,
           part_number: spec["part_number"], part_issue: spec["part_issue"],
-          unit_amount: spec["each_price"],
+          unit_amount: spec["each_price"].presence || quoted_each[key].round(2),
           part: spec.slice("description", "specification", "material", "specified_thicknesses",
                            "special_instructions", "process_type", "aerospace_defense", "jigging_location")
                     .merge("operation_selection" => operation_selection_from(spec))
         }
         item[:part]["aerospace_defense"] = ActiveModel::Type::Boolean.new.cast(spec["aerospace_defense"])
         part = resolve_part!(quote.customer, item, created)
+        # Existing parts get the quoted each price too — the quote is the
+        # latest word on what this part costs.
+        if part && !created.include?(part) && item[:unit_amount].to_d.positive? && part.each_price.to_d != item[:unit_amount].to_d
+          part.update!(each_price: item[:unit_amount].to_d)
+        end
         part_by_key[key] = part
       end
 
@@ -175,7 +193,7 @@ class QuoteService
       lines.each_with_index do |l, idx|
         next if l["skip"] == "1"
         quote.quote_items.create!(
-          part: part_by_key[l["part_key"]], position: idx,
+          part: (l["part_key"].present? ? part_by_key[l["part_key"]] : nil), position: idx,
           description: l["description"], quantity: l["quantity"].to_i.nonzero? || 1,
           unit_amount: l["unit_amount"].to_f.round(2)
         )

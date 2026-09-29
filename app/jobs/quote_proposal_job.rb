@@ -59,12 +59,12 @@ class QuoteProposalJob < AiAssistantJob
           type: "array",
           items: {
             type: "object",
-            required: %w[part_key description quantity unit_amount reasoning],
+            required: %w[description quantity unit_amount reasoning],
             properties: {
-              part_key:    { type: "string" },
+              part_key:    { type: "string", description: "The part this line prices, PER PIECE. Omit (or empty) ONLY for the minimum-order-charge line, which belongs to no part." },
               description: { type: "string" },
-              quantity:    { type: "integer" },
-              unit_amount: { type: "number", description: "GBP ex VAT per unit (or the MOC as a single line with quantity 1)" },
+              quantity:    { type: "integer", description: "The job quantity for a part line; 1 for the minimum order charge line." },
+              unit_amount: { type: "number", description: "GBP ex VAT per piece for a part line. For the MOC line: the SHORTFALL (MOC minus the sum of all part lines), so the job price is the sum of every line." },
               reasoning:   { type: "string", description: "The working for THIS line, once, readable by a plater in a small box: inputs and results only, one item per feature. 'Ø30 bore: A 35 cm², P 10 cm → 9.8 min' — never the substitution ('π×30×28 = ...'), never the formula re-typed, never 'actually...'. Then: dims → sqft, rate (+ add-ons), × qty, MOC comparison. This is the only place numbers are shown." }
             }
           }
@@ -192,8 +192,22 @@ class QuoteProposalJob < AiAssistantJob
          the part's reasoning.
       4. Estimate dimensions and surface area from the drawing (bounding box) and
          price with the rate card. Show the arithmetic in each line's reasoning.
-         One line per quantity break requested; if none, quote the MOC and a
-         per-unit price as two lines.
+         PRICE LINES ARE PER PIECE — the part's each price, which is SAVED ON
+         THE PART as what the customer was quoted per part. One line per part
+         per thing priced (the process; a lacquer-masking line where there is
+         one), quantity = the job quantity, unit_amount = the price per piece.
+         NEVER a "qty 1" lot line for a part, and NEVER the MOC as a part's
+         price: if the sum of the part lines for the job is under the minimum
+         order charge (£250; £125 when the job is chemical conversion only),
+         add ONE extra line with NO part_key, description "Minimum order
+         charge", quantity 1, unit_amount = the shortfall. The job price is
+         then the sum of all lines, and the part's each price stays true.
+         Example, 5 off at £6.40 each + masking £22.50 each = £144.50 →
+         lines: process 5 × £6.40, masking 5 × £22.50, MOC 1 × £105.50; job
+         price £250.00; part each price £28.90.
+         One set of lines per quantity break requested; if no quantity is
+         given, quote for 1 off (the MOC line will carry most of it) and say
+         in the summary where the per-piece price takes over.
       4b. MASKING: apply the masking rule from the rate card. Tapped and
          small holes at ≥30µm are BUNGED and included in the price — set
          "bungs" in masking_methods, no line, no question, unless the line is
