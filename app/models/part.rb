@@ -16,6 +16,7 @@ class Part < ApplicationRecord
   }
   validate :validate_treatments
   validate :must_have_configured_treatments, unless: :locked_for_editing?
+  validate :locked_operations_conform_to_library, on: :create
 
   scope :enabled, -> { where(enabled: true) }
   scope :disabled, -> { where(enabled: false) }
@@ -1826,6 +1827,70 @@ end
     enp_treatment = treatments_data.find { |t| t["type"] == "electroless_nickel_plating" && t["target_thickness"] }
     enp_treatment&.dig("target_thickness")&.to_f
   end
+
+  # ── Provenance ───────────────────────────────────────────────────────
+  # AI-created parts carry operation_selection.cloned_from (the template's
+  # id) and created_by "ai", so a bad part can be traced to its template and
+  # its siblings found. Purely informational.
+  public
+
+  def ai_clone?
+    customisation_data.dig("operation_selection", "cloned_from").present? ||
+      customisation_data.dig("operation_selection", "created_by").to_s == "ai"
+  end
+
+  # ── Library conformance ──────────────────────────────────────────────
+  #
+  # Route cards are built from the operation library; nobody gets to type
+  # their own process text onto a new part. The form can't (it generates ops
+  # from the library), but the AI assistant writes locked_operations directly
+  # when it clones a template, and has been known to "improve" the text.
+  # On create, every locked op whose id the library knows must carry the
+  # library's text (aerospace variant included), and every sealing op must
+  # be one of the real sealing operations. Ids the library can't resolve
+  # (dye / masking / per-jig families aren't enumerable here) are let
+  # through unchecked — that's a gap, not a licence.
+  #
+  # Public so the console (and the assistant, after creating) can ask a part
+  # what it would fail on: Part.find(id).library_text_deviations
+  public
+
+  def library_text_deviations
+    ops = customisation_data.dig("operation_selection", "locked_operations") || []
+    return [] if ops.empty?
+    library = library_operations_by_id
+    sealing_ids = OperationLibrary::Sealing.available_sealing_types.map { |t| t[:value] }
+
+    ops.filter_map do |op|
+      id   = op["id"].to_s
+      text = op["operation_text"].to_s
+      if op["process_type"].to_s == "sealing" && !sealing_ids.include?(id)
+        "op #{op['position']} (#{id}): not a library sealing operation — use one of #{sealing_ids.join(', ')}"
+      elsif (lib = library[id]) && squash(lib.operation_text) != squash(text)
+        "op #{op['position']} (#{id}): text differs from the library — use exactly Operation.all_operations.find { |o| o.id == \"#{id}\" }.operation_text"
+      end
+    end
+  end
+
+  private
+
+  def locked_operations_conform_to_library
+    library_text_deviations.each { |msg| errors.add(:base, msg) }
+  rescue => e
+    # A library lookup blowing up must not stop parts being created.
+    Rails.logger.warn "[Part] library conformance check skipped for #{part_number}: #{e.message}"
+  end
+
+  def library_operations_by_id
+    ad   = aerospace_defense?
+    list = []
+    list.concat(Operation.all_operations(nil, ad)) rescue nil
+    list.concat(fixed_support_operations) rescue nil
+    list.concat(OperationLibrary::Sealing.operations(aerospace_defense: ad)) rescue nil
+    list.compact.index_by { |o| o.id.to_s }
+  end
+
+  def squash(text) = text.to_s.gsub(/\s+/, " ").strip
 
   def validate_locked_operations_integrity
     return true unless locked_for_editing?

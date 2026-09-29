@@ -265,6 +265,9 @@ class QuoteService
     raise Error, "#{number}-#{issue}: part.operation_selection.treatments is required (with operation_id and selected_jig_type)" if op_sel["treatments"].blank?
     raise Error, "#{number}-#{issue}: part.jigging_location is required — the shop wants jigging decided at quote time" if spec["jigging_location"].blank?
     op_sel["aerospace_defense"] = spec["aerospace_defense"] if spec.key?("aerospace_defense")
+    # Provenance, so a bad part can be traced to the template it copied.
+    op_sel["created_by"]  = "ai"
+    op_sel["cloned_from"] = spec["template_part_id"].presence || op_sel["cloned_from"].presence || "quote:#{item[:part_number]}"
 
     part = Part.new(
       customer: customer,

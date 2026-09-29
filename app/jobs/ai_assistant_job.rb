@@ -288,12 +288,29 @@ class AiAssistantJob < ApplicationJob
       or proprietary specification references (e.g. DS 26.00 = Cobham).
       Match case-insensitively.
 
-      LUFTHANSA TECHNIK:
-      On Lufthansa POs, each line item may show a "Part-No." in the table header AND
-      a "P/N:" reference in the notes below. If both are present, the P/N is the actual
-      part number — use it instead of the Part-No. column value.
-      The "CS-Order: XXXXX  SerialNo.: XXXXX" text goes into the customer_reference
-      field on the WorksOrder.
+      LUFTHANSA TECHNIK (Landing Gear Services):
+      Each line shows a "Part-No." in the table (e.g. 2144A5273-4) AND, in the
+      notes below, "VENDOR TO RELEASE PART ... AND REFERENCE P/N: 2144A5273-103".
+      The P/N is the part HAMS knows it by — book against the P/N, not the
+      Part-No. column. An indented sub-line under the item (e.g. "2144A5587-104
+      BRACKET ... 1 EA") is the same P/N restated, not a second line.
+      One works order per numbered ITEM; check the item numbers run 1, 2, 3...
+      across every page and that you have booked each one — page 1 carries
+      item 1 below the address blocks and is easy to skip.
+      If the P/N exists in HAMS under more than one issue, take the one with a
+      price and works-order history (the one actually used); do not park the
+      line as ambiguous — say which you chose in notes.
+      The "CS-Order: XXXXX  SerialNo.: XXXXX" text goes into customer_reference.
+      Every Lufthansa job is a repair: strip then re-anodise, IAW the CMM cited
+      on the line. That is the part's normal route, NOT rework — never set
+      rework: true or a REWORK prefix for Lufthansa.
+      NO operation_note for Lufthansa: the CMM workscope on the PO line is
+      already the part's specification field (that is how their parts are
+      set up), so repeating it on the route card is noise. Only add an
+      operation_note if the PO says something the part's specification does
+      NOT — a different CMM revision, an added instruction — and then only
+      that difference.
+      The unit cost on the line (typically GBP 250.00 each) is the price.
       Lufthansa POs are created as a single customer order regardless of process mix —
       do not split hard anodising lines onto a separate order. (Historic orders may
       still exist with a leading "_" in the number; that convention is retired.)
@@ -560,7 +577,10 @@ class AiAssistantJob < ApplicationJob
       STEP 2 (write) — Clone and create in a single tool call:
       Copy the ENTIRE customisation_data from the matched part. The template already
       has the correct operations in the correct order — your job is minimal tweaking,
-      not rebuilding.
+      not rebuilding. Stamp where it came from, so a bad part can be traced back
+      to its template:
+        cdata["operation_selection"]["cloned_from"] = template.id
+        cdata["operation_selection"]["created_by"]  = "ai"
 
       RULES — READ THESE CAREFULLY:
       - Do NOT add new operations. The template has everything needed.
@@ -578,6 +598,12 @@ class AiAssistantJob < ApplicationJob
         together from the library.
       - The sealing method was already matched in Step 1 — do not change it.
       - Set the aerospace_defense flag to match the customer (see list above).
+      - HAMS ENFORCES THIS: Part.create! rejects any locked operation whose text
+        is not the library's text for its id, and any sealing op that isn't a
+        real sealing operation (SODIUM_DICHROMATE_SEAL, OXIDITE_SECO_SEAL,
+        HOT_WATER_DIP, HOT_SEAL, SURTEC_650V_SEAL, DEIONISED_WATER_SEAL). If a
+        create fails with "text differs from the library", you edited text you
+        should have copied — put the library text back, don't paraphrase it.
 
       Example — ONLY change what's needed:
 
