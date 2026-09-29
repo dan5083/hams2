@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_09_29_071310) do
+ActiveRecord::Schema[8.0].define(version: 2026_09_29_105917) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -606,6 +606,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_09_29_071310) do
     t.boolean "is_fully_released", default: false, null: false
     t.bigint "process_group_id"
     t.datetime "acknowledged_at"
+    t.text "booking_notes"
     t.index ["additional_charge_data"], name: "index_works_orders_on_additional_charge_data", using: :gin
     t.index ["customer_order_id"], name: "index_works_orders_on_customer_order_id"
     t.index ["customer_reference"], name: "index_works_orders_on_customer_reference"

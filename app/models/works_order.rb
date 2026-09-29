@@ -192,8 +192,12 @@ class WorksOrder < ApplicationRecord
     part&.specified_thicknesses.presence || ""
   end
 
+  # The part's standing instructions plus anything that came with this order
+  # (booking_notes: PO instructions, the unpriced warning). Shown in the
+  # yellow box on the show page and on the route card. Kept OFF the frozen
+  # process record so writing it never freezes the WO.
   def special_instructions
-    part&.special_instructions
+    [part&.special_instructions, booking_notes].map(&:presence).compact.join("\n\n").presence
   end
 
   def process_type
