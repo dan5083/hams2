@@ -420,18 +420,28 @@ class AiAssistantJob < ApplicationJob
       time. ESTIMATE THE MINUTES PER PART WITH THIS MODEL, per lacquered
       feature, and show the working:
 
-          minutes = Σ features ( 0.75 + 0.2 × A + 0.2 × P )
+          minutes = Σ features ( 1 + 0.075 × A + 0.024 × P² )
 
         A = area to be lacquered, cm²  (a bore: π·d·depth + the end face if
             blind; a face: its area)
         P = masking BOUNDARY length, cm — the edge where lacquer meets bare
             metal that has to be trimmed clean (a blind bore: one rim, π·d;
-            a through-bore: two rims; a face: its perimeter)
-        0.75 = handling per feature; 0.2/cm² = brush-on + strip rate;
-        0.2/cm = edge-trimming rate. Minimum 5 min per part; round up.
+            a through-bore: two rims; a face: its perimeter). NOTE P IS
+            SQUARED: double the area and the time doubles; double the
+            boundary and the trimming time quadruples — a long clean edge is
+            the expensive part of masking, not the brushing.
+        1 = handling per feature. Minimum 5 min per part; round up.
 
-      Worked example (steering-wheel flange, R4.003): Ø30×28 blind bore with
-      Ø33 step → A ≈ 35 cm², P ≈ 10 cm → 9.8 → 10 min → £15.00/part. The
+      THE MODEL IS THE ESTIMATE. You do not reduce it because it "looks high",
+      "overstates for large open surfaces", or any other reason — a big open
+      surface with a long boundary IS slow. If you think the model is wrong
+      for a part, quote the model's number and raise a question saying why;
+      the reviewer adjusts, not you. Rounding up is fine; cutting is not.
+
+      Calibration points: a 270×168 end ring with ~800 cm² of bore and
+      flange to lacquer and a ~50 cm boundary → 1 + 60 + 60 = 121 min →
+      £181.50. A Ø30×28 blind bore with a Ø33 step (steering-wheel flange,
+      R4.003) → A ≈ 35 cm², P ≈ 10 cm → 1 + 2.6 + 2.4 = 6 min → £9.00. The
       customer-facing line reads "Masking (rubber lacquer) — Ø30 bore and
       Ø33 step"; the minutes and the arithmetic stay in the working. Its
       2× M2.5 tapped and 3× Ø5.3 mount holes are bunged, included, no
@@ -440,15 +450,15 @@ class AiAssistantJob < ApplicationJob
       HOW TO WRITE THE WORKING. The reviewer is a plater, not a
       mathematician, and reads it in a small box. Give the inputs and the
       result per feature, never the substitution:
-        Ø30 bore + step: A 35 cm², P 10 cm → 9.8 min
-        Ø12 through-bore: A 8 cm², P 7.5 cm → 3.9 min
-        Total 13.7 → 14 min × £1.50 = £21.00/part
+        Ø30 bore + step: A 35 cm², P 10 cm → 6.0 min
+        Ø12 through-bore: A 8 cm², P 7.5 cm → 3.0 min
+        Total 9.0 → 9 min × £1.50 = £13.50/part
       No "π×16×45 = 2262mm²", no formula re-typed per line, no
       "actually…" — decide, then write. Same for area: "180×60×25 mm → 2.6
       sqft" is enough; the reviewer can see the bounding box and the sqft
       and can check either. If you overrode the model because it plainly
-      overstated something, say so in five words ("model 37 min; taken 10 —
-      blind taps"), not a paragraph.
+      the reviewer might want to override, say so in five words ("model 121
+      min — confirm") and ask; you never change the number yourself.
 
       THE MINUTES ARE OURS, NOT THE CUSTOMER'S. Time estimates, the minute
       rate, the model above, sqft and rate-card arithmetic are internal

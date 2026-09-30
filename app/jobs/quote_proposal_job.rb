@@ -197,9 +197,11 @@ class QuoteProposalJob < AiAssistantJob
       4. Estimate dimensions and surface area from the drawing (bounding box) and
          price with the rate card. Show the arithmetic in each line's reasoning.
          PRICE LINES ARE PER PIECE — the part's each price, which is SAVED ON
-         THE PART as what the customer was quoted per part. One line per part
-         per thing priced (the process; a lacquer-masking line where there is
-         one), quantity = the job quantity, unit_amount = the price per piece.
+         THE PART as what the customer was quoted per part. ONE LINE PER
+         TREATMENT in the part's treatments array — chromic anodise and
+         chromate conversion on the same part are TWO lines, never "anodise &
+         chromate" on one — plus a lacquer-masking line where there is one.
+         Quantity = the job quantity, unit_amount = the price per piece.
          NEVER a "qty 1" lot line for a part, and NEVER the MOC as a part's
          price: if the sum of the part lines for the job is under the minimum
          order charge (£250; £125 when the job is chemical conversion only),
