@@ -340,6 +340,27 @@ class AiAssistantJob < ApplicationJob
       fit into (L × W × H → 2(LW + LH + WH)). Convert to square feet (1 sqft = 0.0929 m²).
       Use dimensions from the drawing. No need for high precision.
 
+      SPECIFICATION → PROCESS. The spec number DECIDES the process; you do not
+      reason your way to a different one from the drawing's wording, the
+      material, or what a similar part had. If the drawing cites one of these,
+      that is the treatment:
+        DEF STAN 03-24  chromic acid anodise (CAA)          → chromic_anodising
+        DEF STAN 03-25  sulphuric acid anodise (standard)   → standard_anodising
+        DEF STAN 03-26  hard anodise                         → hard_anodising
+        DEF STAN 03-18  chromate conversion (Alochrom 1200)  → chemical_conversion
+        DEF STAN 03-27  thread form / general — NOT a coating spec
+        MIL-A-8625 Type I / IB   chromic acid anodise        → chromic_anodising
+        MIL-A-8625 Type II       sulphuric acid anodise      → standard_anodising
+        MIL-A-8625 Type III      hard anodise                → hard_anodising
+        MIL-A-8625 Class 1 undyed, Class 2 dyed
+        MIL-DTL-5541 / MIL-C-5541  chromate conversion       → chemical_conversion
+        BS EN 2536 / BS 1615 AA*  sulphuric anodise (AA10 = 10µm, AA25 = 25µm)
+        BS 5599                   hard anodise
+        BS EN 2437 / DTD 910      chromic acid anodise
+      "03-24 all over except areas indicated, which are to be chromated" is
+      chromic anodise + Alochrom, two treatments, masked between — and the
+      MOC for the job is the chromic one.
+
       MINIMUM ORDER CHARGES (MOC):
       All processes: £250 MOC, EXCEPT chemical conversion: £125 MOC.
       The MOC is on the job total (every per-piece line × quantity). If that
@@ -420,17 +441,20 @@ class AiAssistantJob < ApplicationJob
       time. ESTIMATE THE MINUTES PER PART WITH THIS MODEL, per lacquered
       feature, and show the working:
 
-          minutes = Σ features ( 1 + 0.075 × A + 0.024 × P² )
+          minutes = 0.075 × A  +  Σ loops ( 1 + 0.018 × P² )
 
-        A = area to be lacquered, cm²  (a bore: π·d·depth + the end face if
-            blind; a face: its area)
-        P = masking BOUNDARY length, cm — the edge where lacquer meets bare
-            metal that has to be trimmed clean (a blind bore: one rim, π·d;
-            a through-bore: two rims; a face: its perimeter). NOTE P IS
-            SQUARED: double the area and the time doubles; double the
-            boundary and the trimming time quadruples — a long clean edge is
-            the expensive part of masking, not the brushing.
-        1 = handling per feature. Minimum 5 min per part; round up.
+        A = TOTAL area to be lacquered, cm² (a bore: π·d·depth + the end
+            face if blind; a face: its area). Brushing is linear.
+        P = the length, cm, of ONE CONTINUOUS BOUNDARY LOOP — one edge where
+            lacquer meets bare metal that is trimmed clean as a single pass
+            (a blind bore: one rim, π·d; a through-bore: two rims = two
+            loops; a face: its perimeter; a band round a cylinder: two
+            loops, one each side). EACH LOOP IS SQUARED SEPARATELY. Never
+            add loops together before squaring: two 47 cm rings are two
+            47 cm trims (2 × 41 min), not one 94 cm trim (160 min).
+            Double one loop's length and its trim time quadruples — a long
+            clean edge is the expensive part of masking, not the brushing.
+        1 = handling per loop. Minimum 5 min per part; round up.
 
       THE MODEL IS THE ESTIMATE. You do not reduce it because it "looks high",
       "overstates for large open surfaces", or any other reason — a big open
@@ -438,10 +462,12 @@ class AiAssistantJob < ApplicationJob
       for a part, quote the model's number and raise a question saying why;
       the reviewer adjusts, not you. Rounding up is fine; cutting is not.
 
-      Calibration points: a 270×168 end ring with ~800 cm² of bore and
-      flange to lacquer and a ~50 cm boundary → 1 + 60 + 60 = 121 min →
-      £181.50. A Ø30×28 blind bore with a Ø33 step (steering-wheel flange,
-      R4.003) → A ≈ 35 cm², P ≈ 10 cm → 1 + 2.6 + 2.4 = 6 min → £9.00. The
+      Calibration points: a Ø150×270 end ring, chromate bands at both ends
+      masked off the anodise: A ≈ 600 cm², two loops of ≈ 47 cm →
+      0.075×600 + 2×(1 + 0.018×47²) = 45 + 82 = 127 min → £190.50. A
+      Ø30×28 blind bore with a Ø33 step (steering-wheel flange, R4.003) →
+      A ≈ 35 cm², one loop ≈ 10 cm → 2.6 + 2.8 = 5.4 → min 5 → 6 min →
+      £9.00. The
       customer-facing line reads "Masking (rubber lacquer) — Ø30 bore and
       Ø33 step"; the minutes and the arithmetic stay in the working. Its
       2× M2.5 tapped and 3× Ø5.3 mount holes are bunged, included, no
@@ -450,9 +476,9 @@ class AiAssistantJob < ApplicationJob
       HOW TO WRITE THE WORKING. The reviewer is a plater, not a
       mathematician, and reads it in a small box. Give the inputs and the
       result per feature, never the substitution:
-        Ø30 bore + step: A 35 cm², P 10 cm → 6.0 min
-        Ø12 through-bore: A 8 cm², P 7.5 cm → 3.0 min
-        Total 9.0 → 9 min × £1.50 = £13.50/part
+        Area: bore + step 35 cm², Ø12 through-bore 8 cm² → 43 cm² → 3.2 min
+        Loops: Ø30 rim 10 cm → 2.8; Ø12 rims 2 × 3.8 cm → 2 × 1.3
+        Total 8.6 → 9 min × £1.50 = £13.50/part
       No "π×16×45 = 2262mm²", no formula re-typed per line, no
       "actually…" — decide, then write. Same for area: "180×60×25 mm → 2.6
       sqft" is enough; the reviewer can see the bounding box and the sqft
