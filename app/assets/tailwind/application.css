@@ -1,1 +1,34 @@
+/* app/assets/tailwind/application.css
+ *
+ * Tailwind v4. There is no JS config in v4 unless @config points at one;
+ * everything from the old tailwind.config.js lives here instead.
+ */
 @import "tailwindcss";
+
+/* Where to scan for class names. v4 auto-detects from the project root, but
+ * being explicit keeps helpers (sections_helper.rb builds pill classes in
+ * Ruby) in the scan. */
+@source "../../views";
+@source "../../helpers";
+@source "../../javascript";
+
+@theme {
+  /* was theme.extend.screens.xs */
+  --breakpoint-xs: 475px;
+
+  /* was theme.extend.spacing.safe-top / safe-bottom */
+  --spacing-safe-top: env(safe-area-inset-top);
+  --spacing-safe-bottom: env(safe-area-inset-bottom);
+}
+
+/* Full-width container. The built-in one caps at 96rem (1536px), which
+ * leaves ~2" dead either side on a 27" at 1920 wide. Defining @utility
+ * container replaces the built-in, breakpoint max-widths included, so
+ * every `container mx-auto` on every page fills the screen with a 1rem
+ * gutter. Swap `none` for `160rem` if you ever want a ceiling on 4K. */
+@utility container {
+  width: 100%;
+  max-width: none;
+  margin-inline: auto;
+  padding-inline: 1rem;
+}

@@ -37,4 +37,20 @@ module SectionsHelper
   def board_row_class(job)
     job.lacquered? ? "bg-fuchsia-50" : promise_row_class(job.promise)
   end
+
+  # Dye pill coloured for the dye. Matched on the label text ("Black dye
+  # for 25-30 minutes"); anything unrecognised falls back to purple.
+  DYE_PILL_CLASSES = [
+    [/\bblack\b/i, "bg-gray-900 text-white"],
+    [/\bred\b/i,   "bg-red-600 text-white"],
+    [/\bgreen\b/i, "bg-green-600 text-white"],
+    [/\bgold\b/i,  "bg-yellow-400 text-yellow-950"],
+    [/\bblue\b/i,  "bg-blue-600 text-white"],
+  ].freeze
+
+  def dye_pill(label)
+    return content_tag(:span, "—", class: "text-gray-400") if label.blank?
+    klass = DYE_PILL_CLASSES.find { |re, _| label.match?(re) }&.last || "bg-purple-100 text-purple-800"
+    content_tag :span, label, class: "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap #{klass}"
+  end
 end

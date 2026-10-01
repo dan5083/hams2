@@ -10,7 +10,7 @@
   </div>
 <% else %>
   <!-- Desktop -->
-  <div class="hidden lg:block bg-white shadow overflow-hidden sm:rounded-lg">
+  <div class="hidden lg:block bg-white shadow overflow-x-auto sm:rounded-lg">
     <table class="min-w-full divide-y divide-gray-200">
       <thead class="bg-gray-50">
         <tr>
@@ -47,14 +47,8 @@
             </td>
             <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900"><%= row[:voltage] || "—" %></td>
             <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900"><%= row[:minutes] ? "#{row[:minutes]} min" : "—" %></td>
-            <td class="px-4 py-3 text-sm">
-              <% if row[:dye] %>
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800"><%= row[:dye] %></span>
-              <% else %>
-                <span class="text-gray-400">—</span>
-              <% end %>
-            </td>
-            <td class="px-4 py-3 text-sm text-gray-700"><%= row[:seal] %></td>
+            <td class="px-4 py-3 text-sm whitespace-nowrap"><%= dye_pill(row[:dye]) %></td>
+            <td class="px-4 py-3 text-sm text-gray-700 whitespace-nowrap"><%= row[:seal] %></td>
           </tr>
         <% end %>
       </tbody>
@@ -76,7 +70,7 @@
         </div>
         <div class="text-sm text-gray-900 mt-2 font-bold"><%= row[:voltage] || "—" %> · <%= row[:minutes] ? "#{row[:minutes]} min" : "—" %></div>
         <% if row[:dye] %>
-          <div class="mt-1"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800"><%= row[:dye] %></span></div>
+          <div class="mt-1"><%= dye_pill(row[:dye]) %></div>
         <% end %>
         <div class="text-xs text-gray-600 mt-1"><%= row[:seal] %></div>
         <div class="mt-2">

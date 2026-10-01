@@ -198,11 +198,13 @@ class ShopSectionBoard
   end
 
   # -- Lacquering board ------------------------------------------------------
-  # Lacquer masking ops with batches still unsigned. Gated on contract
-  # review like every other working board. One row per (op, batches).
+  # One row per lacquer masking op from contract review until its
+  # inspection is signed: batches still to lacquer and batches lacquered
+  # but awaiting inspection on the same row. Promise order only - every
+  # job here is lacquered, so the fast-track flag carries no information.
   def lacquering_queue
     @jobs.flat_map(&:lacquering_rows)
-         .sort_by { |r| [r[:job].priority_sort, r[:job].number] }
+         .sort_by { |r| [r[:job].promise_sort, r[:job].number] }
   end
 
   # Lacquer applied (masking op signed) but the independent inspection not
@@ -543,18 +545,23 @@ class ShopSectionBoard
       (1..owner.section_batch_count(owner.section_for_op(op))).map(&:to_s)
     end
 
-    # Lacquer still to apply: one row per lacquer masking op with batches
-    # unsigned. Same contract-review gate as the jiggers.
+    # Lacquering board row per lacquer masking op: to_lacquer = masking op
+    # unsigned; to_inspect = masking signed, inspection not. Drops off once
+    # every batch is inspected (or there is no inspection op - flagged).
     def lacquering_rows
       return [] unless contract_reviewed?
       ops.each_with_index.filter_map do |op, i|
         next unless lacquer_masking_op?(op)
-        pending = section_batches_for(op) - signed_keys(op)
-        next if pending.empty?
+        insp = inspection_after(i)
+        signed = signed_keys(op)
+        to_lacquer = section_batches_for(op) - signed
+        to_inspect = insp ? signed - signed_keys(insp) : []
+        next if to_lacquer.empty? && to_inspect.empty?
         {
           job: self, op: op,
-          batches: pending.sort_by(&:to_i),
-          batch_qtys: batch_qtys(op, pending),
+          to_lacquer: to_lacquer.sort_by(&:to_i),
+          to_inspect: to_inspect.sort_by(&:to_i),
+          batch_qtys: batch_qtys(op, to_lacquer + to_inspect),
           vats: shop_for_masking(i) || [],
         }
       end
