@@ -1,19 +1,17 @@
-<%# app/views/sections/_jiggers.html.erb — locals: shop
-    Work whose jig op (feeding this shop's vats) is not yet signed off AND
-    whose contract review is signed — nothing gets jigged before review.
-    Unfrozen records have no sign-offs at all, so they never appear. %>
-<% rows = @board.jigging_queue(shop) %>
-
+<%# app/views/sections/_masking_inspection.html.erb — locals: rows
+    Lacquer applied, independent inspection outstanding. Rendered on the
+    lacquering board (all rows) and at the top of each treating shop's
+    board (its own rows via @board.masking_inspection_queue(shop)). %>
 <% if rows.empty? %>
-  <div class="bg-white rounded-lg shadow p-8 text-center text-gray-500">Nothing waiting to be jigged.</div>
+  <div class="bg-white rounded-lg shadow p-8 text-center text-gray-500">Nothing lacquered awaiting inspection.</div>
 <% else %>
   <!-- Desktop -->
-  <div class="hidden lg:block bg-white shadow overflow-hidden sm:rounded-lg">
+  <div class="hidden lg:block bg-white shadow overflow-hidden sm:rounded-lg border-2 border-fuchsia-300">
     <table class="min-w-full divide-y divide-gray-200">
-      <thead class="bg-gray-50">
+      <thead class="bg-fuchsia-50">
         <tr>
-          <% ["WO", "Part", "Qty", "Batches to jig", "Vat", "Next"].each do |h| %>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"><%= h %></th>
+          <% ["WO", "Part", "Qty", "Batches to inspect", "Then", "Masking applied"].each do |h| %>
+            <th class="px-4 py-3 text-left text-xs font-medium text-fuchsia-900 uppercase tracking-wider"><%= h %></th>
           <% end %>
         </tr>
       </thead>
@@ -35,19 +33,17 @@
             </td>
             <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900"><%= row[:job].quantity %></td>
             <td class="px-4 py-3 whitespace-nowrap">
-              <% if row[:batches].any? %>
-                <% row[:batches].each do |b| %>
-                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 mr-1">B<%= b %></span>
-                <% end %>
-              <% else %>
-                <span class="text-gray-400">—</span>
+              <% row[:batches].each do |b| %>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-fuchsia-100 text-fuchsia-800 mr-1">
+                  B<%= b %><%= " · #{row[:batch_qtys][b]}" if row[:batch_qtys][b].present? %>
+                </span>
               <% end %>
             </td>
-            <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900">
+            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
               <%= row[:vats].map { |v| "Vat #{v}" }.join(" / ").presence || "—" %>
             </td>
             <td class="px-4 py-3 text-xs text-gray-600">
-              <%= row[:next_op]["operation_text"].to_s.gsub(/\*+/, "").lines.first.to_s.strip.truncate(90) %>
+              <%= row[:op]["operation_text"].to_s.gsub(/\*+/, "").lines.first.to_s.strip.truncate(110) %>
             </td>
           </tr>
         <% end %>
@@ -58,10 +54,10 @@
   <!-- Mobile cards -->
   <div class="lg:hidden space-y-3">
     <% rows.each do |row| %>
-      <%= link_to works_order_path(row[:job].wo), class: "block bg-white rounded-lg shadow p-4 #{board_row_class(row[:job])}" do %>
+      <%= link_to works_order_path(row[:job].wo), class: "block bg-white rounded-lg shadow p-4 border-2 border-fuchsia-300 #{board_row_class(row[:job])}" do %>
         <div class="flex justify-between items-baseline">
           <span class="font-bold text-blue-700"><%= row[:job].display_name %></span>
-          <span class="text-sm font-bold text-gray-900"><%= row[:vats].map { |v| "Vat #{v}" }.join(" / ").presence || "—" %></span>
+          <span class="text-xs font-bold text-fuchsia-800">Inspect masking</span>
         </div>
         <%= job_pills(row[:job]) %>
         <div class="flex items-center gap-3 mt-1">
@@ -69,11 +65,11 @@
           <div class="text-sm text-gray-700"><%= row[:job].part_number %> · <%= row[:job].customer_name %></div>
         </div>
         <div class="text-xs text-gray-500 mt-2 line-clamp-2">
-          Next: <%= row[:next_op]["operation_text"].to_s.gsub(/\*+/, "").truncate(90) %>
+          <%= row[:op]["operation_text"].to_s.gsub(/\*+/, "").truncate(110) %>
         </div>
         <div class="mt-2 flex items-center justify-between">
           <span class="text-xs text-gray-500">Qty <%= row[:job].quantity %></span>
-          <span class="text-xs font-bold text-amber-700">Batches <%= row[:batches].join(", ") %> to jig</span>
+          <span class="text-xs font-bold text-fuchsia-800">Batches <%= row[:batches].join(", ") %></span>
         </div>
       <% end %>
     <% end %>

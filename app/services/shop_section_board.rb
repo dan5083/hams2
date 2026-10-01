@@ -55,8 +55,17 @@ class ShopSectionBoard
     "factory2"        => "Factory 2",
     "chromic"         => "Chromic",
     "chem_conv"       => "Chemical Conversion",
+    "lacquering"      => "Lacquering",
     "contract_review" => "Contract Review",
   }.freeze
+
+  # Lacquered work is fast-tracked: stopping-off lacquer has a shelf life on
+  # the part, so anything carrying it jumps the queue on every board, ahead
+  # of promised work. Detection is by the masking op's text (the library op
+  # says "45 Stopping off lacquer"; hand-written ones say "LAQUER"), with
+  # the part's treatment selection (45_stopping_off_lacquer) as a fallback.
+  LACQUER_METHOD = "45_stopping_off_lacquer".freeze
+  LACQUER_TEXT   = /lac?quer|stopping[\s-]*off/i
 
   # Chemical conversion chemistries, keyed by the library op id prefix
   # (survives freezing). Order is display order on the board. The label is
@@ -140,7 +149,7 @@ class ShopSectionBoard
     pending = @jobs.select { |j| paperless.include?(j.wo.id) && j.awaiting_contract_review? }
     pending.group_by { |j| j.wo.process_record_owner.id }
            .map { |owner_id, js| js.find { |j| j.wo.id == owner_id } || js.first }
-           .sort_by { |j| [j.promise_sort, j.number] }
+           .sort_by { |j| [j.priority_sort, j.number] }
   end
 
   # For the navbar badge. The cache is load-bearing here: paperless_ids runs
@@ -161,14 +170,14 @@ class ShopSectionBoard
   # (anodising op, batches) pair - a two-treatment WO can appear twice.
   def anodise_ready(shop)
     @jobs.flat_map { |j| j.anodise_ready_rows(shop) }
-         .sort_by { |r| [r[:job].promise_sort, r[:vats].min || 99, r[:job].number] }
+         .sort_by { |r| [r[:job].priority_sort, r[:vats].min || 99, r[:job].number] }
   end
 
   # -- Jiggers boards --------------------------------------------------------
   # Work whose next jig (for this shop's processes) hasn't been signed yet.
   def jigging_queue(shop)
     @jobs.flat_map { |j| j.jig_queue_rows(shop) }
-         .sort_by { |r| [r[:job].promise_sort, r[:job].number] }
+         .sort_by { |r| [r[:job].priority_sort, r[:job].number] }
   end
 
   # -- Chemical conversion board ---------------------------------------------
@@ -182,10 +191,34 @@ class ShopSectionBoard
   def chem_conv_groups
     rows = @jobs.flat_map(&:chem_conv_rows)
     CHEM_CONV_ORDER.filter_map do |chem|
-      group = rows.select { |r| r[:chemistry] == chem }.sort_by { |r| [r[:job].promise_sort, r[:job].number] }
+      group = rows.select { |r| r[:chemistry] == chem }.sort_by { |r| [r[:job].priority_sort, r[:job].number] }
       next if group.empty?
       { chemistry: chem, label: CHEM_CONV_LABELS[chem], rows: group }
     end
+  end
+
+  # -- Lacquering board ------------------------------------------------------
+  # Lacquer masking ops with batches still unsigned. Gated on contract
+  # review like every other working board. One row per (op, batches).
+  def lacquering_queue
+    @jobs.flat_map(&:lacquering_rows)
+         .sort_by { |r| [r[:job].priority_sort, r[:job].number] }
+  end
+
+  # Lacquer applied (masking op signed) but the independent inspection not
+  # yet signed. Shown on the lacquering board AND, routed by the jig that
+  # follows, on the treating shop's board - whoever is free picks it up.
+  # shop: nil = every row, for the lacquering board.
+  def masking_inspection_queue(shop = nil)
+    @jobs.flat_map { |j| j.masking_inspection_rows(shop) }
+         .sort_by { |r| [r[:job].priority_sort, r[:job].number] }
+  end
+
+  # Records the lacquer logic can't make sense of - for the board's
+  # attention block now, the HAMS assistant later.
+  def lacquer_attention
+    @jobs.flat_map { |j| j.lacquer_flags.map { |f| { job: j, note: f } } }
+         .sort_by { |r| r[:job].number }
   end
 
   # ==========================================================================
@@ -214,6 +247,13 @@ class ShopSectionBoard
     # Sort key: promised work first, soonest due first; unpromised after.
     def promise_sort
       promise ? [0, promise.due_on.jd] : [1, 0]
+    end
+
+    # Board order: lacquered (fast-track) first, then promised soonest-due,
+    # then the rest. Every board sorts on this so a lacquered job reads the
+    # same wherever it turns up.
+    def priority_sort
+      [lacquered? ? 0 : 1] + promise_sort
     end
 
     def ops
@@ -262,6 +302,24 @@ class ShopSectionBoard
     def dye_op?(op)
       return true if op["process_type"] == "dye"
       op["process_type"] == "manual" && op["operation_text"].to_s.match?(/\A[\s*]*\w+\s+dye\b/i)
+    end
+
+    # The APPLY masking op - not its inspection, not its removal. Library
+    # id survives freezing; hand-written ones start "MASK ..." / "Masking".
+    def masking_op?(op)
+      return true if op["id"] == "MASKING" || op["process_type"] == "masking"
+      return false unless op["process_type"] == "manual"
+      text = op["operation_text"].to_s
+      text.match?(/\A[\s*]*mask(ing)?\b/i) && !text.match?(/inspect|remov|peel|unmask/i)
+    end
+
+    def masking_inspection_op?(op)
+      return true if op["id"] == "MASKING_INSPECTION" || op["process_type"] == "masking_inspection"
+      op["process_type"] == "manual" && op["operation_text"].to_s.match?(/\A[\s*]*masking\s+inspection/i)
+    end
+
+    def lacquer_masking_op?(op)
+      masking_op?(op) && op["operation_text"].to_s.match?(LACQUER_TEXT)
     end
 
     # ---- ENP ---------------------------------------------------------------
@@ -431,6 +489,123 @@ class ShopSectionBoard
     # Nearest jig op before index i (each treatment cycle jigs itself).
     def jig_before(i)
       ops[0...i].reverse.find { |o| jig_op?(o) }
+    end
+
+    # ---- Lacquering ----------------------------------------------------------
+
+    def lacquer_ops
+      @lacquer_ops ||= ops.select { |o| lacquer_masking_op?(o) }
+    end
+
+    # Did the part's treatment selection ask for lacquer? Fallback for
+    # routes whose masking op text doesn't say so. Parses the part's
+    # treatment JSON only - no route generation.
+    def part_lacquer_selected?
+      return @part_lacquer_selected if defined?(@part_lacquer_selected)
+      @part_lacquer_selected = Array(@wo.part&.get_treatments).any? do |t|
+        (t.dig(:masking, "methods") || {}).keys.map(&:to_s).include?(LACQUER_METHOD)
+      end
+    rescue
+      @part_lacquer_selected = false
+    end
+
+    # Fast-track flag for the whole route, not just while the lacquer is
+    # outstanding - the clock is running from the moment it goes on. Part
+    # selection first (a JSON parse); the frozen ops only as a backstop, so
+    # sorting the contract review queue never regenerates a live route.
+    def lacquered?
+      return @lacquered if defined?(@lacquered)
+      @lacquered = part_lacquer_selected? || (frozen? && lacquer_ops.any?)
+    end
+
+    # The inspection that follows a masking op: the next masking-inspection
+    # op before the jig. nil when the route has none (flagged).
+    def inspection_after(i)
+      ops[(i + 1)..].each do |o|
+        return o if masking_inspection_op?(o)
+        break if jig_op?(o) || anodising_op?(o) || enp_op?(o)
+      end
+      nil
+    end
+
+    # The shop the cycle after a masking op treats in: the first jig after
+    # it, then the first vat-bearing op after that jig - same routing the
+    # jiggers board uses, so homed and unhomed parts both land correctly.
+    def shop_for_masking(i)
+      jig_i = ops[(i + 1)..].index { |o| jig_op?(o) }
+      return nil unless jig_i
+      nxt = ops[(i + jig_i + 2)..].find { |o| vats_for(o).any? }
+      nxt ? vats_for(nxt) : []
+    end
+
+    def section_batches_for(op)
+      owner = @wo.process_record_owner
+      (1..owner.section_batch_count(owner.section_for_op(op))).map(&:to_s)
+    end
+
+    # Lacquer still to apply: one row per lacquer masking op with batches
+    # unsigned. Same contract-review gate as the jiggers.
+    def lacquering_rows
+      return [] unless contract_reviewed?
+      ops.each_with_index.filter_map do |op, i|
+        next unless lacquer_masking_op?(op)
+        pending = section_batches_for(op) - signed_keys(op)
+        next if pending.empty?
+        {
+          job: self, op: op,
+          batches: pending.sort_by(&:to_i),
+          batch_qtys: batch_qtys(op, pending),
+          vats: shop_for_masking(i) || [],
+        }
+      end
+    rescue => e
+      Rails.logger.error "SectionBoard: lacquering rows failed for WO#{number}: #{e.message}"
+      []
+    end
+
+    # Lacquer on, inspection outstanding: masking op signed for a batch,
+    # its inspection op not. shop: restrict to batches whose next cycle
+    # treats on that shop's board (nil = all).
+    def masking_inspection_rows(shop = nil)
+      return [] unless contract_reviewed?
+      ops.each_with_index.filter_map do |op, i|
+        next unless lacquer_masking_op?(op)
+        insp = inspection_after(i)
+        next unless insp
+        vats = shop_for_masking(i) || []
+        next if shop && !op_on_board?(shop, vats)
+        ready = signed_keys(op) - signed_keys(insp)
+        next if ready.empty?
+        {
+          job: self, op: op, inspection_op: insp,
+          batches: ready.sort_by(&:to_i),
+          batch_qtys: batch_qtys(op, ready),
+          vats: vats,
+        }
+      end
+    rescue => e
+      Rails.logger.error "SectionBoard: masking inspection rows failed for WO#{number}: #{e.message}"
+      []
+    end
+
+    # Things the lacquering logic can't classify. Only frozen records are
+    # checked (the live route of an unfrozen one is the part's own, and
+    # fixing it there is the part editor's job, not the board's).
+    def lacquer_flags
+      return [] unless frozen?
+      flags = []
+      if part_lacquer_selected? && lacquer_ops.empty?
+        flags << (ops.any? { |o| masking_op?(o) } ?
+          "Part selects stopping-off lacquer but the masking op text doesn't say so — fast-tracked, not on the lacquering queue" :
+          "Part selects stopping-off lacquer but the route has no masking op")
+      end
+      ops.each_with_index do |op, i|
+        next unless lacquer_masking_op?(op)
+        flags << "Lacquer masking at op #{op['position']} has no masking inspection after it" unless inspection_after(i)
+      end
+      flags
+    rescue
+      []
     end
 
     # ---- Anodisers: jigged, anodise outstanding ----------------------------

@@ -13,10 +13,10 @@
     </thead>
     <tbody class="divide-y divide-gray-200">
       <% jobs.each do |job| %>
-        <tr class="hover:bg-gray-50 <%= promise_row_class(job.promise) %>">
+        <tr class="hover:bg-gray-50 <%= board_row_class(job) %>">
           <td class="px-4 py-2 whitespace-nowrap">
             <%= link_to job.display_name, works_order_path(job.wo), class: "font-bold text-blue-700 hover:underline" %>
-            <% if job.promise %><div class="mt-1"><%= promise_pill(job.promise) %></div><% end %>
+            <%= job_pills(job) %>
           </td>
           <td class="px-4 py-2">
             <div class="flex items-center gap-3">
