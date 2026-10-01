@@ -42,6 +42,10 @@ export default class extends Controller {
     const field = input.dataset.field // 'start' or 'finish'
     const value = parseFloat(input.value)
 
+    // A value the operator typed themselves takes ownership of the box, so
+    // later changes to point A's "before" no longer overwrite it.
+    delete input.dataset.autofilled
+
     // Update the measurement
     if (!isNaN(value) && value > 0) {
       if (field === 'start') {
@@ -62,8 +66,40 @@ export default class extends Controller {
       this.measurements[index].growth_um = null
     }
 
+    // The "before" reading is the same at every point, so point A's value
+    // fills B-F. Operators overtype any point that genuinely differs.
+    if (field === 'start' && index === 0) {
+      this.propagateStart()
+    }
+
     this.updateDisplay()
     this.updateHiddenField()
+  }
+
+  // Copy A's "before" into B-F. Only touches boxes that are empty or were
+  // themselves autofilled, so a hand-typed value is never overwritten, and
+  // correcting A later updates the autofilled ones.
+  propagateStart() {
+    const a = this.measurements[0].start_mm
+
+    this.startInputTargets.forEach((input, i) => {
+      if (i === 0) return
+
+      const untouched = input.value.trim() === '' || input.dataset.autofilled === 'true'
+      if (!untouched) return
+
+      if (a === null) {
+        input.value = ''
+        delete input.dataset.autofilled
+        this.measurements[i].start_mm = null
+      } else {
+        input.value = a
+        input.dataset.autofilled = 'true'
+        this.measurements[i].start_mm = a
+      }
+
+      this.calculateGrowth(i)
+    })
   }
 
   calculateGrowth(index) {
@@ -182,8 +218,11 @@ export default class extends Controller {
     if (confirm("Clear all ENP measurements for this treatment?")) {
       this.measurements = this.initializeMeasurements()
 
-      // Clear all input fields
-      this.startInputTargets.forEach(input => input.value = '')
+      // Clear all input fields (and any autofill ownership flags)
+      this.startInputTargets.forEach(input => {
+        input.value = ''
+        delete input.dataset.autofilled
+      })
       this.finishInputTargets.forEach(input => input.value = '')
 
       this.updateDisplay()
