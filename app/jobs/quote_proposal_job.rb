@@ -261,7 +261,15 @@ class QuoteProposalJob < AiAssistantJob
          applies the prime rate after you and shows the reviewer both figures.
          Say in the overall reasoning what you spotted the prime from.
       2. For each part, check Part.matching(customer_id: ..., part_number: ..., part_issue: ...)
-         — if it exists, set existing_part_id and reuse its each_price as a sanity check.
+         — if it exists, set existing_part_id and reuse its each_price as a sanity check:
+         if your rate-card price differs from the saved each_price by more than
+         25% either way, STOP speculating about why and raise a question —
+         "Saved each price £X vs rate card £Y — which?" with the saved price as
+         the suggested_answer. Do not write a paragraph guessing at uplifts or
+         discrepancies in the working; one line "saved £X — see question" is
+         all. The reviewer knows the history; you don't. (The saved price
+         already includes any prime uplift, so compare it with your figure
+         × the uplift when end_user_prime is set.)
       3. Otherwise find the template part (STEP 1 above) and copy its operation
          set into `treatments`, adjusted for this part's spec (thickness, sealing,
          dye, alloy). Record which template you used and what you changed in

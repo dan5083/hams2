@@ -339,6 +339,14 @@ class AiAssistantJob < ApplicationJob
       Approximate to the surface area of the smallest rectangular box the part could
       fit into (L × W × H → 2(LW + LH + WH)). Convert to square feet (1 sqft = 0.0929 m²).
       Use dimensions from the drawing. No need for high precision.
+      READING THE OVERALL SIZE: the overall length is the longest chain of
+      length dimensions along the elevation, end face to end face — add the
+      chain up if no single dimension spans it. A boxed (basic) dimension
+      between hole centres or between features is NEVER an overall length,
+      and a dimension marked "TO INT'N" / "to shoulder" is a length, not a
+      width. For a turned part the width and height are the largest Ø. In
+      the working, say which dimensions you used: "L 70.5+167.5 = 238 (sheet
+      1 elevation), Ø82 max". If the sheets disagree, say so and ask.
 
       SPECIFICATION → PROCESS. The spec number DECIDES the process; you do not
       reason your way to a different one from the drawing's wording, the
@@ -455,6 +463,14 @@ class AiAssistantJob < ApplicationJob
             encloses barely registers; a 150 mm band on a cylinder is two
             rims and ~23 min with almost no area term at all.
         1 = handling per loop. Minimum 5 min per part; round up.
+
+      EVERY MASKED FEATURE IS NAMED AND COUNTED. The working lists each
+      feature with its own count, area and loop length — "pad 55×25 ×1: 13.6
+      cm², loop 16 cm; pad 29×25 ×1: 7.2 cm², loop 11 cm". NEVER "~8 loops
+      avg 20 cm", never a rounded total with no features behind it. If you
+      cannot find the masked faces on the drawing well enough to name them,
+      price what you can see and raise a question naming what you couldn't
+      — an averaged guess is worse than a question.
 
       THE MODEL IS THE ESTIMATE. You do not reduce it because it "looks high",
       "overstates for large open surfaces", or any other reason — a big open

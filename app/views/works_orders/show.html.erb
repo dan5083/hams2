@@ -768,13 +768,19 @@
                   release validation, so the operator doesn't scan for it. %>
               <div class="border border-gray-200 rounded-lg overflow-hidden" id="op-<%= position %>"
                    <%= "data-keep-context".html_safe if spec.is_a?(Hash) && spec["checklist"].present? %>>
-                <div class="flex items-stretch">
+                <%# Mobile: number + content on one row, sign-off column stacked
+                    beneath it full-width. The content column is min-w-0 so a
+                    wide child (the contract review checklist) wraps instead of
+                    pushing the sign-off column past the card's overflow-hidden
+                    edge, which is how the Sign off button went missing on phones. %>
+                <div class="flex flex-col sm:flex-row sm:items-stretch">
+                  <div class="flex items-stretch flex-1 min-w-0">
                   <!-- Op number: state shown is for the ACTIVE batch -->
                   <div class="flex-none w-12 <%= signed_here ? 'bg-green-100 border-green-200' : (signed_count > 0 ? 'bg-amber-50 border-amber-200' : 'bg-gray-100 border-gray-200') %> border-r flex items-center justify-center">
                     <span class="text-sm font-bold <%= signed_here ? 'text-green-700' : (signed_count > 0 ? 'text-amber-700' : 'text-gray-700') %>"><%= position %></span>
                   </div>
                   <!-- Op content -->
-                  <div class="flex-1 px-4 py-3 text-sm text-gray-900 leading-relaxed">
+                  <div class="flex-1 min-w-0 px-4 py-3 text-sm text-gray-900 leading-relaxed">
                     <% if route_options.length > 1 %>
                       <%# Route selector: which of [primary, *alternates] this batch
                           is running. Submits on change so the row re-renders with
@@ -888,7 +894,7 @@
                                       class: "border border-gray-300 rounded px-1 py-1 text-sm flex-none" %>
                                   <%= text_field_tag "checklist[#{item["id"]}][comment]", r["comment"],
                                       placeholder: "Action taken / comment",
-                                      class: "border border-gray-300 rounded px-2 py-1 text-sm w-44 flex-none" %>
+                                      class: "border border-gray-300 rounded px-2 py-1 text-sm w-full sm:w-44 sm:flex-none" %>
                                 </div>
                               <% end %>
                               </div>
@@ -987,11 +993,12 @@
                       </div>
                     <% end %>
                   </div>
-                  <!-- Sign-off column -->
+                  </div>
+                  <!-- Sign-off column: full-width strip under the op on mobile, side column from sm: up -->
                   <% if paperless %>
                     <% so = (op["sign_offs"] || {})[active_key] %>
                     <% multi = !wo_scoped && sec_batch_count > 1 %>
-                    <div class="flex-none w-32 border-l border-gray-200 flex flex-col items-center justify-center gap-1 p-2 <%= signed_here ? 'bg-green-50' : 'bg-gray-50' %>">
+                    <div class="flex-none w-full sm:w-32 border-t sm:border-t-0 sm:border-l border-gray-200 flex flex-row flex-wrap sm:flex-col items-center justify-center gap-x-3 gap-y-1 sm:gap-1 p-2 <%= signed_here ? 'bg-green-50' : 'bg-gray-50' %>">
                       <%# What this signature certifies: the whole record for a
                           WO-scoped op (the full tank load on a group lead), the
                           active batch's qty in this section otherwise. %>
