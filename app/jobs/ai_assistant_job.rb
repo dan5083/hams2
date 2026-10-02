@@ -441,7 +441,7 @@ class AiAssistantJob < ApplicationJob
       time. ESTIMATE THE MINUTES PER PART WITH THIS MODEL, per lacquered
       feature, and show the working:
 
-          minutes = 0.075 × A  +  Σ loops ( 1 + 0.018 × P² )
+          minutes = 0.075 × A  +  Σ loops ( 1 + 0.22 × P )
 
         A = TOTAL area to be lacquered, cm² (a bore: π·d·depth + the end
             face if blind; a face: its area). Brushing is linear.
@@ -449,11 +449,11 @@ class AiAssistantJob < ApplicationJob
             lacquer meets bare metal that is trimmed clean as a single pass
             (a blind bore: one rim, π·d; a through-bore: two rims = two
             loops; a face: its perimeter; a band round a cylinder: two
-            loops, one each side). EACH LOOP IS SQUARED SEPARATELY. Never
-            add loops together before squaring: two 47 cm rings are two
-            47 cm trims (2 × 41 min), not one 94 cm trim (160 min).
-            Double one loop's length and its trim time quadruples — a long
-            clean edge is the expensive part of masking, not the brushing.
+            loops, one each side). Count every loop. The edge is where the
+            time goes — three coats built up to the line and trimmed clean
+            — so a 47 cm rim costs ~11 min on its own while the area it
+            encloses barely registers; a 150 mm band on a cylinder is two
+            rims and ~23 min with almost no area term at all.
         1 = handling per loop. Minimum 5 min per part; round up.
 
       THE MODEL IS THE ESTIMATE. You do not reduce it because it "looks high",
@@ -462,11 +462,11 @@ class AiAssistantJob < ApplicationJob
       for a part, quote the model's number and raise a question saying why;
       the reviewer adjusts, not you. Rounding up is fine; cutting is not.
 
-      Calibration points: a Ø150×270 end ring, chromate bands at both ends
-      masked off the anodise: A ≈ 600 cm², two loops of ≈ 47 cm →
-      0.075×600 + 2×(1 + 0.018×47²) = 45 + 82 = 127 min → £190.50. A
-      Ø30×28 blind bore with a Ø33 step (steering-wheel flange, R4.003) →
-      A ≈ 35 cm², one loop ≈ 10 cm → 2.6 + 2.8 = 5.4 → min 5 → 6 min →
+      Calibration points (timed on the shop floor): a Ø150 cylinder with a
+      narrow lacquer band round it, chromate kept off the anodise: area
+      negligible, two loops of ≈ 47 cm → 2 × (1 + 0.22×47) = 22.7 → 23 min
+      → £34.50. A Ø30×28 blind bore with a Ø33 step (steering-wheel flange,
+      R4.003) → A ≈ 35 cm², one loop ≈ 10 cm → 2.6 + 3.2 = 5.8 → 6 min →
       £9.00. The
       customer-facing line reads "Masking (rubber lacquer) — Ø30 bore and
       Ø33 step"; the minutes and the arithmetic stay in the working. Its
@@ -477,8 +477,8 @@ class AiAssistantJob < ApplicationJob
       mathematician, and reads it in a small box. Give the inputs and the
       result per feature, never the substitution:
         Area: bore + step 35 cm², Ø12 through-bore 8 cm² → 43 cm² → 3.2 min
-        Loops: Ø30 rim 10 cm → 2.8; Ø12 rims 2 × 3.8 cm → 2 × 1.3
-        Total 8.6 → 9 min × £1.50 = £13.50/part
+        Loops: Ø30 rim 10 cm → 3.2; Ø12 rims 2 × 3.8 cm → 2 × 1.8
+        Total 10.0 → 10 min × £1.50 = £15.00/part
       No "π×16×45 = 2262mm²", no formula re-typed per line, no
       "actually…" — decide, then write. Same for area: "180×60×25 mm → 2.6
       sqft" is enough; the reviewer can see the bounding box and the sqft
@@ -504,8 +504,9 @@ class AiAssistantJob < ApplicationJob
              a bung. "Rubber lacquer" / "lacquer" / "stop-off" in an enquiry
              always means this. Priced by the time model above.
         "pc21_polyester_tape"     — flat faces, pads, large plain areas.
-             Priced at the taping rate per minute (same time model, edge term
-             dominates).
+             Same time model, but priced at the TAPING rate: £1.00/min, NOT
+             the £1.50 lacquer rate. 10 min of tape = £10.00, never £15.00.
+             Say "tape £1.00/min" in the working.
       Lacquer and tape add delacquer + check operations to the route; bungs
       alone do not. A part with lacquered bores configured as "bungs" is
       wrong even if the text says lacquer — the route would have no

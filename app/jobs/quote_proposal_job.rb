@@ -14,6 +14,13 @@
 # happen in QuoteService.finalise!, from the reviewed form, never from the
 # model directly.
 class QuoteProposalJob < AiAssistantJob
+  # End-user primes whose work is priced above the rate card. Matched
+  # case-insensitively against what the model reports in end_user_prime;
+  # applied here, deterministically, to every per-piece line (process AND
+  # masking). The MOC stays at the rate-card figure — the shortfall line is
+  # recomputed and dropped if the uplifted lines clear it.
+  PRIME_UPLIFT = { "Ultra" => 3.1, "Cobham" => 3.1, "Eaton" => 3.1 }.freeze
+
   PROPOSE_TOOL = {
     name: "propose_quote",
     description: "Submit the finished proposal. Call this exactly once, when the analysis is complete. " \
@@ -22,6 +29,10 @@ class QuoteProposalJob < AiAssistantJob
       type: "object",
       required: %w[parts lines questions reasoning],
       properties: {
+        customer_id:    { type: "string", description: "Organization id of the customer, from Organization.where(is_customer: true) matched by name / email domain / letterhead. Omit if you genuinely cannot match one — never guess an id." },
+        customer_name:  { type: "string", description: "The customer's name as HAMS has it (or as the enquiry gives it, if unmatched)." },
+        customer_reasoning: { type: "string", description: "One sentence: what you matched the customer from (sender domain, signature, letterhead) — or why you couldn't." },
+        end_user_prime: { type: "string", description: "Exactly one of #{PRIME_UPLIFT.keys.join(', ')} when the drawing or enquiry shows the work is ultimately for that prime (title block, logo, their spec references, or stated in the email); otherwise omit. Price at the normal rate card — HAMS applies the prime uplift itself." },
         title:          { type: "string", description: "Short quote title, e.g. 'PD67711-00 — Door Upper Hinge Insert'" },
         summary:        { type: "string", description: "One line: process, spec, thickness. Printed on the quote." },
         enquirer_name:  { type: "string" },
@@ -96,6 +107,7 @@ class QuoteProposalJob < AiAssistantJob
     run_proposal_loop([{ role: "user", content: user_content }])
 
     raise "The assistant finished without calling propose_quote" unless @proposal
+    apply_prime_uplift!(@proposal)
     @quote.update!(proposal: @proposal, proposal_error: nil, status: "proposed", proposed_at: Time.current)
   rescue => e
     Rails.logger.error "[QuoteProposalJob] #{e.class}: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
@@ -103,6 +115,53 @@ class QuoteProposalJob < AiAssistantJob
   end
 
   private
+
+  def apply_prime_uplift!(prop)
+    prime  = PRIME_UPLIFT.keys.find { |k| k.casecmp?(prop["end_user_prime"].to_s.strip) }
+    factor = prime && PRIME_UPLIFT[prime]
+    prop.delete("prime_uplift")
+    return unless factor
+
+    lines    = Array(prop["lines"])
+    part_ls  = lines.select { |l| l["part_key"].present? }
+    moc_line = lines.find { |l| l["part_key"].blank? }
+    base_sum = part_ls.sum { |l| l["quantity"].to_i * l["unit_amount"].to_f }
+    moc      = moc_line ? base_sum + moc_line["unit_amount"].to_f : nil
+
+    part_ls.each do |l|
+      base = l["unit_amount"].to_f
+      l["unit_amount"] = (base * factor).round(2)
+      l["reasoning"]   = "#{l['reasoning']}\n#{prime} prime: £#{'%.2f' % base} × #{factor} = £#{'%.2f' % l['unit_amount']} (applied by HAMS)"
+    end
+
+    if moc_line
+      shortfall = moc - part_ls.sum { |l| l["quantity"].to_i * l["unit_amount"].to_f }
+      if shortfall > 0
+        moc_line["unit_amount"] = shortfall.round(2)
+        moc_line["reasoning"]   = "#{moc_line['reasoning']}\nRecomputed after #{prime} uplift: MOC £#{'%.2f' % moc} − lines → £#{'%.2f' % shortfall}"
+      else
+        lines.delete(moc_line)
+      end
+    end
+
+    prop["end_user_prime"] = prime
+    prop["prime_uplift"]   = factor
+  end
+
+  # The previous proposal goes back to the model at rate-card prices so it
+  # can't compound the uplift on a re-run; the reviewer's edited figures on
+  # the build page are uplifted ones, so they get divided down too.
+  def base_proposal
+    prop   = @quote.proposal.deep_dup
+    factor = prop.delete("prime_uplift").to_f
+    return prop unless factor > 1
+    Array(prop["lines"]).each do |l|
+      l["reasoning"] = l["reasoning"].to_s.sub(/\n[^\n]*\(applied by HAMS\)\z/, "").sub(/\nRecomputed after .*\z/m, "")
+      next if l["part_key"].blank?
+      l["unit_amount"] = (l["unit_amount"].to_f / factor).round(2)
+    end
+    prop
+  end
 
   def tools
     [TOOLS.first, PROPOSE_TOOL]
@@ -188,6 +247,14 @@ class QuoteProposalJob < AiAssistantJob
          and for each part record WHICH files are its drawings (drawing_indexes,
          by the "file N" label). Three drawings for three parts means each part
          gets one — match by the part number in the title block or filename.
+      1b. CUSTOMER and END USER are two different things. The customer is who is
+         asking (see CUSTOMER in the message). The end user is who the part is
+         ultimately for: if the title block, logo, spec references (e.g. DS
+         26.00 = Cobham) or the email shows it is for one of the primes in
+         end_user_prime's list, set end_user_prime to that name. Price at the
+         NORMAL rate card regardless — do not multiply anything yourself; HAMS
+         applies the prime rate after you and shows the reviewer both figures.
+         Say in the overall reasoning what you spotted the prime from.
       2. For each part, check Part.matching(customer_id: ..., part_number: ..., part_issue: ...)
          — if it exists, set existing_part_id and reuse its each_price as a sanity check.
       3. Otherwise find the template part (STEP 1 above) and copy its operation
@@ -293,21 +360,39 @@ class QuoteProposalJob < AiAssistantJob
     end
 
     customer = @quote.customer
-    known = Part.where(customer_id: customer.id).order(updated_at: :desc).limit(25)
-                .map { |p| "#{p.part_number}-#{p.part_issue} · #{p.description} · #{p.specification} · each £#{p.each_price}" }
+    if customer
+      known = Part.where(customer_id: customer.id).order(updated_at: :desc).limit(25)
+                  .map { |p| "#{p.part_number}-#{p.part_issue} · #{p.description} · #{p.specification} · each £#{p.each_price}" }
+      customer_block = <<~TXT
+        CUSTOMER: #{customer.name} (id #{customer.id}) — confirmed by the reviewer; return it as customer_id/customer_name.
+
+        EXISTING PARTS FOR THIS CUSTOMER (most recent 25):
+        #{known.presence&.join("\n") || 'none'}
+      TXT
+    else
+      customer_block = <<~TXT
+        CUSTOMER: NOT SET. Identify the customer from the enquiry — sender email
+        domain, signature block, letterhead, PO/RFQ header — and match it to HAMS:
+          Organization.where(is_customer: true).where("name ILIKE ?", "%acme%").pluck(:id, :name)
+        Try the company name, then the email domain's distinctive word. Return
+        customer_id and customer_name; if nothing matches, give customer_name as
+        the enquiry has it, leave customer_id out, and say so in customer_reasoning.
+        The prime/OEM on the drawing is usually NOT the customer — the customer is
+        whoever is asking. Once matched, list their recent parts yourself
+        (Part.where(customer_id: ...).order(updated_at: :desc).limit(25)) before
+        checking Part.matching.
+      TXT
+    end
 
     text = <<~TXT
-      CUSTOMER: #{customer.name} (id #{customer.id})
-      ENQUIRER: #{[@quote.enquirer_name, @quote.enquirer_email].compact_blank.join(' · ').presence || 'not given'}
+      #{customer_block}
+      ENQUIRER: #{[@quote.enquirer_name, @quote.enquirer_email].compact_blank.join(' · ').presence || 'not given — take it from the enquiry'}
 
       ENQUIRY:
       #{@quote.enquiry.presence || '(no text — work from the drawing)'}
-
-      EXISTING PARTS FOR THIS CUSTOMER (most recent 25):
-      #{known.presence&.join("\n") || 'none'}
     TXT
 
-    text += "\n\nPREVIOUS PROPOSAL:\n#{JSON.pretty_generate(@quote.proposal)}" if @quote.proposal.present?
+    text += "\n\nPREVIOUS PROPOSAL (prices shown at the rate card — HAMS applies any prime uplift after you):\n#{JSON.pretty_generate(base_proposal)}" if @quote.proposal.present?
     text += "\n\nANSWERS FROM THE REVIEWER:\n" + @quote.answers.map { |k, v| "- #{k}: #{v}" }.join("\n") if @quote.answers.present?
 
     blocks << { type: "text", text: text }

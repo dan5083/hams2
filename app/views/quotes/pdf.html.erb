@@ -55,13 +55,15 @@
           </tr>
         </thead>
         <tbody>
-          <% @quote.quote_items.each do |item| %>
+          <%# One row per part: the process + masking lines summed into one
+              each price. The per-line breakdown stays on the HAMS quote. %>
+          <% @quote.customer_lines.each do |line| %>
             <tr>
-              <td><%= item.part&.display_name %></td>
-              <td class="desc"><%= item.description %></td>
-              <td class="num"><%= item.quantity %></td>
-              <td class="num"><%= '%.2f' % item.unit_amount %></td>
-              <td class="num"><%= '%.2f' % item.line_total %></td>
+              <td><%= line.part&.display_name %></td>
+              <td class="desc"><%= line.description %></td>
+              <td class="num"><%= line.quantity %></td>
+              <td class="num"><%= '%.2f' % line.unit_amount %></td>
+              <td class="num"><%= '%.2f' % line.line_total %></td>
             </tr>
           <% end %>
         </tbody>

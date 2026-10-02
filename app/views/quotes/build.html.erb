@@ -10,7 +10,7 @@
   <div class="flex justify-between items-start mb-6">
     <div>
       <h1 class="text-3xl font-bold text-gray-900">Quote <%= @quote.display_name %> <span class="text-lg font-normal text-gray-500">— workbench</span></h1>
-      <p class="text-sm text-gray-600 mt-1"><%= @quote.customer.name %><%= " · raised by #{@quote.created_by.display_name}" if @quote.created_by %></p>
+      <p class="text-sm text-gray-600 mt-1"><%= @quote.customer&.name || p["customer_name"].presence || "customer not yet identified" %><%= " · raised by #{@quote.created_by.display_name}" if @quote.created_by %></p>
     </div>
     <%= link_to "Back to Quotes", quotes_path, class: "text-sm text-blue-600 hover:text-blue-900" %>
   </div>
@@ -68,6 +68,31 @@
 
       <% else %>
         <%= form_with url: finalise_quote_path(@quote), method: :post, local: true, data: { turbo: false }, id: "workbench-form", class: "space-y-6" do %>
+          <%# Customer — proposed by the assistant, confirmed or corrected here %>
+          <% matched = @quote.customer || (p["customer_id"].present? ? Organization.find_by(id: p["customer_id"]) : nil) %>
+          <div class="bg-white shadow rounded-lg p-4 grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+            <div class="md:col-span-2">
+              <label class="block text-xs font-medium text-gray-700">Customer <span class="text-red-600">*</span>
+                <% if matched %><span class="ml-2 inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">matched in HAMS</span>
+                <% else %><span class="ml-2 inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">no match — type the HAMS name</span><% end %>
+              </label>
+              <%= hidden_field_tag "form[customer_id]", matched&.id %>
+              <%= text_field_tag "form[customer_name]", matched&.name || p["customer_name"], list: "hams-customers", required: true,
+                  class: "border border-gray-300 rounded px-2 py-1 w-full", placeholder: "start typing the customer's HAMS name" %>
+              <datalist id="hams-customers">
+                <% Organization.enabled.where(is_customer: true).order(:name).pluck(:name).each do |n| %><option value="<%= n %>"><% end %>
+              </datalist>
+              <% if p["customer_reasoning"].present? %><p class="text-xs text-gray-500 mt-1"><%= p["customer_reasoning"] %></p><% end %>
+            </div>
+            <div class="text-sm">
+              <% if @quote.proposal_prime %>
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded bg-purple-100 text-purple-800">End user: <%= @quote.proposal_prime %> — prime rate ×<%= @quote.prime_uplift %></span>
+                <p class="text-xs text-gray-500 mt-1">Applied by HAMS to every per-piece line below; the working shows the base figure.</p>
+              <% else %>
+                <span class="text-xs text-gray-500">No prime end user detected.</span>
+              <% end %>
+            </div>
+          </div>
           <% if p["reasoning"].present? %>
             <p class="text-sm text-gray-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3"><%= p["reasoning"] %></p>
           <% end %>

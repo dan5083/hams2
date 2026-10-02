@@ -16,7 +16,10 @@ class Quote < ApplicationRecord
   STATUSES          = %w[proposing proposed proposal_failed draft sent won lost].freeze
   WORKBENCH_STATUSES = %w[proposing proposed proposal_failed].freeze
 
-  belongs_to :customer, class_name: "Organization"
+  # Unset while the assistant is working out who the customer is; required
+  # from draft onwards (finalise resolves it from the reviewed form).
+  belongs_to :customer, class_name: "Organization", optional: true
+  validates :customer, presence: true, unless: :in_workbench?
   belongs_to :created_by, class_name: "User", optional: true
   has_many :quote_items, -> { order(:position) }, dependent: :destroy, inverse_of: :quote
   has_many :parts, through: :quote_items
@@ -40,6 +43,8 @@ class Quote < ApplicationRecord
   def proposal_questions = Array(proposal&.dig("questions"))
   def proposal_parts     = Array(proposal&.dig("parts"))
   def proposal_lines     = Array(proposal&.dig("lines"))
+  def proposal_prime     = proposal&.dig("end_user_prime").presence
+  def prime_uplift       = proposal&.dig("prime_uplift").to_f
 
   def self.next_number
     Sequence.next_value("quote_number")
@@ -51,6 +56,31 @@ class Quote < ApplicationRecord
 
   def total_ex_tax
     quote_items.sum { |i| i.line_total }
+  end
+
+  # What the customer sees. The saved quote_items keep the breakdown for us
+  # (one per treatment, one for masking); the customer gets ONE row per part
+  # with those per-piece amounts summed into a single each price — the same
+  # figure saved as the part's each_price. Price breaks (same part, different
+  # quantity) stay separate rows; the MOC and any other part-less line is its
+  # own row. Order follows the items' positions.
+  CustomerLine = Struct.new(:part, :description, :quantity, :unit_amount, :items, keyword_init: true) do
+    def line_total = unit_amount * quantity
+    def combined?  = items.size > 1
+  end
+
+  def customer_lines
+    quote_items.includes(:part)
+               .group_by { |i| i.part_id ? [i.part_id, i.quantity] : [nil, i.id] }
+               .map do |_, items|
+      CustomerLine.new(
+        part:        items.first.part,
+        description: items.map { |i| i.description.to_s.strip }.join("\n"),
+        quantity:    items.first.quantity,
+        unit_amount: items.sum(&:unit_amount),
+        items:       items
+      )
+    end
   end
 
   def sent?  = status == "sent"

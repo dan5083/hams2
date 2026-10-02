@@ -1,6 +1,6 @@
-<%# app/views/quotes/new.html.erb — start a quote: customer, drawings, enquiry.
-    Submitting uploads the files and kicks off the assistant; the reviewer
-    lands on the build page while it works. %>
+<%# app/views/quotes/new.html.erb — start a quote: drawings + the enquiry.
+    No fields to fill: the assistant reads customer, enquirer, part, spec and
+    quantities out of the paste / PDF and proposes them on the build page. %>
 <div class="container mx-auto px-4 py-6 max-w-3xl">
   <div class="flex justify-between items-center mb-6">
     <h1 class="text-3xl font-bold text-gray-900">New Quote</h1>
@@ -20,35 +20,33 @@
     <p class="text-sm text-red-700 mt-1">Files uploaded here are stored in Cloudinary and sent to an external AI service for analysis. ITAR-controlled data must not leave the controlled environment — quote those by hand.</p>
   </div>
 
+  <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 text-sm text-blue-900">
+    <p class="font-semibold mb-1">What the paste or the PDF needs to contain</p>
+    <p class="text-blue-800 mb-2">The assistant fills the quote from these. Anything missing becomes a question on the next page, so the more of it is in here the less you type later.</p>
+    <ul class="list-disc pl-5 space-y-0.5">
+      <li><strong>Who is asking</strong> — company, contact name and email (the sender block of the email is enough).</li>
+      <li><strong>Part number and issue / revision</strong> — on the drawing title block or in the email.</li>
+      <li><strong>Specification and process</strong> — DEF STAN / MIL spec, thickness or build-up, sealing, dye, colour.</li>
+      <li><strong>Material</strong> — the alloy (6082, 7075-T6, 2024…).</li>
+      <li><strong>Quantities</strong> — and any price breaks they want.</li>
+      <li><strong>Masking</strong> — any faces, bores or areas the drawing marks as free of coating.</li>
+      <li><strong>End user / prime</strong> — if the work is ultimately for Ultra, Cobham or Eaton, it should be visible on the drawing or stated in the email.</li>
+      <li><strong>Anything they said</strong> — deadline, previous quote reference, "same as last time".</li>
+    </ul>
+  </div>
+
   <%= form_with model: @quote, url: quotes_path, local: true, multipart: true, data: { turbo: false }, class: "bg-white shadow rounded-lg p-6 space-y-5" do |f| %>
-    <div>
-      <%= f.label :customer_id, "Customer", class: "block text-sm font-medium text-gray-700 mb-1" %>
-      <%= f.collection_select :customer_id, @customers, :id, :name, { prompt: "Select customer" }, required: true,
-          class: "border border-gray-300 rounded px-3 py-2 w-full" %>
-    </div>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div>
-        <%= f.label :enquirer_name, "Enquirer name", class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= f.text_field :enquirer_name, class: "border border-gray-300 rounded px-3 py-2 w-full", placeholder: "optional" %>
-      </div>
-      <div>
-        <%= f.label :enquirer_email, "Enquirer email", class: "block text-sm font-medium text-gray-700 mb-1" %>
-        <%= f.email_field :enquirer_email, class: "border border-gray-300 rounded px-3 py-2 w-full", placeholder: "needed to send, can add later" %>
-      </div>
-    </div>
-
     <div>
       <%= f.label :drawings, "Drawings / enquiry documents (PDF, JPG, PNG)", class: "block text-sm font-medium text-gray-700 mb-1" %>
       <%= f.file_field :drawings, multiple: true, accept: "application/pdf,image/*", required: true,
           class: "block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-blue-50 file:text-blue-700" %>
-      <p class="text-xs text-gray-500 mt-1">These are attached to the part(s) created when you save, and go out with the quote email.</p>
+      <p class="text-xs text-gray-500 mt-1">An emailed RFQ saved as PDF works here on its own. Drawings are attached to the part(s) created when you save, and go out with the quote email.</p>
     </div>
 
     <div>
       <%= f.label :enquiry, "Enquiry text", class: "block text-sm font-medium text-gray-700 mb-1" %>
-      <%= f.text_area :enquiry, rows: 8, class: "border border-gray-300 rounded px-3 py-2 w-full font-mono text-sm",
-          placeholder: "Paste the customer's email / RFQ here — quantities, spec, deadline, anything they said." %>
+      <%= f.text_area :enquiry, rows: 10, class: "border border-gray-300 rounded px-3 py-2 w-full font-mono text-sm",
+          placeholder: "Paste the whole customer email here, sender block included — quantities, spec, deadline, anything they said." %>
     </div>
 
     <div class="flex justify-end space-x-2 pt-2">

@@ -38,26 +38,24 @@ class QuotesController < ApplicationController
 
   def new
     @quote = Quote.new(valid_until: Date.current + Quote::VALIDITY_DAYS.days)
-    @customers = Organization.enabled.order(:name)
   end
 
   def create
-    customer = Organization.find(params.dig(:quote, :customer_id))
     files    = Array(params.dig(:quote, :drawings)).reject(&:blank?)
     if files.empty?
-      @quote = Quote.new(quote_params); @customers = Organization.enabled.order(:name)
+      @quote = Quote.new(quote_params)
       @quote.errors.add(:base, "Attach at least one drawing or enquiry document.")
       render :new, status: :unprocessable_entity and return
     end
 
-    @quote = Quote.new(quote_params.merge(customer: customer, status: "proposing", created_by: Current.user))
-    @quote.drawings = files.map { |f| upload_drawing(f, customer) }
+    @quote = Quote.new(quote_params.merge(status: "proposing", created_by: Current.user))
+    @quote.drawings = files.map { |f| upload_drawing(f) }
     @quote.save!
     QuoteProposalJob.perform_later(@quote.id)
     redirect_to build_quote_path(@quote)
   rescue => e
     Rails.logger.error "quotes#create failed: #{e.message}"
-    @quote ||= Quote.new(quote_params); @customers = Organization.enabled.order(:name)
+    @quote ||= Quote.new(quote_params)
     @quote.errors.add(:base, e.message)
     render :new, status: :unprocessable_entity
   end
@@ -73,6 +71,7 @@ class QuotesController < ApplicationController
 
   # Post the reviewer's answers (and any edits) back to the assistant.
   def rerun
+    resolve_customer!
     @quote.update!(answers: (params[:answers] || {}).to_unsafe_h.reject { |_, v| v.blank? },
                    proposal: merged_proposal, status: "proposing", proposal_error: nil)
     QuoteProposalJob.perform_later(@quote.id)
@@ -82,6 +81,8 @@ class QuotesController < ApplicationController
   # Create parts + items from the reviewed form.
   def finalise
     return rerun if params[:intent] == "rerun" # same form, same CSRF token — see build.html.erb
+    resolve_customer!
+    raise "Pick a customer before saving — the assistant couldn't match one." unless @quote.customer
 
     # The form is free-shaped (parts keyed by proposal key, arbitrary
     # treatment JSON), so it can't be strong-params-permitted field by field;
@@ -118,16 +119,26 @@ class QuotesController < ApplicationController
   end
 
   def quote_params
-    params.require(:quote).permit(:customer_id, :enquirer_name, :enquirer_email, :enquiry, :valid_until)
+    params.require(:quote).permit(:enquiry, :valid_until)
   end
 
-  def upload_drawing(file, customer)
-    r = CloudinaryService.upload_file(file, "quotes/#{customer.name.parameterize}", filename_prefix: "qt")
+  def upload_drawing(file)
+    r = CloudinaryService.upload_file(file, "quotes", filename_prefix: "qt")
     {
       "cloudinary_public_id" => r[:public_id], "cloudinary_url" => r[:secure_url],
       "original_filename" => r[:filename], "file_size_bytes" => r[:size],
       "content_type" => r[:content_type], "uploaded_at" => Time.current.iso8601
     }
+  end
+
+  # The build page posts form[customer_id] (hidden, from the proposal) and
+  # form[customer_name] (editable). A changed name wins over the id.
+  def resolve_customer!
+    form = (params[:form] || {}).to_unsafe_h
+    name = form["customer_name"].to_s.strip
+    org  = Organization.enabled.find_by("name ILIKE ?", name) if name.present?
+    org ||= Organization.find_by(id: form["customer_id"]) if form["customer_id"].present?
+    @quote.update!(customer: org) if org && org != @quote.customer
   end
 
   # On re-run, carry the reviewer's edits into the proposal so the model
@@ -136,6 +147,8 @@ class QuotesController < ApplicationController
     form = (params[:form] || {}).to_unsafe_h.deep_stringify_keys
     prop = (@quote.proposal || {}).deep_dup
     %w[title summary notes enquirer_name enquirer_email].each { |k| prop[k] = form[k] if form.key?(k) }
+    prop["customer_id"]   = @quote.customer_id if @quote.customer_id
+    prop["customer_name"] = @quote.customer&.name if @quote.customer
     if form["parts"].is_a?(Hash)
       prop["parts"] = Array(prop["parts"]).map do |p|
         f = form["parts"][p["key"]] or next p
