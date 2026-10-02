@@ -7,7 +7,7 @@ module OperationLibrary
     # Values are µm, stored as the strings an operator would type.
     FOIL_METERS = {
       "5"  => ["23.8", "79.8", "49.4"],
-      "8"  => ["24.5", "49.3"],
+      "8"  => ["24.5", "49.3", "23.7", "50.0"],
       "9"  => ["23.3", "50.4", "79.3"],
       "10" => ["12.2", "12.2"]
     }.freeze
