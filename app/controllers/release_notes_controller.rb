@@ -127,17 +127,9 @@ class ReleaseNotesController < ApplicationController
   end
 
   def pdf
-    # The lead release note carries the Proof of Collection (see pdf.html.erb),
-    # so it's a collection document too: same guard as the collection pack.
-    # Non-lead RNs are just a CofC and print regardless.
-    co = @release_note.works_order.customer_order
-    if params[:force].blank? && co.lead_release_note&.id == @release_note.id && (gap = co.releasable_candidates).any?
-      redirect_to release_customer_order_path(co),
-                  alert: "#{@release_note.display_name} carries the Proof of Collection for #{co.number}, but " \
-                         "#{gap.sum(&:quantity)} certified part(s) on #{gap.map { |c| c.works_order.display_name }.join(', ')} " \
-                         "haven't been released. Release them first, or add ?force=1 to print anyway."
-      return
-    end
+    # The lead release note carries the Proof of Collection (see pdf.html.erb).
+    # Certified-but-unreleased parts on the order are flagged on the customer
+    # order page; a partial collection is routine, so this always prints.
     @company_name    = "Hard Anodising Surface Treatments Ltd"
     @trading_address = "Firs Industrial Estate, Rickets Close\nKidderminster, DY11 7QN"
 

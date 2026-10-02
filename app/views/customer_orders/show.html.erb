@@ -13,10 +13,13 @@
             class: "#{releasable > 0 ? 'bg-blue-600 hover:bg-blue-800' : 'bg-gray-400 hover:bg-gray-500'} text-white font-bold py-2 px-4 rounded",
             title: (releasable > 0 ? "#{@bookout_candidates.select { |c| c.reason.nil? }.sum(&:quantity)} certified part(s) not yet released" : "Nothing certified and unreleased right now") %>
         <% if @customer_order.delivery_release_notes.any? %>
+          <% unreleased = @bookout_candidates.select { |c| c.reason.nil? && c.quantity.positive? } %>
           <%= link_to "Collection Pack (PDF)",
               collection_pack_customer_order_path(@customer_order, format: :pdf),
               target: "_blank",
-              title: "One PDF: the Proof of Collection the driver signs, followed by the Certificate of Conformity for every release note on this order",
+              title: (unreleased.any? ?
+                "Not in this pack: #{unreleased.sum(&:quantity)} certified part(s) on #{unreleased.map { |c| c.works_order.display_name }.join(', ')} haven't been released" :
+                "One PDF: the Proof of Collection the driver signs, followed by the Certificate of Conformity for every release note on this order"),
               class: "bg-purple-600 hover:bg-purple-800 text-white font-bold py-2 px-4 rounded" %>
         <% end %>
         <% if @customer_order.can_be_voided? %>
@@ -30,6 +33,19 @@
           class: "bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" %>
     </div>
   </div>
+
+  <%# Partial collection: the pack always prints, but say what it leaves behind. %>
+  <% unreleased = @bookout_candidates.select { |c| c.reason.nil? && c.quantity.positive? } %>
+  <% if unreleased.any? && @customer_order.delivery_release_notes.any? %>
+    <div class="bg-amber-50 border-l-4 border-amber-400 text-amber-800 px-4 py-3 mb-6 rounded">
+      <strong>Partial collection:</strong>
+      <%= unreleased.sum(&:quantity) %> certified part(s) on
+      <%= unreleased.map { |c| c.works_order.display_name }.join(', ') %>
+      <%= unreleased.one? ? "isn't" : "aren't" %> released and won't appear on the collection pack.
+      <%= link_to "Release them", release_customer_order_path(@customer_order), class: "underline font-semibold" %>
+      if they're going on this collection.
+    </div>
+  <% end %>
 
   <%
     uninvoiced_release_notes = ReleaseNote.joins(:works_order)

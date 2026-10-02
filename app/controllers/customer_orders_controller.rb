@@ -203,17 +203,8 @@ class CustomerOrdersController < ApplicationController
       return
     end
 
-    # The PoC is what the driver signs for. If the process record certifies
-    # parts nobody has released, they will leave the building on this
-    # signature and never be invoiced — so release them first. ?force=1 is
-    # the escape hatch for a genuinely partial collection.
-    if params[:force].blank? && (gap = @customer_order.releasable_candidates).any?
-      redirect_to release_customer_order_path(@customer_order),
-                  alert: "Collection pack not printed — #{gap.sum(&:quantity)} certified part(s) on " \
-                         "#{gap.map { |c| c.works_order.display_name }.join(', ')} haven't been released. " \
-                         "Release them here first, or add ?force=1 to the pack link for a partial collection."
-      return
-    end
+    # Certified-but-unreleased parts are flagged on the order page next to
+    # the pack link (a partial collection is routine), so always print.
 
     respond_to do |format|
       format.html { render layout: false }
