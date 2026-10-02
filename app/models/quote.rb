@@ -66,7 +66,31 @@ class Quote < ApplicationRecord
   # own row. Order follows the items' positions.
   CustomerLine = Struct.new(:part, :description, :quantity, :unit_amount, :items, keyword_init: true) do
     def line_total = unit_amount * quantity
-    def combined?  = items.size > 1
+    def combined?  = items.size > 1 || rows.size > 1
+
+    # One row per treatment: [{ description:, unit_amount: }]. From the items'
+    # saved breakdown when they have one, else one row per item (older
+    # quotes). The part number the model used to prefix every description
+    # ("2250-4000 — Hard anodise…") is stripped — the Part column shows it.
+    def rows
+      @rows ||= items.flat_map do |i|
+        bd = i.breakdown_rows
+        bd.any? ? bd.map { |c| { description: strip_pn(c["description"]), unit_amount: c["unit_amount"].to_d } }
+                : [{ description: strip_pn(i.description), unit_amount: i.unit_amount.to_d }]
+      end
+    end
+
+    # Reviewer may have overtyped the unit price on the workbench; show the gap.
+    def adjustment = unit_amount.to_d - rows.sum { |r| r[:unit_amount] }
+
+    private
+
+    def strip_pn(text)
+      t = text.to_s.strip
+      pn = part&.part_number.to_s
+      t = t.sub(/\A#{Regexp.escape(pn)}(-\w+)?\s*[—–-]\s*/, "") if pn.present?
+      t
+    end
   end
 
   def customer_lines

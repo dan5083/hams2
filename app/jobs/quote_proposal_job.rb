@@ -74,7 +74,10 @@ class QuoteProposalJob < AiAssistantJob
             required: %w[description quantity unit_amount reasoning],
             properties: {
               part_key:    { type: "string", description: "The part this line prices, PER PIECE. ONE line per part (per quantity break): every treatment and any masking summed into unit_amount. Omit (or empty) ONLY for the minimum-order-charge line, which belongs to no part." },
-              description: { type: "string", description: "Customer-facing. Part number, then each treatment and any masking on its own line, e.g. 'Hard anodise WS T.I. 5031, 50–65 µm, hot water sealed\\nChromate conversion (Alochrom 1200) on designated faces\\nMasking (polyester tape) — chromated electrical faces'. No prices per treatment here — one price, on the line." },
+              description: { type: "string", description: "Customer-facing. Each treatment and any masking on its own line, e.g. 'Hard anodise WS T.I. 5031, 50–65 µm, hot water sealed\\nChromate conversion (Alochrom 1200) on designated faces\\nMasking (polyester tape) — chromated electrical faces'. NO part number — the quote shows it in its own column. No prices here." },
+              components:  { type: "array", description: "REQUIRED on every part line: the per-piece make-up of unit_amount, one entry per treatment / masking, same order and wording as the description lines. Their unit_amounts MUST sum to the line's unit_amount. Omit on the MOC line.",
+                             items: { type: "object", required: %w[description unit_amount],
+                                      properties: { description: { type: "string" }, unit_amount: { type: "number" } } } },
               quantity:    { type: "integer", description: "The job quantity for a part line; 1 for the minimum order charge line." },
               unit_amount: { type: "number", description: "GBP ex VAT per piece for a part line. For the MOC line: the SHORTFALL (MOC minus the sum of all part lines), so the job price is the sum of every line." },
               reasoning:   { type: "string", description: "The working for THIS line, readable by a plater in a small box. One block per component, each ending in its per-piece £, then the sum: 'Hard anodise: 181×82×53 → 0.62 sqft × £20 = £12.40\\nAlochrom: 0.62 × £8 = £4.96\\nTape: A 25 cm², loops 2×12.6 → 10 min × £1.00 = £10.00\\nEach £27.36'. Inputs and results only — never the substitution, never the formula re-typed. Then × qty and the MOC comparison. This is the only place numbers are shown." },
@@ -131,6 +134,7 @@ class QuoteProposalJob < AiAssistantJob
     part_ls.each do |l|
       base = l["unit_amount"].to_f
       l["unit_amount"] = (base * factor).round(2)
+      Array(l["components"]).each { |c| c["unit_amount"] = (c["unit_amount"].to_f * factor).round(2) if c.is_a?(Hash) }
       l["reasoning"]   = "#{l['reasoning']}\n#{prime} prime: £#{'%.2f' % base} × #{factor} = £#{'%.2f' % l['unit_amount']} (applied by HAMS)"
     end
 
@@ -159,6 +163,7 @@ class QuoteProposalJob < AiAssistantJob
       l["reasoning"] = l["reasoning"].to_s.sub(/\n[^\n]*\(applied by HAMS\)\z/, "").sub(/\nRecomputed after .*\z/m, "")
       next if l["part_key"].blank?
       l["unit_amount"] = (l["unit_amount"].to_f / factor).round(2)
+      Array(l["components"]).each { |c| c["unit_amount"] = (c["unit_amount"].to_f / factor).round(2) if c.is_a?(Hash) }
     end
     prop
   end

@@ -60,7 +60,7 @@
           <% @quote.customer_lines.each do |line| %>
             <tr>
               <td><%= line.part&.display_name %></td>
-              <td class="desc"><%= line.description %></td>
+              <td class="desc"><%= line.rows.map { |r| r[:description] }.join("\n") %></td>
               <td class="num"><%= line.quantity %></td>
               <td class="num"><%= '%.2f' % line.unit_amount %></td>
               <td class="num"><%= '%.2f' % line.line_total %></td>

@@ -160,7 +160,9 @@ class QuotesController < ApplicationController
     end
     if form["lines"].is_a?(Hash)
       prop["lines"] = form["lines"].values.sort_by { |l| l["position"].to_i }.map { |l|
-        l.slice("part_key", "description", "reasoning").merge("quantity" => l["quantity"].to_i, "unit_amount" => l["unit_amount"].to_f)
+        l.slice("part_key", "description", "reasoning")
+         .merge("quantity" => l["quantity"].to_i, "unit_amount" => l["unit_amount"].to_f,
+                "components" => (JSON.parse(l["components"].to_s) rescue []))
       }
     end
     prop

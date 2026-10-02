@@ -13,6 +13,13 @@ class QuoteItem < ApplicationRecord
     (unit_amount || 0) * (quantity || 0)
   end
 
+  # The per-treatment make-up of unit_amount, [{ "description", "unit_amount" }],
+  # saved from the proposal line's components. Older items (one per
+  # treatment) have none — Quote#customer_lines treats each as its own row.
+  def breakdown_rows
+    Array(breakdown).select { |c| c.is_a?(Hash) && c["description"].present? }
+  end
+
   private
 
   def set_position

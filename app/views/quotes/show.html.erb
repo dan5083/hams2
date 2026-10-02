@@ -36,21 +36,18 @@
                     <% if line.part.has_previewable_files? %><span class="ml-1 text-xs text-gray-400" title="Drawing on file">📎<%= line.part.files.length %></span><% end %>
                   <% else %><span class="text-gray-400">—</span><% end %>
                 </td>
-                <td class="px-4 py-3 text-sm text-gray-800 whitespace-pre-line align-top"><%= line.description %></td>
+                <td class="px-4 py-3 text-sm text-gray-800 align-top">
+                  <% line.rows.each do |r| %>
+                    <div class="flex justify-between gap-4"><span><%= r[:description] %></span><% if line.combined? %><span class="tabular-nums text-gray-500 whitespace-nowrap">£<%= '%.2f' % r[:unit_amount] %></span><% end %></div>
+                  <% end %>
+                  <% if line.combined? && line.adjustment.nonzero? %>
+                    <div class="flex justify-between gap-4 text-gray-500 italic"><span>adjusted on the workbench</span><span class="tabular-nums whitespace-nowrap"><%= line.adjustment.positive? ? '+' : '' %>£<%= '%.2f' % line.adjustment %></span></div>
+                  <% end %>
+                </td>
                 <td class="px-4 py-3 text-sm text-right tabular-nums align-top"><%= line.quantity %></td>
                 <td class="px-4 py-3 text-sm text-right tabular-nums align-top">£<%= '%.2f' % line.unit_amount %></td>
                 <td class="px-4 py-3 text-sm text-right tabular-nums font-medium align-top">£<%= '%.2f' % line.line_total %></td>
               </tr>
-              <% if line.combined? %>
-                <tr class="bg-gray-50">
-                  <td></td>
-                  <td colspan="4" class="px-4 pb-2 text-xs text-gray-500">
-                    <span class="font-medium">Made up of:</span>
-                    <%= line.items.map { |i| "#{i.description.to_s.sub(/\A.*? — /, '')} £#{'%.2f' % i.unit_amount}" }.join(" · ") %>
-                    <span class="text-gray-400">— customer sees the one line above</span>
-                  </td>
-                </tr>
-              <% end %>
             <% end %>
           </tbody>
           <tfoot class="bg-gray-50">

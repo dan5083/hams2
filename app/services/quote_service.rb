@@ -203,10 +203,13 @@ class QuoteService
       quote.quote_items.destroy_all
       lines.each_with_index do |l, idx|
         next if l["skip"] == "1"
+        components = l["components"]
+        components = (JSON.parse(components) rescue []) if components.is_a?(String)
         quote.quote_items.create!(
           part: (l["part_key"].present? ? part_by_key[l["part_key"]] : nil), position: idx,
           description: l["description"], quantity: l["quantity"].to_i.nonzero? || 1,
-          unit_amount: l["unit_amount"].to_f.round(2)
+          unit_amount: l["unit_amount"].to_f.round(2),
+          breakdown: Array(components).select { |c| c.is_a?(Hash) }.map { |c| { "description" => c["description"], "unit_amount" => c["unit_amount"].to_f.round(2) } }
         )
       end
       quote.update!(status: "draft")

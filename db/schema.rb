@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_09_29_105917) do
+ActiveRecord::Schema[8.0].define(version: 2026_10_02_110756) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -325,13 +325,14 @@ ActiveRecord::Schema[8.0].define(version: 2026_09_29_105917) do
     t.decimal "unit_amount", precision: 10, scale: 2, default: "0.0", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.jsonb "breakdown", default: [], null: false
     t.index ["part_id"], name: "index_quote_items_on_part_id"
     t.index ["quote_id"], name: "index_quote_items_on_quote_id"
   end
 
   create_table "quotes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.integer "number", null: false
-    t.uuid "customer_id", null: false
+    t.uuid "customer_id"
     t.uuid "created_by_id"
     t.string "status", default: "draft", null: false
     t.string "title"
