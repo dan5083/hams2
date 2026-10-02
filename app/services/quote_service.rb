@@ -166,6 +166,10 @@ class QuoteService
       quoted_each = Hash.new(0.to_d)
       lines.each { |l| quoted_each[l["part_key"]] += l["unit_amount"].to_d if l["skip"] != "1" && l["part_key"].present? }
 
+      # What the assistant proposed for each part's jig — so we can tell a
+      # reviewer's change in the Jig type box from the template's default.
+      proposed_jigs = quote.proposal_parts.to_h { |p| [p["key"], p["jig_type"]] }
+
       part_by_key = {}
       parts.each do |key, spec|
         next if spec["skip"] == "1"
@@ -175,7 +179,7 @@ class QuoteService
           unit_amount: spec["each_price"].presence || quoted_each[key].round(2),
           part: spec.slice("description", "specification", "material", "specified_thicknesses",
                            "special_instructions", "process_type", "aerospace_defense", "jigging_location")
-                    .merge("operation_selection" => operation_selection_from(spec))
+                    .merge("operation_selection" => operation_selection_from(spec, proposed_jig: proposed_jigs[key]))
         }
         item[:part]["aerospace_defense"] = ActiveModel::Type::Boolean.new.cast(spec["aerospace_defense"])
         part = resolve_part!(quote.customer, item, created)
@@ -212,15 +216,22 @@ class QuoteService
   end
 
   # Build operation_selection from the form: treatments come back as a JSON
-  # string (the workbench edits them as JSON), jig type is applied to every
-  # treatment that lacks one, extras are whatever the proposal copied from
-  # the template.
-  def self.operation_selection_from(spec)
+  # string (the workbench edits them as JSON), extras are whatever the
+  # proposal copied from the template. The card's Jig type box is the
+  # reviewer's decision and WINS: it is written onto every treatment. (It
+  # used to fill only blanks — but treatments copied from a template always
+  # carry the template's jig, so changing the box did nothing.) A different
+  # jig on one treatment has to be set in the treatments JSON, and only
+  # survives if the box is left matching the proposal's jig for that part.
+  def self.operation_selection_from(spec, proposed_jig: nil)
     treatments = spec["treatments"]
     treatments = JSON.parse(treatments) if treatments.is_a?(String) && treatments.present?
     treatments = Array(treatments).map { |t| t.to_h.deep_stringify_keys }
     if spec["jig_type"].present?
-      treatments.each { |t| t["selected_jig_type"] = spec["jig_type"] if t["selected_jig_type"].blank? }
+      changed = proposed_jig.present? && spec["jig_type"] != proposed_jig
+      treatments.each do |t|
+        t["selected_jig_type"] = spec["jig_type"] if changed || t["selected_jig_type"].blank? || t["selected_jig_type"] == proposed_jig
+      end
     end
     extra = spec["operation_selection_extra"]
     extra = JSON.parse(extra) if extra.is_a?(String) && extra.present?

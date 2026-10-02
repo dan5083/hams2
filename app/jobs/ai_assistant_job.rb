@@ -528,8 +528,15 @@ class AiAssistantJob < ApplicationJob
           so a jig screwed into one leaves its mark where there is no coating
           to spoil. When the drawing excludes threaded holes and there is one,
           that IS the jigging location; use the matching M-jig (M6 Jig
-          (Metric)/(UNC) for M5–M8, Thin-/Thick-stem M8 Jig for M8+, wire
-          through anything smaller than M5) and don't ask.
+          (Metric)/(UNC) for M5–M8, Thin-/Thick-stem M8 Jig for M8+) and
+          don't ask.
+        - SMALL TAPPED HOLES (M4 and below) are jigged with the DOUBLE STRAP
+          JIG — "#{OperationLibrary::JigUnjig::JIG_TYPES.find { |j| j =~ /double\s*strap/i } || 'Double Strap Jig'}"
+          — never wire. A small thread can't take a stem jig and the strap
+          spreads the load across two holes. This is the rule on EVERY
+          aerospace / defence part with small tapped holes; on commercial
+          work it is still the default when the only usable feature is
+          M4 or smaller. Name the holes it uses in jigging_location.
         - "a secure titanium-to-part assy" is the generic fallback for parts
           with no usable feature. Never propose it when a tapped hole, bore or
           flange is available.

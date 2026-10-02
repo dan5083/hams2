@@ -73,11 +73,11 @@ class QuoteProposalJob < AiAssistantJob
             type: "object",
             required: %w[description quantity unit_amount reasoning],
             properties: {
-              part_key:    { type: "string", description: "The part this line prices, PER PIECE. Omit (or empty) ONLY for the minimum-order-charge line, which belongs to no part." },
-              description: { type: "string" },
+              part_key:    { type: "string", description: "The part this line prices, PER PIECE. ONE line per part (per quantity break): every treatment and any masking summed into unit_amount. Omit (or empty) ONLY for the minimum-order-charge line, which belongs to no part." },
+              description: { type: "string", description: "Customer-facing. Part number, then each treatment and any masking on its own line, e.g. 'Hard anodise WS T.I. 5031, 50–65 µm, hot water sealed\\nChromate conversion (Alochrom 1200) on designated faces\\nMasking (polyester tape) — chromated electrical faces'. No prices per treatment here — one price, on the line." },
               quantity:    { type: "integer", description: "The job quantity for a part line; 1 for the minimum order charge line." },
               unit_amount: { type: "number", description: "GBP ex VAT per piece for a part line. For the MOC line: the SHORTFALL (MOC minus the sum of all part lines), so the job price is the sum of every line." },
-              reasoning:   { type: "string", description: "The working for THIS line, once, readable by a plater in a small box: inputs and results only, one item per feature. 'Ø30 bore: A 35 cm², P 10 cm → 9.8 min' — never the substitution ('π×30×28 = ...'), never the formula re-typed, never 'actually...'. Then: dims → sqft, rate (+ add-ons), × qty, MOC comparison. This is the only place numbers are shown." }
+              reasoning:   { type: "string", description: "The working for THIS line, readable by a plater in a small box. One block per component, each ending in its per-piece £, then the sum: 'Hard anodise: 181×82×53 → 0.62 sqft × £20 = £12.40\\nAlochrom: 0.62 × £8 = £4.96\\nTape: A 25 cm², loops 2×12.6 → 10 min × £1.00 = £10.00\\nEach £27.36'. Inputs and results only — never the substitution, never the formula re-typed. Then × qty and the MOC comparison. This is the only place numbers are shown." },
             }
           }
         },
@@ -265,19 +265,23 @@ class QuoteProposalJob < AiAssistantJob
          price with the rate card. Show the arithmetic in each line's reasoning.
          PRICE LINES ARE PER PIECE — the part's each price, which is SAVED ON
          THE PART as what the customer was quoted per part. ONE LINE PER
-         TREATMENT in the part's treatments array — chromic anodise and
-         chromate conversion on the same part are TWO lines, never "anodise &
-         chromate" on one — plus a lacquer-masking line where there is one.
-         Quantity = the job quantity, unit_amount = the price per piece.
+         PART: price every treatment in the part's treatments array and any
+         masking SEPARATELY in the working, then SUM them into that part's
+         single unit_amount. Chromic anodise + chromate + masking on one part
+         is ONE line with three components in its reasoning and all three
+         named in its description, not three lines. The reviewer and the
+         customer both see one price per part; the breakdown lives in the
+         working only. Quantity = the job quantity, unit_amount = the summed
+         price per piece.
          NEVER a "qty 1" lot line for a part, and NEVER the MOC as a part's
          price: if the sum of the part lines for the job is under the minimum
          order charge (£250; £125 when the job is chemical conversion only),
          add ONE extra line with NO part_key, description "Minimum order
          charge", quantity 1, unit_amount = the shortfall. The job price is
          then the sum of all lines, and the part's each price stays true.
-         Example, 5 off at £6.40 each + masking £22.50 each = £144.50 →
-         lines: process 5 × £6.40, masking 5 × £22.50, MOC 1 × £105.50; job
-         price £250.00; part each price £28.90.
+         Example, 5 off: anodise £6.40 + masking £22.50 = £28.90 each →
+         lines: part 5 × £28.90 (working shows both components), MOC 1 ×
+         £105.50; job price £250.00; part each price £28.90.
          One set of lines per quantity break requested; if no quantity is
          given, quote for 1 off (the MOC line will carry most of it) and say
          in the summary where the per-piece price takes over.
@@ -286,7 +290,8 @@ class QuoteProposalJob < AiAssistantJob
          "bungs" in masking_methods, no line, no question, unless the line is
          high-volume and low-value (rate card says when). Faces the drawing
          marks for masking, bores, grooves and splines are rubber lacquer:
-         add a masking line priced by minutes and set
+         price it by minutes as a component of the part's line (named in the
+         description, worked in the reasoning) and set
          "45_stopping_off_lacquer" with the features. Never put lacquered
          features under "bungs" or holes under lacquer. The question, if any,
          is about WHICH features — never whether to quote it.
