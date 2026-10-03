@@ -763,6 +763,9 @@ end
     @part.customisation_data["operation_selection"]["aerospace_defense"] = !current_status
 
     if @part.save
+      # The locked ops' OCV specs were resolved for the OLD flag; redo them
+      # for the new one or the process record keeps the old capture shape.
+      @part.reresolve_locked_ocv_specs!
       status = @part.aerospace_defense? ? 'Aerospace/Defense' : 'Standard'
       redirect_to @part, notice: "Part successfully reclassified as #{status}."
     else

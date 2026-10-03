@@ -148,6 +148,10 @@ class QuoteProposalJob < AiAssistantJob
       end
     end
 
+    # A prime end user is NADCAP work whoever the customer is: water break,
+    # foil verification and OCV capture on every part on the quote.
+    Array(prop["parts"]).each { |p| p["aerospace_defense"] = true if p.is_a?(Hash) }
+
     prop["end_user_prime"] = prime
     prop["prime_uplift"]   = factor
   end
@@ -336,7 +340,9 @@ class QuoteProposalJob < AiAssistantJob
       - The company in the drawing's title block vs the customer. The prime/OEM
         on the drawing (Williams, Airbus, Leonardo...) is routinely NOT the
         customer — the customer is a subcontractor. That is normal and needs no
-        question. aerospace_defense follows the CUSTOMER's status, not the drawing.
+        question. aerospace_defense is true when the CUSTOMER is aerospace/defence
+        OR the part is for a prime (end_user_prime set) — a subcontractor's
+        Ultra part is aero work even though the subcontractor isn't.
       - Lead time, QA paperwork, or anything that doesn't change the config or price.
 
       ENQUIRER: fill enquirer_name/email ONLY from the enquiry text. Never use the

@@ -412,9 +412,11 @@ class AiAssistantJob < ApplicationJob
       - Nickel PTFE: £50 / sqft / thou
 
       TIME-DEPENDENT ADD-ONS:
-      - Masking (lacquering + delacquering): £1.50 / minute
+      - Masking labour (lacquer or tape, incl. removal): £1.50 / minute
       - Bunging: £0.30 per bung
-      - Taping: £1.00 / minute
+      - Taping: same £1.50/min, but ONE THIRD of the lacquer minutes — see
+        the masking model. Tape on a feature costs about a third of
+        lacquer on the same feature.
       - Heat treatment: £0.50 / kWh — assume the oven draws 24 kW regardless of temperature.
         Cost = 24 × hours × £0.50. E.g. 2 hours = 24 × 2 × 0.50 = £24.
 
@@ -520,9 +522,12 @@ class AiAssistantJob < ApplicationJob
              a bung. "Rubber lacquer" / "lacquer" / "stop-off" in an enquiry
              always means this. Priced by the time model above.
         "pc21_polyester_tape"     — flat faces, pads, large plain areas.
-             Same time model, but priced at the TAPING rate: £1.00/min, NOT
-             the £1.50 lacquer rate. 10 min of tape = £10.00, never £15.00.
-             Say "tape £1.00/min" in the working.
+             Same features, same loops, but ONE PASS: no coats, no drying,
+             so tape minutes = the model's minutes ÷ 3 (minimum 3 min),
+             still at £1.50/min. Three pads modelled at 13.6 min → 4.5 → 5
+             min × £1.50 = £7.50 taped; the same pads lacquered would be
+             14 min → £21.00. Show the ÷ 3 in the working: "tape: 13.6 ÷ 3
+             → 5 min × £1.50 = £7.50".
       Lacquer and tape add delacquer + check operations to the route; bungs
       alone do not. A part with lacquered bores configured as "bungs" is
       wrong even if the text says lacquer — the route would have no

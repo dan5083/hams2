@@ -198,6 +198,31 @@ class Part < ApplicationRecord
     true
   end
 
+  # Re-resolve every locked operation's OCV spec for the part's CURRENT
+  # aerospace flag. Locked ops carry the spec they were born with — a part
+  # locked as commercial has hard anodise stored as thickness-only,
+  # basis :general — and WorksOrder#resolve_ocv_spec treats an explicit spec
+  # as the instruction, so flipping the flag alone changes nothing on the
+  # record. Called from the aero toggle; safe to run from the console.
+  #
+  # Library spec by id first (so an anodise op keeps its own voltage
+  # checkpoints), the pattern fallback for ops the library doesn't know
+  # (custom text), nil for ops that record nothing. A live (unfrozen) WO
+  # picks the change up on next render; frozen records are untouched.
+  def reresolve_locked_ocv_specs!
+    return false unless locked_for_editing? && has_locked_operations_data?
+
+    library = searchable_library_operations.index_by(&:id)
+    aero    = aerospace_defense?
+    locked_operations.each do |op|
+      lib  = library[op["id"]]
+      spec = lib.respond_to?(:ocv) ? lib.ocv : nil
+      spec ||= OperationLibrary::OcvSpecs.fallback_for(op["id"], op["operation_text"], aerospace_defense: aero)
+      set_locked_operation_ocv!(op["position"], spec)
+    end
+    true
+  end
+
   # Attach (or replace) an explicit OCV capture spec on a locked operation.
   # Manual/copied ops carry ocv: nil, so the paperless record renders their
   # legacy "Time ___ Temp ___" blanks with nothing to type into; an explicit
