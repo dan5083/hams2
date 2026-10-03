@@ -24,7 +24,7 @@
         <% @quotes.each do |q| %>
           <tr class="hover:bg-gray-50">
             <td class="px-4 py-3 text-sm font-medium"><%= link_to q.display_name, (q.in_workbench? ? build_quote_path(q) : quote_path(q)), class: "text-blue-600 hover:text-blue-900" %></td>
-            <td class="px-4 py-3 text-sm text-gray-900"><%= q.customer.name %></td>
+            <td class="px-4 py-3 text-sm text-gray-900"><%= q.customer&.name || q.proposal&.dig("customer_name").presence || "—" %></td>
             <td class="px-4 py-3 text-sm text-gray-700 max-w-md truncate" title="<%= q.title %>"><%= q.title %></td>
             <td class="px-4 py-3 text-sm text-right tabular-nums">£<%= '%.2f' % q.total_ex_tax %></td>
             <td class="px-4 py-3 text-sm">

@@ -152,6 +152,7 @@
         <% end %>
       <% end %>
       <%= link_to "Release Notes", release_notes_path, class: "#{mlink_base} #{nav_amob if current_page?(release_notes_path)}" %>
+      <%= link_to "Quotes", quotes_path, class: "#{mlink_base} #{nav_amob if request.path.start_with?("/quotes")}" %>
       <%= link_to "Parts", parts_path, class: "#{mlink_base} #{nav_amob if current_page?(parts_path)}" %>
 
       <!-- Quality submenu (mobile) -->
