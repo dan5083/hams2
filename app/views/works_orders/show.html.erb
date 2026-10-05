@@ -475,31 +475,49 @@
                         mark = { complete: "✓", in_progress: "▸" }[statuses[n]] || "·"
                         date = entry["date"] ? " #{Date.parse(entry['date']).strftime('%d/%m')}" : ""
                         ["#{mark} B#{n}#{date} (qty #{entry['qty'].presence || '—'})", n]
-                      }, active_batch),
+                      } + [["— batched #{qty_total} · signed off #{@works_order.section_signed_quantity_total(wo_sections.first)}", "", { disabled: true }]],
+                      active_batch),
                     onchange: "this.form.requestSubmit()",
                     class: "border border-gray-300 rounded px-2 py-1 text-sm" %>
               <% end %>
 
-              <% if signed_batches.include?(active_batch) %>
-                <span class="text-xs text-gray-400">Qty <%= active_entry["qty"] %> · locked by sign-off</span>
+              <% base_signed = signed_batches.include?(active_batch) %>
+              <% if !@works_order.batch_qty_editable?(wo_sections.first, active_batch) %>
+                <span class="text-xs text-gray-400">Qty <%= active_entry["qty"] %> · locked by sign-off (released)</span>
               <% else %>
                 <%= form_with url: set_batch_qty_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex items-center gap-1" do %>
                   <%= hidden_field_tag :batch, active_batch %>
                   <% active_fb.each do |k, v| %><%= hidden_field_tag "fb[#{k}]", v %><% end %>
-                  <span class="text-xs text-gray-500">Qty</span>
-                  <% base_qty_id = "batch_qty_base_#{active_batch}" %>
-                  <%= number_field_tag :qty, active_entry["qty"], min: 1, id: base_qty_id,
-                      oninput: (@works_order.process_lead? ? "hamsBatchShareSum('shares_base_#{active_batch}', '#{base_qty_id}')" : nil),
-                      class: "border border-gray-300 rounded px-1 py-1 text-sm w-16" %>
                   <% if @works_order.process_lead? %>
-                    <%# How many of each member's parts are on this batch -
-                        the split is what lets a member release its own
+                    <%# Group lead: the batch qty IS the split - no separate qty
+                        box. The split is what lets a member release its own
                         parts (WorksOrder#own_signed_off_quantity). %>
-                    <%= render "works_orders/batch_shares",
-                        section: wo_sections.first, batch: active_batch, qty_input_id: base_qty_id %>
+                    <span class="text-xs text-gray-500">Qty <span class="font-medium text-gray-700"><%= active_entry["qty"].presence || "—" %></span></span>
+                    <%= render "works_orders/batch_shares", section: wo_sections.first, batch: active_batch %>
+                  <% else %>
+                    <span class="text-xs text-gray-500">Qty</span>
+                    <%= number_field_tag :qty, active_entry["qty"], min: 1, id: "batch_qty_base_#{active_batch}",
+                        class: "border border-gray-300 rounded px-1 py-1 text-sm w-16" %>
                   <% end %>
-                  <%= submit_tag "Set", class: "bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium px-2 py-1 rounded" %>
+                  <%= submit_tag "Set", class: "bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium px-2 py-1 rounded",
+                      data: (base_signed ? { confirm: "Batch #{active_batch} is signed off at qty #{active_entry['qty']}. Correct it? The change is logged on the record." } : {}) %>
+                  <% if base_signed %>
+                    <span class="text-xs text-amber-600" title="This batch has sign-offs; a qty change is recorded against it">· signed — correction logged</span>
+                  <% end %>
+                  <% if (changes = active_entry["qty_changes"]).present? %>
+                    <span class="text-xs text-gray-400" title="<%= changes.map { |c| "#{c['from'] || '—'} → #{c['to']} by #{c.dig('by', 'name')} #{(Time.parse(c['at']).strftime('%d/%m/%y %H:%M') rescue c['at'])}" }.join("\n") %>">
+                      (qty corrected ×<%= changes.length %>)
+                    </span>
+                  <% end %>
                 <% end %>
+              <% end %>
+
+              <% if @works_order.batch_deletable?(wo_sections.first, active_batch) %>
+                <%= button_to "✕ delete batch", delete_batch_works_order_path(@works_order, section: "base", batch: active_batch, fb: active_fb.presence),
+                    method: :delete, form: { data: { turbo: false } },
+                    data: { confirm: "Delete batch #{active_batch}? It has no records. Batches above it move down one number." },
+                    title: "Only a batch with no sign-offs, readings or date can be deleted",
+                    class: "text-xs text-red-500 hover:text-red-700 px-1" %>
               <% end %>
 
               <%= form_with url: add_batch_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex items-center gap-1" do %>
@@ -512,9 +530,9 @@
               <div class="ml-auto flex items-center gap-3">
               <span class="text-xs <%= qty_total == @works_order.record_quantity ? 'text-gray-400' : 'text-orange-600 font-medium' %>">
                 <% if qty_total == @works_order.record_quantity %>
-                  <%= batch_count %> batch<%= 'es' unless batch_count == 1 %> · <%= qty_total %> parts
+                  <%= batch_count %> batch<%= 'es' unless batch_count == 1 %> · <%= qty_total %> parts · <%= @works_order.section_signed_quantity_total(wo_sections.first) %> signed off
                 <% else %>
-                  ⚠️ Batch quantities total <%= qty_total %>, <%= @works_order.process_lead? ? "tank load" : "order" %> is <%= @works_order.record_quantity %>
+                  ⚠️ Batch quantities total <%= qty_total %>, <%= @works_order.process_lead? ? "process group" : "order" %> is <%= @works_order.record_quantity %>
                 <% end %>
               </span>
                 <% if active_batch > 1 %>
@@ -658,7 +676,7 @@
                       <% if f_qty_total == @works_order.record_quantity %>
                         <%= f_qty_total %> parts
                       <% else %>
-                        ⚠️ quantities total <%= f_qty_total %>, <%= @works_order.process_lead? ? "tank load" : "order" %> is <%= @works_order.record_quantity %>
+                        ⚠️ quantities total <%= f_qty_total %>, <%= @works_order.process_lead? ? "process group" : "order" %> is <%= @works_order.record_quantity %>
                       <% end %>
                     </span>
                     <span class="text-xs text-gray-500"><%= f_complete %>/<%= f_count %> complete<%= " · #{f_in_progress} in progress" if f_in_progress > 0 %></span>
@@ -681,29 +699,45 @@
                               mark = { complete: "✓", in_progress: "▸" }[f_statuses[n]] || "·"
                               date = entry["date"] ? " #{Date.parse(entry['date']).strftime('%d/%m')}" : ""
                               ["#{mark} B#{n}#{date} (qty #{entry['qty'].presence || '—'})", n]
-                            }, f_active),
+                            } + [["— batched #{f_qty_total} · signed off #{@works_order.section_signed_quantity_total(fork_sec)}", "", { disabled: true }]],
+                            f_active),
                           onchange: "this.form.requestSubmit()",
                           class: "border border-gray-300 rounded px-2 py-1 text-sm" %>
                     <% end %>
-                    <% if f_signed.include?(f_active) %>
-                      <span class="text-xs text-gray-400">Qty <%= f_entry["qty"] %> · locked by sign-off</span>
+                    <% fork_signed = f_signed.include?(f_active) %>
+                    <% if !@works_order.batch_qty_editable?(fork_sec, f_active) %>
+                      <span class="text-xs text-gray-400">Qty <%= f_entry["qty"] %> · locked by sign-off (released)</span>
                     <% else %>
                       <%= form_with url: set_batch_qty_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex items-center gap-1" do %>
                         <%= hidden_field_tag :section, f_key %>
                         <%= hidden_field_tag :batch, f_active %>
                         <%= hidden_field_tag :base_batch, active_batch %>
                         <% active_fb.each do |k, v| %><%= hidden_field_tag "fb[#{k}]", v %><% end %>
-                        <span class="text-xs text-gray-500">Qty</span>
-                        <% fork_qty_id = "batch_qty_#{f_key.to_s.parameterize}_#{f_active}" %>
-                        <%= number_field_tag :qty, f_entry["qty"], min: 1, id: fork_qty_id,
-                            oninput: (@works_order.process_lead? ? "hamsBatchShareSum('shares_#{f_key.to_s.parameterize}_#{f_active}', '#{fork_qty_id}')" : nil),
-                            class: "border border-gray-300 rounded px-1 py-1 text-sm w-16" %>
                         <% if @works_order.process_lead? %>
-                          <%= render "works_orders/batch_shares",
-                              section: fork_sec, batch: f_active, qty_input_id: fork_qty_id %>
+                          <span class="text-xs text-gray-500">Qty <span class="font-medium text-gray-700"><%= f_entry["qty"].presence || "—" %></span></span>
+                          <%= render "works_orders/batch_shares", section: fork_sec, batch: f_active %>
+                        <% else %>
+                          <span class="text-xs text-gray-500">Qty</span>
+                          <%= number_field_tag :qty, f_entry["qty"], min: 1, id: "batch_qty_#{f_key.to_s.parameterize}_#{f_active}",
+                              class: "border border-gray-300 rounded px-1 py-1 text-sm w-16" %>
                         <% end %>
-                        <%= submit_tag "Set", class: "bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium px-2 py-1 rounded" %>
+                        <%= submit_tag "Set", class: "bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium px-2 py-1 rounded",
+                            data: (fork_signed ? { confirm: "Batch #{f_active} is signed off at qty #{f_entry['qty']}. Correct it? The change is logged on the record." } : {}) %>
+                        <% if fork_signed %>
+                          <span class="text-xs text-amber-600">· signed — correction logged</span>
+                        <% end %>
+                        <% if (changes = f_entry["qty_changes"]).present? %>
+                          <span class="text-xs text-gray-400" title="<%= changes.map { |c| "#{c['from'] || '—'} → #{c['to']} by #{c.dig('by', 'name')} #{(Time.parse(c['at']).strftime('%d/%m/%y %H:%M') rescue c['at'])}" }.join("\n") %>">
+                            (qty corrected ×<%= changes.length %>)
+                          </span>
+                        <% end %>
                       <% end %>
+                    <% end %>
+                    <% if @works_order.batch_deletable?(fork_sec, f_active) %>
+                      <%= button_to "✕ delete batch", delete_batch_works_order_path(@works_order, section: f_key, batch: f_active, base_batch: active_batch, fb: active_fb.presence),
+                          method: :delete, form: { data: { turbo: false } },
+                          data: { confirm: "Delete batch #{f_active} from this fork? It has no records. Batches above it move down one number." },
+                          class: "text-xs text-red-500 hover:text-red-700 px-1" %>
                     <% end %>
                     <%= form_with url: add_batch_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex items-center gap-1" do %>
                       <%= hidden_field_tag :section, f_key, id: nil %>
@@ -1010,6 +1044,11 @@
                       <% end %>
                       <% if so %>
                         <span class="text-xs text-green-700 font-semibold text-center">✓<%= " B#{sec_active}" if multi %> <%= so["name"] %></span>
+                        <% if (so_at = @works_order.sign_off_time(op, active_key)) %>
+                          <span class="text-[11px] text-green-700/70 leading-none text-center">
+                            <%= so_at.respond_to?(:hour) ? so_at.strftime("%d/%m/%y %H:%M") : so_at.strftime("%d/%m/%y") %>
+                          </span>
+                        <% end %>
                         <% if can_undo %>
                           <% undo_confirm = "Undo the sign-off by #{so['name']} on operation #{position}#{wo_scoped ? '' : " batch #{sec_active}"}? The undone signature is kept on the record; re-sign as the right person afterwards." %>
                           <%= button_to "↩ undo", undo_sign_off_works_order_path(@works_order, position: position, batch: active_key,
@@ -1189,24 +1228,20 @@
 </div>
 
 <script>
-// Batch split (group lead): echo the per-member share total against the
-// batch qty as it's typed. Server-side set_batch_qty! is the real check;
-// this just stops the operator pressing Set on 40 + 20 = 60 for a qty of 50.
-function hamsBatchShareSum(uid, qtyInputId) {
+// Batch split (group lead): echo the per-member share total as it's chosen -
+// on a lead the batch qty IS this total (set_batch_qty! derives it).
+function hamsBatchShareSum(uid) {
   var wrap = document.querySelector('[data-batch-shares="' + uid + '"]');
   var out  = document.getElementById(uid + '_sum');
   if (!wrap || !out) return;
   var total = 0, any = false;
-  wrap.querySelectorAll('input[type=number]').forEach(function (el) {
+  wrap.querySelectorAll('select, input[type=number]').forEach(function (el) {
     var v = parseInt(el.value, 10);
     if (!isNaN(v) && v > 0) { total += v; any = true; }
   });
   if (!any) { out.innerHTML = '<span class="text-gray-400">unsplit</span>'; return; }
-  var qtyEl = document.getElementById(qtyInputId);
-  var qty   = qtyEl ? parseInt(qtyEl.value, 10) : NaN;
-  var ok    = isNaN(qty) || qty === total;
-  out.className = 'text-xs ' + (ok ? 'text-gray-700' : 'text-red-600 font-medium');
-  out.textContent = '= ' + total + (ok ? '' : ' ≠ ' + qty);
+  out.className = 'text-xs text-gray-700';
+  out.textContent = '= ' + total + ' (batch qty)';
 }
 
 // Keep the operation you acted on under your finger. Turbo preserves the pixel

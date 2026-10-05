@@ -322,6 +322,7 @@ class WorksOrder < ApplicationRecord
   def protect_frozen_process_record
     return if @discarding_process_record
     return if @undoing_sign_off # undo_sign_off! makes exactly one change and logs it
+    return if @deleting_batch   # delete_batch! renumbers keys above the deleted batch and logs it
 
     old_ops = customised_process_data_was&.dig("operations")
     return if old_ops.blank?
@@ -401,7 +402,7 @@ class WorksOrder < ApplicationRecord
       # Sign-off validates against the batch quantity, so re-batching must not
       # rewrite the quantity of a batch that has already been signed for.
       if signed_batches.include?(old_b["number"].to_i) && old_b["qty"].present? &&
-         !(new_b && new_b["qty"] == old_b["qty"])
+         !(new_b && new_b["qty"] == old_b["qty"]) && !@correcting_batch_qty
         errors.add(:base, "Batch #{old_b['number']} is signed off at qty #{old_b['qty']}; its quantity cannot be changed")
         throw :abort
       end
@@ -841,23 +842,44 @@ class WorksOrder < ApplicationRecord
   # pooled). When any share is given the split must account for the whole
   # batch: shares sum to qty. Names not on the group are ignored. Replaces
   # the old "wos" tick list, which is dropped from the entry on write.
-  def set_batch_qty!(batch_number, qty, section_key: "base", shares: nil)
+  def set_batch_qty!(batch_number, qty, section_key: "base", shares: nil, user: nil)
     assert_record_open!
     freeze_operations!
     section = find_section!(section_key)
     n = normalise_batch!(batch_number, section: section)
-    raise "Batch #{n} is signed off; its quantity cannot be changed" if section_signed_batch_numbers(section).include?(n)
 
     batches = (section["data"]["batches"] ||= [])
     entry = batches.find { |b| b["number"] == n } || (batches << { "number" => n }).last
-    qty.to_s.strip.empty? ? entry.delete("qty") : entry["qty"] = qty.to_s.strip
+    old_qty = entry["qty"]
 
+    # Group lead: the batch qty IS the split. The form posts no qty; it is
+    # the sum of the shares. A qty posted alongside shares must still agree.
+    split = nil
     if !shares.nil? && process_lead?
-      valid  = process_group.members.where(voided: false).pluck(:number).map { |num| "WO#{num}" }
-      split  = shares.to_h.each_with_object({}) do |(wo, q), h|
+      valid = process_group.members.where(voided: false).pluck(:number).map { |num| "WO#{num}" }
+      split = shares.to_h.each_with_object({}) do |(wo, q), h|
         next unless valid.include?(wo.to_s)
         h[wo.to_s] = q.to_i if q.to_i > 0
       end
+      qty = split.values.sum.to_s if qty.to_s.strip.empty? && split.any?
+    end
+
+    new_qty = qty.to_s.strip
+    signed  = section_signed_batch_numbers(section).include?(n)
+    if signed && new_qty != old_qty.to_s
+      # A signed batch's qty can be corrected only while nothing has been
+      # released (same gate as undoing a sign-off), never to blank, and the
+      # correction is logged on the batch so the record states what changed.
+      raise "Batch #{n} is signed off; its quantity cannot be changed once anything is released" unless can_undo_sign_offs?
+      raise "Batch #{n} is signed off; its quantity cannot be cleared" if new_qty.empty?
+      entry["qty_changes"] = (entry["qty_changes"] || []) + [{
+        "from" => old_qty, "to" => new_qty, "at" => Time.current.iso8601, "by" => (user ? signature_for(user) : nil)
+      }.compact]
+      @correcting_batch_qty = true
+    end
+    new_qty.empty? ? entry.delete("qty") : entry["qty"] = new_qty
+
+    unless split.nil?
       entry.delete("wos") # legacy tick list superseded
       if split.empty?
         entry.delete("shares")
@@ -872,6 +894,98 @@ class WorksOrder < ApplicationRecord
     end
     customised_process_data_will_change!
     save!
+  ensure
+    @correcting_batch_qty = false
+  end
+
+  # Whether this batch's qty can be edited from the page right now: always
+  # while unsigned; once signed, only pre-release (see set_batch_qty!).
+  def batch_qty_editable?(section, batch_number)
+    return true unless section_signed_batch_numbers(section).include?(batch_number.to_i)
+    can_undo_sign_offs?
+  end
+
+  # Group lead only: how many of member `wo` (display name) are still
+  # unallocated in this section, i.e. its WO quantity less its shares on the
+  # OTHER batches of the section. The split dropdown runs from here to 0.
+  def member_unallocated_in_section(section, batch_number, wo_name, wo_quantity)
+    taken = section_batches(section).sum do |b|
+      next 0 if b["number"] == batch_number.to_i
+      (b["shares"] || {})[wo_name].to_i
+    end
+    [wo_quantity.to_i - taken, 0].max
+  end
+
+  # Parts on batches that are fully signed in this section (every batch-
+  # scoped op signed for that batch) - "batched and signed off".
+  def section_signed_quantity_total(section)
+    section_batch_statuses(section).sum { |n, st| st == :complete ? section_batch_qty(section, n).to_i : 0 }
+  end
+
+  # Nothing recorded against this batch in its section: no sign-off, reading
+  # or route choice on any op, and no stamped date. Only such a batch may be
+  # deleted; a qty alone is not a record.
+  def batch_has_records?(section, batch_number)
+    key = batch_number.to_i.to_s
+    return true if section_batch_date(section, batch_number).present?
+    section_ops(section).any? do |o|
+      o.dig("sign_offs", key).present? || o.dig("ocv_readings", key).present? ||
+        (o["alternate_choices"] || {}).key?(key)
+    end
+  end
+
+  def batch_deletable?(section, batch_number)
+    section_batch_count(section) > 1 && !batch_has_records?(section, batch_number)
+  end
+
+  # Remove an empty batch (the accidental "+ Add batch") from a section and
+  # close the gap: every batch above it moves down one, and so do the keys
+  # of every record on the section's ops - sign_offs, ocv_readings,
+  # alternate_choices. The deleted batch has no records by construction, so
+  # nothing is lost; the renumbering is logged on the section. The
+  # immutability guard yields to @deleting_batch for exactly this save.
+  # Returns the batch count after deletion.
+  def delete_batch!(batch_number, section_key: "base", user: nil)
+    assert_record_open!
+    freeze_operations!
+    section = find_section!(section_key)
+    n = normalise_batch!(batch_number, section: section)
+    raise "Batch #{n} cannot be deleted; it is the only batch in this section" if section_batch_count(section) < 2
+    raise "Batch #{n} has records (sign-offs, readings or a date) and cannot be deleted" if batch_has_records?(section, n)
+
+    data  = section["data"]
+    count = section_batch_count(section)
+
+    shift = ->(h) do
+      next h unless h.is_a?(Hash)
+      h.each_with_object({}) do |(k, v), out|
+        if k == "wo" || k.to_i < n then out[k] = v
+        elsif k.to_i > n           then out[(k.to_i - 1).to_s] = v
+        end
+      end
+    end
+    section_ops(section).each do |op|
+      frozen = find_frozen_operation!(op["position"])
+      %w[sign_offs ocv_readings alternate_choices].each do |field|
+        frozen[field] = shift.call(frozen[field]) if frozen[field].is_a?(Hash)
+      end
+    end
+
+    data["batches"] = (data["batches"] || []).reject { |b| b["number"] == n }
+                                              .map { |b| b["number"] > n ? b.merge("number" => b["number"] - 1) : b }
+    data["batch_count"] = count - 1
+    data.delete("parts_per_batch")
+    data["batch_deletions"] = (data["batch_deletions"] || []) + [{
+      "number" => n, "renumbered_from" => (n + 1..count).to_a, "at" => Time.current.iso8601,
+      "by" => (user ? signature_for(user) : nil)
+    }.compact]
+
+    customised_process_data_will_change!
+    @deleting_batch = true
+    save!
+    count - 1
+  ensure
+    @deleting_batch = false
   end
 
   # Sum of recorded batch quantities. Compared against `quantity` on screen as
@@ -1240,6 +1354,20 @@ class WorksOrder < ApplicationRecord
     remember_part_checklist_answers(op)
   end
 
+  # When a sign-off was made, for display. Stamps made before "at" was
+  # recorded fall back to the batch date stamped at the same moment (so a
+  # date, no time); WO-scoped sign-offs from that era have nothing.
+  def sign_off_time(op, key)
+    so = op.dig("sign_offs", key.to_s)
+    return nil if so.blank?
+    return Time.zone.parse(so["at"]) if so["at"].present?
+    return nil if key.to_s == "wo"
+    date = section_batch_date(section_for_op(op), key)
+    date.present? ? Date.parse(date) : nil
+  rescue ArgumentError
+    nil
+  end
+
   # Who a mark on the process record belongs to. A sub-user is a named
   # operator who unlocked this terminal with a PIN: they sign in their own
   # name, with the account they came in through recorded alongside so the
@@ -1247,7 +1375,7 @@ class WorksOrder < ApplicationRecord
   # sub-users existed carry no "kind" key and read back as account sign-offs,
   # which is exactly what they were.
   def signature_for(actor)
-    stamp = { "id" => actor.id, "name" => actor.display_name }
+    stamp = { "id" => actor.id, "name" => actor.display_name, "at" => Time.current.iso8601 }
     if actor.is_a?(SubUser)
       stamp["kind"] = "sub_user"
       stamp["via"]  = Current.user&.display_name

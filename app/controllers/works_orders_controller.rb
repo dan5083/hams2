@@ -1,6 +1,6 @@
 # app/controllers/works_orders_controller.rb - Fixed pricing parameter handling and route card operations with RBAC
 class WorksOrdersController < ApplicationController
-  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :invoice_to_date, :void, :unvoid, :sign_off_operation, :undo_sign_off, :save_ocv, :add_operation_note, :set_batch_count, :set_batch_qty, :add_batch, :add_fork, :remove_fork, :discard_process_record, :choose_alternate]
+  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :invoice_to_date, :void, :unvoid, :sign_off_operation, :undo_sign_off, :save_ocv, :add_operation_note, :set_batch_count, :set_batch_qty, :add_batch, :delete_batch, :add_fork, :remove_fork, :discard_process_record, :choose_alternate]
 
   # Marks on a process record are attributed to Current.actor - the operator
   # unlocked with a PIN if there is one, otherwise the account holder. That
@@ -8,7 +8,7 @@ class WorksOrdersController < ApplicationController
   # named operator mandatory before anything can be signed or re-batched.
   #
   # require_sub_user only: [:sign_off_operation, :save_ocv,
-  #                         :set_batch_qty, :set_batch_count, :add_fork, :remove_fork]
+  #                         :set_batch_qty, :set_batch_count, :add_batch, :delete_batch, :add_fork, :remove_fork]
 
  def index
     @works_orders = WorksOrder.includes(:customer_order, :part, customer: [])
@@ -320,7 +320,8 @@ class WorksOrdersController < ApplicationController
     # shares[WO1234]=40 arrives only from a group lead's form (every member
     # posts a field, blank or not); absent means don't touch the split.
     shares = params.key?(:shares) ? params[:shares].to_unsafe_h : nil
-    @works_order.set_batch_qty!(params[:batch], params[:qty], section_key: params[:section].presence || "base", shares: shares)
+    @works_order.set_batch_qty!(params[:batch], params[:qty], section_key: params[:section].presence || "base",
+                                shares: shares, user: Current.actor)
     redirect_to works_order_path(@works_order, batch: return_base_batch, fb: fork_batch_params.presence),
                 notice: "Batch #{params[:batch]} quantity updated."
   rescue => e
@@ -358,6 +359,25 @@ class WorksOrdersController < ApplicationController
     else
       redirect_to works_order_path(@works_order, batch: return_base_batch, fb: fork_batch_params.merge(section_key => n.to_s)),
                   notice: "Batch #{n} added to the fork at op #{section_key}."
+    end
+  rescue => e
+    redirect_to works_order_path(@works_order, batch: return_base_batch, fb: fork_batch_params.presence), alert: e.message
+  end
+
+  # Paperless process record: delete an EMPTY batch (no sign-offs, readings or
+  # date) and renumber the ones above it. Route: `delete :delete_batch`
+  # alongside add_batch. Lands on the batch that took the deleted number.
+  def delete_batch
+    return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
+    section_key = params[:section].presence || "base"
+    n = params[:batch].to_i
+    remaining = @works_order.delete_batch!(n, section_key: section_key, user: Current.actor)
+    land = [n, remaining].min
+    if section_key == "base"
+      redirect_to works_order_path(@works_order, batch: land, fb: fork_batch_params.presence), notice: "Batch #{n} deleted; #{remaining} batch#{'es' unless remaining == 1} remain."
+    else
+      redirect_to works_order_path(@works_order, batch: return_base_batch, fb: fork_batch_params.merge(section_key => land.to_s)),
+                  notice: "Batch #{n} deleted from the fork at op #{section_key}; #{remaining} remain."
     end
   rescue => e
     redirect_to works_order_path(@works_order, batch: return_base_batch, fb: fork_batch_params.presence), alert: e.message

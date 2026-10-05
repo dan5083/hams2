@@ -83,6 +83,7 @@ Rails.application.routes.draw do
       patch :set_batch_count
       patch :add_batch
       patch :set_batch_qty
+      delete :delete_batch
       patch :add_operation_note
       patch :choose_alternate
       patch :discard_process_record
