@@ -18,7 +18,7 @@
             <%= link_to job.display_name, works_order_path(job.wo), class: "font-bold text-blue-700 hover:underline" %>
             <%= job_pills(job) %>
           </td>
-          <td class="px-4 py-2">
+          <td class="px-4 py-2 whitespace-nowrap">
             <div class="flex items-center gap-3">
               <%= part_thumb(job.wo.part) %>
               <div>

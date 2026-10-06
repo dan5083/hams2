@@ -1,9 +1,9 @@
 <%# app/views/sections/_lacquering.html.erb
     Stopping-off lacquer. One row per lacquer masking op from contract
     review until its inspection is signed. Amber batches still need
-    lacquer; fuchsia batches are lacquered and need the independent
-    inspection (also shown on the treating shop's board). No fast-track
-    pill here - every row is lacquered. %>
+    lacquer; green batches are lacquered and need the independent
+    inspection (also shown on the treating shop's jigging board). No
+    lacquer pill here - every row is lacquered. %>
 <% rows = @board.lacquering_queue %>
 <% attention = @board.lacquer_attention %>
 
@@ -16,18 +16,18 @@
       <thead class="bg-gray-50">
         <tr>
           <% ["WO", "Part", "Qty", "To lacquer", "To inspect", "Then", "Instruction"].each do |h| %>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"><%= h %></th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"><%= h %></th>
           <% end %>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-200">
         <% rows.each do |row| %>
           <tr class="hover:bg-gray-50 <%= promise_row_class(row[:job].promise) %>">
-            <td class="px-4 py-3 whitespace-nowrap">
+            <td class="px-4 py-2 whitespace-nowrap">
               <%= link_to row[:job].display_name, works_order_path(row[:job].wo), class: "font-bold text-blue-700 hover:underline" %>
               <% if row[:job].promise %><div class="mt-1"><%= promise_pill(row[:job].promise) %></div><% end %>
             </td>
-            <td class="px-4 py-3">
+            <td class="px-4 py-2 whitespace-nowrap">
               <div class="flex items-center gap-3">
                 <%= part_thumb(row[:job].wo.part) %>
                 <div>
@@ -36,8 +36,8 @@
                 </div>
               </div>
             </td>
-            <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900"><%= row[:job].quantity %></td>
-            <td class="px-4 py-3 whitespace-nowrap">
+            <td class="px-4 py-2 whitespace-nowrap text-sm font-bold text-gray-900"><%= row[:job].quantity %></td>
+            <td class="px-4 py-2 whitespace-nowrap">
               <% row[:to_lacquer].each do |b| %>
                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 mr-1">
                   B<%= b %><%= " · #{row[:batch_qtys][b]}" if row[:batch_qtys][b].present? %>
@@ -45,19 +45,19 @@
               <% end %>
               <% if row[:to_lacquer].empty? %><span class="text-gray-400">—</span><% end %>
             </td>
-            <td class="px-4 py-3 whitespace-nowrap">
+            <td class="px-4 py-2 whitespace-nowrap">
               <% row[:to_inspect].each do |b| %>
-                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-fuchsia-100 text-fuchsia-800 mr-1">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800 mr-1">
                   B<%= b %><%= " · #{row[:batch_qtys][b]}" if row[:batch_qtys][b].present? %>
                 </span>
               <% end %>
               <% if row[:to_inspect].empty? %><span class="text-gray-400">—</span><% end %>
             </td>
-            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+            <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700">
               <%= row[:vats].map { |v| "Vat #{v}" }.join(" / ").presence || "—" %>
             </td>
-            <td class="px-4 py-3 text-xs text-gray-600">
-              <%= row[:op]["operation_text"].to_s.gsub(/\*+/, "").lines.first.to_s.strip.truncate(110) %>
+            <td class="px-4 py-2 text-xs text-gray-600">
+              <%= clipped_cell(row[:op]["operation_text"], max: 110) %>
             </td>
           </tr>
         <% end %>
@@ -83,7 +83,7 @@
         </div>
         <div class="mt-2 text-xs font-bold space-x-3">
           <% if row[:to_lacquer].any? %><span class="text-amber-700">Lacquer B<%= row[:to_lacquer].join(", B") %></span><% end %>
-          <% if row[:to_inspect].any? %><span class="text-fuchsia-800">Inspect B<%= row[:to_inspect].join(", B") %></span><% end %>
+          <% if row[:to_inspect].any? %><span class="text-green-800">Inspect B<%= row[:to_inspect].join(", B") %></span><% end %>
         </div>
       <% end %>
     <% end %>
@@ -94,7 +94,7 @@
   <h2 class="text-lg font-bold text-gray-700 mt-8 mb-3">Needs a look</h2>
   <div class="bg-amber-50 border border-amber-200 rounded-lg divide-y divide-amber-200">
     <% attention.each do |a| %>
-      <div class="px-4 py-3 text-sm text-amber-900">
+      <div class="px-4 py-2 text-sm text-amber-900">
         <%= link_to a[:job].display_name, works_order_path(a[:job].wo), class: "font-bold text-blue-700 hover:underline" %>
         <span class="text-gray-500"><%= a[:job].part_number %></span> — <%= a[:note] %>
       </div>

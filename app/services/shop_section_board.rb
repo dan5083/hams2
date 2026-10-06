@@ -60,10 +60,12 @@ class ShopSectionBoard
   }.freeze
 
   # Lacquered work is fast-tracked: stopping-off lacquer has a shelf life on
-  # the part, so anything carrying it jumps the queue on every board, ahead
-  # of promised work. Detection is by the masking op's text (the library op
-  # says "45 Stopping off lacquer"; hand-written ones say "LAQUER"), with
-  # the part's treatment selection (45_stopping_off_lacquer) as a fallback.
+  # the part, so anything carrying it goes ahead of unpromised work on every
+  # board. A promise date always beats it - lacquer only breaks ties within
+  # a group (see Job#priority_sort). Detection is by the masking op's text
+  # (the library op says "45 Stopping off lacquer"; hand-written ones say
+  # "LAQUER"), with the part's treatment selection (45_stopping_off_lacquer)
+  # as a fallback.
   LACQUER_METHOD = "45_stopping_off_lacquer".freeze
   LACQUER_TEXT   = /lac?quer|stopping[\s-]*off/i
 
@@ -251,11 +253,12 @@ class ShopSectionBoard
       promise ? [0, promise.due_on.jd] : [1, 0]
     end
 
-    # Board order: lacquered (fast-track) first, then promised soonest-due,
-    # then the rest. Every board sorts on this so a lacquered job reads the
-    # same wherever it turns up.
+    # Board order: promised work first, soonest due first; then unpromised,
+    # lacquered ahead of the rest. A promise date always beats a lacquer
+    # fast-track - lacquer only breaks ties within a group. Every board
+    # sorts on this so a job reads the same wherever it turns up.
     def priority_sort
-      [lacquered? ? 0 : 1] + promise_sort
+      promise_sort + [lacquered? ? 0 : 1]
     end
 
     def ops
@@ -294,6 +297,15 @@ class ShopSectionBoard
     def jig_op?(op)
       return true if op["process_type"] == "jig"
       op["process_type"] == "manual" && op["operation_text"].to_s.match?(/\A[\s*]*jig\b/i)
+    end
+
+    # The sacrificial "double" anodise (OperationLibrary::DoubleAndEtch) is
+    # a pre-treatment step that runs in whatever vat is free, so its vat
+    # list ("in vat 1, 2, 3, 5, 6, 9 or 12") says nothing about where the
+    # job is homed. Ignored for routing; never an anodising_op? either.
+    def double_anodise_op?(op)
+      return true if op["process_type"] == "double_anodise" || op["id"].to_s.start_with?("DOUBLE_ANODISE")
+      op["process_type"] == "manual" && op["operation_text"].to_s.match?(/\bdouble\s+anodis/i)
     end
 
     def sealing_op?(op)
@@ -493,6 +505,20 @@ class ShopSectionBoard
       ops[0...i].reverse.find { |o| jig_op?(o) }
     end
 
+    # The treatment op a jig at index i feeds, for routing: the first
+    # vat-bearing op after it, skipping doubles. nil when the jig feeds a
+    # conversion tank - conversion ops carry no vat, and without this the
+    # scan would run on past the tank to the next anodise and route a
+    # conversion jig onto a shop board as if it fed the vat.
+    def next_routed_op(i)
+      ops[(i + 1)..].each do |o|
+        next if double_anodise_op?(o)
+        return nil if chem_conv_op?(o)
+        return o if vats_for(o).any?
+      end
+      nil
+    end
+
     # ---- Lacquering ----------------------------------------------------------
 
     def lacquer_ops
@@ -531,12 +557,12 @@ class ShopSectionBoard
     end
 
     # The shop the cycle after a masking op treats in: the first jig after
-    # it, then the first vat-bearing op after that jig - same routing the
+    # it, then the op that jig feeds (next_routed_op) - same routing the
     # jiggers board uses, so homed and unhomed parts both land correctly.
     def shop_for_masking(i)
       jig_i = ops[(i + 1)..].index { |o| jig_op?(o) }
       return nil unless jig_i
-      nxt = ops[(i + jig_i + 2)..].find { |o| vats_for(o).any? }
+      nxt = next_routed_op(i + jig_i + 1)
       nxt ? vats_for(nxt) : []
     end
 
@@ -678,7 +704,7 @@ class ShopSectionBoard
       rows = []
       ops.each_with_index do |op, i|
         next unless jig_op?(op)
-        nxt = ops[(i + 1)..].find { |o| vats_for(o).any? }
+        nxt = next_routed_op(i)
         next unless nxt
         next unless op_on_board?(shop, vats_for(nxt))
 

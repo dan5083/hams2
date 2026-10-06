@@ -21,18 +21,18 @@
         <thead class="bg-gray-50">
           <tr>
             <% ["WO", "Part", "Batches", "Temp", "Time", "Spec"].each do |h| %>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"><%= h %></th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"><%= h %></th>
             <% end %>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-200">
           <% group[:rows].each do |row| %>
             <tr class="hover:bg-gray-50 <%= board_row_class(row[:job]) %>">
-              <td class="px-4 py-3 whitespace-nowrap">
+              <td class="px-4 py-2 whitespace-nowrap">
                 <%= link_to row[:job].display_name, works_order_path(row[:job].wo), class: "font-bold text-blue-700 hover:underline" %>
                 <%= job_pills(row[:job]) %>
               </td>
-              <td class="px-4 py-3">
+              <td class="px-4 py-2 whitespace-nowrap">
                 <div class="flex items-center gap-3">
                   <%= part_thumb(row[:job].wo.part) %>
                   <div>
@@ -41,7 +41,7 @@
                   </div>
                 </div>
               </td>
-              <td class="px-4 py-3 whitespace-nowrap">
+              <td class="px-4 py-2 whitespace-nowrap">
                 <% row[:batches].each do |b| %>
                   <% ready = row[:ready].include?(b) %>
                   <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold mr-1 <%= ready ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800' %>"
@@ -50,11 +50,11 @@
                   </span>
                 <% end %>
               </td>
-              <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900"><%= row[:temp] || "—" %></td>
-              <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900">
+              <td class="px-4 py-2 whitespace-nowrap text-sm font-bold text-gray-900"><%= row[:temp] || "—" %></td>
+              <td class="px-4 py-2 whitespace-nowrap text-sm font-bold text-gray-900">
                 <%= row[:time] || (row[:temp] ? "—" : "multi-stage · see route card") %>
               </td>
-              <td class="px-4 py-3 text-xs text-gray-600"><%= row[:spec]&.truncate(60) || "—" %></td>
+              <td class="px-4 py-2 text-xs text-gray-600"><%= clipped_cell(row[:spec], max: 60) %></td>
             </tr>
           <% end %>
         </tbody>

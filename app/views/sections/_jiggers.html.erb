@@ -1,7 +1,9 @@
 <%# app/views/sections/_jiggers.html.erb — locals: shop
     Work whose jig op (feeding this shop's vats) is not yet signed off AND
     whose contract review is signed — nothing gets jigged before review.
-    Unfrozen records have no sign-offs at all, so they never appear. %>
+    Unfrozen records have no sign-offs at all, so they never appear.
+    "Next" is the op the jig feeds (Job#next_routed_op): doubles are
+    skipped, and a jig feeding a conversion tank never lands here. %>
 <% rows = @board.jigging_queue(shop) %>
 
 <% if rows.empty? %>
@@ -13,18 +15,18 @@
       <thead class="bg-gray-50">
         <tr>
           <% ["WO", "Part", "Qty", "Batches to jig", "Vat", "Next"].each do |h| %>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"><%= h %></th>
+            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"><%= h %></th>
           <% end %>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-200">
         <% rows.each do |row| %>
           <tr class="hover:bg-gray-50 <%= board_row_class(row[:job]) %>">
-            <td class="px-4 py-3 whitespace-nowrap">
+            <td class="px-4 py-2 whitespace-nowrap">
               <%= link_to row[:job].display_name, works_order_path(row[:job].wo), class: "font-bold text-blue-700 hover:underline" %>
               <%= job_pills(row[:job]) %>
             </td>
-            <td class="px-4 py-3">
+            <td class="px-4 py-2 whitespace-nowrap">
               <div class="flex items-center gap-3">
                 <%= part_thumb(row[:job].wo.part) %>
                 <div>
@@ -33,8 +35,8 @@
                 </div>
               </div>
             </td>
-            <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900"><%= row[:job].quantity %></td>
-            <td class="px-4 py-3 whitespace-nowrap">
+            <td class="px-4 py-2 whitespace-nowrap text-sm font-bold text-gray-900"><%= row[:job].quantity %></td>
+            <td class="px-4 py-2 whitespace-nowrap">
               <% if row[:batches].any? %>
                 <% row[:batches].each do |b| %>
                   <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 mr-1">B<%= b %></span>
@@ -43,11 +45,11 @@
                 <span class="text-gray-400">—</span>
               <% end %>
             </td>
-            <td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900">
+            <td class="px-4 py-2 whitespace-nowrap text-sm font-bold text-gray-900">
               <%= row[:vats].map { |v| "Vat #{v}" }.join(" / ").presence || "—" %>
             </td>
-            <td class="px-4 py-3 text-xs text-gray-600">
-              <%= row[:next_op]["operation_text"].to_s.gsub(/\*+/, "").lines.first.to_s.strip.truncate(90) %>
+            <td class="px-4 py-2 text-xs text-gray-600">
+              <%= clipped_cell(row[:job].op_label(row[:next_op])) %>
             </td>
           </tr>
         <% end %>

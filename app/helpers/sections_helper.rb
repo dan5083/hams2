@@ -17,25 +17,36 @@ module SectionsHelper
     end
   end
 
-  # "⚡ Lacquer — fast track" for jobs carrying stopping-off lacquer.
-  def fast_track_pill(job)
+  # "🖌️ Lacquer" for jobs carrying stopping-off lacquer. Deliberately
+  # neutral: the job still sorts ahead of unpromised work, but the only
+  # colour on a board row is the promise colour.
+  def lacquer_pill(job)
     return unless job.lacquered?
-    content_tag :span, "⚡ Lacquer — fast track",
-      class: "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap bg-fuchsia-600 text-white",
-      title: "Stopping-off lacquer on this job: jumps the queue on every board"
+    content_tag :span, "🖌️ Lacquer",
+      class: "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap bg-gray-100 text-gray-700",
+      title: "Stopping-off lacquer on this job: goes ahead of unpromised work on every board"
   end
 
-  # Every pill a board row carries under the WO number: fast track first,
-  # then the promise. Nothing when the job has neither.
+  # Every pill a board row carries under the WO number: promise first (it
+  # sorts first), then lacquer. Nothing when the job has neither.
   def job_pills(job)
-    pills = [fast_track_pill(job), promise_pill(job.promise)].compact
+    pills = [promise_pill(job.promise), lacquer_pill(job)].compact
     return if pills.empty?
     content_tag :div, safe_join(pills, " "), class: "mt-1 flex flex-wrap gap-1"
   end
 
-  # Row tint: lacquer beats the promise colour, since it sorts above it.
+  # Row tint is the promise colour only.
   def board_row_class(job)
-    job.lacquered? ? "bg-fuchsia-50" : promise_row_class(job.promise)
+    promise_row_class(job.promise)
+  end
+
+  # One-line text cell with the full text on hover. Long op text (seal,
+  # next op, masking instruction, spec) was wrapping into five-line rows
+  # once the boards went full width.
+  def clipped_cell(text, max: 90, extra: "")
+    text = text.to_s.gsub(/\*+/, "").gsub(/\s+/, " ").strip
+    return content_tag(:span, "—", class: "text-gray-400") if text.blank?
+    content_tag :span, text.truncate(max), class: "block max-w-xs truncate #{extra}", title: text
   end
 
   # Dye pill coloured for the dye. Matched on the label text ("Black dye
