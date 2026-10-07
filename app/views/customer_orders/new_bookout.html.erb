@@ -12,6 +12,13 @@
 <% provide :title, "Release #{@customer_order.number}" %>
 <% bookable = @candidates.select { |c| c.reason.nil? && c.quantity.positive? } %>
 <% blocked  = @candidates.reject { |c| c.reason.nil? && c.quantity.positive? } %>
+<%# Table order is WO order (as bookout_candidates returns them) so a blocked
+    row sits where the operator expects it, not banished to the bottom. %>
+<% row_tint = {
+     awaiting_sign_off: "bg-amber-50",
+     manual_thickness:  "bg-blue-50/40",
+     no_record:         "bg-gray-100"
+   } %>
 
 <div class="container mx-auto px-4 py-6 max-w-5xl">
   <div class="flex justify-between items-start mb-6">
@@ -23,7 +30,18 @@
         class: "text-sm text-blue-600 hover:text-blue-900" %>
   </div>
 
-  <% if bookable.any? %>
+  <% if blocked.any? %>
+    <div class="mb-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+      <span class="font-semibold"><%= pluralize(blocked.count, "works order") %> on this order can't be released yet</span>
+      — <%= blocked.count { |c| c.reason == :awaiting_sign_off } %> waiting on a sign-off,
+      <%= blocked.count { |c| c.reason == :manual_thickness } %> needing the WO form,
+      <%= blocked.count { |c| c.reason == :no_record } %> with no open record.
+      They're shaded in the table below. If a part is physically finished and still shaded amber,
+      someone has missed the last sign-off on the process record.
+    </div>
+  <% end %>
+
+  <% if @candidates.any? %>
     <%= form_with url: bookout_customer_order_path(@customer_order), method: :post, local: true, data: { turbo: false } do %>
       <p class="text-sm text-gray-600 mb-3">
         Each row becomes one release note. Accepted is prefilled with everything the
@@ -47,12 +65,21 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200">
-            <% bookable.each do |c| %>
+            <% @candidates.each do |c| %>
               <% wo = c.works_order %>
               <% focused = @focus_wo_id.present? && wo.id.to_s == @focus_wo_id %>
+              <% blocked_row = c.reason.present? || !c.quantity.positive? %>
               <% rid = "rel_#{wo.id}" %>
-              <tr class="<%= 'bg-blue-50' if focused %>" data-release-row="<%= rid %>" data-max="<%= c.quantity %>">
+              <% if blocked_row %>
+                <%# No data-release-row: the JS totals/guard only walk live rows. %>
+                <tr class="<%= row_tint[c.reason] || 'bg-gray-100' %> <%= 'ring-2 ring-inset ring-blue-400' if focused %>">
+              <% else %>
+                <tr class="<%= 'bg-blue-50' if focused %>" data-release-row="<%= rid %>" data-max="<%= c.quantity %>">
+              <% end %>
                 <td class="px-3 py-2 text-sm font-medium text-gray-900 whitespace-nowrap">
+                  <% if c.reason == :awaiting_sign_off %>
+                    <span class="text-amber-600 mr-1" title="Waiting on a process record sign-off">⚠</span>
+                  <% end %>
                   <%= link_to wo.display_name, works_order_path(wo), class: "hover:text-blue-700", target: "_blank" %>
                   <% if wo.grouped? %>
                     <span class="text-xs text-indigo-600 ml-1"><%= wo.process_group.display_name %></span>
@@ -64,6 +91,36 @@
                 </td>
                 <td class="px-3 py-2 text-sm text-right text-gray-700"><%= wo.quantity %></td>
                 <td class="px-3 py-2 text-sm text-right text-gray-700"><%= wo.quantity_released %></td>
+              <% if blocked_row %>
+                <td class="px-3 py-2 text-sm text-right font-semibold text-gray-400">0</td>
+                <td colspan="3" class="px-3 py-2 text-sm">
+                  <div class="flex justify-between items-center gap-3">
+                    <span class="<%= c.reason == :awaiting_sign_off ? 'text-amber-800' : 'text-gray-600' %>">
+                      <% case c.reason %>
+                      <% when :awaiting_sign_off %>
+                        <span class="font-medium">Awaiting sign-off</span> —
+                        <%= wo.quantity_remaining %> still to release but nothing new is signed off end to end
+                        on <%= wo.grouped? ? wo.process_record_owner.display_name : 'the process record' %><%= c.pooled ? " (group width already released)" : "" %>.
+                        Check the last operation(s) for an unsigned batch.
+                      <% when :manual_thickness %>
+                        <span class="font-medium">Thickness on the release form</span> — release this one via the WO form.
+                      <% when :no_record %>
+                        <span class="font-medium">No open process record</span> — record closed, or the part isn't paperless yet.
+                      <% else %>
+                        <span class="font-medium">Nothing certified</span>
+                      <% end %>
+                    </span>
+                    <% if c.reason == :manual_thickness %>
+                      <%= link_to "Release via WO form", new_works_order_release_note_path(wo, manual: 1),
+                          class: "text-blue-600 hover:text-blue-900 whitespace-nowrap" %>
+                    <% else %>
+                      <%= link_to "Open #{wo.grouped? ? wo.process_record_owner.display_name : 'record'} →",
+                          works_order_path(wo.process_record_owner), target: "_blank",
+                          class: "text-blue-600 hover:text-blue-900 whitespace-nowrap" %>
+                    <% end %>
+                  </div>
+                </td>
+              <% else %>
                 <td class="px-3 py-2 text-sm text-right font-semibold text-green-700">
                   <%= c.quantity %>
                   <% if c.pooled %>
@@ -89,6 +146,7 @@
                       placeholder: "Standard CofC statement",
                       class: "border border-gray-300 rounded px-2 py-1 text-sm w-56" %>
                 </td>
+              <% end %>
               </tr>
             <% end %>
           </tbody>
@@ -113,8 +171,8 @@
           <%= link_to "Cancel", customer_order_path(@customer_order),
               class: "bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded" %>
           <button type="submit" id="rel_submit"
-                  class="bg-blue-600 hover:bg-blue-800 text-white font-bold py-2 px-4 rounded"
-                  data-disable-with="Releasing…">
+                  class="bg-blue-600 hover:bg-blue-800 text-white font-bold py-2 px-4 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                  data-disable-with="Releasing…" <%= 'disabled' if bookable.empty? %>>
             Release
           </button>
         </div>
@@ -122,42 +180,7 @@
     <% end %>
   <% else %>
     <div class="bg-white shadow rounded-lg p-6 text-sm text-gray-600">
-      Nothing on this order is certified and unreleased right now
-      <%= "— see below for why." if blocked.any? %>
-    </div>
-  <% end %>
-
-  <% if blocked.any? %>
-    <div class="mt-6 bg-white shadow rounded-lg p-4">
-      <h3 class="text-sm font-semibold text-gray-700 mb-2">Not releasable yet</h3>
-      <ul class="space-y-1 text-sm text-gray-600">
-        <% blocked.each do |c| %>
-          <li class="flex justify-between items-center">
-            <span>
-              <span class="font-medium text-gray-900"><%= c.works_order.display_name %></span>
-              · <%= c.works_order.part_number %> ·
-              <% case c.reason %>
-              <% when :awaiting_sign_off %>
-                nothing new signed off on the process record<%= c.pooled ? " (group width already released)" : "" %>
-              <% when :manual_thickness %>
-                thickness readings are captured on the release form
-              <% when :no_record %>
-                no open process record for this works order
-              <% else %>
-                nothing certified
-              <% end %>
-            </span>
-            <% if c.reason == :manual_thickness %>
-              <%= link_to "Release via WO form", new_works_order_release_note_path(c.works_order, manual: 1),
-                  class: "text-blue-600 hover:text-blue-900 ml-3 whitespace-nowrap" %>
-            <% else %>
-              <%= link_to "Open #{c.works_order.grouped? ? c.works_order.process_record_owner.display_name : 'WO'}",
-                  works_order_path(c.works_order.process_record_owner),
-                  class: "text-blue-600 hover:text-blue-900 ml-3 whitespace-nowrap" %>
-            <% end %>
-          </li>
-        <% end %>
-      </ul>
+      Every works order on this order is fully released (or voided) — nothing left to release.
     </div>
   <% end %>
 </div>
