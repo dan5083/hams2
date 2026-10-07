@@ -11,14 +11,16 @@
 #   :forwarded - it did reach orders@, but not from a domain we hold for the
 #                customer (buyers + Xero contact), so somebody forwarded it on
 #
-# A PO the customer emailed to orders@ themselves is left alone. Called from
-# WorksOrder#acknowledge_order! next to the acknowledgement, so it only ever
-# goes out for a reviewed, accepted order. Deliberately NOT throttled: every
-# paper/forwarded order gets one until they change. The acknowledgement no
-# longer carries the generic "send orders to orders@" note - this is the
-# targeted replacement.
+# A PO the customer emailed to orders@ themselves is left alone. Fires at the
+# moment the PO is attached: from InboundPurchaseOrder#book_order! for email
+# (passing the inbound row, since it isn't linked to the order yet) and from
+# a CustomerOrder after_commit on po_document for everything else.
+# Deliberately NOT throttled: every paper/forwarded order gets one until they
+# change. The acknowledgement no longer carries the generic "send orders to
+# orders@" note - this is the targeted replacement.
 #
 #   DigitalPoNudge.deliver_if_needed(customer_order, signed_off_by: user)
+#   DigitalPoNudge.deliver_if_needed(customer_order, inbound: ipo, signed_off_by: user)
 #   DigitalPoNudge.new(customer_order).origin_of_po   # console: why/why not
 class DigitalPoNudge
   # "From:" line in a forwarded body, quoted or not. Outlook writes
@@ -29,13 +31,14 @@ class DigitalPoNudge
 
   Origin = Struct.new(:kind, :original_sender, keyword_init: true)
 
-  def self.deliver_if_needed(customer_order, signed_off_by: nil)
-    new(customer_order).deliver_if_needed(signed_off_by: signed_off_by)
+  def self.deliver_if_needed(customer_order, inbound: nil, signed_off_by: nil)
+    new(customer_order, inbound: inbound).deliver_if_needed(signed_off_by: signed_off_by)
   end
 
-  def initialize(customer_order)
+  def initialize(customer_order, inbound: nil)
     @co       = customer_order
     @customer = customer_order.customer
+    @ipo      = inbound
   end
 
   def deliver_if_needed(signed_off_by: nil)
@@ -68,7 +71,7 @@ class DigitalPoNudge
   private
 
   def email_origin
-    ipo = InboundPurchaseOrder.find_by(customer_order_id: @co.id)
+    ipo = @ipo || InboundPurchaseOrder.find_by(customer_order_id: @co.id)
     return nil unless ipo
     return skip_nil("no domains on file for #{@customer.name}, can't tell who sent it") if customer_domains.empty?
     return nil if customer_domain?(ipo.sender)

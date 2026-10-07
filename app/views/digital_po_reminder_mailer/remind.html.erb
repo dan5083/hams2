@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .header {
+      border-bottom: 3px solid #2563eb;
+      padding-bottom: 20px;
+      margin-bottom: 30px;
+    }
+    .header img {
+      max-width: 300px;
+      height: auto;
+      margin-bottom: 15px;
+    }
+    .header h1 {
+      color: #1e40af;
+      margin: 0 0 10px 0;
+      font-size: 28px;
+    }
+    p { margin: 0 0 16px 0; }
+    .ask {
+      background-color: #eff6ff;
+      border-left: 4px solid #2563eb;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      color: #1e40af;
+    }
+    .ask p { margin: 0; }
+    .ask p + p {
+      margin-top: 8px;
+      font-size: 14px;
+      color: #1e3a8a;
+    }
+    .ask .address {
+      font-size: 20px;
+      font-weight: bold;
+    }
+    .ask .address a { color: #1e40af; }
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 2px solid #e5e7eb;
+      font-size: 14px;
+      color: #6b7280;
+    }
+    .footer p { margin: 5px 0; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <% if attachments['logo.png'] %>
+      <img src="<%= attachments['logo.png'].url %>" alt="Hard Anodising Surface Treatments Ltd"
+           width="300" style="width: 300px; max-width: 100%; height: auto; display: block; margin-bottom: 15px;">
+    <% else %>
+      <h1 style="font-size: 24px; margin-bottom: 5px;">Hard Anodising Surface Treatments Ltd</h1>
+    <% end %>
+    <h1>A quick request about purchase orders</h1>
+  </div>
+
+  <p>Thank you for your order <strong><%= @customer_order.number %></strong>, which we are booking in now. Our formal acknowledgement will follow once it has been through contract review.</p>
+
+  <p>
+    <% case @origin %>
+    <% when :paper %>
+      This order reached us as a paper copy with the parts, so we scanned it in to book the work.
+    <% when :manual %>
+      This order was sent to one of our team's individual inboxes rather than to our shared orders mailbox.
+    <% when :forwarded %>
+      This order reached our orders mailbox from an address we don't have on file for you, which usually means it was passed on by one of our team.
+    <% else %>
+      This order reached us by a route other than our shared orders mailbox.
+    <% end %>
+    Both work, but they are slower and easier to miss than the address below.
+  </p>
+
+  <div class="ask">
+    <p><strong>Please email a digital copy of every purchase order to</strong></p>
+    <p class="address"><a href="mailto:<%= @orders_address %>"><%= @orders_address %></a></p>
+    <p>This is a shared mailbox checked by the whole team. Orders sent there are picked up and
+      booked in straight away, rather than waiting in an individual's inbox or for the parts
+      to arrive. A PDF attached to the email is ideal. Please update your records and pass
+      this address on to your purchasing team.</p>
+  </div>
+
+  <p><strong>Please still send paperwork with the goods.</strong> A copy of the purchase order or a
+    delivery note quoting your PO number lets us match the parts to the order the moment they
+    arrive.</p>
+
+  <p>Thank you for your help with this.</p>
+
+  <div class="footer">
+    <p><strong>Why you're receiving this:</strong> this is an automated message, sent when an order reaches
+      us other than by email from an address we hold for your company. If this order did come from you
+      directly — for example from a purchasing system or a group address — just reply to let us know and
+      we'll add that address to your account so you don't hear from us again.</p>
+    <p>If you have any questions, please call us on 01562 747100 quoting order <%= @customer_order.number %>.</p>
+    <br>
+    <p style="margin: 0; font-weight: bold; color: #1e40af;">Hard Anodising Surface Treatments Ltd</p>
+    <p style="margin: 5px 0;">Firs Industrial Estate, Rickets Close, Kidderminster DY11 7QN</p>
+    <p style="margin: 5px 0;">Tel: 01562 747100 | <a href="http://www.hard-anodising.co.uk" style="color: #2563eb; text-decoration: none;">www.hard-anodising.co.uk</a></p>
+  </div>
+</body>
+</html>

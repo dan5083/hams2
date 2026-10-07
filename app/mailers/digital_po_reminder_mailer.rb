@@ -2,8 +2,9 @@
 #
 # "Please email your POs to orders@" - sent by DigitalPoNudge when an
 # acknowledged order's PO arrived on paper, via an individual's inbox, or
-# forwarded by one of us. Same cc/reply-to convention as the acknowledgement:
-# the reviewer who signed off is the person any reply should reach.
+# forwarded by one of us. Whoever booked it is cc'd and is the reply-to, so a
+# "that's our purchasing system, please add it" reply reaches a person; when
+# nobody is (assistant bookings), replies go to orders@.
 class DigitalPoReminderMailer < ApplicationMailer
   ORDERS_ADDRESS = "orders@hardanodisingstl.com".freeze
 
@@ -20,7 +21,7 @@ class DigitalPoReminderMailer < ApplicationMailer
     mail(
       to:       to,
       cc:       cc_list.presence,
-      reply_to: cc_list.first.presence,
+      reply_to: cc_list.first.presence || ORDERS_ADDRESS,
       subject:  "Sending us purchase orders - #{@customer_order.number} - Hard Anodising Surface Treatments Ltd"
     )
   end
