@@ -74,6 +74,7 @@
             <dd>
               <% colour = { "draft" => "bg-gray-100 text-gray-800", "sent" => "bg-blue-100 text-blue-800", "won" => "bg-green-100 text-green-800", "lost" => "bg-red-100 text-red-800" }[@quote.status] %>
               <span class="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full <%= colour %>"><%= @quote.status.titleize %></span>
+              <% if @quote.itar? %><span class="ml-1 inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-800" title="Drawings were not sent to the assistant">ITAR</span><% end %>
             </dd></div>
           <div><dt class="text-gray-500">Enquirer</dt>
             <dd class="text-gray-900"><%= @quote.enquirer_name.presence %><%= " · " if @quote.enquirer_name.present? && @quote.enquirer_email.present? %><%= mail_to(@quote.enquirer_email) if @quote.enquirer_email.present? %><%= "—" if @quote.enquirer_name.blank? && @quote.enquirer_email.blank? %></dd></div>

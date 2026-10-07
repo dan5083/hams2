@@ -72,8 +72,12 @@ class QuotesController < ApplicationController
   # Post the reviewer's answers (and any edits) back to the assistant.
   def rerun
     resolve_customer!
-    @quote.update!(answers: (params[:answers] || {}).to_unsafe_h.reject { |_, v| v.blank? },
-                   proposal: merged_proposal, status: "proposing", proposal_error: nil)
+    attrs = { answers: (params[:answers] || {}).to_unsafe_h.reject { |_, v| v.blank? },
+              proposal: merged_proposal, status: "proposing", proposal_error: nil }
+    # The drawing description is the assistant's only view of an ITAR
+    # drawing, so a correction here must reach the re-run.
+    attrs[:drawing_description] = params.dig(:form, :drawing_description) if params.dig(:form, :drawing_description)
+    @quote.update!(attrs)
     QuoteProposalJob.perform_later(@quote.id)
     redirect_to build_quote_path(@quote)
   end
@@ -119,7 +123,7 @@ class QuotesController < ApplicationController
   end
 
   def quote_params
-    params.require(:quote).permit(:enquiry, :valid_until)
+    params.require(:quote).permit(:enquiry, :valid_until, :itar, :drawing_description)
   end
 
   def upload_drawing(file)

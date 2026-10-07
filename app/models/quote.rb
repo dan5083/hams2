@@ -28,6 +28,13 @@ class Quote < ApplicationRecord
   validates :status, inclusion: { in: STATUSES }
   validates :enquirer_email, format: { with: URI::MailTo::EMAIL_REGEXP }, allow_blank: true
 
+  # ITAR / export-controlled work. The drawings are uploaded to Cloudinary
+  # and attached to the parts exactly as usual — what changes is that they
+  # are NEVER passed to the assistant. drawing_description is the reviewer's
+  # description of what's on them, and is what the model reads instead, so
+  # it is required whenever the flag is set.
+  validates :drawing_description, presence: { message: "is required for an ITAR quote — describe the drawing(s) for the assistant" }, if: :itar?
+
   before_validation :assign_next_number, if: :new_record?
   VALIDITY_DAYS = 90
   before_validation -> { self.valid_until ||= Date.current + VALIDITY_DAYS.days }, if: :new_record?
@@ -37,6 +44,13 @@ class Quote < ApplicationRecord
   scope :open,   -> { where(status: %w[draft sent]) }
 
   def in_workbench? = WORKBENCH_STATUSES.include?(status)
+
+  # The ONLY list QuoteProposalJob (and anything else that talks to the
+  # model) may read drawings from. `drawings` stays the full list for
+  # Cloudinary, the workbench thumbnails, finalise and the email.
+  def drawings_for_assistant
+    itar? ? [] : Array(drawings)
+  end
   def proposing?    = status == "proposing"
   def proposed?     = status == "proposed"
 

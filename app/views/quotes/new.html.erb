@@ -13,11 +13,13 @@
     </div>
   <% end %>
 
-  <%# Drawings uploaded here go to Cloudinary and to a third-party model
-      for analysis — neither is an ITAR-controlled environment. %>
+  <%# Drawings always go to Cloudinary (our account, attached to the part,
+      sent out with the quote). Ticking ITAR below keeps them off the
+      external model: the assistant then works from the enquiry text and the
+      reviewer's description of the drawing instead. %>
   <div class="bg-red-50 border-2 border-red-300 rounded-lg p-4 mb-4">
-    <p class="text-red-800 font-bold">Do not attach ITAR drawings.</p>
-    <p class="text-sm text-red-700 mt-1">Files uploaded here are stored in Cloudinary and sent to an external AI service for analysis. ITAR-controlled data must not leave the controlled environment — quote those by hand.</p>
+    <p class="text-red-800 font-bold">ITAR / export-controlled drawings: tick the box below.</p>
+    <p class="text-sm text-red-700 mt-1">Drawings uploaded here are stored in Cloudinary and, unless the quote is marked ITAR, sent to an external AI service to read. Marking it ITAR keeps every file in our own systems — the assistant only sees the enquiry text and your description.</p>
   </div>
 
   <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 text-sm text-blue-900">
@@ -41,6 +43,24 @@
       <%= f.file_field :drawings, multiple: true, accept: "application/pdf,image/*", required: true,
           class: "block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-blue-50 file:text-blue-700" %>
       <p class="text-xs text-gray-500 mt-1">An emailed RFQ saved as PDF works here on its own. Drawings are attached to the part(s) created when you save, and go out with the quote email.</p>
+    </div>
+
+    <div class="border border-red-200 rounded-lg p-4 bg-red-50/40">
+      <label class="flex items-start space-x-3 cursor-pointer">
+        <%= f.check_box :itar, class: "mt-1 h-4 w-4 text-red-600 border-gray-300 rounded",
+            onchange: "document.getElementById('itar-description').classList.toggle('hidden', !this.checked); document.getElementById('quote_drawing_description').required = this.checked;" %>
+        <span>
+          <span class="block text-sm font-semibold text-gray-900">ITAR / export-controlled — do not send the drawings to the assistant</span>
+          <span class="block text-xs text-gray-600 mt-0.5">The files still upload, attach to the part(s) and go out with the quote email as normal. Only the AI never sees them.</span>
+        </span>
+      </label>
+      <div id="itar-description" class="mt-3 <%= 'hidden' unless @quote.itar? %>">
+        <%= f.label :drawing_description, "Describe the drawing(s) for the assistant", class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.text_area :drawing_description, rows: 8, required: @quote.itar?,
+            class: "border border-gray-300 rounded px-3 py-2 w-full font-mono text-sm",
+            placeholder: "What the assistant would otherwise read off the drawing — keep it functional, not geometric:\n\n- Part number and issue (title block)\n- Material / alloy\n- Spec callouts: process, thickness, seal, dye/colour, any standard quoted\n- Masking: faces, bores or threads marked free of coating\n- Jigging: holes or features it can be hung from, surfaces that must not be contacted\n- Rough size / weight class if it affects jigging\n- End user / prime if shown" %>
+        <p class="text-xs text-gray-500 mt-1">This is stored on the quote and shown on the workbench; you can correct it before a re-run.</p>
+      </div>
     </div>
 
     <div>

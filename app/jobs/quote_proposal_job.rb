@@ -225,9 +225,18 @@ class QuoteProposalJob < AiAssistantJob
 
   # Quote mode never writes. Anything that would is refused, not rolled back
   # silently — the model should know it asked for something it can't have.
+  # Drawing URLs and file bytes must not be reachable through the query tool
+  # on an ITAR quote: the Cloudinary URLs are public-by-URL, so a query that
+  # returns one (or opens it) would hand the model what the flag withholds.
+  ITAR_PATTERNS = [/Net::HTTP/, /URI\.open/, /open-uri/, /open\(/, /Base64/, /cloudinary/i, /\.files\b/,
+                   /\.drawings\b/, /file_preview_url|file_thumbnail_url|generate_file_download_url/].freeze
+
   def run_query(code)
     if WRITE_PATTERNS.any? { |p| code.match?(p) }
       return { blocked: true, reason: "Quote mode is read-only. Parts and quotes are created by the reviewer from your proposal, not by you." }
+    end
+    if @quote.itar? && ITAR_PATTERNS.any? { |p| code.match?(p) }
+      return { blocked: true, reason: "This is an ITAR quote: drawings, file lists and URLs are not available to you. Work from the description." }
     end
     super
   end
@@ -252,7 +261,10 @@ class QuoteProposalJob < AiAssistantJob
       call to propose_quote; prose outside it is discarded.
 
       Work through it like this:
-      1. Read the drawing(s) and enquiry. Identify each distinct part number/issue,
+      1. Read the drawing(s) and enquiry. (On an ITAR quote the user message
+         says so and gives a DRAWING DESCRIPTION in place of the files — treat
+         that description as the drawing throughout, and assign drawing_indexes
+         from the file list it gives you.) Identify each distinct part number/issue,
          and for each part record WHICH files are its drawings (drawing_indexes,
          by the "file N" label). Three drawings for three parts means each part
          gets one — match by the part number in the title block or filename.
@@ -373,7 +385,10 @@ class QuoteProposalJob < AiAssistantJob
 
   def user_content
     blocks = []
-    @quote.drawings.each_with_index do |d, i|
+    # drawings_for_assistant is [] for an ITAR quote. Never read
+    # @quote.drawings here — that list is for Cloudinary, the workbench and
+    # the email, not the model.
+    @quote.drawings_for_assistant.each_with_index do |d, i|
       data = fetch_base64(d["cloudinary_url"]) or next
       if d["content_type"].to_s == "application/pdf"
         blocks << { type: "document", source: { type: "base64", media_type: "application/pdf", data: data }, title: d["original_filename"] }
@@ -408,8 +423,27 @@ class QuoteProposalJob < AiAssistantJob
       TXT
     end
 
+    if @quote.itar?
+      files = @quote.drawings.each_with_index.map { |d, i| "  file #{i}: #{d['original_filename']}" }.join("\n")
+      itar_block = <<~TXT
+        ITAR / EXPORT-CONTROLLED QUOTE — THE DRAWINGS ARE NOT PROVIDED TO YOU.
+        #{@quote.drawings.length} file(s) are held on the quote and will be attached to the
+        part(s) by HAMS; you only see their names, for drawing_indexes:
+        #{files.presence || '  (none)'}
+        Work from the enquiry and the reviewer's description below. Do not ask
+        for the drawing, do not try to fetch it, and do not guess what it shows
+        beyond the description: dimensions_mm and surface_area_sqft come from
+        the description if it gives them, otherwise price from the nearest
+        existing part for this customer and raise a question for the size.
+
+        DRAWING DESCRIPTION (written by the reviewer):
+        #{@quote.drawing_description}
+
+      TXT
+    end
+
     text = <<~TXT
-      #{customer_block}
+      #{itar_block}#{customer_block}
       ENQUIRER: #{[@quote.enquirer_name, @quote.enquirer_email].compact_blank.join(' · ').presence || 'not given — take it from the enquiry'}
 
       ENQUIRY:
