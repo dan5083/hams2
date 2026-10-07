@@ -2,13 +2,12 @@
 #
 # "Please email your POs to orders@" - sent by DigitalPoNudge when an
 # acknowledged order's PO arrived on paper, via an individual's inbox, or
-# forwarded by one of us. Whoever booked it is cc'd and is the reply-to, so a
-# "that's our purchasing system, please add it" reply reaches a person; when
-# nobody is (assistant bookings), replies go to orders@.
+# forwarded by one of us. Reply-to is orders@ so a "that's our purchasing
+# system, please add it" reply lands in the shared mailbox.
 class DigitalPoReminderMailer < ApplicationMailer
   ORDERS_ADDRESS = "orders@hardanodisingstl.com".freeze
 
-  def remind(customer_order, origin:, to:, cc: nil)
+  def remind(customer_order, origin:, to:)
     @customer_order = customer_order
     @customer       = customer_order.customer
     @origin         = origin.to_sym
@@ -16,12 +15,9 @@ class DigitalPoReminderMailer < ApplicationMailer
 
     attach_inline_logo
 
-    cc_list = Array(cc).map { |e| e.to_s.strip }.reject(&:blank?).uniq - Array(to)
-
     mail(
       to:       to,
-      cc:       cc_list.presence,
-      reply_to: cc_list.first.presence || ORDERS_ADDRESS,
+      reply_to: ORDERS_ADDRESS,
       subject:  "Sending us purchase orders - #{@customer_order.number} - Hard Anodising Surface Treatments Ltd"
     )
   end

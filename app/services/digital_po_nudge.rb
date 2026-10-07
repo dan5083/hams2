@@ -19,8 +19,8 @@
 # change. The acknowledgement no longer carries the generic "send orders to
 # orders@" note - this is the targeted replacement.
 #
-#   DigitalPoNudge.deliver_if_needed(customer_order, signed_off_by: user)
-#   DigitalPoNudge.deliver_if_needed(customer_order, inbound: ipo, signed_off_by: user)
+#   DigitalPoNudge.deliver_if_needed(customer_order)
+#   DigitalPoNudge.deliver_if_needed(customer_order, inbound: ipo)
 #   DigitalPoNudge.new(customer_order).origin_of_po   # console: why/why not
 class DigitalPoNudge
   # "From:" line in a forwarded body, quoted or not. Outlook writes
@@ -31,8 +31,8 @@ class DigitalPoNudge
 
   Origin = Struct.new(:kind, :original_sender, keyword_init: true)
 
-  def self.deliver_if_needed(customer_order, inbound: nil, signed_off_by: nil)
-    new(customer_order, inbound: inbound).deliver_if_needed(signed_off_by: signed_off_by)
+  def self.deliver_if_needed(customer_order, inbound: nil)
+    new(customer_order, inbound: inbound).deliver_if_needed
   end
 
   def initialize(customer_order, inbound: nil)
@@ -41,14 +41,14 @@ class DigitalPoNudge
     @ipo      = inbound
   end
 
-  def deliver_if_needed(signed_off_by: nil)
+  def deliver_if_needed
     origin = origin_of_po
     return skip("PO came from the customer digitally (or no PO attached)") if origin.nil?
 
     to = recipients(origin)
     return skip("no email address for #{@customer.name}") if to.empty?
 
-    DigitalPoReminderMailer.remind(@co, origin: origin.kind, to: to, cc: signed_off_by&.email).deliver_later
+    DigitalPoReminderMailer.remind(@co, origin: origin.kind, to: to).deliver_later
     Rails.logger.info "[DigitalPoNudge] #{@co.display_name}: #{origin.kind} → #{to.join(', ')}"
     true
   end
