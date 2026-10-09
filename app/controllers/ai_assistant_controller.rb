@@ -10,12 +10,19 @@ class AiAssistantController < ApplicationController
   # POST /ai_assistant/chat
   # Enqueues the job and immediately returns a request_id for polling.
   def chat
-    messages = params[:messages]
+    messages = params.to_unsafe_h["messages"]
 
     unless messages.is_a?(Array) && messages.any?
       render json: { error: "No messages provided" }, status: :bad_request
       return
     end
+
+    # Base64 attachments are uploaded (Cloudinary + Anthropic Files) and
+    # replaced with reference blocks here, so the row — and every agentic
+    # turn — carries a few hundred bytes per file, not the file. The widget
+    # re-posts the whole history each turn; AssistantAttachments de-dupes
+    # by content hash, so each file is uploaded once.
+    messages = AssistantAttachments.normalise(messages, owner: Current.user)
 
     request = AiAssistantRequest.create!(
       user:     Current.user,

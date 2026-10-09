@@ -1,7 +1,5 @@
 # app/services/purchase_order_service.rb
 require "tempfile"
-require "base64"
-
 class PurchaseOrderService
   class PurchaseOrderError < StandardError; end
 
@@ -32,17 +30,17 @@ class PurchaseOrderService
   # Called from the AI assistant (via execute_query) after it creates a
   # CustomerOrder from an uploaded PO.
   #
-  # IMPORTANT — must be called in the same assistant run the files were
-  # uploaded in. AiAssistantRequest#mark_complete!/#mark_error! strip base64
-  # data out of stored messages once the job finishes (see
-  # ai_assistant_request.rb#strip_base64_from_messages!), so this has nothing
-  # to read on a later turn.
+  # The request's attachments are "hams_file" reference blocks (see
+  # AssistantAttachments): the bytes are already in Cloudinary, so this is
+  # the same no-bytes path the email intake uses — a PDF is copied into the
+  # customer's folder server-side, photographed pages are tagged and combined
+  # into one cleaned multi-page PDF by Cloudinary. No bytes pass through
+  # the worker, and it can run on any later turn, not just the one the
+  # files were attached in.
   #
-  # PDF attachments are stored as-is. Photographed pages (one or more images)
-  # are cleaned up and combined into a single multi-page PDF. If a message
-  # contains both, the PDF wins and the images are ignored — mixed uploads
-  # aren't a case this handles; if that turns out to matter in practice, it
-  # needs its own decision.
+  # PDF attachments win over images; mixed uploads aren't a case this
+  # handles — if that turns out to matter in practice, it needs its own
+  # decision.
   #
   # Usage from AI assistant:
   #   PurchaseOrderService.attach_from_request(
@@ -52,45 +50,23 @@ class PurchaseOrderService
   # ---------------------------------------------------------------------------
   def self.attach_from_request(customer_order_id:, request_id:)
     customer_order = CustomerOrder.find(customer_order_id)
-    request = AiAssistantRequest.find(request_id)
+    request        = AiAssistantRequest.find(request_id)
 
-    pdf_blocks   = []
-    image_blocks = []
+    pdfs   = request.pdf_attachments
+    images = request.image_attachments
 
-    request.messages.each do |msg|
-      content = msg["content"]
-      next unless content.is_a?(Array)
-
-      content.each do |block|
-        source = block["source"]
-        next unless source&.dig("type") == "base64" && source["data"].present?
-
-        media_type = source["media_type"].to_s
-        if media_type == "application/pdf"
-          pdf_blocks << source["data"]
-        elsif media_type.start_with?("image/")
-          image_blocks << source["data"]
-        end
-      end
-    end
-
-    if pdf_blocks.empty? && image_blocks.empty?
+    if pdfs.empty? && images.empty?
       raise PurchaseOrderError, "No PDF or image attachments found in the request messages."
     end
 
-    result =
-      if pdf_blocks.any?
-        upload_pdf(pdf_blocks.first, customer_order)
-      else
-        upload_images_as_pdf(image_blocks, customer_order)
-      end
+    result = pdfs.any? ? copy_pdf(pdfs.first, customer_order) : adopt_images(images, customer_order)
 
-    store!(customer_order, result, source: pdf_blocks.any? ? "pdf" : "scanned_images")
+    store!(customer_order, result, source: pdfs.any? ? "pdf" : "scanned_images")
 
     {
       success: true,
       url: result[:secure_url],
-      pages_combined: pdf_blocks.any? ? nil : image_blocks.length,
+      pages_combined: pdfs.any? ? nil : images.length,
       customer_order_number: customer_order.number
     }.compact
   rescue => e
@@ -174,8 +150,28 @@ class PurchaseOrderService
   end
   private_class_method :adopt_pdf
 
-  # Parked photos → cleaned multi-page PDF, same as upload_images_as_pdf but
-  # tagging the assets that already exist instead of uploading them again.
+  # Same destination, but the source stays where it is: assistant uploads
+  # live at ai_assistant/<user>/<hash> and are referenced from the request
+  # (and the de-dupe cache), so they must not be renamed away. Cloudinary
+  # fetches the source URL itself — no bytes through the worker.
+  def self.copy_pdf(att, customer_order)
+    uploaded = Cloudinary::Uploader.upload(
+      att["secure_url"],
+      public_id:       "#{folder_path(customer_order)}/#{file_prefix(customer_order)}",
+      resource_type:   "image",
+      overwrite:       true,
+      unique_filename: false
+    )
+
+    { public_id: uploaded["public_id"], secure_url: uploaded["secure_url"],
+      format: "pdf", bytes: uploaded["bytes"],
+      thumbnail_url: page_thumbnail_url(uploaded["public_id"]) }
+  end
+  private_class_method :copy_pdf
+
+  # Parked photos (inbound email or assistant upload — both already in
+  # Cloudinary) → cleaned multi-page PDF. Tags the existing assets and lets
+  # Cloudinary's `multi` assemble and clean them; nothing is downloaded.
   def self.adopt_images(atts, customer_order)
     tag      = "po_#{customer_order.id}_#{SecureRandom.hex(4)}"
     page_ids = atts.map { |a| a["public_id"] }
@@ -375,73 +371,8 @@ class PurchaseOrderService
 
   # ---------------------------------------------------------------------------
 
-  def self.upload_pdf(base64_data, customer_order)
-    with_tempfile("po", ".pdf", base64_data) do |tempfile|
-      uploaded = Cloudinary::Uploader.upload(
-        tempfile.path,
-        public_id: "#{folder_path(customer_order)}/#{file_prefix(customer_order)}",
-        resource_type: "image", # see attach_upload — enables the page-1 thumbnail
-        overwrite: true,
-        unique_filename: false
-      )
 
-      { public_id: uploaded["public_id"], secure_url: uploaded["secure_url"],
-        format: "pdf", bytes: uploaded["bytes"],
-        thumbnail_url: page_thumbnail_url(uploaded["public_id"]) }
-    end
-  end
-  private_class_method :upload_pdf
 
-  def self.upload_images_as_pdf(base64_images, customer_order)
-    tag      = "po_#{customer_order.id}_#{SecureRandom.hex(4)}"
-    page_ids = []
-
-    base64_images.each do |data|
-      with_tempfile("po_page", ".jpg", data) do |tempfile|
-        uploaded = Cloudinary::Uploader.upload(
-          tempfile.path,
-          folder: "#{folder_path(customer_order)}/pages",
-          tags: [tag],
-          overwrite: true
-        )
-        page_ids << uploaded["public_id"]
-      end
-    end
-
-    # Combines every image tagged above into one multi-page PDF, applying the
-    # cleanup transformation to each page as it's assembled. Page order follows
-    # upload order, i.e. the order the files were attached in.
-    combined = Cloudinary::Uploader.multi(
-      tag,
-      format: "pdf",
-      transformation: IMAGE_CLEANUP_TRANSFORMATION.map(&:dup)
-    )
-
-    # The combined PDF is its own stored asset (type "multi"), so the page
-    # originals are dead weight once it exists — except page 1, which is kept
-    # as the source of the order page thumbnail (a multi asset can't be
-    # page-transformed). Best-effort — a failure here shouldn't lose the PO.
-    begin
-      Cloudinary::Api.delete_resources(page_ids.drop(1)) if page_ids.length > 1
-    rescue => e
-      Rails.logger.warn "[PurchaseOrderService] page cleanup failed for #{tag}: #{e.message}"
-    end
-
-    { public_id: combined["public_id"], secure_url: combined["secure_url"],
-      format: "pdf", bytes: combined["bytes"],
-      thumbnail_url: scan_thumbnail_url(page_ids.first) }
-  end
-  private_class_method :upload_images_as_pdf
-
-  def self.with_tempfile(basename, ext, base64_data)
-    tempfile = Tempfile.new([basename, ext], binmode: true)
-    tempfile.write(Base64.decode64(base64_data))
-    tempfile.flush
-    yield tempfile
-  ensure
-    tempfile&.close!
-  end
-  private_class_method :with_tempfile
 
   # Page 1 of an image-type PDF asset as a JPEG.
   # Cloudinary::Utils.cloudinary_url MUTATES the transformation hashes it is

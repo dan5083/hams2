@@ -2,15 +2,13 @@
 #
 # Stage 1 of intake. Runs once per InboundPurchaseOrder:
 #   1. drop obvious noise (auto-replies, no usable attachment)
-#   2. read each parked PDF/image back from Cloudinary (the controller parked
-#      them at inbound_purchase_orders/<id>/ — that's the durable copy that
-#      #create_order! attaches later; the assistant request strips base64
-#      once it finishes)
-#   3. build an AiAssistantRequest (files + email context) for the system
-#      user and hand off to PoIntakeAssistantJob
-require "net/http"
-require "uri"
-require "base64"
+#   2. upload each parked PDF/image to the Anthropic Files API, once, so
+#      every turn of the assistant run references it by id instead of
+#      carrying the bytes (the controller parked them in Cloudinary at
+#      inbound_purchase_orders/<id>/ — that's the durable copy that
+#      #create_order! attaches later)
+#   3. build an AiAssistantRequest (file references + email context) for the
+#      system user and hand off to PoIntakeAssistantJob
 
 class PoIntakeJob < ApplicationJob
   queue_as :default
@@ -33,7 +31,10 @@ class PoIntakeJob < ApplicationJob
 
     ipo.update!(status: "fetching")
 
-    files = usable.map { |att| att.merge("base64" => Base64.strict_encode64(fetch(att["secure_url"]))) }
+    files = usable.map { |att| file_ref(att) }
+    # Remember the file_ids on the row so a retry doesn't upload twice.
+    ids   = files.to_h { |f| [f["index"], f["file_id"]] }
+    ipo.update!(attachments: ipo.attachments.map { |a| ids[a["index"]] ? a.merge("file_id" => ids[a["index"]]) : a })
 
     request = AiAssistantRequest.create!(
       user:     system_user,
@@ -54,21 +55,22 @@ class PoIntakeJob < ApplicationJob
       raise "PO intake system user #{SYSTEM_USER_EMAIL} not found — create it (see README)"
   end
 
-  def fetch(url)
-    uri = URI(url)
-    res = Net::HTTP.start(uri.host, uri.port, use_ssl: true, read_timeout: 60) { |http| http.get(uri.request_uri) }
-    raise "Cloudinary fetch failed #{res.code} for #{url}" unless res.is_a?(Net::HTTPSuccess)
-    res.body
+  # Parked attachment -> "hams_file" reference block (AssistantAttachments
+  # shape). A Mailgun retry re-runs this job, so reuse a file_id already on
+  # the attachment rather than uploading again.
+  def file_ref(att)
+    file_id = att["file_id"].presence ||
+              AnthropicFiles.upload_from_url(att["secure_url"], filename: att["name"], media_type: att["content_type"]) ||
+              raise("could not upload #{att['name']} to Anthropic Files")
+
+    { "type" => AssistantAttachments::TYPE, "file_id" => file_id,
+      "public_id" => att["public_id"], "secure_url" => att["secure_url"],
+      "content_type" => att["content_type"], "name" => att["name"], "bytes" => att["bytes"],
+      "index" => att["index"] }
   end
 
   def build_content(ipo, files)
-    blocks = files.map do |f|
-      if f["content_type"] == "application/pdf"
-        { "type" => "document", "source" => { "type" => "base64", "media_type" => "application/pdf", "data" => f["base64"] } }
-      else
-        { "type" => "image", "source" => { "type" => "base64", "media_type" => f["content_type"], "data" => f["base64"] } }
-      end
-    end
+    blocks = files.map { |f| f.except("index") }
 
     attachment_lines = ipo.attachments.map do |a|
       usable = InboundPurchaseOrder::USABLE_CONTENT_TYPES.include?(a["content_type"].to_s.downcase)

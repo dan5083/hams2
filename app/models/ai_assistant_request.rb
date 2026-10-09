@@ -1,4 +1,9 @@
 # app/models/ai_assistant_request.rb
+#
+# messages never hold file bytes: the controller replaces base64 blocks with
+# "hams_file" reference blocks (see AssistantAttachments) before the row is
+# created, so a request can be re-read — and its files re-used — on any
+# later turn. The old strip_base64_from_messages! is gone with it.
 class AiAssistantRequest < ApplicationRecord
   belongs_to :user
 
@@ -10,32 +15,14 @@ class AiAssistantRequest < ApplicationRecord
 
   def mark_complete!(response_text)
     update!(status: "complete", response: response_text)
-    strip_base64_from_messages!
   end
 
   def mark_error!(message)
     update!(status: "error", error: message)
-    strip_base64_from_messages!
   end
 
-  private
-
-  def strip_base64_from_messages!
-    return unless messages.is_a?(Array)
-
-    cleaned = messages.map do |m|
-      content = m["content"]
-      next m unless content.is_a?(Array)
-
-      m.merge("content" => content.map { |c|
-        if c.dig("source", "type") == "base64"
-          c.merge("source" => { "type" => "stripped", "media_type" => c.dig("source", "media_type") })
-        else
-          c
-        end
-      })
-    end
-
-    update_columns(messages: cleaned.to_json)
-  end
+  # Attachment reference blocks, in the order they were attached.
+  def attachments      = AssistantAttachments.refs(messages)
+  def pdf_attachments   = AssistantAttachments.pdfs(messages)
+  def image_attachments = AssistantAttachments.images(messages)
 end

@@ -84,9 +84,9 @@ class AiAssistantJob < ApplicationJob
     request = AiAssistantRequest.find(request_id)
     @request_user = request.user
     @request_id = request_id
-    messages = request.messages
-
-    response_text = run_agentic_loop(messages)
+    # request.messages holds hams_file reference blocks, never bytes; the
+    # copy that goes to the model references the files by id.
+    response_text = run_agentic_loop(api_messages(request.messages))
     request.mark_complete!(response_text)
   rescue => e
     Rails.logger.error "[AI Assistant Job] Error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
@@ -94,6 +94,18 @@ class AiAssistantJob < ApplicationJob
   end
 
   private
+
+  # Stored messages -> Messages API messages: each "hams_file" reference
+  # becomes a Files API document/image block. request.messages is untouched.
+  def api_messages(messages)
+    messages.map do |msg|
+      content = msg["content"]
+      next msg unless content.is_a?(Array)
+      msg.merge("content" => content.map { |b|
+        b["type"] == AssistantAttachments::TYPE ? AnthropicFiles.content_block(b["file_id"], b["content_type"], title: b["name"]) : b
+      })
+    end
+  end
 
   def run_agentic_loop(messages)
     loop_messages = messages.dup
@@ -165,6 +177,7 @@ class AiAssistantJob < ApplicationJob
       req["Content-Type"]      = "application/json"
       req["x-api-key"]         = ENV["ANTHROPIC_API_KEY"]
       req["anthropic-version"] = "2023-06-01"
+      req["anthropic-beta"]    = AnthropicFiles::BETA
       req.body = body
 
       res = http.request(req)
@@ -784,11 +797,9 @@ class AiAssistantJob < ApplicationJob
           customer_order_id: co.id,
           request_id: @request_id
         )
-      @request_id is available in the eval context. This MUST happen in the same
-      assistant run the files were attached in — the raw file data is only available
-      while this request is still in progress, not on a later turn. Photographed pages
-      are cleaned up and combined into one PDF automatically; just pass all of it
-      through in one call.
+      @request_id is available in the eval context. Photographed pages are cleaned
+      up and combined into one PDF automatically; just pass all of it through in
+      one call.
 
       STEP 6 — Reply:
       Confirm the order was created with a link ([CustomerOrder N](/customer_orders/N)),
@@ -828,7 +839,7 @@ class AiAssistantJob < ApplicationJob
       STEP 2 — Check it is signed. If the Name/Signature box looks blank, say
       so and ask before proceeding. An unsigned PoC is not proof of collection.
 
-      STEP 3 — One call, in this same run (the file data is only available now):
+      STEP 3 — One call:
         ProofOfCollectionService.process_from_request(
           customer_order_id: co.id,
           request_id: @request_id

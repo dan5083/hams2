@@ -126,13 +126,24 @@ class QuotesController < ApplicationController
     params.require(:quote).permit(:enquiry, :valid_until, :itar, :drawing_description)
   end
 
+  # Cloudinary for HAMS (thumbnails, parts, the email); Anthropic Files for
+  # the assistant, uploaded once here so QuoteProposalJob references it by id
+  # on every run instead of fetching and base64-encoding it. An ITAR quote's
+  # drawings never go to Anthropic — Quote#drawings_for_assistant is [] and
+  # there is no anthropic_file_id to find.
   def upload_drawing(file)
     r = CloudinaryService.upload_file(file, "quotes", filename_prefix: "qt")
-    {
+    drawing = {
       "cloudinary_public_id" => r[:public_id], "cloudinary_url" => r[:secure_url],
       "original_filename" => r[:filename], "file_size_bytes" => r[:size],
       "content_type" => r[:content_type], "uploaded_at" => Time.current.iso8601
     }
+    unless @quote.itar?
+      tempfile = file.respond_to?(:tempfile) ? file.tempfile : file
+      tempfile.rewind
+      drawing["anthropic_file_id"] = AnthropicFiles.upload(tempfile.read, filename: r[:filename], media_type: r[:content_type])
+    end
+    drawing
   end
 
   # The build page posts form[customer_id] (hidden, from the proposal) and

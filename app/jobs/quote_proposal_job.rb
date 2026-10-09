@@ -229,6 +229,7 @@ class QuoteProposalJob < AiAssistantJob
   # on an ITAR quote: the Cloudinary URLs are public-by-URL, so a query that
   # returns one (or opens it) would hand the model what the flag withholds.
   ITAR_PATTERNS = [/Net::HTTP/, /URI\.open/, /open-uri/, /open\(/, /Base64/, /cloudinary/i, /\.files\b/,
+                   /AnthropicFiles/, /AssistantAttachments/, /file_id/,
                    /\.drawings\b/, /file_preview_url|file_thumbnail_url|generate_file_download_url/].freeze
 
   def run_query(code)
@@ -388,13 +389,14 @@ class QuoteProposalJob < AiAssistantJob
     # drawings_for_assistant is [] for an ITAR quote. Never read
     # @quote.drawings here — that list is for Cloudinary, the workbench and
     # the email, not the model.
+    #
+    # Drawings go to the model by Anthropic Files id (uploaded once by
+    # quotes#create), never as base64 — a re-run with answers costs a few
+    # hundred bytes per drawing, not the drawing. Quotes from before that
+    # change have no id, so upload on the way past and keep it.
     @quote.drawings_for_assistant.each_with_index do |d, i|
-      data = fetch_base64(d["cloudinary_url"]) or next
-      if d["content_type"].to_s == "application/pdf"
-        blocks << { type: "document", source: { type: "base64", media_type: "application/pdf", data: data }, title: d["original_filename"] }
-      else
-        blocks << { type: "image", source: { type: "base64", media_type: d["content_type"].presence || "image/jpeg", data: data } }
-      end
+      file_id = drawing_file_id(d) or next
+      blocks << AnthropicFiles.content_block(file_id, d["content_type"].presence || "image/jpeg", title: d["original_filename"])
       blocks << { type: "text", text: "(file #{i}: #{d['original_filename']})" }
     end
 
@@ -457,14 +459,12 @@ class QuoteProposalJob < AiAssistantJob
     blocks
   end
 
-  def fetch_base64(url, limit = 3)
-    return nil if url.blank?
-    res = Net::HTTP.get_response(URI(url))
-    return fetch_base64(res["location"], limit - 1) if res.is_a?(Net::HTTPRedirection) && limit > 0
-    return nil unless res.is_a?(Net::HTTPSuccess)
-    Base64.strict_encode64(res.body)
-  rescue => e
-    Rails.logger.warn "[QuoteProposalJob] could not fetch #{url}: #{e.message}"
-    nil
+  def drawing_file_id(d)
+    return d["anthropic_file_id"] if d["anthropic_file_id"].present?
+    file_id = AnthropicFiles.upload_from_url(d["cloudinary_url"], filename: d["original_filename"],
+                                             media_type: d["content_type"].presence || "image/jpeg") or return nil
+    d["anthropic_file_id"] = file_id
+    @quote.update_columns(drawings: @quote.drawings) # keep it for the next re-run
+    file_id
   end
 end
