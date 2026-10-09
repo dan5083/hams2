@@ -206,9 +206,10 @@ class PurchaseOrderService
   # each_price (WorksOrder only writes back `each` prices > 0).
   #
   # One transaction — either every line books or none do, and the error says
-  # which line and why. A works order carries the TRUE price only: the PO's
-  # if stated, else the part's each_price, else a £0 lot for contract review
-  # to fix. Minimum charges are NOT applied here — the caller runs
+  # which line and why. A works order carries the TRUE price only: the part's
+  # saved each_price if it has one, else the PO's, else a £0 lot for contract
+  # review to fix. Where the part has a price and the PO states a different
+  # one, the WO is flagged so CR queries it. Minimum charges are NOT applied here — the caller runs
   # MinimumCharges.apply!(customer_order) once every line is booked, which
   # puts the customer's per-order / per-WO minimums on as top-up charges.
   #
@@ -253,6 +254,7 @@ class PurchaseOrderService
         # instructions box on the WO page and route card.
         notes = []
         notes << UNPRICED_WARNING if !free && pricing[:lot_price].to_d.zero?
+        notes << price_mismatch_warning(part, line["unit_price"]) if !free && price_mismatch?(part, line["unit_price"])
         notes << "From customer PO: #{line['operation_note']}".first(2000) if line["operation_note"].present?
         wo.update_column(:booking_notes, notes.join("\n\n")) if notes.any?
       end
@@ -289,10 +291,14 @@ class PurchaseOrderService
   end
   private_class_method :resolve_part!
 
-  # PO price if stated, else the part's each_price, else £0 (lot) — the
-  # reviewer sees a £0 line and prices it. No minimum-charge floor here.
+  # The part's saved each_price wins: that's our agreed price, and a PO
+  # stating something else is a query for contract review, not a reason to
+  # book at it (booking at the PO price would also write it back onto the
+  # part - see WorksOrder - silently replacing ours). The PO price is the
+  # fallback for a part with no price yet, else £0 (lot) — the reviewer sees
+  # a £0 line and prices it. No minimum-charge floor here.
   def self.price_attributes(part, qty, po_unit_price)
-    each = po_unit_price.present? && po_unit_price.to_d.positive? ? po_unit_price.to_d : part.each_price&.to_d
+    each = saved_each_price(part) || positive_decimal(po_unit_price)
     if each&.positive?
       { price_type: "each", each_price: each, lot_price: (each * qty).round(2) }
     else
@@ -300,6 +306,32 @@ class PurchaseOrderService
     end
   end
   private_class_method :price_attributes
+
+  def self.price_mismatch?(part, po_unit_price)
+    saved = saved_each_price(part)
+    po    = positive_decimal(po_unit_price)
+    saved && po && saved != po
+  end
+  private_class_method :price_mismatch?
+
+  def self.price_mismatch_warning(part, po_unit_price)
+    "** PRICE QUERY: customer PO states £#{'%.2f' % positive_decimal(po_unit_price)} each for " \
+    "#{part.display_name}; booked at our saved price of £#{'%.2f' % saved_each_price(part)} each. " \
+    "QUERY WITH THE CUSTOMER BEFORE CR SIGN-OFF **"
+  end
+  private_class_method :price_mismatch_warning
+
+  def self.saved_each_price(part)
+    positive_decimal(part.each_price)
+  end
+  private_class_method :saved_each_price
+
+  def self.positive_decimal(value)
+    return nil if value.blank?
+    d = value.to_d
+    d.positive? ? d : nil
+  end
+  private_class_method :positive_decimal
 
   # ---------------------------------------------------------------------------
   # Drawings that arrived alongside the PO → the part's file list, in the
