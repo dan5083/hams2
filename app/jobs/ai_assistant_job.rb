@@ -84,9 +84,9 @@ class AiAssistantJob < ApplicationJob
     request = AiAssistantRequest.find(request_id)
     @request_user = request.user
     @request_id = request_id
-    # request.messages holds hams_file reference blocks, never bytes; the
-    # copy that goes to the model references the files by id.
-    response_text = run_agentic_loop(api_messages(request.messages))
+    # request.messages holds hams_file reference blocks, never bytes;
+    # call_anthropic swaps them for Files API blocks on the way out.
+    response_text = run_agentic_loop(request.messages)
     request.mark_complete!(response_text)
   rescue => e
     Rails.logger.error "[AI Assistant Job] Error: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
@@ -96,7 +96,9 @@ class AiAssistantJob < ApplicationJob
   private
 
   # Stored messages -> Messages API messages: each "hams_file" reference
-  # becomes a Files API document/image block. request.messages is untouched.
+  # becomes a Files API document/image block. Applied in call_anthropic so
+  # every path (chat, PO intake, quote) is covered whatever perform it uses;
+  # the stored messages are never touched.
   def api_messages(messages)
     messages.map do |msg|
       content = msg["content"]
@@ -162,7 +164,7 @@ class AiAssistantJob < ApplicationJob
       cache_control: { type: "ephemeral" },
       system:        build_system_prompt,
       tools:         tools,
-      messages:      messages
+      messages:      api_messages(messages)
     }.to_json
 
     retries = 0
