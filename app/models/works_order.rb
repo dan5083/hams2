@@ -1393,11 +1393,18 @@ class WorksOrder < ApplicationRecord
     raise "Operation #{position} has no checklist" if items.blank?
 
     ids = items.map { |i| i["id"] }
+    existing = op["checklist_responses"] || {}
     cleaned = {}
     (responses || {}).each do |item_id, r|
       next unless ids.include?(item_id.to_s)
       answer = r["answer"].to_s.strip.upcase
       next unless %w[YES NO].include?(answer)
+      item = items.find { |i| i["id"] == item_id.to_s }
+      # A YES already on this WO's record predates the rule and stands.
+      if answer == "YES" && existing.dig(item_id.to_s, "answer") != "YES" &&
+         (why = OperationLibrary::ContractReviewOperations.yes_blocker(item, part))
+        raise "Checklist item #{items.index(item) + 1} cannot be YES: #{why}"
+      end
       cleaned[item_id.to_s] = { "answer" => answer, "comment" => r["comment"].to_s.strip }
     end
 

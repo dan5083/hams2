@@ -593,6 +593,11 @@ class Part < ApplicationRecord
   #     and so put one job on every shop's board.
   # An empty shop (nobody in RELEASER_SHOPS has released it yet) leaves the
   # boards on vat routing. Recomputed by ReleaseNote's after_commit.
+  #
+  # parts.home_shop_override (string, nullable) is the manual say-so: set
+  # from the WO page (or the part page), it REPLACES the releaser rule for
+  # the shop and survives every recompute. nil = automatic. Tags are never
+  # overridable - they follow the treatments.
   # ---------------------------------------------------------------------------
   SECTION_TAGS_BY_TREATMENT = {
     "chromic_anodising"          => "chromic",
@@ -605,8 +610,29 @@ class Part < ApplicationRecord
   def computed_home_sections
     types = parse_treatments_data.map { |t| t["type"] }
     tags  = types.filter_map { |t| SECTION_TAGS_BY_TREATMENT[t] }.uniq
-    shop  = releaser_shop if (types & ShopSectionBoard::SHOP_ROUTED_TREATMENTS).any?
+    shop  = home_shop_override.presence || releaser_shop if (types & ShopSectionBoard::SHOP_ROUTED_TREATMENTS).any?
     (tags + [shop]).compact.uniq
+  end
+
+  # The shop this part's hard/standard work is homed to, or nil (vat routing).
+  def home_shop
+    (Array(home_sections) & ShopSectionBoard::SHOP_ROUTED_SHOPS).first
+  end
+
+  # Does this part have any hard/standard anodise work to home?
+  def shop_routable?
+    (parse_treatments_data.map { |t| t["type"] } & ShopSectionBoard::SHOP_ROUTED_TREATMENTS).any?
+  end
+
+  # Manual homing. shop: a SHOP_ROUTED_SHOPS key, or blank to go back to
+  # automatic (releaser rule). Rehomes immediately so the boards follow.
+  def set_home_shop!(shop)
+    shop = shop.presence
+    if shop && !ShopSectionBoard::SHOP_ROUTED_SHOPS.include?(shop)
+      raise ArgumentError, "Unknown shop #{shop.inspect}"
+    end
+    update_column(:home_shop_override, shop)
+    rehome_from_releases!
   end
 
   def releaser_shop

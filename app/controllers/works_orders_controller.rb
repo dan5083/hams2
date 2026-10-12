@@ -1,6 +1,6 @@
 # app/controllers/works_orders_controller.rb - Fixed pricing parameter handling and route card operations with RBAC
 class WorksOrdersController < ApplicationController
-  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :invoice_to_date, :void, :unvoid, :sign_off_operation, :undo_sign_off, :save_ocv, :add_operation_note, :set_batch_count, :set_batch_qty, :add_batch, :delete_batch, :add_fork, :remove_fork, :discard_process_record, :choose_alternate]
+  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :invoice_to_date, :void, :unvoid, :sign_off_operation, :undo_sign_off, :save_ocv, :add_operation_note, :set_batch_count, :set_batch_qty, :add_batch, :delete_batch, :add_fork, :remove_fork, :discard_process_record, :choose_alternate, :set_home_shop]
 
   # Marks on a process record are attributed to Current.actor - the operator
   # unlocked with a PIN if there is one, otherwise the account holder. That
@@ -68,6 +68,10 @@ class WorksOrdersController < ApplicationController
   # of every operation is what made 20 a practical ceiling; with the page
   # pinned to a single batch the cost no longer scales with batch count.
   def show
+    # Section chips in the header: the boards the route passes through and
+    # the one the job is on now. Derived from the record, no queries beyond
+    # the ones the page already makes.
+    @board_job = ShopSectionBoard::Job.new(@works_order)
     return unless @works_order.paperless_record?
 
     requested = params[:batch].to_i
@@ -254,6 +258,19 @@ class WorksOrdersController < ApplicationController
                 status: :see_other
   rescue => e
     redirect_to process_record_path(params[:position]), alert: e.message, status: :see_other
+  end
+
+  # Home shop for this WO's PART (every WO on the part follows). Blank =
+  # back to automatic (the releaser rule). Route:
+  #   patch :set_home_shop, on: :member   # under resources :works_orders
+  def set_home_shop
+    part = @works_order.part or raise "WO#{@works_order.number} has no part"
+    part.set_home_shop!(params[:shop])
+    label = part.home_shop ? ShopSectionBoard::SHOP_LABELS[part.home_shop] : "automatic"
+    redirect_back fallback_location: works_order_path(@works_order), status: :see_other,
+                  notice: "#{part.part_number} homed to #{label}" + (part.home_shop_override.present? ? " (manual)." : " (releaser rule).")
+  rescue => e
+    redirect_back fallback_location: works_order_path(@works_order), alert: e.message, status: :see_other
   end
 
   # Paperless process record: OCV readings for the ACTIVE batch of an operation

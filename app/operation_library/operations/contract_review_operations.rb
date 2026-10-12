@@ -14,7 +14,7 @@ module OperationLibrary
     CHECKLIST = [
       { "id" => "receipt_of_order",       "scope" => "order", "text" => "Receipt of order - check all details are clear and unambiguous" },
       { "id" => "order_agrees_quotation", "scope" => "order", "text" => "Order agrees with quotation?" },
-      { "id" => "specs_at_correct_issue", "scope" => "part",  "text" => "Ensure drawings and relevant specifications have been reviewed and are at the correct issue. Ensure all specifications and quality requirements called out on customer PO are held either electronically or on file and the requirements flow down to the relevant job card and buy off sheet where required",
+      { "id" => "specs_at_correct_issue", "scope" => "part",  "requires" => "drawing", "text" => "Ensure drawings and relevant specifications have been reviewed and are at the correct issue. Ensure all specifications and quality requirements called out on customer PO are held either electronically or on file and the requirements flow down to the relevant job card and buy off sheet where required",
         "guidance" => "If the correct specification issues are not available, put work on hold and contact the customer. If Terms and Conditions or Quality Requirements are not on file, put work on hold and contact the customer. The operator / chemist should be in no doubt as to the requirements for lot testing / periodic testing once the CR has been carried out" },
       { "id" => "key_characteristics",    "scope" => "part",  "text" => "Have key characteristics been identified on the drawing or as part of this review? (If yes, Phil to determine if control plan required. Refer IP2007 page 7 to determine relevant OCV data to be recorded)" },
       { "id" => "jigging_review",         "scope" => "part",  "text" => "Jigging review - when viewing drawing, carry out a jigging review to ensure work holding, special threads, and component orientation suitable to minimise air locks is taken into account" },
@@ -52,6 +52,19 @@ module OperationLibrary
           ocv: ocv_spec
         )
       ]
+    end
+
+    # Why `item` cannot be answered YES for `part` right now, or nil.
+    # "requires" names a precondition on the part. The show page drops YES
+    # from the dropdown and prints the reason; save_checklist_responses!
+    # refuses a YES that arrives anyway (stale form, remembered answer). A
+    # YES already recorded on the WO predates the rule and stands.
+    def self.yes_blocker(item, part)
+      case item["requires"]
+      when "drawing"
+        return nil if part&.has_files?
+        "no drawing on file for this part — upload it to the part first"
+      end
     end
 
     # Resolve checklist content: the current form for a marker (true), or the

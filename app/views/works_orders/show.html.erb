@@ -69,6 +69,58 @@
     </div>
   </div>
 
+  <%# ---- Sections: where this WO is for and where it is -------------------
+      Home shop is a PART property (parts.home_sections / home_shop_override):
+      set here, it moves every WO on the part. The chips after it are the
+      boards the route passes through, derived from the record by
+      ShopSectionBoard::Job#board_path - the job is on the blue one now. %>
+  <% wo_part_for_home = @works_order.part %>
+  <% board_path = @board_job.board_path %>
+  <% if wo_part_for_home || board_path.any? %>
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs -mt-3 mb-6">
+      <% if wo_part_for_home&.shop_routable? %>
+        <%= form_with url: set_home_shop_works_order_path(@works_order), method: :patch, local: true,
+                      class: "flex items-center gap-1",
+                      data: { turbo_confirm: "This homes #{wo_part_for_home.part_number} itself — every works order on this part follows. Continue?" } do %>
+          <span class="text-gray-500">Home shop:</span>
+          <%= select_tag :shop,
+              options_for_select([["Automatic (releaser rule)", ""]] + ShopSectionBoard::SHOP_LABELS.map { |k, v| [v, k] },
+                                 wo_part_for_home.home_shop_override.presence),
+              onchange: "this.form.requestSubmit()",
+              class: "border border-gray-300 rounded px-1 py-0.5 text-xs" %>
+          <% if wo_part_for_home.home_shop_override.present? %>
+            <span class="text-amber-700" title="Set by hand; the releaser rule is ignored for this part">manual</span>
+          <% elsif wo_part_for_home.home_shop %>
+            <span class="text-gray-400" title="Whichever section head has released this part the most">
+              → <%= ShopSectionBoard::SHOP_LABELS[wo_part_for_home.home_shop] %> (from releases)
+            </span>
+          <% else %>
+            <span class="text-amber-700" title="Nobody in a shop has released this part yet, so it shows on every shop whose vats the route names">
+              unhomed — vat routing
+            </span>
+          <% end %>
+        <% end %>
+      <% end %>
+
+      <% if board_path.any? %>
+        <div class="flex flex-wrap items-center gap-1" title="Section boards this WO passes through, in route order">
+          <span class="text-gray-500 mr-1">Boards:</span>
+          <% board_path.each_with_index do |sec, i| %>
+            <% klass = { now:   "bg-blue-600 text-white font-bold",
+                         done:  "bg-green-100 text-green-800",
+                         later: "bg-gray-100 text-gray-600" }[sec[:state]] %>
+            <%= link_to section_path(sec[:key]),
+                        class: "inline-flex items-center px-2 py-0.5 rounded-full whitespace-nowrap #{klass}",
+                        title: { now: "On this board now", done: "Signed off", later: "Still to come" }[sec[:state]] do %>
+              <%= { now: "▶ ", done: "✓ ", later: "" }[sec[:state]] %><%= sec[:label] %>
+            <% end %>
+            <% if i < board_path.length - 1 %><span class="text-gray-300">→</span><% end %>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
   <% if aero && has_ocv %>
     <div class="mb-4 flex items-center gap-2.5 rounded-lg border-2 border-red-300 bg-red-50 px-4 py-2.5">
       <span class="text-lg">⏱</span>
@@ -915,6 +967,11 @@
                               <div class="p-3 space-y-2">
                               <% checklist_items.each_with_index do |item, idx| %>
                                 <% r = prefill[item["id"]] || {} %>
+                                <%# YES is withheld when the part fails the item's precondition
+                                    (no drawing on file). A YES already recorded on this WO
+                                    predates the rule and keeps its option. %>
+                                <% blocker = OperationLibrary::ContractReviewOperations.yes_blocker(item, @works_order.part) %>
+                                <% blocker = nil if op.dig("checklist_responses", item["id"], "answer") == "YES" %>
                                 <div class="flex flex-wrap items-start gap-2 <%= r["from_memory"] ? "opacity-80" : "" %>">
                                   <span class="text-xs text-gray-400 w-5 flex-none pt-1"><%= idx + 1 %></span>
                                   <span class="text-xs text-gray-700 flex-1 min-w-48 pt-1"><%= item["text"] %>
@@ -922,10 +979,17 @@
                                     <% if item["guidance"].present? %>
                                       <span class="block text-xs italic text-gray-400 mt-0.5"><%= item["guidance"] %></span>
                                     <% end %>
+                                    <% if blocker %>
+                                      <span class="block text-xs font-semibold text-red-600 mt-0.5">
+                                        ⛔ Can't be YES: <%= blocker %>
+                                        <% if @works_order.part %>· <%= link_to "open part", part_path(@works_order.part), class: "underline", target: "_blank", rel: "noopener" %><% end %>
+                                        <% if r["from_memory"] && r["answer"] == "YES" %>(the remembered YES is not carried over)<% end %>
+                                      </span>
+                                    <% end %>
                                   </span>
                                   <%= select_tag "checklist[#{item["id"]}][answer]",
-                                      options_for_select(["", "YES", "NO"], r["answer"]),
-                                      class: "border border-gray-300 rounded px-1 py-1 text-sm flex-none" %>
+                                      options_for_select(blocker ? ["", "NO"] : ["", "YES", "NO"], r["answer"]),
+                                      class: "border #{blocker ? 'border-red-400' : 'border-gray-300'} rounded px-1 py-1 text-sm flex-none" %>
                                   <%= text_field_tag "checklist[#{item["id"]}][comment]", r["comment"],
                                       placeholder: "Action taken / comment",
                                       class: "border border-gray-300 rounded px-2 py-1 text-sm w-full sm:w-44 sm:flex-none" %>

@@ -77,6 +77,7 @@ Rails.application.routes.draw do
   resources :works_orders, except: [:new, :create] do
     member do
       get :route_card
+      patch :set_home_shop
       patch :sign_off_operation
       patch :undo_sign_off
       patch :save_ocv

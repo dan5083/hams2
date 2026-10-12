@@ -47,6 +47,22 @@ class ShopSectionBoard
   SHOP_ROUTED_VATS = SHOP_VATS.values_at(*SHOP_ROUTED_SHOPS).flatten.freeze
   SHOP_ROUTED_TREATMENTS = %w[hard_anodising standard_anodising].freeze
 
+  # Which board a shop's jig and treatment ops land on. Shop 1 splits
+  # jiggers/anodisers; the others are one board.
+  BOARD_FOR = {
+    "shop1"    => { jig: "shop1_jiggers", vat: "shop1_anodisers" },
+    "shop2"    => { jig: "shop2",         vat: "shop2" },
+    "factory2" => { jig: "factory2",      vat: "factory2" },
+    "chromic"  => { jig: "chromic",       vat: "chromic" },
+  }.freeze
+
+  # Homing dropdown labels (Part#set_home_shop!).
+  SHOP_LABELS = {
+    "shop1"    => "Shop 1",
+    "shop2"    => "Shop 2",
+    "factory2" => "Factory 2",
+  }.freeze
+
   SECTIONS = {
     "enp"             => "ENP",
     "shop1_anodisers" => "Shop 1 · Anodisers",
@@ -776,6 +792,73 @@ class ShopSectionBoard
             thickness: enp_thickness, pretreat: enp_pretreat_label }
         end
       end
+    end
+
+    # ---- WO page: the boards this job passes through ------------------------
+    # [{ key:, label:, state: :done | :now | :later }] in route order.
+    # Derived from the route with the same classifiers the boards use, and
+    # :now means a board actually lists the job at this moment (same row
+    # builders), so the WO page can never claim a board the job isn't on.
+    # Contract review is deliberately left out - every WO goes through it
+    # and the page already shows its state.
+    # An unhomed part whose op text lists several shops' vats shows every
+    # one of them - that IS where it appears until a section head releases
+    # it (or someone sets the home shop) and home_shop? becomes true.
+    def board_path
+      stops = []
+      push = ->(key, done) { stops << [key, done] }
+
+      ops.each_with_index do |op, i|
+        if lacquer_masking_op?(op)
+          push.("lacquering", fully_signed?(op))
+        elsif jig_op?(op)
+          nxt = next_routed_op(i) or next
+          shops_for(vats_for(nxt)).each { |s| push.(BOARD_FOR[s][:jig], fully_signed?(op)) }
+        elsif anodising_op?(op)
+          shops_for(vats_for(op)).each { |s| push.(BOARD_FOR[s][:vat], fully_signed?(op)) }
+        elsif enp_op?(op)
+          push.("enp", fully_signed?(op))
+        elsif chem_conv_op?(op)
+          push.("chem_conv", fully_signed?(op))
+        end
+      end
+
+      now = current_boards
+      stops.group_by(&:first).map do |key, occurrences|   # group_by keeps first-seen order
+        state = if now.include?(key) then :now
+                elsif occurrences.all?(&:last) then :done
+                else :later
+                end
+        { key: key, label: SECTIONS[key], state: state }
+      end
+    end
+
+    # Boards listing this job right now - built from the row methods the
+    # boards themselves render from.
+    def current_boards
+      @current_boards ||= begin
+        keys = []
+        keys << "lacquering" if lacquering_rows.any?
+        keys << "enp"        if enp?                       # ENP board lists every live ENP job
+        keys << "chem_conv"  if chem_conv_rows.any?
+        SHOP_VATS.each_key do |shop|
+          keys << BOARD_FOR[shop][:jig] if jig_queue_rows(shop).any? || masking_inspection_rows(shop).any?
+          keys << BOARD_FOR[shop][:vat] if anodise_ready_rows(shop).any?
+        end
+        keys.uniq
+      end
+    end
+
+    def shops_for(vats)
+      SHOP_VATS.keys.select { |shop| op_on_board?(shop, vats) }
+    end
+
+    # Every batch in the op's section signed.
+    def fully_signed?(op)
+      return false unless frozen?
+      (section_batches_for(op) - signed_keys(op)).empty?
+    rescue
+      false
     end
 
     # Library ops carry a display_name; copied/manual ops don't, so fall

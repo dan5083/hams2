@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_10_02_110756) do
+ActiveRecord::Schema[8.0].define(version: 2026_10_12_091733) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -255,6 +255,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_10_02_110756) do
     t.string "file_cloudinary_ids", default: [], array: true
     t.string "file_filenames", default: [], array: true
     t.string "home_sections", default: [], null: false, array: true
+    t.string "home_shop_override"
     t.index ["customer_id", "enabled"], name: "index_parts_on_customer_id_and_enabled"
     t.index ["customer_id", "part_number", "part_issue"], name: "index_parts_on_customer_and_part_number_and_issue", unique: true
     t.index ["customer_id"], name: "index_parts_on_customer_id"
@@ -352,6 +353,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_10_02_110756) do
     t.jsonb "answers", default: {}, null: false
     t.text "proposal_error"
     t.datetime "proposed_at"
+    t.boolean "itar", default: false, null: false
+    t.text "drawing_description"
     t.index ["created_by_id"], name: "index_quotes_on_created_by_id"
     t.index ["customer_id"], name: "index_quotes_on_customer_id"
     t.index ["number"], name: "index_quotes_on_number", unique: true
