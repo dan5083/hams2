@@ -42,9 +42,13 @@ def self.upload_file(uploaded_file, folder_path, filename_prefix: nil, resource_
                 end
 
     Rails.logger.info "About to upload with public_id: #{public_id}"
-    # Get file content
+    # Always hand Cloudinary a PATH, never the Tempfile/IO itself. The gem's
+    # Faraday multipart layer closes any IO it is given once the request has
+    # gone, so a caller that then touched uploaded_file.tempfile (rewind /
+    # read for the Anthropic Files upload) got "closed stream". Given a path
+    # the gem opens and closes its own handle and ours is left alone.
     file_content = if uploaded_file.respond_to?(:tempfile)
-                     uploaded_file.tempfile
+                     uploaded_file.tempfile.path
                    elsif uploaded_file.respond_to?(:path)
                      uploaded_file.path
                    else

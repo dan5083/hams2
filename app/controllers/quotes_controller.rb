@@ -139,9 +139,16 @@ class QuotesController < ApplicationController
       "content_type" => r[:content_type], "uploaded_at" => Time.current.iso8601
     }
     unless @quote.itar?
-      tempfile = file.respond_to?(:tempfile) ? file.tempfile : file
-      tempfile.rewind
-      drawing["anthropic_file_id"] = AnthropicFiles.upload(tempfile.read, filename: r[:filename], media_type: r[:content_type])
+      # Read by path, not through the upload object's handle: the cloudinary
+      # gem closes any IO it is handed, and a closed Tempfile is still on
+      # disk until the request ends. Failure here must not lose the quote -
+      # QuoteProposalJob#drawing_file_id uploads any drawing without an id.
+      begin
+        path = file.respond_to?(:tempfile) ? file.tempfile.path : file.path
+        drawing["anthropic_file_id"] = AnthropicFiles.upload(File.binread(path), filename: r[:filename], media_type: r[:content_type])
+      rescue => e
+        Rails.logger.warn "quotes#create: Anthropic Files upload of #{r[:filename]} failed, job will retry: #{e.message}"
+      end
     end
     drawing
   end
