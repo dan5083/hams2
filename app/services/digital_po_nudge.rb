@@ -11,10 +11,10 @@
 #   :forwarded - it did reach orders@, but not from a domain we hold for the
 #                customer (buyers + Xero contact), so somebody forwarded it on
 #
-# A PO the customer emailed to orders@ themselves is left alone. Fires at the
-# moment the PO is attached: from InboundPurchaseOrder#book_order! for email
-# (passing the inbound row, since it isn't linked to the order yet) and from
-# a CustomerOrder after_commit on po_document for everything else.
+# A PO the customer emailed to orders@ themselves is left alone. Fires from
+# PurchaseOrderService.store! at the moment the PO is attached, whichever
+# path attached it (the email path passes the inbound row, since it isn't
+# linked to the order yet).
 # Deliberately NOT throttled: every paper/forwarded order gets one until they
 # change. The acknowledgement no longer carries the generic "send orders to
 # orders@" note - this is the targeted replacement.
