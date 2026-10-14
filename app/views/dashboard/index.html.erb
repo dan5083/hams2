@@ -235,7 +235,11 @@
         <% if uninvoiced_rows.any? %>
           <p class="text-sm text-gray-600">
             <%= pluralize(uninvoiced_rows.size, 'works order') %> &middot;
-            <strong>£<%= sprintf("%.2f", uninvoiced_rows.sum { |r| r[:value] }) %></strong> uninvoiced
+            <strong>£<%= sprintf("%.2f", uninvoiced_rows.sum { |r| r[:total] }) %></strong> uninvoiced
+            <% charges_total = uninvoiced_rows.sum { |r| r[:charges] } %>
+            <% if charges_total > 0 %>
+              <span class="text-gray-500">(incl. £<%= sprintf("%.2f", charges_total) %> charges)</span>
+            <% end %>
           </p>
         <% end %>
       </div>
@@ -256,7 +260,8 @@
             </thead>
             <tbody class="divide-y divide-gray-200">
               <% uninvoiced_rows.group_by { |r| r[:customer_order] }.each do |customer_order, rows| %>
-                <% group_value = rows.sum { |r| r[:value] } %>
+                <% group_value   = rows.sum { |r| r[:total] } %>
+                <% group_charges = rows.sum { |r| r[:charges] } %>
                 <tr class="bg-gray-100">
                   <td colspan="6" class="px-3 py-2 text-sm">
                     <span class="font-semibold text-gray-900">
@@ -267,6 +272,11 @@
                       &middot; <%= rows.first[:customer_name] %>
                       &middot; <%= pluralize(rows.size, 'WO') %>
                       &middot; <strong>£<%= sprintf("%.2f", group_value) %></strong>
+                      <% if group_charges > 0 %>
+                        <span class="text-xs text-amber-700" title="Additional charges that will be added to the invoice (minimum order charge, courier, rework...)">
+                          incl. £<%= sprintf("%.2f", group_charges) %> charges
+                        </span>
+                      <% end %>
                     </span>
                   </td>
                   <td class="px-3 py-2 text-right">
@@ -288,7 +298,15 @@
                     <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500"><%= row[:part] %></td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900 text-right"><%= row[:qty_uninvoiced] %></td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500 text-right"><%= row[:remaining] %></td>
-                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900 text-right">£<%= sprintf("%.2f", row[:value]) %></td>
+                    <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-900 text-right">
+                      £<%= sprintf("%.2f", row[:total]) %>
+                      <% if row[:charges] > 0 %>
+                        <div class="text-xs text-amber-700"
+                             title="Parts £<%= sprintf("%.2f", row[:value]) %> + charges £<%= sprintf("%.2f", row[:charges]) %>">
+                          +£<%= sprintf("%.2f", row[:charges]) %> charges
+                        </div>
+                      <% end %>
+                    </td>
                     <td class="px-3 py-2 whitespace-nowrap text-sm text-right">
                       <span class="<%= row[:days_since].to_i > 14 ? 'text-red-600 font-semibold' : 'text-gray-500' %>">
                         <%= row[:days_since] || '—' %>
@@ -302,7 +320,7 @@
                             form: { class: "inline" },
                             class: "text-xl leading-none rounded px-2 py-1 hover:bg-gray-200 transition",
                             title: "Invoice WO to date",
-                            data: { confirm: "Stage an invoice for WO#{row[:works_order].number} only — #{row[:qty_uninvoiced]} parts, £#{sprintf('%.2f', row[:value])}?" } %>
+                            data: { confirm: "Stage an invoice for WO#{row[:works_order].number} only — #{row[:qty_uninvoiced]} parts, £#{sprintf('%.2f', row[:total])}#{row[:charges] > 0 ? " incl. £#{sprintf('%.2f', row[:charges])} charges" : ''}?" } %>
                       <% end %>
                     </td>
                   </tr>

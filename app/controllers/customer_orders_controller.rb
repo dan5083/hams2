@@ -84,6 +84,18 @@ class CustomerOrdersController < ApplicationController
       wo.is_open && !wo.voided && !wo.grouped? && !released_ids.include?(wo.id)
     }.map(&:id)
 
+    # Pricing per row and for the Order Summary card. Each WO's additional
+    # charges (courier, rework, and the minimum-charge top-ups MinimumCharges
+    # writes onto the WO) are resolved from selected_charge_ids /
+    # custom_amounts the same way InvoiceItem.create_from_additional_charge
+    # prices them, so the page shows what the invoice will carry.
+    @wo_charges    = charge_lines_by_works_order(@works_orders)
+    live_wos       = @works_orders.reject(&:voided)
+    @parts_total   = live_wos.sum { |wo| (wo.lot_price || 0).to_f }.round(2)
+    @charges_total = live_wos.sum { |wo| @wo_charges[wo.id].sum { |c| c[:amount] } }.round(2)
+    @minimum_total = live_wos.sum { |wo| @wo_charges[wo.id].select { |c| c[:minimum] }.sum { |c| c[:amount] } }.round(2)
+    @order_moc     = live_wos.any? ? MinimumCharges.new(@customer_order).order_moc : nil
+
     # Fetch part WO counts in one query rather than once per row
     part_ids = @works_orders.map(&:part_id).compact
     @part_wo_counts = WorksOrder.where(part_id: part_ids)
@@ -303,6 +315,31 @@ class CustomerOrdersController < ApplicationController
   def safe_return_path(path)
     return if path.blank?
     path if path.start_with?("/") && !path.start_with?("//")
+  end
+
+  # { works_order_id => [{ preset:, amount:, minimum:, carriage: }, ...] }
+  # Amount rule mirrors InvoiceItem.create_from_additional_charge: variable
+  # presets take the WO's custom amount (else the preset default), fixed
+  # presets always take the preset amount. Unknown/deleted preset ids are
+  # skipped rather than raising, since this is a read-only page.
+  def charge_lines_by_works_order(works_orders)
+    ids     = works_orders.flat_map { |wo| Array(wo.selected_charge_ids) }.map(&:to_s).reject(&:blank?).uniq
+    presets = ids.empty? ? {} : AdditionalChargePreset.where(id: ids).index_by { |p| p.id.to_s }
+    minimum_names = MinimumCharges::PRESET_NAMES.values
+
+    works_orders.index_by(&:id).transform_values do |wo|
+      amounts = wo.custom_amounts || {}
+      Array(wo.selected_charge_ids).map(&:to_s).reject(&:blank?).filter_map do |id|
+        preset = presets[id] or next
+        amount = if preset.is_variable?
+                   amounts[id]&.to_f || preset.amount.to_f
+                 else
+                   preset.amount.to_f
+                 end
+        { preset: preset, amount: amount.round(2),
+          minimum: minimum_names.include?(preset.name), carriage: preset.carriage? }
+      end
+    end
   end
 
   def customer_order_params

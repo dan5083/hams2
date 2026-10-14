@@ -167,6 +167,8 @@ class DashboardController < ApplicationController
                  next if wo.nil? || wo.voided?
 
                  last_release_date = release_notes.filter_map(&:date).max
+                 parts_value       = release_notes.sum(&:invoice_value).to_f
+                 charges_value     = pending_charges_value(wo, release_notes)
 
                  {
                    works_order:    wo,
@@ -175,11 +177,47 @@ class DashboardController < ApplicationController
                    part:           "#{wo.part_number}-#{wo.part_issue}",
                    qty_uninvoiced: release_notes.sum(&:quantity_accepted),
                    remaining:      wo.unreleased_quantity,
-                   value:          release_notes.sum(&:invoice_value),
+                   value:          parts_value,            # part lines only
+                   charges:        charges_value,          # additional-charge lines stage_to_date will add
+                   total:          (parts_value + charges_value).round(2),
                    days_since:     last_release_date ? (Date.current - last_release_date).to_i : nil
                  }
                end
                .sort_by { |r| -(r[:days_since] || 0) }
+  end
+
+  # Value of the additional-charge lines Invoice.stage_to_date would add if
+  # these release notes were invoiced now. Mirrors its rules exactly:
+  #   * carriage (AdditionalChargePreset#carriage?) is billed once per
+  #     release note, at the WO's flat custom amount;
+  #   * everything else (minimum-charge top-ups, rework, masking...) is a
+  #     one-off per works order, billed with the WO's first invoiced release
+  #     only — so it's zero here if an earlier release is already invoiced.
+  # Keep in step with Invoice.stage_to_date and
+  # InvoiceItem.create_from_additional_charge.
+  def pending_charges_value(wo, release_notes)
+    ids = Array(wo.selected_charge_ids).map(&:to_s).reject(&:blank?)
+    return 0.0 if ids.empty?
+
+    amounts        = wo.custom_amounts || {}
+    presets        = AdditionalChargePreset.where(id: ids)
+    one_off_billed = wo.release_notes.joins(:invoice_item).exists?
+
+    presets.sum do |preset|
+      amount = if preset.is_variable?
+                 amounts[preset.id.to_s]&.to_f || preset.amount.to_f
+               else
+                 preset.amount.to_f
+               end
+
+      if preset.carriage?
+        amount * release_notes.size
+      elsif one_off_billed
+        0.0
+      else
+        amount
+      end
+    end.round(2)
   end
 
   def push_invoice_to_xero(invoice)

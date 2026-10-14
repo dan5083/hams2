@@ -232,9 +232,27 @@
           </dd>
         </div>
 
+        <div class="pt-3 border-t border-gray-200">
+          <dt class="text-sm font-medium text-gray-500">Parts Value</dt>
+          <dd class="text-sm text-gray-900 font-semibold">£<%= sprintf("%.2f", @parts_total) %></dd>
+        </div>
+
         <div>
-          <dt class="text-sm font-medium text-gray-500">Total Value</dt>
-          <dd class="text-sm text-gray-900 font-semibold text-lg">£<%= sprintf("%.2f", @customer_order.total_value) %></dd>
+          <dt class="text-sm font-medium text-gray-500">Additional Charges</dt>
+          <dd class="text-sm text-gray-900 font-semibold">
+            £<%= sprintf("%.2f", @charges_total) %>
+            <% if @minimum_total > 0 %>
+              <span class="text-xs font-normal text-amber-700"
+                    title="Order minimum is £<%= sprintf("%.2f", @order_moc) %><%= @order_moc == MinimumCharges::CHEM_CONV_ORDER_MOC ? ' (chemical conversion only)' : '' %>; any per-works-order minimum comes from the customer's settings. Top-ups are recomputed when works orders are added, repriced or voided.">
+                incl. £<%= sprintf("%.2f", @minimum_total) %> minimum charge top-up
+              </span>
+            <% end %>
+          </dd>
+        </div>
+
+        <div>
+          <dt class="text-sm font-medium text-gray-500">Order Total (ex VAT)</dt>
+          <dd class="text-sm text-gray-900 font-semibold text-lg">£<%= sprintf("%.2f", @parts_total + @charges_total) %></dd>
         </div>
       </dl>
     </div>
@@ -288,6 +306,9 @@
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Quantity
+              </th>
+              <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider" title="Line price plus any additional charges (courier, rework, minimum charge top-ups)">
+                Value £
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Progress
@@ -346,6 +367,26 @@
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   <%= works_order.quantity %>
+                </td>
+                <td class="px-6 py-4 text-sm text-right whitespace-nowrap">
+                  <% charges = @wo_charges[works_order.id] || [] %>
+                  <% line_price = (works_order.lot_price || 0).to_f %>
+                  <div class="<%= line_price.zero? ? 'text-red-600 font-semibold' : 'text-gray-900' %>"
+                       title="<%= line_price.zero? ? 'No price on this works order — set one before invoicing' : (works_order.price_type == 'each' ? "#{works_order.quantity} × £#{sprintf('%.2f', works_order.each_price.to_f)}" : 'Lot price') %>">
+                    £<%= sprintf("%.2f", line_price) %>
+                  </div>
+                  <% charges.each do |c| %>
+                    <div class="text-xs <%= c[:minimum] ? 'text-amber-700' : 'text-gray-500' %>"
+                         title="<%= c[:preset].name %><%= c[:carriage] ? ' — billed per release note' : ' — billed once, with the first invoiced release' %>">
+                      + £<%= sprintf("%.2f", c[:amount]) %>
+                      <%= c[:minimum] ? c[:preset].name.sub('Minimum', 'Min.') : c[:preset].name.truncate(28) %>
+                    </div>
+                  <% end %>
+                  <% if charges.any? %>
+                    <div class="text-xs text-gray-900 font-medium border-t border-gray-200 mt-1 pt-1">
+                      = £<%= sprintf("%.2f", line_price + charges.sum { |c| c[:amount] }) %>
+                    </div>
+                  <% end %>
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-900 min-w-[12rem]">
                   <%# Two facts: how far through the process record the parts
