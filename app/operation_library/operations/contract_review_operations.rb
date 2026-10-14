@@ -33,6 +33,14 @@ module OperationLibrary
       { "id" => "calibrated_timers",      "scope" => "part",  "text" => "For timed processes, ensure the works order refers to use of calibrated timers" }
     ].freeze
 
+    # Customers whose parts may be answered YES on "specs at correct issue"
+    # without a drawing on file in HAMS — they hold and issue-control the
+    # drawings themselves, so the review is done against their paperwork,
+    # not our upload. Matched case-insensitively on Organization#name.
+    DRAWING_EXEMPT_CUSTOMERS = [
+      "Lufthansa Technik Landing Gear Services UK"
+    ].freeze
+
     def self.operations(aerospace_defense: false)
       # The spec carries a MARKER, not the items. Parts (locked or live)
       # reference the form; the current CHECKLIST is resolved at render time,
@@ -63,8 +71,16 @@ module OperationLibrary
       case item["requires"]
       when "drawing"
         return nil if part&.has_files?
+        return nil if drawing_exempt?(part)
         "no drawing on file for this part — upload it to the part first"
       end
+    end
+
+    # Is the part's customer on DRAWING_EXEMPT_CUSTOMERS?
+    def self.drawing_exempt?(part)
+      name = part&.customer&.name.to_s.strip
+      return false if name.empty?
+      DRAWING_EXEMPT_CUSTOMERS.any? { |exempt| exempt.casecmp?(name) }
     end
 
     # Resolve checklist content: the current form for a marker (true), or the
