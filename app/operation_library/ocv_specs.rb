@@ -62,14 +62,15 @@ module OperationLibrary
     # haystack fallback_for builds starts with the op id.
     DYE_OP = /\A[A-Z]+_DYE\b|\*\*[A-Za-z]+ dye\*\*/
 
-    # The paper monitoring block dye ops used to carry in their text
-    # ("**Monitoring:**" plus three "Batch ___: Time ___ Temp ___°C" rows).
+    # The paper monitoring block dye and seal ops used to carry in their
+    # text ("**Monitoring:**" / "**OCV Monitoring:**" plus three
+    # "Batch ___: Time ___ Temp ___°C" rows).
     # Trailing only - the instruction line before it is kept verbatim. Ops
     # that are NOTHING but blank rows (the old standalone "OCV Check" op)
     # have no header and deliberately don't match; they are removed from
     # the part, not stripped.
     LEGACY_MONITORING_BLOCK =
-      /\s*\*\*Monitoring:\*\*\s*(?:Batch ___:\s*Time ___\s*Temp ___°C\s*)+\z/
+      /\s*\*\*(?:OCV\s+)?Monitoring:\*\*\s*(?:Batch ___:\s*Time ___\s*Temp ___°C\s*)+\z/
 
     # Text with the legacy block removed; unchanged text when there is none.
     # Applied at freeze time (WorksOrder#operation_snapshot) so already-locked
@@ -117,6 +118,11 @@ module OperationLibrary
       # ElectrolessNickelPlate.operations. Matched on the library ids and
       # the bath names so a copied ENP op keeps the same shape.
       [/electroless\s+nickel\s+plat|vandalloy|nicklad/i, -> { enp_plate }],
+      # Seal ops - library ids end in _SEAL / HOT_WATER_DIP; wording is
+      # "Seal in ..." or "Hot water dip". Case-sensitive on the id half so a
+      # dye-spot "seal test" style op never matches. Sealing.operations now
+      # declares time_temp explicitly; this catches edited/manual seals.
+      [/(?-i:\A\w*(?:SEAL|HOT_WATER_DIP)\b)|\bseal\s+in\b|hot\s+water\s+dip/i, -> { time_temp }],
       # Dye on aero/defence work: time/temp per batch. Matched on library id
       # or wording so a copied/manual dye op resolves the same spec the
       # library one (Dye.operations) now declares explicitly.

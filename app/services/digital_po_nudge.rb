@@ -19,6 +19,16 @@
 # change. The acknowledgement no longer carries the generic "send orders to
 # orders@" note - this is the targeted replacement.
 #
+# Who sent it: everything reaches us via the Exchange forward orders@ -> po@,
+# and Exchange rewrites the envelope sender with SRS so SPF passes at Mailgun:
+#
+#   sender      = orders+SRS=Scs8s=ID=Renishaw.com=Tasha.Foster@hardanodisingstl.com
+#   from_header = "SyteLine 10 live UK server Notifications" <Tasha.Foster@Renishaw.com>
+#
+# So `sender` is always our own domain and tells us nothing. The From: header
+# survives the hop intact and is the address to judge by; the SRS local part
+# is decoded only as a fallback when From: is missing.
+#
 #   DigitalPoNudge.deliver_if_needed(customer_order)
 #   DigitalPoNudge.deliver_if_needed(customer_order, inbound: ipo)
 #   DigitalPoNudge.new(customer_order).origin_of_po   # console: why/why not
@@ -28,6 +38,9 @@ class DigitalPoNudge
   # address out of either.
   FORWARDED_FROM = /^\s*>?\s*(?:From|Von|De)\s*:\s*(.+)$/i
   EMAIL          = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/
+
+  # Exchange SRS: local+SRS=<hash>=<timestamp>=<orig domain>=<orig local>@our.domain
+  SRS            = /\+SRS=[^=]+=[^=]+=([^=]+)=([^@]+)@/i
 
   Origin = Struct.new(:kind, :original_sender, keyword_init: true)
 
@@ -68,16 +81,31 @@ class DigitalPoNudge
                             .filter_map { |e| domain_of(e) }.uniq
   end
 
+  # The address that actually sent the email to orders@ (see header comment).
+  def sender_address(ipo)
+    from = ipo.from_header.to_s[EMAIL]
+    return from if from
+
+    if (m = ipo.sender.to_s.match(SRS))
+      return "#{m[2]}@#{m[1]}"
+    end
+
+    ipo.sender.to_s[EMAIL]
+  end
+
   private
 
   def email_origin
     ipo = @ipo || InboundPurchaseOrder.find_by(customer_order_id: @co.id)
     return nil unless ipo
     return skip_nil("no domains on file for #{@customer.name}, can't tell who sent it") if customer_domains.empty?
-    return nil if customer_domain?(ipo.sender)
+
+    sent_by = sender_address(ipo)
+    return nil if customer_domain?(sent_by)
 
     # Not from the customer's domain, so one of us (or someone's personal
     # address) sent it on. The quoted From:, if we can find it, is who to tell.
+    Rails.logger.info "[DigitalPoNudge] #{@co.display_name}: sent to orders@ by #{sent_by.inspect}, not a #{@customer.name} domain (#{customer_domains.join(', ')})"
     Origin.new(kind: :forwarded, original_sender: forwarded_from(ipo))
   end
 
