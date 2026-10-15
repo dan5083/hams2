@@ -26,7 +26,8 @@
     a BroadcastChannel; any tab holding a different one reloads. %>
 <nav class="<%= nav_bg %> shadow-lg sticky top-0 z-50" data-controller="navbar sub-user"
      data-sub-user-actor-value="<%= Current.actor&.to_global_id %>">
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+  <%# Full width: the page below runs edge to edge, so the bar does too. %>
+  <div class="w-full px-4 sm:px-6 lg:px-8">
     <div class="flex justify-between h-16">
       <!-- Logo/Brand -->
       <div class="flex items-center">

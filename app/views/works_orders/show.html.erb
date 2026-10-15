@@ -611,6 +611,11 @@
                 </span>
               <% end %>
 
+              <button type="button" onclick="hamsPlanOpen()"
+                      class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-1.5 rounded ml-1">
+                Batch plan…
+              </button>
+
               <div class="ml-auto flex items-center gap-2">
                 <% if active_batch > 1 %>
                   <%= link_to "‹ B#{active_batch - 1}", works_order_path(@works_order, batch: active_batch - 1, fb: active_fb.presence),
@@ -620,10 +625,6 @@
                   <%= link_to "B#{active_batch + 1} ›", works_order_path(@works_order, batch: active_batch + 1, fb: active_fb.presence),
                       class: "text-xs text-blue-600 hover:text-blue-900 px-2 py-1" %>
                 <% end %>
-                <button type="button" onclick="hamsPlanOpen()"
-                        class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-1.5 rounded">
-                  Batch plan…
-                </button>
               </div>
             </div>
 
