@@ -833,6 +833,69 @@ class WorksOrder < ApplicationRecord
     n
   end
 
+  # Save the whole batch plan for a section in one go - the "Batch plan"
+  # dialog. rows is keyed by the row's position in the plan (1..n) and each
+  # row carries:
+  #   "orig"   - the batch number it had before the edit, blank for a new row
+  #   "qty"    - parts on it (blank clears; a lead derives it from the split)
+  #   "shares" - (group lead) { "WO1234" => "6", ... }
+  # Rows whose "orig" is missing from the plan are deleted - highest first,
+  # since delete_batch! closes the gap by renumbering - then the survivors
+  # are renumbered in plan order and their quantities applied. Everything
+  # goes through the existing primitives, so every guard they carry (records
+  # block deletion, signed quantities are logged, the split must sum) holds
+  # here without restating it. One transaction: a plan is saved or it isn't.
+  def save_batch_plan!(rows, section_key: "base", user: nil)
+    assert_record_open!
+    rows = (rows || {}).to_h.map { |k, v| [k.to_i, (v || {}).to_h.transform_keys(&:to_s)] }
+                           .select { |k, _| k.positive? }.sort_by(&:first)
+    raise "A batch plan needs at least one batch" if rows.empty?
+    raise "A batch plan can have at most #{MAX_BATCHES} batches" if rows.length > MAX_BATCHES
+
+    transaction do
+      section = find_section!(section_key)
+      current = (1..section_batch_count(section)).to_a
+      kept    = rows.map { |_, r| r["orig"].to_i }.select(&:positive?)
+      dups    = kept.tally.select { |_, c| c > 1 }.keys
+      raise "Batch #{dups.first} appears twice in the plan" if dups.any?
+      raise "Batch #{(kept - current).first} is not on this record" if (kept - current).any?
+
+      (current - kept).sort.reverse.each { |n| delete_batch!(n, section_key: section_key, user: user) }
+
+      # Survivors keep their relative order, so after the gap-closing deletes
+      # plan row i IS batch i for every kept row. New rows can only follow.
+      kept_sorted = kept.sort
+      rows.each_with_index do |(_, r), i|
+        orig = r["orig"].to_i
+        next unless orig.positive?
+        raise "Existing batches must stay in order in the plan" unless kept_sorted[i] == orig
+      end
+
+      count_now = find_section!(section_key).then { |sec| section_batch_count(sec) }
+      set_batch_count!(rows.length, {}, section_key: section_key) if rows.length > count_now
+
+      rows.each_with_index do |(_, r), i|
+        shares = process_lead? && r.key?("shares") ? r["shares"].to_h : nil
+        set_batch_qty!(i + 1, r["qty"], section_key: section_key, shares: shares, user: user)
+      end
+    end
+    reload
+    section_batch_count(find_section!(section_key))
+  end
+
+  # Divide `total` parts into the fewest batches that fit `max_per_batch`,
+  # as evenly as they can be: 23 at a max of 10 is 8/8/7, not 10/10/3. The
+  # client does the same sum live; this is the reference and the test.
+  def self.divide_evenly(total, max_per_batch)
+    total = total.to_i; max = max_per_batch.to_i
+    return [] if total <= 0
+    raise "Max per batch must be at least 1" if max < 1
+    n    = [(total.to_f / max).ceil, 1].max
+    base = total / n
+    rem  = total % n
+    Array.new(n) { |i| base + (i < rem ? 1 : 0) }
+  end
+
   # Correct one batch's quantity without disturbing the rest of the structure -
   # short loads, scrapped parts, a batch split across two racks.
   #

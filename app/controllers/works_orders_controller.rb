@@ -1,6 +1,6 @@
 # app/controllers/works_orders_controller.rb - Fixed pricing parameter handling and route card operations with RBAC
 class WorksOrdersController < ApplicationController
-  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :invoice_to_date, :void, :unvoid, :sign_off_operation, :undo_sign_off, :save_ocv, :add_operation_note, :set_batch_count, :set_batch_qty, :add_batch, :delete_batch, :add_fork, :remove_fork, :discard_process_record, :choose_alternate, :set_home_shop]
+  before_action :set_works_order, only: [:show, :edit, :update, :destroy, :route_card, :invoice_to_date, :void, :unvoid, :sign_off_operation, :undo_sign_off, :save_ocv, :add_operation_note, :set_batch_count, :set_batch_qty, :add_batch, :delete_batch, :save_batch_plan, :add_fork, :remove_fork, :discard_process_record, :choose_alternate, :set_home_shop]
 
   # Marks on a process record are attributed to Current.actor - the operator
   # unlocked with a PIN if there is one, otherwise the account holder. That
@@ -9,6 +9,17 @@ class WorksOrdersController < ApplicationController
   #
   # require_sub_user only: [:sign_off_operation, :save_ocv,
   #                         :set_batch_qty, :set_batch_count, :add_batch, :delete_batch, :add_fork, :remove_fork]
+
+  # Every form on the process record carries the actor it was rendered as.
+  # The operator lives on the server session, which every tab of the browser
+  # shares: a tab left open while a colleague PINs in on another tab still
+  # shows the old name in the corner, but the session now belongs to the
+  # colleague. Without this, the first click in the stale tab stamps the
+  # colleague's name on the record.
+  before_action :require_rendered_actor,
+                only: %i[sign_off_operation undo_sign_off save_ocv add_operation_note
+                         set_batch_count set_batch_qty add_batch delete_batch save_batch_plan
+                         add_fork remove_fork choose_alternate]
 
  def index
     @works_orders = WorksOrder.includes(:customer_order, :part, customer: [])
@@ -400,6 +411,21 @@ class WorksOrdersController < ApplicationController
     redirect_to works_order_path(@works_order, batch: return_base_batch, fb: fork_batch_params.presence), alert: e.message
   end
 
+  # Paperless process record: the whole batch plan from the "Batch plan"
+  # dialog - rows added, removed, re-quantified or split, saved atomically.
+  #   batches[1][orig]=1  batches[1][qty]=8  batches[1][shares][WO7021]=6 ...
+  # Route:  patch :save_batch_plan, on: :member   # under resources :works_orders
+  def save_batch_plan
+    return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
+    rows = params.fetch(:batches, {}).permit!.to_h
+    count = @works_order.save_batch_plan!(rows, section_key: params[:section].presence || "base", user: Current.actor)
+    land = [return_base_batch.to_i, count].min.clamp(1, count)
+    redirect_to works_order_path(@works_order, batch: land, fb: fork_batch_params.presence),
+                notice: "Batch plan saved: #{count} batch#{'es' unless count == 1}, #{@works_order.batched_quantity_total} parts batched."
+  rescue => e
+    redirect_to works_order_path(@works_order, batch: return_base_batch, fb: fork_batch_params.presence), alert: e.message
+  end
+
   def set_batch_count
     return redirect_to(works_order_path(@works_order), alert: "This works order's process record is on paper.") unless @works_order.paperless_record?
     @works_order.set_batch_count!(params[:batch_count], params.fetch(:batch_qtys, {}).permit!.to_h,
@@ -411,6 +437,33 @@ class WorksOrdersController < ApplicationController
   end
 
   private
+
+  # Refuse any write to the process record from a form rendered under a
+  # different actor than the session now carries. Forms that predate the
+  # field (no as_actor param at all) are let through, so a deploy mid-shift
+  # doesn't reject every page already open on the floor.
+  def require_rendered_actor
+    return unless params.key?(:as_actor)
+    return if params[:as_actor].to_s == current_actor_gid
+
+    was_name = begin
+      GlobalID::Locator.locate(params[:as_actor])&.display_name
+    rescue StandardError
+      nil
+    end || "nobody"
+    now_name = Current.actor&.display_name || "nobody"
+
+    Rails.logger.warn "=== SUB-USER: stale tab on WO#{@works_order.number} - rendered as #{was_name}, " \
+                      "session now #{now_name} (session #{Current.session&.id}, ip #{request.remote_ip}) - write refused ==="
+
+    redirect_to works_order_path(@works_order), status: :see_other,
+                alert: "This tab was signed on as #{was_name}, but this terminal is now signed on as #{now_name}. " \
+                       "Nothing was recorded. Check the name in the corner and sign on with your PIN if that isn't you."
+  end
+
+  def current_actor_gid
+    Current.actor&.to_global_id.to_s
+  end
 
   # Where to land after acting on an operation: the URL the page is already
   # showing. Turbo reads a redirect to the current URL as a page refresh, morphs

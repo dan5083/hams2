@@ -22,6 +22,13 @@
     # OCV *monitoring* specifically - nadcap-basis specs. Correct on frozen
     # records regardless of the part's current flag.
     has_ocv = operations.any? { |op| [op, *Array(op["alternates"])].any? { |o| o["ocv"].is_a?(Hash) && o["ocv"]["basis"].to_s == "nadcap" } }
+    # Who this page was rendered as. Every form that writes to the process
+    # record carries it, and the controller refuses the write if the session
+    # has since been signed on as someone else (stale tab after a colleague
+    # PIN'd in on another one). Sub-user or account holder - GlobalID covers
+    # both. id: nil on the hidden fields: there's one per form, and a dozen
+    # forms on the page.
+    as_actor = Current.actor&.to_global_id.to_s
   %>
 
   <div class="flex justify-between items-center mb-6">
@@ -521,80 +528,90 @@
 
           <div class="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-3">
 
-            <!-- Batching is hand-built, one load at a time: "+ Add batch"
-                 appends a batch and lands on it; its quantity is set there.
-                 The page renders one batch at a time. -->
-            <div class="flex flex-wrap items-center gap-3">
-              <label class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Batch</label>
-              <%= form_with url: works_order_path(@works_order), method: :get, local: true, data: { turbo: false }, class: "flex items-center gap-2" do %>
-                <% active_fb.each do |k, v| %><%= hidden_field_tag "fb[#{k}]", v %><% end %>
-                <%= select_tag :batch,
-                    options_for_select(
-                      (1..batch_count).map { |n|
-                        entry = @works_order.process_batches.find { |b| b["number"] == n } || {}
-                        mark = { complete: "✓", in_progress: "▸" }[statuses[n]] || "·"
-                        date = entry["date"] ? " #{Date.parse(entry['date']).strftime('%d/%m')}" : ""
-                        ["#{mark} B#{n}#{date} (qty #{entry['qty'].presence || '—'})", n]
-                      } + [["— batched #{qty_total} · signed off #{@works_order.section_signed_quantity_total(wo_sections.first)}", "", { disabled: true }]],
-                      active_batch),
-                    onchange: "this.form.requestSubmit()",
-                    class: "border border-gray-300 rounded px-2 py-1 text-sm" %>
-              <% end %>
+            <%
+              # Batch strip. Working the record happens here one batch at a
+              # time (pills + prev/next); restructuring the plan - adding,
+              # removing, dividing, splitting between group members - happens
+              # in the "Batch plan" dialog further down, which shows every
+              # batch at once. A solo WO keeps its inline qty box: "B1 took
+              # what fitted on the rack" is a one-number correction and
+              # shouldn't need the dialog. A group lead shows its split read-
+              # only here; the split is edited in the plan, where every
+              # member is labelled by part number and quantity.
+              lead      = @works_order.process_lead?
+              members   = lead ? @works_order.process_group.members.where(voided: false).to_a : []
+              base_sec  = wo_sections.first
+              batched   = qty_total
+              order_qty = @works_order.record_quantity
+              unalloc   = order_qty - batched
+              active_shares = lead ? (@works_order.section_batch_shares(base_sec, active_batch) || {}) : {}
+              member_label = ->(m) { "#{m.display_name} · #{m.part_number} ×#{m.quantity}" }
+              status_mark  = { complete: "✓", in_progress: "▸", not_started: "·" }
+              status_word  = { complete: "complete", in_progress: "in progress", not_started: "not started" }
+              pill_class   = {
+                complete:    "bg-green-100 text-green-800 border-green-300",
+                in_progress: "bg-amber-100 text-amber-800 border-amber-300",
+                not_started: "bg-white text-gray-600 border-gray-300"
+              }
+            %>
+            <div class="flex flex-wrap items-center gap-2">
+              <label class="text-xs font-semibold text-gray-600 uppercase tracking-wide mr-1">Batch</label>
+              <%# One pill per batch: number, status, qty - the state of the
+                  whole record at a glance, which a closed <select> never gave. %>
+              <div class="flex flex-wrap items-center gap-1">
+                <% (1..batch_count).each do |n| %>
+                  <% entry = @works_order.process_batches.find { |b| b["number"] == n } || {} %>
+                  <% st = statuses[n] || :not_started %>
+                  <%= link_to works_order_path(@works_order, batch: n, fb: active_fb.presence),
+                      title: "B#{n} · #{status_word[st]} · qty #{entry['qty'].presence || 'not set'}#{entry['date'] ? ' · ' + (Date.parse(entry['date']).strftime('%d/%m') rescue '') : ''}",
+                      class: "inline-flex items-center gap-1 px-2 py-1 rounded border text-xs font-medium #{pill_class[st]} #{n == active_batch ? 'ring-2 ring-blue-500 ring-offset-1' : 'hover:bg-gray-100'}" do %>
+                    <span><%= status_mark[st] %></span><span>B<%= n %></span>
+                    <span class="font-normal opacity-80"><%= entry["qty"].presence || "—" %></span>
+                  <% end %>
+                <% end %>
+              </div>
 
               <% base_signed = signed_batches.include?(active_batch) %>
-              <% if !@works_order.batch_qty_editable?(wo_sections.first, active_batch) %>
-                <span class="text-xs text-gray-400">Qty <%= active_entry["qty"] %> · locked by sign-off (released)</span>
+              <% if !@works_order.batch_qty_editable?(base_sec, active_batch) %>
+                <span class="text-xs text-gray-400 ml-2">Qty <%= active_entry["qty"] %> · locked by sign-off (released)</span>
+              <% elsif lead %>
+                <span class="text-xs text-gray-600 ml-2">
+                  Qty <span class="font-medium text-gray-800"><%= active_entry["qty"].presence || "—" %></span>
+                  <% if active_shares.any? %>
+                    <span class="text-gray-400">=</span>
+                    <% members.each do |m| %>
+                      <% q = active_shares[m.display_name].to_i %>
+                      <% next if q.zero? %>
+                      <span class="inline-flex items-center gap-1 ml-1 px-1.5 py-0.5 rounded bg-white border border-gray-200" title="<%= member_label.call(m) %>">
+                        <span class="font-medium"><%= q %></span><span class="text-gray-500">of <%= m.display_name %> · <%= m.part_number %></span>
+                      </span>
+                    <% end %>
+                  <% else %>
+                    <span class="text-gray-400" title="No per-works-order split: this batch certifies the bar as a whole">unsplit</span>
+                  <% end %>
+                </span>
               <% else %>
-                <%= form_with url: set_batch_qty_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex items-center gap-1" do %>
+                <%= form_with url: set_batch_qty_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex items-center gap-1 ml-2" do %>
+                  <%= hidden_field_tag :as_actor, as_actor, id: nil %>
                   <%= hidden_field_tag :batch, active_batch %>
                   <% active_fb.each do |k, v| %><%= hidden_field_tag "fb[#{k}]", v %><% end %>
-                  <% if @works_order.process_lead? %>
-                    <%# Group lead: the batch qty IS the split - no separate qty
-                        box. The split is what lets a member release its own
-                        parts (WorksOrder#own_signed_off_quantity). %>
-                    <span class="text-xs text-gray-500">Qty <span class="font-medium text-gray-700"><%= active_entry["qty"].presence || "—" %></span></span>
-                    <%= render "works_orders/batch_shares", section: wo_sections.first, batch: active_batch %>
-                  <% else %>
-                    <span class="text-xs text-gray-500">Qty</span>
-                    <%= number_field_tag :qty, active_entry["qty"], min: 1, id: "batch_qty_base_#{active_batch}",
-                        class: "border border-gray-300 rounded px-1 py-1 text-sm w-16" %>
-                  <% end %>
+                  <span class="text-xs text-gray-500">Qty</span>
+                  <%= number_field_tag :qty, active_entry["qty"], min: 1, id: "batch_qty_base_#{active_batch}",
+                      class: "border border-gray-300 rounded px-1 py-1 text-sm w-16" %>
                   <%= submit_tag "Set", class: "bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium px-2 py-1 rounded",
                       data: (base_signed ? { confirm: "Batch #{active_batch} is signed off at qty #{active_entry['qty']}. Correct it? The change is logged on the record." } : {}) %>
-                  <% if base_signed %>
-                    <span class="text-xs text-amber-600" title="This batch has sign-offs; a qty change is recorded against it">· signed — correction logged</span>
-                  <% end %>
-                  <% if (changes = active_entry["qty_changes"]).present? %>
-                    <span class="text-xs text-gray-400" title="<%= changes.map { |c| "#{c['from'] || '—'} → #{c['to']} by #{c.dig('by', 'name')} #{(Time.parse(c['at']).strftime('%d/%m/%y %H:%M') rescue c['at'])}" }.join("\n") %>">
-                      (qty corrected ×<%= changes.length %>)
-                    </span>
-                  <% end %>
                 <% end %>
               <% end %>
-
-              <% if @works_order.batch_deletable?(wo_sections.first, active_batch) %>
-                <%= button_to "✕ delete batch", delete_batch_works_order_path(@works_order, section: "base", batch: active_batch, fb: active_fb.presence),
-                    method: :delete, form: { data: { turbo: false } },
-                    data: { confirm: "Delete batch #{active_batch}? It has no records. Batches above it move down one number." },
-                    title: "Only a batch with no sign-offs, readings or date can be deleted",
-                    class: "text-xs text-red-500 hover:text-red-700 px-1" %>
+              <% if base_signed && @works_order.batch_qty_editable?(base_sec, active_batch) %>
+                <span class="text-xs text-amber-600" title="This batch has sign-offs; a qty change is recorded against it">· signed — correction logged</span>
+              <% end %>
+              <% if (changes = active_entry["qty_changes"]).present? %>
+                <span class="text-xs text-gray-400" title="<%= changes.map { |c| "#{c['from'] || '—'} → #{c['to']} by #{c.dig('by', 'name')} #{(Time.parse(c['at']).strftime('%d/%m/%y %H:%M') rescue c['at'])}" }.join("\n") %>">
+                  (qty corrected ×<%= changes.length %>)
+                </span>
               <% end %>
 
-              <%= form_with url: add_batch_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex items-center gap-1" do %>
-                <%= hidden_field_tag :section, "base", id: nil %>
-                <%= hidden_field_tag :base_batch, active_batch, id: nil %>
-                <% active_fb.each do |k, v| %><%= hidden_field_tag "fb[#{k}]", v, id: nil %><% end %>
-                <%= submit_tag "+ Add batch", class: "bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-2 py-1 rounded",
-                    title: "Append a batch; you set its quantity next" %>
-              <% end %>
-              <div class="ml-auto flex items-center gap-3">
-              <span class="text-xs <%= qty_total == @works_order.record_quantity ? 'text-gray-400' : 'text-orange-600 font-medium' %>">
-                <% if qty_total == @works_order.record_quantity %>
-                  <%= batch_count %> batch<%= 'es' unless batch_count == 1 %> · <%= qty_total %> parts · <%= @works_order.section_signed_quantity_total(wo_sections.first) %> signed off
-                <% else %>
-                  ⚠️ Batch quantities total <%= qty_total %>, <%= @works_order.process_lead? ? "process group" : "order" %> is <%= @works_order.record_quantity %>
-                <% end %>
-              </span>
+              <div class="ml-auto flex items-center gap-2">
                 <% if active_batch > 1 %>
                   <%= link_to "‹ B#{active_batch - 1}", works_order_path(@works_order, batch: active_batch - 1, fb: active_fb.presence),
                       class: "text-xs text-blue-600 hover:text-blue-900 px-2 py-1" %>
@@ -603,8 +620,23 @@
                   <%= link_to "B#{active_batch + 1} ›", works_order_path(@works_order, batch: active_batch + 1, fb: active_fb.presence),
                       class: "text-xs text-blue-600 hover:text-blue-900 px-2 py-1" %>
                 <% end %>
+                <button type="button" onclick="hamsPlanOpen()"
+                        class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-1.5 rounded">
+                  Batch plan…
+                </button>
               </div>
             </div>
+
+            <%# Allocation line. Short of the order is normal while a job is
+                being loaded; only OVER the order is a problem, so only that
+                goes orange. %>
+            <p class="text-xs <%= unalloc < 0 ? 'text-orange-600 font-medium' : 'text-gray-500' %>">
+              <%= batch_count %> batch<%= 'es' unless batch_count == 1 %> ·
+              <%= batched %> of <%= order_qty %> parts batched<%= " (#{lead ? 'process group' : 'order'} qty)" %> ·
+              <%= @works_order.section_signed_quantity_total(base_sec) %> signed off
+              <% if unalloc > 0 %>· <span class="text-gray-700"><%= unalloc %> not yet on a batch</span>
+              <% elsif unalloc < 0 %>· ⚠️ <%= -unalloc %> more than the <%= lead ? 'process group' : 'order' %><% end %>
+            </p>
 
             <!-- Whole-WO progress: every sign-off the record requires - across
                  all fork sections AND the WO-scoped header ops - measured in
@@ -626,17 +658,108 @@
               </p>
             </div>
 
-            <!-- Manual escape hatch: physical reality diverges from arithmetic -->
-            <details class="text-xs">
-              <summary class="cursor-pointer select-none text-gray-500 hover:text-gray-700">Set batch count manually</summary>
-              <%= form_with url: set_batch_count_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex items-center gap-2 mt-2" do %>
-                <span class="text-gray-500">Batches</span>
-                <%= number_field_tag :batch_count, batch_count, min: 1, max: WorksOrder::MAX_BATCHES,
-                    class: "border border-gray-300 rounded px-2 py-1 text-sm w-20" %>
-                <%= submit_tag "Update", class: "bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium px-2 py-1 rounded" %>
-                <span class="text-gray-400">Quantities are then set per batch above.</span>
+            <%# ---------------------------------------------------------------
+                Batch plan dialog. Every batch on one screen; rows are added,
+                removed, re-quantified and (on a group lead) split between
+                members here, then saved as one plan. "Divide" pre-fills the
+                unlocked rows from a max-per-batch figure - the old auto-batch,
+                now just a starting point you can edit before saving. Rows
+                with records keep their qty read-only and can't be removed;
+                a signed-but-unreleased row can be corrected (logged).
+                State lives in the hamsPlan object below; the table is
+                re-rendered from it on every change. --------------------- %>
+            <%
+              plan_rows = (1..batch_count).map do |n|
+                entry = @works_order.process_batches.find { |b| b["number"] == n } || {}
+                {
+                  orig: n, qty: entry["qty"].to_s, date: entry["date"],
+                  status: (statuses[n] || :not_started).to_s,
+                  shares: (@works_order.section_batch_shares(base_sec, n) || {}),
+                  editable: @works_order.batch_qty_editable?(base_sec, n),
+                  deletable: @works_order.batch_deletable?(base_sec, n),
+                  signed: signed_batches.include?(n)
+                }
+              end
+              plan_members = members.map { |m| { name: m.display_name, label: member_label.call(m), part: m.part_number, qty: m.quantity.to_i } }
+            %>
+            <dialog id="batch-plan" class="rounded-xl shadow-2xl p-0 w-[calc(100%-2rem)] max-w-4xl backdrop:bg-black/50">
+              <%= form_with url: save_batch_plan_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, id: "batch-plan-form" do %>
+                <%= hidden_field_tag :as_actor, as_actor, id: nil %>
+                <%= hidden_field_tag :section, "base", id: nil %>
+                <%= hidden_field_tag :base_batch, active_batch, id: nil %>
+                <% active_fb.each do |k, v| %><%= hidden_field_tag "fb[#{k}]", v, id: nil %><% end %>
+
+                <div class="px-5 py-4 border-b border-gray-200 flex items-start justify-between gap-4">
+                  <div>
+                    <p class="text-xs uppercase tracking-wide text-gray-500">Batch plan</p>
+                    <p class="text-lg font-bold text-gray-900">
+                      <%= lead ? @works_order.process_group.display_name : @works_order.display_name %> ·
+                      <%= order_qty %> parts<%= lead ? " across #{members.length} works orders" : " · #{@works_order.part_number}" %>
+                    </p>
+                  </div>
+                  <button type="button" onclick="hamsPlanClose()" class="text-gray-400 hover:text-gray-700 text-2xl leading-none px-2">×</button>
+                </div>
+
+                <div class="px-5 py-3 bg-blue-50 border-b border-blue-100 flex flex-wrap items-center gap-3">
+                  <span class="text-sm font-medium text-blue-900">Divide evenly:</span>
+                  <label class="text-sm text-blue-900 inline-flex items-center gap-2">
+                    max per batch
+                    <input type="number" id="plan-max" min="1" max="<%= order_qty %>" inputmode="numeric"
+                           class="border border-blue-300 rounded px-2 py-2 text-lg w-24 text-center">
+                  </label>
+                  <button type="button" onclick="hamsPlanDivide()"
+                          class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded">Divide</button>
+                  <span class="text-xs text-blue-800/80 basis-full sm:basis-auto">
+                    Makes the fewest batches the max allows and sizes them as evenly as possible:
+                    23 parts at a max of 10 gives 3 batches of <strong>8, 8, 7</strong> — not 10, 10, 3.
+                    Batches that already have records are kept; the rest are replaced. Edit anything before saving.
+                  </span>
+                </div>
+
+                <div class="px-5 py-3 overflow-x-auto">
+                  <table class="w-full text-sm" id="plan-table">
+                    <thead>
+                      <tr class="text-left text-xs uppercase tracking-wide text-gray-500">
+                        <th class="py-2 pr-3">Batch</th>
+                        <th class="py-2 pr-3">Status</th>
+                        <% plan_members.each do |m| %>
+                          <th class="py-2 pr-3 whitespace-nowrap" title="<%= m[:label] %>">
+                            <%= m[:name] %><br><span class="font-normal normal-case text-gray-400"><%= m[:part] %> ×<%= m[:qty] %></span>
+                          </th>
+                        <% end %>
+                        <th class="py-2 pr-3">Qty</th>
+                        <th class="py-2"></th>
+                      </tr>
+                    </thead>
+                    <tbody id="plan-body"></tbody>
+                    <tfoot>
+                      <tr class="border-t border-gray-200 text-xs text-gray-600">
+                        <td class="py-2 pr-3" colspan="2">Total</td>
+                        <% plan_members.each do |m| %>
+                          <td class="py-2 pr-3" data-plan-member-total="<%= m[:name] %>"></td>
+                        <% end %>
+                        <td class="py-2 pr-3 font-semibold" id="plan-total"></td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                <div class="px-5 py-3 border-t border-gray-200 flex flex-wrap items-center gap-3">
+                  <button type="button" onclick="hamsPlanAddRow()"
+                          class="bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-medium px-3 py-2 rounded">+ Add batch</button>
+                  <span class="text-sm text-gray-600" id="plan-summary"></span>
+                  <div class="ml-auto flex items-center gap-2">
+                    <button type="button" onclick="hamsPlanClose()" class="text-sm text-gray-600 hover:text-gray-900 px-3 py-2">Cancel</button>
+                    <button type="submit" id="plan-save"
+                            class="bg-gray-800 hover:bg-black text-white text-sm font-semibold px-5 py-2 rounded">Save plan</button>
+                  </div>
+                </div>
               <% end %>
-            </details>
+            </dialog>
+            <script>
+              window.hamsPlanData = <%= raw({ orderQty: order_qty, lead: lead, members: plan_members, rows: plan_rows }.to_json) %>;
+            </script>
 
             <!-- 🌵 Fork: from a given operation onward the parts regroup into a
                  new batch structure. Renders as a divider in the ops list.
@@ -654,6 +777,7 @@
                                         .map { |o| ["#{o['position']} — #{o['operation_text'].to_s.gsub(/\*+/, '').truncate(48)}", o["position"]] }
               %>
               <%= form_with url: add_fork_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex flex-wrap items-center gap-2 mt-2" do %>
+                <%= hidden_field_tag :as_actor, as_actor, id: nil %>
                 <span class="text-gray-500">From op</span>
                 <%= select_tag :from_position, options_for_select([["choose…", ""]] + fork_choices),
                     class: "border border-gray-300 rounded px-2 py-1 text-sm max-w-96" %>
@@ -742,7 +866,7 @@
                     <span class="text-xs text-gray-500"><%= f_complete %>/<%= f_count %> complete<%= " · #{f_in_progress} in progress" if f_in_progress > 0 %></span>
                     <% if f_removable %>
                       <%= button_to "✕ remove", remove_fork_works_order_path(@works_order, from_position: fork_sec["from"], base_batch: active_batch),
-                          method: :patch, form: { data: { turbo: false }, class: "ml-auto" },
+                          method: :patch, form: { data: { turbo: false }, class: "ml-auto" }, params: { as_actor: as_actor },
                           data: { confirm: "Remove the fork at op #{fork_sec['from']}? Its operations go back to the works order's own batching." },
                           class: "text-xs text-red-500 hover:text-red-700" %>
                     <% end %>
@@ -769,6 +893,7 @@
                       <span class="text-xs text-gray-400">Qty <%= f_entry["qty"] %> · locked by sign-off (released)</span>
                     <% else %>
                       <%= form_with url: set_batch_qty_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex items-center gap-1" do %>
+                        <%= hidden_field_tag :as_actor, as_actor, id: nil %>
                         <%= hidden_field_tag :section, f_key %>
                         <%= hidden_field_tag :batch, f_active %>
                         <%= hidden_field_tag :base_batch, active_batch %>
@@ -795,11 +920,12 @@
                     <% end %>
                     <% if @works_order.batch_deletable?(fork_sec, f_active) %>
                       <%= button_to "✕ delete batch", delete_batch_works_order_path(@works_order, section: f_key, batch: f_active, base_batch: active_batch, fb: active_fb.presence),
-                          method: :delete, form: { data: { turbo: false } },
+                          method: :delete, form: { data: { turbo: false } }, params: { as_actor: as_actor },
                           data: { confirm: "Delete batch #{f_active} from this fork? It has no records. Batches above it move down one number." },
                           class: "text-xs text-red-500 hover:text-red-700 px-1" %>
                     <% end %>
                     <%= form_with url: add_batch_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex items-center gap-1" do %>
+                      <%= hidden_field_tag :as_actor, as_actor, id: nil %>
                       <%= hidden_field_tag :section, f_key, id: nil %>
                       <%= hidden_field_tag :base_batch, active_batch, id: nil %>
                       <% active_fb.each do |k, v| %><%= hidden_field_tag "fb[#{k}]", v, id: nil %><% end %>
@@ -824,6 +950,7 @@
                     <summary class="cursor-pointer select-none text-gray-500 hover:text-gray-700">Set batches for this fork</summary>
                     <div class="flex flex-wrap items-center gap-4 mt-2">
                       <%= form_with url: set_batch_count_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex items-center gap-2" do %>
+                        <%= hidden_field_tag :as_actor, as_actor, id: nil %>
                         <%= hidden_field_tag :section, f_key %>
                         <%= hidden_field_tag :base_batch, active_batch %>
                         <% active_fb.each do |k, v| %><%= hidden_field_tag "fb[#{k}]", v %><% end %>
@@ -886,6 +1013,7 @@
                           <% if signed_here %><span class="text-xs text-gray-400">· locked by sign-off</span><% end %>
                         <% else %>
                           <%= form_with url: choose_alternate_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, class: "flex items-center gap-1" do %>
+                            <%= hidden_field_tag :as_actor, as_actor, id: nil %>
                             <%= hidden_field_tag :position, position %>
                             <%= hidden_field_tag :batch, active_key %>
                             <%= hidden_field_tag :base_batch, active_batch %>
@@ -931,6 +1059,7 @@
                       <details class="mt-2 text-xs">
                         <summary class="cursor-pointer select-none text-gray-400 hover:text-gray-600">📝 Add note</summary>
                         <%= form_with url: add_operation_note_works_order_path(@works_order), method: :patch, local: true, class: "mt-1.5 flex items-start gap-2" do %>
+                          <%= hidden_field_tag :as_actor, as_actor, id: nil %>
                           <%= hidden_field_tag :position, position %>
                           <%= hidden_field_tag :batch, active_batch %>
                           <% active_fb.each do |k, v| %><%= hidden_field_tag "fb[#{k}]", v %><% end %>
@@ -954,6 +1083,7 @@
                           <%= checklist_items.any? ? "Contract Review Checklist" : (spec["basis"].to_s == "nadcap" ? "OCV Monitoring" : "Record") %>
                         </p>
                         <%= form_with url: save_ocv_works_order_path(@works_order), method: :patch, local: true, id: "ocv-form-#{position}" do |f| %>
+                          <%= hidden_field_tag :as_actor, as_actor, id: nil %>
                           <%= hidden_field_tag :position, position %>
                           <%= hidden_field_tag :batch, active_batch %>
                           <% active_fb.each do |k, v| %><%= hidden_field_tag "fb[#{k}]", v %><% end %>
@@ -1125,7 +1255,7 @@
                           <% undo_confirm = "Undo the sign-off by #{so['name']} on operation #{position}#{wo_scoped ? '' : " batch #{sec_active}"}? The undone signature is kept on the record; re-sign as the right person afterwards." %>
                           <%= button_to "↩ undo", undo_sign_off_works_order_path(@works_order, position: position, batch: active_key,
                                                                                  base_batch: active_batch, fb: active_fb.presence),
-                              method: :patch,
+                              method: :patch, params: { as_actor: as_actor },
                               form: { data: { confirm: undo_confirm, turbo_confirm: undo_confirm } },
                               class: "text-xs text-red-400 hover:text-red-600 underline" %>
                         <% end %>
@@ -1149,7 +1279,7 @@
                         <%= button_to (multi ? "Sign off B#{sec_active}" : "Sign off"),
                             sign_off_operation_works_order_path(@works_order, position: position, batch: active_key,
                                                                base_batch: active_batch, fb: active_fb.presence),
-                            method: :patch,
+                            method: :patch, params: { as_actor: as_actor },
                             data: { keyflow: "signoff" },
                             class: "bg-gray-700 hover:bg-gray-900 text-white text-xs font-medium px-2 py-1 rounded" %>
                       <% end %>
@@ -1314,6 +1444,184 @@ function hamsBatchShareSum(uid) {
   if (!any) { out.innerHTML = '<span class="text-gray-400">unsplit</span>'; return; }
   out.className = 'text-xs text-gray-700';
   out.textContent = '= ' + total + ' (batch qty)';
+}
+
+// ---------------------------------------------------------------------------
+// Batch plan dialog. hamsPlanData (rendered server-side) seeds hamsPlan.rows;
+// the table is drawn from that array on every change and the inputs write
+// back into it. Rows: { orig, qty, status, shares, editable, deletable,
+// signed, date }. orig is the batch number before this edit, null for a new
+// row - the server deletes any orig missing from the plan and renumbers.
+var hamsPlan = { rows: [], data: null };
+
+function hamsPlanOpen() {
+  var d = document.getElementById('batch-plan');
+  hamsPlan.data = window.hamsPlanData;
+  hamsPlan.rows = hamsPlan.data.rows.map(function (r) {
+    return { orig: r.orig, qty: r.qty, status: r.status, date: r.date, editable: r.editable,
+             deletable: r.deletable, signed: r.signed, shares: Object.assign({}, r.shares || {}) };
+  });
+  hamsPlanRender();
+  d.showModal();
+  var mx = document.getElementById('plan-max');
+  if (mx) setTimeout(function () { mx.focus(); mx.select(); }, 50);
+}
+function hamsPlanClose() { document.getElementById('batch-plan').close(); }
+
+// The runt rule, same sum as WorksOrder.divide_evenly: fewest batches the
+// max allows, sized as evenly as possible. 23 @ 10 -> [8, 8, 7].
+function hamsDivideEvenly(total, max) {
+  total = parseInt(total, 10); max = parseInt(max, 10);
+  if (!(total > 0)) return [];
+  if (!(max > 0)) max = total;
+  var n = Math.max(1, Math.ceil(total / max));
+  var base = Math.floor(total / n), rem = total % n, out = [];
+  for (var i = 0; i < n; i++) out.push(base + (i < rem ? 1 : 0));
+  return out;
+}
+
+function hamsPlanLockedRows()   { return hamsPlan.rows.filter(function (r) { return !r.editable; }); }
+function hamsPlanRowQty(r) {
+  if (hamsPlan.data.lead) {
+    var t = 0; hamsPlan.data.members.forEach(function (m) { t += parseInt(r.shares[m.name], 10) || 0; });
+    return t;
+  }
+  return parseInt(r.qty, 10) || 0;
+}
+
+function hamsPlanDivide() {
+  var max = parseInt(document.getElementById('plan-max').value, 10);
+  if (!(max > 0)) { document.getElementById('plan-max').focus(); return; }
+  var data = hamsPlan.data, locked = hamsPlanLockedRows();
+  var lockedQty = locked.reduce(function (s, r) { return s + hamsPlanRowQty(r); }, 0);
+  var remaining = data.orderQty - lockedQty;
+  if (remaining <= 0) { hamsPlanRender('Every part is already on a batch with records; nothing to divide.'); return; }
+
+  var sizes = hamsDivideEvenly(remaining, max);
+  var fresh = [];
+  if (data.lead) {
+    // Fill members in works order order: each member's unallocated parts are
+    // poured into the batches in turn, so a batch may straddle two WOs but
+    // a WO is never scattered across more batches than it has to be.
+    var left = data.members.map(function (m) {
+      var taken = locked.reduce(function (s, r) { return s + (parseInt(r.shares[m.name], 10) || 0); }, 0);
+      return { name: m.name, left: Math.max(0, m.qty - taken) };
+    });
+    var mi = 0;
+    sizes.forEach(function (size) {
+      var row = { orig: null, qty: '', status: 'not_started', editable: true, deletable: true, signed: false, shares: {} };
+      var need = size;
+      while (need > 0 && mi < left.length) {
+        if (left[mi].left <= 0) { mi++; continue; }
+        var take = Math.min(need, left[mi].left);
+        row.shares[left[mi].name] = (row.shares[left[mi].name] || 0) + take;
+        left[mi].left -= take; need -= take;
+      }
+      fresh.push(row);
+    });
+  } else {
+    sizes.forEach(function (size) {
+      fresh.push({ orig: null, qty: String(size), status: 'not_started', editable: true, deletable: true, signed: false, shares: {} });
+    });
+  }
+  // Locked rows keep their place at the front (the server requires existing
+  // batches to stay in order); the editable tail is replaced wholesale.
+  hamsPlan.rows = locked.concat(fresh);
+  hamsPlanRender(sizes.length + ' batch' + (sizes.length === 1 ? '' : 'es') + ' of ' + sizes.join(', ') + ' for the ' + remaining + ' parts not locked by records.');
+}
+
+function hamsPlanAddRow() {
+  hamsPlan.rows.push({ orig: null, qty: '', status: 'not_started', editable: true, deletable: true, signed: false, shares: {} });
+  hamsPlanRender();
+  var inputs = document.querySelectorAll('#plan-body input[type=number]');
+  if (inputs.length) inputs[inputs.length - 1].focus();
+}
+function hamsPlanRemoveRow(i) {
+  if (!hamsPlan.rows[i] || !hamsPlan.rows[i].deletable) return;
+  hamsPlan.rows.splice(i, 1);
+  hamsPlanRender();
+}
+function hamsPlanInput(i, field, value) {
+  var r = hamsPlan.rows[i]; if (!r) return;
+  if (field === 'qty') r.qty = value; else r.shares[field] = value;
+  hamsPlanTotals();
+}
+
+var hamsPlanMarks = { complete: ['✓', 'complete', 'text-green-700'], in_progress: ['▸', 'in progress', 'text-amber-700'], not_started: ['·', 'not started', 'text-gray-400'] };
+
+function hamsPlanRender(note) {
+  var data = hamsPlan.data, body = document.getElementById('plan-body');
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var html = '';
+  hamsPlan.rows.forEach(function (r, i) {
+    var n = i + 1, mark = hamsPlanMarks[r.status] || hamsPlanMarks.not_started;
+    var inputCls = 'border border-gray-300 rounded px-2 py-2 text-base w-20 text-center';
+    html += '<tr class="border-t border-gray-100 ' + (r.editable ? '' : 'bg-gray-50') + '">';
+    html += '<td class="py-2 pr-3 font-semibold whitespace-nowrap">B' + n +
+            (r.orig && r.orig !== n ? ' <span class="text-xs font-normal text-gray-400">(was B' + r.orig + ')</span>' : '') +
+            (r.orig ? '' : ' <span class="text-xs font-normal text-blue-600">new</span>') +
+            '<input type="hidden" name="batches[' + n + '][orig]" value="' + (r.orig || '') + '"></td>';
+    html += '<td class="py-2 pr-3 text-xs whitespace-nowrap ' + mark[2] + '">' + mark[0] + ' ' + mark[1] +
+            (r.date ? '<br><span class="text-gray-400">' + esc(r.date) + '</span>' : '') +
+            (r.signed && r.editable ? '<br><span class="text-amber-600">signed — edits logged</span>' : '') +
+            (!r.editable ? '<br><span class="text-gray-400">locked</span>' : '') + '</td>';
+    if (data.lead) {
+      data.members.forEach(function (m) {
+        var v = r.shares[m.name] || '';
+        html += '<td class="py-2 pr-3">';
+        if (r.editable) {
+          html += '<input type="number" min="0" max="' + m.qty + '" inputmode="numeric" class="' + inputCls + '" value="' + esc(v) + '"' +
+                  ' name="batches[' + n + '][shares][' + esc(m.name) + ']"' +
+                  ' oninput="hamsPlanInput(' + i + ', \'' + esc(m.name) + '\', this.value)">';
+        } else {
+          html += '<span class="text-gray-700">' + (v === '' ? '—' : esc(v)) + '</span>' +
+                  '<input type="hidden" name="batches[' + n + '][shares][' + esc(m.name) + ']" value="' + esc(v) + '">';
+        }
+        html += '</td>';
+      });
+      html += '<td class="py-2 pr-3 font-semibold" data-plan-row-qty="' + i + '"></td>';
+    } else {
+      html += '<td class="py-2 pr-3">';
+      if (r.editable) {
+        html += '<input type="number" min="1" inputmode="numeric" class="' + inputCls + '" value="' + esc(r.qty) + '"' +
+                ' name="batches[' + n + '][qty]" oninput="hamsPlanInput(' + i + ', \'qty\', this.value)">';
+      } else {
+        html += '<span class="text-gray-700">' + esc(r.qty || '—') + '</span>' +
+                '<input type="hidden" name="batches[' + n + '][qty]" value="' + esc(r.qty) + '">';
+      }
+      html += '</td>';
+    }
+    html += '<td class="py-2 text-right">' +
+            (r.deletable ? '<button type="button" onclick="hamsPlanRemoveRow(' + i + ')" class="text-xs text-red-500 hover:text-red-700 px-2 py-2" title="Remove this batch">✕</button>'
+                         : '<span class="text-xs text-gray-300 px-2" title="Has records; cannot be removed">✕</span>') +
+            '</td></tr>';
+  });
+  body.innerHTML = html;
+  hamsPlanTotals(note);
+}
+
+function hamsPlanTotals(note) {
+  var data = hamsPlan.data, total = 0, memberTotals = {};
+  hamsPlan.rows.forEach(function (r, i) {
+    var q = hamsPlanRowQty(r); total += q;
+    var cell = document.querySelector('[data-plan-row-qty="' + i + '"]'); if (cell) cell.textContent = q || '—';
+    if (data.lead) data.members.forEach(function (m) { memberTotals[m.name] = (memberTotals[m.name] || 0) + (parseInt(r.shares[m.name], 10) || 0); });
+  });
+  var over = total > data.orderQty, memberOver = false;
+  if (data.lead) data.members.forEach(function (m) {
+    var cell = document.querySelector('[data-plan-member-total="' + m.name + '"]');
+    var t = memberTotals[m.name] || 0, bad = t > m.qty;
+    if (bad) memberOver = true;
+    if (cell) { cell.textContent = t + ' / ' + m.qty; cell.className = 'py-2 pr-3 ' + (bad ? 'text-orange-600 font-semibold' : t === m.qty ? 'text-green-700' : 'text-gray-600'); }
+  });
+  var tot = document.getElementById('plan-total');
+  tot.textContent = total + ' / ' + data.orderQty;
+  tot.className = 'py-2 pr-3 font-semibold ' + (over ? 'text-orange-600' : total === data.orderQty ? 'text-green-700' : 'text-gray-800');
+  var sum = document.getElementById('plan-summary'), left = data.orderQty - total;
+  sum.textContent = note || (over ? ('⚠️ ' + (-left) + ' more than the ' + (data.lead ? 'process group' : 'order')) :
+                             left > 0 ? (left + ' part' + (left === 1 ? '' : 's') + ' not yet on a batch') : 'Every part is on a batch.');
+  sum.className = 'text-sm ' + (over || memberOver ? 'text-orange-600 font-medium' : 'text-gray-600');
+  document.getElementById('plan-save').disabled = over || memberOver || hamsPlan.rows.length === 0;
 }
 
 // Keep the operation you acted on under your finger. Turbo preserves the pixel

@@ -20,7 +20,9 @@
     <% cap = [cap, shares[m.display_name].to_i].max %>
     <label class="text-xs text-gray-700 inline-flex items-center gap-1"
            title="<%= m.display_name %> · <%= m.part_number %> (qty <%= m.quantity %>, <%= cap %> not yet on another batch)">
-      <%= m.display_name %>
+      <%# Label by part and quantity, not bare WO number - "WO7021" tells
+          the operator nothing; "WO7021 · C5.V9.05 ×6" is what's on the bar. %>
+      <span><%= m.display_name %> · <%= m.part_number %> <span class="text-gray-400">×<%= m.quantity %></span></span>
       <%= select_tag "shares[#{m.display_name}]",
           options_for_select(cap.downto(0).map { |q| [q, q] }, shares[m.display_name].to_i),
           id: nil,
