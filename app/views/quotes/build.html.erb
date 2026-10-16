@@ -85,7 +85,7 @@
             <div class="md:col-span-2">
               <label class="block text-xs font-medium text-gray-700">Customer <span class="text-red-600">*</span>
                 <% if matched %><span class="ml-2 inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">matched in HAMS</span>
-                <% else %><span class="ml-2 inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">no match — type the HAMS name</span><% end %>
+                <% else %><span class="ml-2 inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">no match — type the HAMS name, or create it</span><% end %>
               </label>
               <%= hidden_field_tag "form[customer_id]", matched&.id %>
               <%= text_field_tag "form[customer_name]", matched&.name || p["customer_name"], list: "hams-customers", required: true,
@@ -94,6 +94,10 @@
                 <% Organization.enabled.where(is_customer: true).order(:name).pluck(:name).each do |n| %><option value="<%= n %>"><% end %>
               </datalist>
               <% if p["customer_reasoning"].present? %><p class="text-xs text-gray-500 mt-1"><%= p["customer_reasoning"] %></p><% end %>
+              <label class="inline-flex items-start gap-2 text-xs text-gray-600 mt-2" title="Only used when the name above matches no HAMS customer. Creates the contact in Xero (as a customer, with the enquirer's email) and mirrors it into HAMS.">
+                <%= check_box_tag "form[create_customer]", "1", matched.nil?, class: "rounded border-gray-300 mt-0.5" %>
+                <span>If no HAMS customer matches this name, create it — in Xero as a customer contact, then in HAMS</span>
+              </label>
             </div>
             <div class="text-sm">
               <% if @quote.proposal_prime %>

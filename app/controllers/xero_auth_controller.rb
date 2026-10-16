@@ -129,6 +129,9 @@ class XeroAuthController < ApplicationController
 
   private
 
+  # Every contact from Xero → XeroContact + Organization. The per-contact
+  # upsert lives on XeroContact.upsert_from_api! so the quote workbench can
+  # use the same code for a customer it creates.
   def sync_contacts_from_xero(token_set, tenant_id)
     begin
       Rails.logger.info "Fetching contacts from Xero..."
@@ -146,50 +149,7 @@ class XeroAuthController < ApplicationController
         # Skip archived contacts
         next if contact['ContactStatus'] == 'ARCHIVED'
 
-        # Find or create XeroContact record
-        xero_contact = XeroContact.find_or_initialize_by(xero_id: contact['ContactID'])
-        xero_contact.assign_attributes(
-          name: contact['Name'] || 'Unknown',
-          contact_status: contact['ContactStatus'] || 'ACTIVE',
-          is_customer: contact['IsCustomer'] || false,
-          is_supplier: contact['IsSupplier'] || false,
-          accounts_receivable_tax_type: contact['AccountsReceivableTaxType'],
-          accounts_payable_tax_type: contact['AccountsPayableTaxType'],
-          xero_data: contact,
-          last_synced_at: Time.current
-        )
-        xero_contact.save!
-
-        # Find or create organization
-        organization = Organization.find_or_initialize_by(xero_contact: xero_contact)
-
-        if organization.new_record?
-          organization.assign_attributes(
-            name: contact['Name'] || 'Unknown',
-            enabled: true,
-            is_customer: contact['IsCustomer'] || false,
-            is_supplier: contact['IsSupplier'] || false
-          )
-        else
-          # Update organization details from fresh Xero data
-          organization.assign_attributes(
-            name: contact['Name'] || organization.name,
-            is_customer: contact['IsCustomer'] || false,
-            is_supplier: contact['IsSupplier'] || false
-          )
-        end
-
-        organization.save!
-
-        # Sync address for customer organizations
-        if organization.is_customer
-          begin
-            organization.sync_address_from_xero!
-          rescue => e
-            Rails.logger.error "Failed to sync address for #{organization.name}: #{e.message}"
-          end
-        end
-
+        XeroContact.upsert_from_api!(contact)
         contact_count += 1
       end
 

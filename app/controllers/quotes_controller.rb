@@ -80,13 +80,18 @@ class QuotesController < ApplicationController
     @quote.update!(attrs)
     QuoteProposalJob.perform_later(@quote.id)
     redirect_to build_quote_path(@quote)
+  rescue => e
+    # Customer creation (Xero) is the only thing above that can fail on
+    # user input; show it on the workbench rather than a 500.
+    Rails.logger.error "quotes#rerun (#{@quote.display_name}) failed: #{e.class}: #{e.message}"
+    redirect_to build_quote_path(@quote), alert: "❌ Not re-run: #{e.message}"
   end
 
   # Create parts + items from the reviewed form.
   def finalise
     return rerun if params[:intent] == "rerun" # same form, same CSRF token — see build.html.erb
     resolve_customer!
-    raise "Pick a customer before saving — the assistant couldn't match one." unless @quote.customer
+    raise "Pick a customer before saving — the assistant couldn't match one. Type the HAMS name, or tick 'create it' to add a new customer." unless @quote.customer
 
     # The form is free-shaped (parts keyed by proposal key, arbitrary
     # treatment JSON), so it can't be strong-params-permitted field by field;
@@ -153,13 +158,23 @@ class QuotesController < ApplicationController
     drawing
   end
 
-  # The build page posts form[customer_id] (hidden, from the proposal) and
-  # form[customer_name] (editable). A changed name wins over the id.
+  # The build page posts form[customer_id] (hidden, from the proposal),
+  # form[customer_name] (editable) and form[create_customer] (tick box). A
+  # changed name wins over the id. If nothing matches and the box is ticked,
+  # the customer is created in Xero and mirrored into HAMS — a customer that
+  # exists only in HAMS could never be invoiced, so there is no HAMS-only
+  # path. Called from both rerun and finalise, so a customer created on
+  # Re-run is the CUSTOMER block the assistant sees on its next pass.
   def resolve_customer!
     form = (params[:form] || {}).to_unsafe_h
     name = form["customer_name"].to_s.strip
     org  = Organization.enabled.find_by("name ILIKE ?", name) if name.present?
     org ||= Organization.find_by(id: form["customer_id"]) if form["customer_id"].present?
+    if org.nil? && form["create_customer"] == "1"
+      raise "Enter the customer's name to create it." if name.blank?
+      org = XeroContact.create_customer!(name: name, email: form["enquirer_email"].presence)
+      Rails.logger.info "quotes#resolve_customer!: created customer #{org.name} (#{org.id}) via Xero for #{@quote.display_name}"
+    end
     @quote.update!(customer: org) if org && org != @quote.customer
   end
 
