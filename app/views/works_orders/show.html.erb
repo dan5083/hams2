@@ -683,7 +683,10 @@
               end
               plan_members = members.map { |m| { name: m.display_name, label: member_label.call(m), part: m.part_number, qty: m.quantity.to_i } }
             %>
-            <dialog id="batch-plan" class="rounded-xl shadow-2xl p-0 w-[calc(100%-2rem)] max-w-4xl backdrop:bg-black/50">
+            <%# Width follows the table: a solo WO or a small group fits a
+                normal dialog; a big group gets nearly the whole screen so
+                every member column is on view without sideways scrolling. %>
+            <dialog id="batch-plan" class="rounded-xl shadow-2xl p-0 w-[calc(100%-2rem)] <%= plan_members.length > 3 ? 'max-w-[96vw]' : 'max-w-4xl' %> backdrop:bg-black/50">
               <%= form_with url: save_batch_plan_works_order_path(@works_order), method: :patch, local: true, data: { turbo: false }, id: "batch-plan-form" do %>
                 <%= hidden_field_tag :as_actor, as_actor, id: nil %>
                 <%= hidden_field_tag :section, "base", id: nil %>
@@ -706,36 +709,40 @@
                     load; by hand is the table itself. Either way the table
                     is what gets saved, so an auto-batch can still be
                     tweaked before Save. %>
-                <div class="px-5 pt-3 pb-1 text-sm text-gray-700">
-                  There are <strong>two ways</strong> to plan the batches — use <strong>one or the other</strong>, not both:
+                <div class="px-5 pt-3 pb-1 text-sm text-gray-600">
+                  Plan the batches either way — whichever suits the job:
                 </div>
                 <div class="px-5 pb-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div class="rounded-lg border-2 border-blue-300 bg-blue-50 p-3">
-                    <p class="text-sm font-bold text-blue-900">1 · Auto-batch from a max load</p>
-                    <p class="text-xs text-blue-900/80 mt-1 mb-2">
+                  <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <p class="text-sm font-bold text-gray-800">Auto-batch from a max load</p>
+                    <p class="text-xs text-gray-600 mt-1 mb-2">
                       Tell HAMS the most parts that fit in one load. It makes the fewest batches that allows and
                       sizes them as evenly as it can — 23 parts at a max of 10 becomes <strong>8, 8, 7</strong>, not 10, 10, 3,
                       so nobody gets a load of 3. The batches appear in the table and can still be edited before saving.
                     </p>
                     <div class="flex items-center gap-2">
-                      <label class="text-sm text-blue-900 inline-flex items-center gap-2">
+                      <label class="text-sm text-gray-800 inline-flex items-center gap-2">
                         Max per load
                         <input type="number" id="plan-max" min="1" max="<%= order_qty %>" inputmode="numeric"
-                               class="border border-blue-300 rounded px-2 py-2 text-lg w-24 text-center bg-white">
+                               class="border border-gray-300 rounded px-2 py-2 text-lg w-24 text-center bg-white">
                       </label>
                       <button type="button" onclick="hamsPlanDivide()"
                               class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded">Auto-batch</button>
                     </div>
                   </div>
-                  <div class="rounded-lg border-2 border-gray-200 bg-gray-50 p-3">
-                    <p class="text-sm font-bold text-gray-800">2 · Build the batches by hand</p>
+                  <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <p class="text-sm font-bold text-gray-800">Build the batches by hand</p>
                     <p class="text-xs text-gray-600 mt-1 mb-2">
-                      Use <strong>+ Add batch</strong> under the table for each load and type its quantity
-                      <%= lead ? "(for a process group: how many of each works order's parts are on it)" : "" %>.
-                      Remove a batch with ✕. This is the way to go when loads are uneven or you already know the split.
+                      <% if lead %>
+                        Type how many of each works order's parts go in <strong>B1</strong> in the table below.
+                      <% else %>
+                        Type the quantity for <strong>B1</strong> in the table below.
+                      <% end %>
+                      If the job takes more than one load, press <strong>+ Add batch</strong> and fill in the next one;
+                      ✕ removes a batch added by mistake. Best when loads are uneven or you already know the split.
                     </p>
                     <p class="text-xs text-gray-500">
-                      Batches that already have records are kept whichever way you choose; only the unlocked ones change.
+                      Either way, batches that already have records are kept; only the unlocked ones change.
                     </p>
                   </div>
                 </div>
@@ -747,8 +754,9 @@
                         <th class="py-2 pr-3">Batch</th>
                         <th class="py-2 pr-3">Status</th>
                         <% plan_members.each do |m| %>
-                          <th class="py-2 pr-3 whitespace-nowrap" title="<%= m[:label] %>">
-                            <%= m[:name] %><br><span class="font-normal normal-case text-gray-400"><%= m[:part] %> ×<%= m[:qty] %></span>
+                          <th class="py-2 pr-2 align-bottom" title="<%= m[:label] %>">
+                            <%= m[:name] %> <span class="font-normal text-gray-500">×<%= m[:qty] %></span><br>
+                            <span class="font-normal normal-case text-gray-400 text-[10px] leading-tight"><%= m[:part] %></span>
                           </th>
                         <% end %>
                         <th class="py-2 pr-3">Qty</th>
@@ -760,7 +768,7 @@
                       <tr class="border-t border-gray-200 text-xs text-gray-600">
                         <td class="py-2 pr-3" colspan="2">Total</td>
                         <% plan_members.each do |m| %>
-                          <td class="py-2 pr-3" data-plan-member-total="<%= m[:name] %>"></td>
+                          <td class="py-2 pr-2" data-plan-member-total="<%= m[:name] %>"></td>
                         <% end %>
                         <td class="py-2 pr-3 font-semibold" id="plan-total"></td>
                         <td></td>
@@ -1592,9 +1600,9 @@ function hamsPlanRender(note) {
     if (data.lead) {
       data.members.forEach(function (m) {
         var v = r.shares[m.name] || '';
-        html += '<td class="py-2 pr-3">';
+        html += '<td class="py-2 pr-2">';
         if (r.editable) {
-          html += '<input type="number" min="0" max="' + m.qty + '" inputmode="numeric" class="' + inputCls + '" value="' + esc(v) + '"' +
+          html += '<input type="number" min="0" max="' + m.qty + '" inputmode="numeric" class="' + inputCls.replace('w-20', 'w-16') + '" value="' + esc(v) + '"' +
                   ' name="batches[' + n + '][shares][' + esc(m.name) + ']"' +
                   ' oninput="hamsPlanInput(' + i + ', \'' + esc(m.name) + '\', this.value)">';
         } else {
@@ -1636,7 +1644,7 @@ function hamsPlanTotals(note) {
     var cell = document.querySelector('[data-plan-member-total="' + m.name + '"]');
     var t = memberTotals[m.name] || 0, bad = t > m.qty;
     if (bad) memberOver = true;
-    if (cell) { cell.textContent = t + ' / ' + m.qty; cell.className = 'py-2 pr-3 ' + (bad ? 'text-orange-600 font-semibold' : t === m.qty ? 'text-green-700' : 'text-gray-600'); }
+    if (cell) { cell.textContent = t + ' / ' + m.qty; cell.className = 'py-2 pr-2 ' + (bad ? 'text-orange-600 font-semibold' : t === m.qty ? 'text-green-700' : 'text-gray-600'); }
   });
   var tot = document.getElementById('plan-total');
   tot.textContent = total + ' / ' + data.orderQty;
