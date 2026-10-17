@@ -712,13 +712,15 @@
                 <div class="px-5 pt-3 pb-1 text-sm text-gray-600">
                   Plan the batches either way — whichever suits the job:
                 </div>
-                <div class="px-5 pb-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                <%# A visible fork: the two cards sit either side of a big
+                    "OR", equal in weight, so nobody fills in both. %>
+                <div class="px-5 pb-3 grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-3 items-stretch">
                   <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
                     <p class="text-sm font-bold text-gray-800">Auto-batch from a max load</p>
                     <p class="text-xs text-gray-600 mt-1 mb-2">
                       Tell HAMS the most parts that fit in one load. It makes the fewest batches that allows and
                       sizes them as evenly as it can — 23 parts at a max of 10 becomes <strong>8, 8, 7</strong>, not 10, 10, 3,
-                      so nobody gets a load of 3. The batches appear in the table and can still be edited before saving.
+                      so no runt load of 3. The batches appear in the table and can still be edited before saving.
                     </p>
                     <div class="flex items-center gap-2">
                       <label class="text-sm text-gray-800 inline-flex items-center gap-2">
@@ -727,8 +729,11 @@
                                class="border border-gray-300 rounded px-2 py-2 text-lg w-24 text-center bg-white">
                       </label>
                       <button type="button" onclick="hamsPlanDivide()"
-                              class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded">Auto-batch</button>
+                              class="bg-gray-700 hover:bg-gray-900 text-white text-sm font-semibold px-4 py-2 rounded">Auto-batch</button>
                     </div>
+                  </div>
+                  <div class="flex items-center justify-center" aria-hidden="true">
+                    <span class="inline-flex items-center justify-center w-12 h-12 rounded-full border-2 border-gray-300 bg-white text-sm font-black tracking-wide text-gray-600 shadow-sm">OR</span>
                   </div>
                   <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
                     <p class="text-sm font-bold text-gray-800">Build the batches by hand</p>
@@ -1495,8 +1500,8 @@ function hamsPlanOpen() {
   });
   hamsPlanRender();
   d.showModal();
-  var mx = document.getElementById('plan-max');
-  if (mx) setTimeout(function () { mx.focus(); mx.select(); }, 50);
+  // Nothing gets focus on open: the two cards are a fork in the road and
+  // a blinking cursor in one of them would quietly pick a side.
 }
 function hamsPlanClose() { document.getElementById('batch-plan').close(); }
 
