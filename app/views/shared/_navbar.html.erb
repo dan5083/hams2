@@ -84,6 +84,19 @@
       <!-- User menu (desktop) -->
       <div class="hidden md:flex items-center">
         <% if Current.user %>
+          <%# One press to the PIN pad. Switching operator is the most
+              frequent thing anyone does with this corner of the bar, so it
+              doesn't live behind the dropdown; the dropdown keeps the rarer
+              sign-out / log-out. %>
+          <button type="button"
+                  class="flex items-center gap-2 px-3 py-2 rounded-md bg-[#e8028c] hover:bg-[#c00278] text-white text-sm font-semibold shadow-sm mr-1"
+                  data-action="click->sub-user#open"
+                  title="<%= sub ? "Switch operator with PIN" : "Sign on with PIN" %>">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <%= sub ? "Switch" : "Sign on" %>
+          </button>
           <div class="relative mr-2">
             <button type="button"
                     class="flex items-center gap-2 text-white <%= nav_hover %> px-3 py-2 rounded-md text-sm font-medium"
@@ -114,17 +127,6 @@
                       form_class: "block",
                       class: "w-full text-left px-4 py-3 text-sm font-medium text-[#e8028c] hover:bg-gray-50" %>
               <% end %>
-
-              <div class="px-2 py-1.5">
-                <button type="button"
-                        class="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[#e8028c] hover:bg-[#c00278] text-white text-sm font-semibold shadow-sm"
-                        data-action="click->sub-user#open">
-                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                  <%= sub ? "Switch user with PIN" : "Sign on with PIN" %>
-                </button>
-              </div>
 
               <%# A stranded kiosk can't get itself back in - magic link only.
                   Nobody on the floor should be able to log the terminal out. %>
@@ -223,10 +225,14 @@
 
   <!-- PIN pad -->
   <% if Current.user %>
-    <div class="hidden fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4"
+    <%# Anchored top-right, just under the bar: it opens where the button
+        that summoned it lives, so the eye doesn't have to travel to the
+        middle of the screen and back. Centred on phones, where there is no
+        "beside the button". %>
+    <div class="hidden fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4 md:items-start md:justify-end md:pt-20 md:pr-4"
          data-sub-user-target="modal"
          data-action="click->sub-user#backdrop keydown@window->sub-user#key">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6" data-sub-user-target="card">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm md:max-w-xs p-6" data-sub-user-target="card">
         <div class="text-center">
           <p class="text-xs uppercase tracking-wide text-gray-500">Operator sign-on</p>
           <p class="text-xl font-bold text-gray-900 mt-1">Enter your PIN</p>
