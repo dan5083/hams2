@@ -11,6 +11,8 @@
   nav_hover  = sub ? "hover:bg-[#c00278]"   : "hover:bg-blue-500"
   nav_hovmob = sub ? "hover:bg-[#c00278]"   : "hover:bg-blue-600"
   nav_border = sub ? "border-[#c00278]"     : "border-blue-600"
+  # The Switch button is the bar's opposite colour, so it stands out on both.
+  nav_switch = sub ? "bg-blue-600 hover:bg-blue-700" : "bg-[#e8028c] hover:bg-[#c00278]"
   link_base  = "text-white hover:text-white/80 px-3 py-2 rounded-md text-sm font-medium"
   mlink_base = "text-white #{nav_hovmob} block px-3 py-2 rounded-md text-base font-medium"
 
@@ -89,7 +91,7 @@
               doesn't live behind the dropdown; the dropdown keeps the rarer
               sign-out / log-out. %>
           <button type="button"
-                  class="flex items-center gap-2 px-3 py-2 rounded-md bg-[#e8028c] hover:bg-[#c00278] text-white text-sm font-semibold shadow-sm mr-1"
+                  class="flex items-center gap-2 px-3 py-2 rounded-md <%= nav_switch %> text-white text-sm font-semibold shadow-sm mr-1"
                   data-action="click->sub-user#open"
                   title="Switch operator with PIN">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
