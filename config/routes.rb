@@ -146,6 +146,8 @@ Rails.application.routes.draw do
     resources :documents, only: [:create, :destroy], controller: 'external_ncr_documents' do
       member { get :download }
     end
+    # Internal, timestamped background notes — never on the response PDF
+    resources :notes, only: [:create, :destroy], controller: 'external_ncr_notes'
   end
 
   # 6. Invoice routes (PDFs handled by Xero)
