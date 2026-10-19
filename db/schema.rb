@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_10_12_091733) do
+ActiveRecord::Schema[8.0].define(version: 2026_10_19_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -122,6 +122,16 @@ ActiveRecord::Schema[8.0].define(version: 2026_10_12_091733) do
     t.index ["uploaded_by_id"], name: "index_external_ncr_documents_on_uploaded_by_id"
   end
 
+  create_table "external_ncr_notes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "external_ncr_id", null: false
+    t.uuid "user_id", null: false
+    t.text "body", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["external_ncr_id"], name: "index_external_ncr_notes_on_external_ncr_id"
+    t.index ["user_id"], name: "index_external_ncr_notes_on_user_id"
+  end
+
   create_table "external_ncr_release_notes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "external_ncr_id", null: false
     t.uuid "release_note_id", null: false
@@ -142,6 +152,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_10_12_091733) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.uuid "release_note_id"
+    t.date "target_response_date"
+    t.datetime "responded_at"
     t.index ["assigned_to_id"], name: "index_external_ncrs_on_assigned_to_id"
     t.index ["created_by_id"], name: "index_external_ncrs_on_created_by_id"
     t.index ["date"], name: "index_external_ncrs_on_date"
@@ -149,6 +161,7 @@ ActiveRecord::Schema[8.0].define(version: 2026_10_12_091733) do
     t.index ["ncr_data"], name: "index_external_ncrs_on_ncr_data", using: :gin
     t.index ["release_note_id"], name: "index_external_ncrs_on_release_note_id"
     t.index ["status"], name: "index_external_ncrs_on_status"
+    t.index ["target_response_date"], name: "index_external_ncrs_on_target_response_date"
     t.check_constraint "hal_ncr_number > 0", name: "check_positive_ncr_number"
     t.check_constraint "status::text = ANY (ARRAY['draft'::character varying, 'in_progress'::character varying, 'completed'::character varying]::text[])", name: "check_valid_status"
   end
@@ -660,6 +673,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_10_12_091733) do
   add_foreign_key "customer_orders", "users", column: "updated_by_id"
   add_foreign_key "external_ncr_documents", "external_ncrs"
   add_foreign_key "external_ncr_documents", "users", column: "uploaded_by_id"
+  add_foreign_key "external_ncr_notes", "external_ncrs"
+  add_foreign_key "external_ncr_notes", "users"
   add_foreign_key "external_ncr_release_notes", "external_ncrs"
   add_foreign_key "external_ncr_release_notes", "release_notes"
   add_foreign_key "external_ncrs", "release_notes"

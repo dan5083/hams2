@@ -9,9 +9,9 @@ class AddResponseTrackingToExternalNcrs < ActiveRecord::Migration[8.0]
     # Internal, timestamped background notes. Deliberately a separate table
     # rather than another ncr_data key: ncr_data feeds the customer response
     # PDF and these must never appear on it.
-    create_table :external_ncr_notes do |t|
-      t.references :external_ncr, null: false, foreign_key: true
-      t.references :user,         null: false, foreign_key: true
+    create_table :external_ncr_notes, id: :uuid do |t|
+      t.references :external_ncr, null: false, foreign_key: true, type: :uuid
+      t.references :user,         null: false, foreign_key: true, type: :uuid
       t.text :body, null: false
       t.timestamps
     end
