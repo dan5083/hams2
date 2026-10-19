@@ -189,11 +189,25 @@
             <% end %>
           </div>
 
-          <!-- Date -->
+          <!-- Date received -->
           <div>
-            <%= f.label :date, class: "block text-sm font-medium text-gray-700" %>
+            <%= f.label :date, "Date received", class: "block text-sm font-medium text-gray-700" %>
             <%= f.date_field :date,
                 class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
+            <p class="mt-1 text-xs text-gray-500">
+              The day the reject arrived. Backdate it if it was logged late.
+            </p>
+          </div>
+
+          <!-- Target response date -->
+          <div>
+            <%= f.label :target_response_date, "Target response date", class: "block text-sm font-medium text-gray-700" %>
+            <%= f.date_field :target_response_date,
+                class: "mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md" %>
+            <p class="mt-1 text-xs text-gray-500">
+              Defaults to <%= ExternalNcr::DEFAULT_RESPONSE_WORKING_DAYS %> working days after the date received.
+              Leave blank to recalculate.
+            </p>
           </div>
 
           <!-- Handled by (Auto-assigned, Read-only) -->

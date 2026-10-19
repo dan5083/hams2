@@ -187,7 +187,7 @@
           <h3 class="text-lg font-medium text-gray-900">NCR Information</h3>
         </div>
         <div class="px-4 py-5 sm:p-6">
-          <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-3">
+          <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
             <div>
               <dt class="text-sm font-medium text-gray-500">Status</dt>
               <dd class="mt-1">
@@ -197,9 +197,34 @@
               </dd>
             </div>
             <div>
-              <dt class="text-sm font-medium text-gray-500">Date</dt>
+              <dt class="text-sm font-medium text-gray-500">Date received</dt>
               <dd class="mt-1 text-sm text-gray-900">
                 <%= @external_ncr.date.strftime("%d %B %Y") %>
+                <% if @external_ncr.created_at.to_date != @external_ncr.date %>
+                  <div class="text-xs text-gray-500 mt-0.5">
+                    Logged <%= @external_ncr.created_at.strftime("%d %b %Y") %>
+                  </div>
+                <% end %>
+              </dd>
+            </div>
+            <div>
+              <dt class="text-sm font-medium text-gray-500">Response due</dt>
+              <dd class="mt-1 text-sm text-gray-900">
+                <% if @external_ncr.target_response_date.present? %>
+                  <%= @external_ncr.target_response_date.strftime("%d %B %Y") %>
+                <% else %>
+                  <span class="text-gray-400 italic">Not set</span>
+                <% end %>
+                <div class="mt-1">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium <%= @external_ncr.response_timer_badge_class %>">
+                    <%= @external_ncr.response_timer_label %>
+                  </span>
+                </div>
+                <% if @external_ncr.responded_at.present? %>
+                  <div class="text-xs text-gray-500 mt-1">
+                    Completed <%= @external_ncr.responded_at.strftime("%d %b %Y") %>
+                  </div>
+                <% end %>
               </dd>
             </div>
             <div>
@@ -419,6 +444,59 @@
               </dd>
             </div>
           </dl>
+        </div>
+      </div>
+
+      <!-- Internal Notes -->
+      <% notes = @external_ncr.notes.includes(:user).to_a %>
+      <div class="bg-white shadow sm:rounded-lg">
+        <div class="px-4 py-5 sm:px-6 border-b border-gray-200 flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-medium text-gray-900">Internal Notes</h3>
+            <p class="text-xs text-gray-500 mt-0.5">
+              Background for QA — what happened, who's looked at it, why it's taking longer.
+              Not shown on the customer response document.
+            </p>
+          </div>
+          <% if notes.any? %>
+            <span class="text-xs text-gray-500 flex-shrink-0 ml-4"><%= pluralize(notes.size, 'note') %></span>
+          <% end %>
+        </div>
+        <div class="px-4 py-5 sm:p-6">
+          <%= form_with url: external_ncr_notes_path(@external_ncr), method: :post, class: "mb-5" do |nf| %>
+            <%= text_area_tag "external_ncr_note[body]", nil,
+                rows: 3,
+                required: true,
+                placeholder: "e.g. Spoke to Brian — batch was run on Vat 4 after the Vat 2 fault on the 14th. Checking the OCV log.",
+                class: "block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" %>
+            <div class="mt-2 flex justify-end">
+              <%= nf.submit "Add note", class: "bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded text-sm cursor-pointer" %>
+            </div>
+          <% end %>
+
+          <% if notes.any? %>
+            <ol class="space-y-4">
+              <% notes.each do |note| %>
+                <li class="border-l-2 border-gray-200 pl-3">
+                  <div class="flex items-baseline justify-between">
+                    <p class="text-xs text-gray-500">
+                      <span class="font-medium text-gray-700"><%= note.user&.full_name || "Unknown" %></span>
+                      · <%= note.created_at.strftime("%d %b %Y at %H:%M") %>
+                    </p>
+                    <% if note.deletable_by?(Current.user) %>
+                      <%= button_to "Remove", external_ncr_note_path(@external_ncr, note),
+                          method: :delete,
+                          form: { data: { turbo_confirm: "Remove this note?" }, class: "inline" },
+                          class: "text-red-600 hover:text-red-800 text-xs font-medium bg-transparent border-0 p-0 cursor-pointer ml-3" %>
+                    <% end %>
+                  </div>
+                  <p class="mt-1 text-sm text-gray-900 whitespace-pre-line leading-relaxed"><%= note.body.strip %></p>
+                </li>
+              <% end %>
+            </ol>
+          <% else %>
+            <p class="text-sm text-gray-500">No notes yet.</p>
+          <% end %>
         </div>
       </div>
 

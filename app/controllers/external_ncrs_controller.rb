@@ -4,9 +4,22 @@ class ExternalNcrsController < ApplicationController
   before_action :require_ncr_manage_access, only: [:edit, :update, :advance_status, :reassign_respondent]
   before_action :require_delete_access, only: [:destroy]
 
+  DUE_FILTERS = %w[overdue open].freeze
+
   def index
-    @external_ncrs = ExternalNcr.includes(:release_notes, :created_by, :respondent, :documents)
-                                .recent
+    @due_filter = params[:due].presence_in(DUE_FILTERS)
+
+    @external_ncrs = ExternalNcr.includes(:release_notes, :created_by, :respondent, :documents, :notes)
+
+    # Summary counts for the filter chips — independent of the current filter
+    @overdue_count = ExternalNcr.overdue.count
+    @open_count    = ExternalNcr.active.count
+
+    @external_ncrs = case @due_filter
+                     when 'overdue' then @external_ncrs.overdue.by_due_date
+                     when 'open'    then @external_ncrs.active.by_due_date
+                     else @external_ncrs.recent
+                     end
 
     if params[:search].present?
       @external_ncrs = @external_ncrs.search(params[:search])
@@ -294,7 +307,7 @@ class ExternalNcrsController < ApplicationController
 
   def external_ncr_params
     params.require(:external_ncr).permit(
-      :date,
+      :date, :target_response_date,
       :manual_customer_name,
       :concession_number, :customer_ncr_number, :estimated_cost,
       :reject_quantity,

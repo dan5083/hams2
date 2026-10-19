@@ -22,9 +22,30 @@
     </div>
   </div>
 
+  <!-- Response timer filters -->
+  <div class="flex items-center gap-2 mb-4 text-sm">
+    <% chip = "inline-flex items-center px-3 py-1 rounded-full border font-medium" %>
+    <%= link_to external_ncrs_path(search: params[:search]),
+        class: "#{chip} #{@due_filter.nil? ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}" do %>
+      All
+    <% end %>
+    <%= link_to external_ncrs_path(due: 'open', search: params[:search]),
+        class: "#{chip} #{@due_filter == 'open' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-blue-700 border-blue-200 hover:bg-blue-50'}" do %>
+      Open (<%= @open_count %>)
+    <% end %>
+    <%= link_to external_ncrs_path(due: 'overdue', search: params[:search]),
+        class: "#{chip} #{@due_filter == 'overdue' ? 'bg-red-600 text-white border-red-600' : 'bg-white text-red-700 border-red-200 hover:bg-red-50'}" do %>
+      Overdue (<%= @overdue_count %>)
+    <% end %>
+    <% if @due_filter %>
+      <span class="text-xs text-gray-500 ml-2">Sorted by response due date</span>
+    <% end %>
+  </div>
+
   <!-- Search -->
   <div class="bg-white p-4 rounded-lg shadow mb-6">
     <%= form_with url: external_ncrs_path, method: :get, local: true, class: "flex items-end gap-4" do |form| %>
+      <%= hidden_field_tag :due, @due_filter if @due_filter %>
       <div class="flex-1">
         <%= form.label :search, "Search NCRs", class: "block text-sm font-medium text-gray-700 mb-1" %>
         <%= form.text_field :search,
@@ -81,9 +102,13 @@
                       <%= link_to ncr.display_name, ncr, class: "text-blue-600 hover:text-blue-900" %>
                     </div>
                     <div class="text-sm text-gray-500">
-                      <%= ncr.date.strftime("%d %b %Y") %>
+                      Received <%= ncr.date.strftime("%d %b %Y") %>
                     </div>
-                    <div class="flex items-center mt-1">
+                    <div class="flex items-center mt-1 space-x-1">
+                      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium <%= ncr.response_timer_badge_class %>"
+                            title="<%= ncr.target_response_date&.strftime('Target response date: %d %b %Y') %>">
+                        <%= ncr.response_timer_label %>
+                      </span>
                       <% if ncr.has_document? %>
                         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
                           <svg class="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
@@ -226,7 +251,7 @@
       </div>
       <div class="flex items-center space-x-2">
         <% if @external_ncrs.prev_page %>
-          <%= link_to "← Previous", external_ncrs_path(page: @external_ncrs.prev_page, search: params[:search], status: params[:status], document_status: params[:document_status]),
+          <%= link_to "← Previous", external_ncrs_path(page: @external_ncrs.prev_page, search: params[:search], due: @due_filter, status: params[:status], document_status: params[:document_status]),
               class: "px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50" %>
         <% end %>
 
@@ -235,7 +260,7 @@
         </span>
 
         <% if @external_ncrs.next_page %>
-          <%= link_to "Next →", external_ncrs_path(page: @external_ncrs.next_page, search: params[:search], status: params[:status], document_status: params[:document_status]),
+          <%= link_to "Next →", external_ncrs_path(page: @external_ncrs.next_page, search: params[:search], due: @due_filter, status: params[:status], document_status: params[:document_status]),
               class: "px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50" %>
         <% end %>
       </div>

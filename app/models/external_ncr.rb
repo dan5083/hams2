@@ -1,11 +1,21 @@
 # app/models/external_ncr.rb
 class ExternalNcr < ApplicationRecord
+  # Working days allowed to investigate and answer the customer, counted from
+  # `date` (the day the reject arrived). Stored per record so it can be
+  # overridden; see set_target_response_date.
+  DEFAULT_RESPONSE_WORKING_DAYS = 5
+
   # --- Associations ---
   has_many :external_ncr_release_notes, dependent: :destroy, inverse_of: :external_ncr, validate: false
   has_many :release_notes, through: :external_ncr_release_notes
 
   has_many :documents, -> { chronological },
            class_name: 'ExternalNcrDocument',
+           dependent: :destroy,
+           inverse_of: :external_ncr
+
+  has_many :notes, -> { newest_first },
+           class_name: 'ExternalNcrNote',
            dependent: :destroy,
            inverse_of: :external_ncr
 
@@ -49,6 +59,7 @@ class ExternalNcr < ApplicationRecord
   # --- Validations ---
   validates :hal_ncr_number, uniqueness: true, numericality: { greater_than: 0 }, allow_nil: true
   validates :date, presence: true
+  validates :target_response_date, presence: true
   validates :created_by_id, presence: true
   validates :status, inclusion: { in: %w[draft in_progress completed] }
   validate :at_least_one_release_note
@@ -66,6 +77,11 @@ class ExternalNcr < ApplicationRecord
       .distinct
   }
   scope :recent, -> { order(created_at: :desc) }
+  scope :overdue, -> { active.where("target_response_date < ?", Date.current) }
+  scope :due_within, ->(days) { active.where(target_response_date: Date.current..(Date.current + days)) }
+  # Soonest due first. Plain columns only — `search` adds DISTINCT, and
+  # Postgres rejects ORDER BY expressions that aren't in the select list.
+  scope :by_due_date, -> { order(:target_response_date, created_at: :desc) }
   scope :with_documents, -> { where(id: ExternalNcrDocument.select(:external_ncr_id)) }
   scope :missing_documents, -> {
     where.not(id: ExternalNcrDocument.select(:external_ncr_id))
@@ -74,6 +90,7 @@ class ExternalNcr < ApplicationRecord
 
   # --- Callbacks ---
   before_validation :set_defaults, if: :new_record?
+  before_validation :set_target_response_date
   after_create :log_creation
   after_update :log_status_change, if: :saved_change_to_status?
 
@@ -304,6 +321,62 @@ class ExternalNcr < ApplicationRecord
     save!(validate: false)
   end
 
+  # --- Response timer ---
+
+  # Signed working days to the target: 3 = three left, 0 = due today, -2 =
+  # two working days overdue. nil once completed (the clock has stopped).
+  def working_days_remaining
+    return nil if target_response_date.blank? || status == 'completed'
+    WorkingDays.from_today(target_response_date)
+  end
+
+  def overdue?
+    status != 'completed' && target_response_date.present? && target_response_date < Date.current
+  end
+
+  # nil for completed records that pre-date responded_at (unknown).
+  def responded_on_time?
+    return nil if responded_at.blank? || target_response_date.blank?
+    responded_at.to_date <= target_response_date
+  end
+
+  def response_timer_label
+    if status == 'completed'
+      case responded_on_time?
+      when true  then "Answered on time"
+      when false then "Answered #{WorkingDays.between(target_response_date + 1, responded_at.to_date)} wd late"
+      else "Completed"
+      end
+    else
+      days = working_days_remaining
+      return "No target set" if days.nil?
+      if days.zero?
+        "Due today"
+      elsif days.positive?
+        "#{days} working #{'day'.pluralize(days)} left"
+      else
+        "#{-days} working #{'day'.pluralize(-days)} overdue"
+      end
+    end
+  end
+
+  def response_timer_badge_class
+    if status == 'completed'
+      responded_on_time? == false ? 'bg-red-50 text-red-700' : 'bg-green-100 text-green-800'
+    else
+      days = working_days_remaining
+      if days.nil?
+        'bg-gray-100 text-gray-600'
+      elsif days.negative?
+        'bg-red-100 text-red-800'
+      elsif days <= 1
+        'bg-orange-100 text-orange-800'
+      else
+        'bg-blue-100 text-blue-800'
+      end
+    end
+  end
+
   # --- Status management ---
 
   def next_status
@@ -336,6 +409,7 @@ class ExternalNcr < ApplicationRecord
 
     if new_status == 'completed'
       self.completed_by_user_id = Current.user&.id
+      self.responded_at = Time.current
     end
 
     update!(status: new_status)
@@ -407,6 +481,14 @@ class ExternalNcr < ApplicationRecord
     sequence = Sequence.find_or_create_by(key: 'external_ncr_number')
     self.hal_ncr_number = sequence.value
     sequence.increment!(:value)
+  end
+
+  # Default is date received + DEFAULT_RESPONSE_WORKING_DAYS. Runs whenever
+  # the target is blank, so clearing the field in the form recomputes it from
+  # the (possibly backdated) received date.
+  def set_target_response_date
+    return if target_response_date.present? || date.blank?
+    self.target_response_date = WorkingDays.add(date, DEFAULT_RESPONSE_WORKING_DAYS)
   end
 
   def set_defaults

@@ -18,6 +18,18 @@ module WorkingDays
     (start_date..end_date).count { |d| working_day?(d) }
   end
 
+  # `date` plus `n` working days, weekends skipped. Received Monday + 5 wd =
+  # the following Monday; received Friday + 5 wd = the Friday after. Used
+  # for the external NCR target response date.
+  def add(date, n)
+    result = date
+    n.to_i.times do
+      result += 1
+      result += 1 until working_day?(result)
+    end
+    result
+  end
+
   # Signed working days from today to `date`, exclusive of today: due
   # tomorrow = 1, due today = 0, due yesterday = -1. Weekends never count
   # in either direction, so a Friday promise read on Monday is -1, not -3.
