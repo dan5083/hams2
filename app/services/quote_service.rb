@@ -157,14 +157,15 @@ class QuoteService
         title: form["title"], summary: form["summary"], notes: form["notes"],
         enquirer_name: form["enquirer_name"].presence, enquirer_email: form["enquirer_email"].presence
       )
+      quote.minimum_per_piece = form["minimum_per_piece"] if form.key?("minimum_per_piece") && form["minimum_per_piece"].present?
       quote.save!
 
       # A part's each price is what the customer was quoted PER PIECE: the
-      # sum of that part's lines' unit amounts (process + masking...). The
-      # form's each_price overrides it if the reviewer typed one. The MOC
-      # line has no part and never touches a part price.
-      quoted_each = Hash.new(0.to_d)
-      lines.each { |l| quoted_each[l["part_key"]] += l["unit_amount"].to_d if l["skip"] != "1" && l["part_key"].present? }
+      # sum of that part's lines' unit amounts at the FIRST quantity break
+      # (one line per part per break — summing across breaks would double
+      # count). The form's each_price overrides it if the reviewer typed
+      # one. The MOC line has no part and never touches a part price.
+      quoted_each = quoted_each_from_lines(lines)
 
       # What the assistant proposed for each part's jig — so we can tell a
       # reviewer's change in the Jig type box from the template's default.
@@ -216,6 +217,78 @@ class QuoteService
     end
 
     { success: true, quote: quote, parts_created: created }
+  end
+
+  # { part_key => each } from workbench lines: lines at the lowest-position
+  # quantity for each part, summed. Skipped lines ignored.
+  def self.quoted_each_from_lines(lines)
+    live = lines.reject { |l| l["skip"] == "1" || l["part_key"].blank? }
+    live.group_by { |l| l["part_key"] }.transform_values do |ls|
+      q = ls.min_by { |l| l["position"].to_i }["quantity"].to_i
+      ls.select { |l| l["quantity"].to_i == q }.sum { |l| l["unit_amount"].to_d }
+    end.tap { |h| h.default = 0.to_d }
+  end
+  private_class_method :quoted_each_from_lines
+
+  # ---------------------------------------------------------------------------
+  # Saved quote: hand edits at any stage (draft, sent, won, lost). No
+  # assistant, no parts created — the lines are QuoteItems, edited in place.
+  # `form` from quotes/edit:
+  #   header fields; items[<id>]{description, quantity, unit_amount, part_id, delete}
+  #   new_items[<n>]{description, quantity, unit_amount, part_id}
+  #   parts[<part_id>][each_price]  — override; blank = sum of that part's lines
+  # The breakdown (per-treatment make-up) on an edited item is left as it
+  # was: the quote page shows the gap as "adjusted". Status is untouched —
+  # a sent quote stays sent, but edited_at is stamped so the page can say
+  # the customer hasn't seen this version.
+  # ---------------------------------------------------------------------------
+  def self.edit!(quote, form)
+    raise Error, "#{quote.display_name} is still on the workbench — edit it there." if quote.in_workbench?
+    form      = form.to_h.deep_stringify_keys
+    items     = form["items"] || {}
+    new_items = (form["new_items"] || {}).values.select { |n| n["description"].present? || n["unit_amount"].present? }
+    part_ids  = quote.quote_items.map(&:part_id).compact.uniq
+
+    Quote.transaction do
+      quote.assign_attributes(
+        title: form["title"], summary: form["summary"], notes: form["notes"],
+        enquirer_name: form["enquirer_name"].presence, enquirer_email: form["enquirer_email"].presence
+      )
+      quote.valid_until       = form["valid_until"] if form["valid_until"].present?
+      quote.minimum_per_piece = form["minimum_per_piece"] if form["minimum_per_piece"].present?
+
+      quote.quote_items.each do |item|
+        f = items[item.id.to_s] or next
+        if f["delete"] == "1"
+          item.destroy!
+          next
+        end
+        part_id = f["part_id"].presence
+        raise Error, "Line #{item.position + 1}: that part isn't on this quote" if part_id && !part_ids.include?(part_id)
+        item.update!(description: f["description"], quantity: f["quantity"].to_i.nonzero? || 1,
+                     unit_amount: f["unit_amount"].to_f.round(2), part_id: part_id)
+      end
+      new_items.each do |n|
+        part_id = n["part_id"].presence
+        raise Error, "New line: that part isn't on this quote" if part_id && !part_ids.include?(part_id)
+        quote.quote_items.create!(description: n["description"], quantity: n["quantity"].to_i.nonzero? || 1,
+                                  unit_amount: n["unit_amount"].to_f.round(2), part_id: part_id, breakdown: [])
+      end
+      quote.quote_items.reload
+      raise Error, "A quote needs at least one line" if quote.quote_items.empty?
+
+      # Each price follows the lines unless overridden — same rule as Save.
+      overrides = form["parts"] || {}
+      Part.where(id: part_ids).find_each do |part|
+        each = overrides.dig(part.id.to_s, "each_price").presence&.to_d || quote.quoted_each_price(part)
+        next if each.nil? || !each.positive?
+        part.update!(each_price: each.round(2)) if part.each_price.to_d != each.round(2)
+      end
+
+      quote.edited_at = Time.current
+      quote.save!
+    end
+    { success: true, quote: quote }
   end
 
   # Build operation_selection from the form: treatments come back as a JSON

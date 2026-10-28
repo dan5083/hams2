@@ -38,6 +38,16 @@ class Quote < ApplicationRecord
   before_validation :assign_next_number, if: :new_record?
   VALIDITY_DAYS = 90
   before_validation -> { self.valid_until ||= Date.current + VALIDITY_DAYS.days }, if: :new_record?
+
+  # Floor under any part's each price (per piece, all treatments summed).
+  # Rate card says £1.50; the column default matches. Editable per quote on
+  # the workbench. QuoteProposalJob enforces it on the assistant's base
+  # figures before the prime uplift; a reviewer typing a lower price by hand
+  # is not overridden — the floor is a guard against the area formula, not
+  # against people.
+  MINIMUM_PER_PIECE_DEFAULT = 1.50.to_d
+  validates :minimum_per_piece, numericality: { greater_than_or_equal_to: 0 }
+  before_validation -> { self.minimum_per_piece = MINIMUM_PER_PIECE_DEFAULT if minimum_per_piece.nil? }
   before_create -> { self.created_by ||= Current.user }
 
   scope :recent, -> { order(created_at: :desc) }
@@ -123,6 +133,24 @@ class Quote < ApplicationRecord
 
   def sent?  = status == "sent"
   def draft? = status == "draft"
+
+  # Saved quotes can be edited by hand at any stage (draft, sent, won, lost)
+  # — QuoteService.edit!, no assistant. Workbench quotes are edited on the
+  # workbench instead.
+  def editable? = !in_workbench?
+
+  # Hand-edited after it went out — the customer has the old figures.
+  def edited_since_sent? = sent_at.present? && edited_at.present? && edited_at > sent_at
+
+  # The each price a part was quoted at: the sum of its per-piece lines at
+  # the FIRST quantity break (lowest position). Price breaks are separate
+  # rows for the same part — summing across them would double count.
+  def quoted_each_price(part)
+    items = quote_items.select { |i| i.part_id == part.id }
+    return nil if items.empty?
+    first_qty = items.min_by(&:position).quantity
+    items.select { |i| i.quantity == first_qty }.sum { |i| i.unit_amount.to_d }
+  end
 
   def can_send?
     enquirer_email.present? && quote_items.any?

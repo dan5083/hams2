@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2026_10_19_120000) do
+ActiveRecord::Schema[8.0].define(version: 2026_10_28_112438) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -368,6 +368,8 @@ ActiveRecord::Schema[8.0].define(version: 2026_10_19_120000) do
     t.datetime "proposed_at"
     t.boolean "itar", default: false, null: false
     t.text "drawing_description"
+    t.decimal "minimum_per_piece", precision: 8, scale: 2, default: "1.5", null: false
+    t.datetime "edited_at"
     t.index ["created_by_id"], name: "index_quotes_on_created_by_id"
     t.index ["customer_id"], name: "index_quotes_on_customer_id"
     t.index ["number"], name: "index_quotes_on_number", unique: true

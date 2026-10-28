@@ -6,6 +6,7 @@
       <p class="text-sm text-gray-600 mt-1"><%= link_to @quote.customer.name, organization_path(@quote.customer), class: "hover:text-blue-700" %><%= " — #{@quote.title}" if @quote.title.present? %></p>
     </div>
     <div class="flex space-x-2">
+      <%= link_to "Edit", edit_quote_path(@quote), class: "bg-white hover:bg-gray-100 text-gray-800 border border-gray-300 font-bold py-2 px-4 rounded" %>
       <%= link_to "PDF", quote_path(@quote, format: :pdf), target: "_blank",
           class: "bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" %>
       <%= link_to "Back to Quotes", quotes_path, class: "bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" %>
@@ -75,6 +76,7 @@
               <% colour = { "draft" => "bg-gray-100 text-gray-800", "sent" => "bg-blue-100 text-blue-800", "won" => "bg-green-100 text-green-800", "lost" => "bg-red-100 text-red-800" }[@quote.status] %>
               <span class="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full <%= colour %>"><%= @quote.status.titleize %></span>
               <% if @quote.itar? %><span class="ml-1 inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-800" title="Drawings were not sent to the assistant">ITAR</span><% end %>
+              <% if @quote.edited_since_sent? %><span class="ml-1 inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-800" title="Edited <%= @quote.edited_at.strftime('%d/%m/%Y %H:%M') %>, after it was sent">edited since sent — re-send?</span><% end %>
             </dd></div>
           <div><dt class="text-gray-500">Enquirer</dt>
             <dd class="text-gray-900"><%= @quote.enquirer_name.presence %><%= " · " if @quote.enquirer_name.present? && @quote.enquirer_email.present? %><%= mail_to(@quote.enquirer_email) if @quote.enquirer_email.present? %><%= "—" if @quote.enquirer_name.blank? && @quote.enquirer_email.blank? %></dd></div>

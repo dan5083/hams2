@@ -8,10 +8,11 @@
 #   page and either re-runs with answers or saves. Nothing exists in HAMS
 #   beyond the Quote row until Save.
 #
-#   Saved quote (show / send_email / update_status): parts + items exist;
-#   send emails the PDF and drawings; won/lost by hand.
+#   Saved quote (show / edit / update / send_email / update_status): parts +
+#   items exist; edit changes header + lines by hand (no assistant) at any
+#   stage; send emails the PDF and drawings; won/lost by hand.
 class QuotesController < ApplicationController
-  before_action :set_quote, only: [:show, :build, :rerun, :finalise, :send_email, :update_status]
+  before_action :set_quote, only: [:show, :build, :rerun, :finalise, :edit, :update, :send_email, :update_status]
 
   def index
     @quotes = Quote.includes(:customer, :created_by).recent
@@ -77,6 +78,9 @@ class QuotesController < ApplicationController
     # The drawing description is the assistant's only view of an ITAR
     # drawing, so a correction here must reach the re-run.
     attrs[:drawing_description] = params.dig(:form, :drawing_description) if params.dig(:form, :drawing_description)
+    # The per-piece floor is read from the quote by the prompt and the job's
+    # post-processing, so it must be on the row before the job runs.
+    attrs[:minimum_per_piece] = params.dig(:form, :minimum_per_piece) if params.dig(:form, :minimum_per_piece).present?
     @quote.update!(attrs)
     QuoteProposalJob.perform_later(@quote.id)
     redirect_to build_quote_path(@quote)
@@ -108,6 +112,22 @@ class QuotesController < ApplicationController
   end
 
   # ── Saved quote ────────────────────────────────────────────────────────
+
+  # Hand edits at any stage. Nothing here talks to the assistant: to have it
+  # re-price, raise a new quote.
+  def edit
+    redirect_to build_quote_path(@quote) and return if @quote.in_workbench?
+  end
+
+  def update
+    QuoteService.edit!(@quote, params.require(:form).to_unsafe_h)
+    notice = "✅ #{@quote.display_name} updated."
+    notice += " It was sent on #{@quote.sent_at.strftime('%d/%m/%Y')} — re-send it if the customer should see the change." if @quote.sent_at
+    redirect_to @quote, notice: notice
+  rescue => e
+    Rails.logger.error "quotes#update (#{@quote.display_name}) failed: #{e.class}: #{e.message}"
+    redirect_to edit_quote_path(@quote), alert: "❌ Not saved: #{e.message}"
+  end
 
   def send_email
     result = QuoteService.send!(quote_id: @quote.id, to: params[:to].presence)

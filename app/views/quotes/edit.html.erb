@@ -1,0 +1,174 @@
+<%# app/views/quotes/edit.html.erb — hand edits to a SAVED quote (draft, sent,
+    won, lost). No assistant: the lines are the saved QuoteItems, edited in
+    place, plus any new lines. Posts to quotes#update → QuoteService.edit!.
+    Workbench quotes redirect to build instead. %>
+<% provide :title, "Edit #{@quote.display_name}" %>
+<% parts = @quote.quote_items.map(&:part).compact.uniq %>
+<div class="w-full px-6 py-6">
+  <div class="flex justify-between items-start mb-6">
+    <div>
+      <h1 class="text-3xl font-bold text-gray-900">Edit <%= @quote.display_name %></h1>
+      <p class="text-sm text-gray-600 mt-1"><%= @quote.customer.name %> · <%= @quote.status.titleize %></p>
+    </div>
+    <%= link_to "Cancel", @quote, class: "text-sm text-blue-600 hover:text-blue-900" %>
+  </div>
+
+  <% if @quote.sent_at %>
+    <div class="mb-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
+      This quote was sent to <%= @quote.sent_to.join(", ") %> on <%= @quote.sent_at.strftime("%d/%m/%Y") %>. Saving here changes HAMS only — press Re-send on the quote page if the customer should see the new figures.
+    </div>
+  <% end %>
+
+  <%= form_with url: quote_path(@quote), method: :patch, local: true, data: { turbo: false }, id: "quote-edit-form", class: "space-y-6" do %>
+    <%# Header %>
+    <div class="bg-white shadow rounded-lg p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div class="md:col-span-2">
+        <label class="block text-xs font-medium text-gray-500">Title</label>
+        <%= text_field_tag "form[title]", @quote.title, class: "border border-gray-300 rounded px-2 py-1 w-full" %>
+      </div>
+      <div class="md:col-span-2">
+        <label class="block text-xs font-medium text-gray-500">Summary (printed on the quote)</label>
+        <%= text_field_tag "form[summary]", @quote.summary, class: "border border-gray-300 rounded px-2 py-1 w-full" %>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-500">Enquirer name</label>
+        <%= text_field_tag "form[enquirer_name]", @quote.enquirer_name, class: "border border-gray-300 rounded px-2 py-1 w-full" %>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-500">Enquirer email</label>
+        <%= email_field_tag "form[enquirer_email]", @quote.enquirer_email, class: "border border-gray-300 rounded px-2 py-1 w-full" %>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-500">Valid until</label>
+        <%= date_field_tag "form[valid_until]", @quote.valid_until, class: "border border-gray-300 rounded px-2 py-1 w-full text-sm" %>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-500">Minimum per piece £ <span class="font-normal">— record only here; the assistant isn't re-run from this page</span></label>
+        <%= number_field_tag "form[minimum_per_piece]", ("%.2f" % @quote.minimum_per_piece), step: 0.01, min: 0, class: "border border-gray-300 rounded px-2 py-1 w-32 text-sm text-right" %>
+      </div>
+      <div class="md:col-span-2">
+        <label class="block text-xs font-medium text-gray-500">Notes to customer (printed on the quote)</label>
+        <%= text_area_tag "form[notes]", @quote.notes, rows: 2, class: "border border-gray-300 rounded px-2 py-1 w-full text-sm" %>
+      </div>
+    </div>
+
+    <%# Lines %>
+    <div class="bg-white shadow rounded-lg overflow-hidden">
+      <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+        <h3 class="font-semibold text-gray-900">Price lines <span class="text-xs font-normal text-gray-500">— per piece; the MOC shortfall is a part-less line</span></h3>
+        <button type="button" onclick="hamsAddLine()" class="text-xs px-2 py-1 rounded bg-white border border-gray-300 text-gray-700 hover:bg-gray-100">+ Add line</button>
+      </div>
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Part</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qty</th>
+            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Unit £</th>
+            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Breakdown</th>
+            <th class="px-3 py-2"></th>
+          </tr>
+        </thead>
+        <tbody id="quote-lines" class="divide-y divide-gray-200">
+          <% part_opts = [["— MOC / no part —", ""]] + parts.map { |pt| [pt.display_name, pt.id] } %>
+          <% @quote.quote_items.each_with_index do |item, i| %>
+            <tr data-line="<%= i %>">
+              <td class="px-3 py-2 align-top">
+                <%= select_tag "form[items][#{item.id}][part_id]", options_for_select(part_opts, item.part_id), class: "border border-gray-300 rounded px-1 py-1 text-xs", onchange: "hamsQuoteTotal()", data: { part_id: i } %>
+              </td>
+              <td class="px-3 py-2 align-top"><%= text_area_tag "form[items][#{item.id}][description]", item.description, rows: 3, class: "border border-gray-300 rounded px-2 py-1 w-full min-w-[24rem] text-sm" %></td>
+              <td class="px-3 py-2 align-top"><%= number_field_tag "form[items][#{item.id}][quantity]", item.quantity, min: 1, class: "border border-gray-300 rounded px-2 py-1 w-20 text-sm text-right", oninput: "hamsQuoteTotal()", data: { qty: i } %></td>
+              <td class="px-3 py-2 align-top"><%= number_field_tag "form[items][#{item.id}][unit_amount]", ("%.2f" % item.unit_amount), step: 0.01, min: 0, class: "border border-gray-300 rounded px-2 py-1 w-24 text-sm text-right", oninput: "hamsQuoteTotal()", data: { unit: i } %></td>
+              <td class="px-3 py-2 align-top text-xs text-gray-500 min-w-[14rem]">
+                <% item.breakdown_rows.each do |r| %><div class="flex justify-between gap-2"><span><%= r["description"] %></span><span class="tabular-nums">£<%= '%.2f' % r["unit_amount"].to_f %></span></div><% end %>
+                <% if item.breakdown_rows.any? %><div class="text-gray-400 italic mt-1">kept as the assistant priced it; the quote page shows any gap to the unit price as "adjusted"</div><% end %>
+              </td>
+              <td class="px-3 py-2 align-top"><label class="text-xs text-gray-500 inline-flex items-center gap-1"><%= check_box_tag "form[items][#{item.id}][delete]", "1", false, class: "rounded border-gray-300", onchange: "hamsQuoteTotal()", data: { skip: i } %> delete</label></td>
+            </tr>
+          <% end %>
+        </tbody>
+        <tfoot class="bg-gray-50">
+          <tr>
+            <td colspan="3" class="px-3 py-2 text-sm font-semibold text-right">Total ex VAT</td>
+            <td class="px-3 py-2 text-sm font-bold text-right tabular-nums" id="quote-total">£<%= '%.2f' % @quote.total_ex_tax %></td>
+            <td colspan="2" class="px-3 py-2 text-xs text-gray-500">qty × unit, summed; deleted lines excluded</td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <%# Template for new lines — cloned by hamsAddLine(), name placeholders filled in %>
+      <template id="new-line-template">
+        <tr>
+          <td class="px-3 py-2 align-top"><%= select_tag "form[new_items][__N__][part_id]", options_for_select(part_opts), class: "border border-gray-300 rounded px-1 py-1 text-xs", onchange: "hamsQuoteTotal()", data: { part_id: "__N__" } %></td>
+          <td class="px-3 py-2 align-top"><%= text_area_tag "form[new_items][__N__][description]", nil, rows: 3, class: "border border-gray-300 rounded px-2 py-1 w-full min-w-[24rem] text-sm", placeholder: "Customer-facing description, one treatment per line" %></td>
+          <td class="px-3 py-2 align-top"><%= number_field_tag "form[new_items][__N__][quantity]", 1, min: 1, class: "border border-gray-300 rounded px-2 py-1 w-20 text-sm text-right", oninput: "hamsQuoteTotal()", data: { qty: "__N__" } %></td>
+          <td class="px-3 py-2 align-top"><%= number_field_tag "form[new_items][__N__][unit_amount]", nil, step: 0.01, min: 0, class: "border border-gray-300 rounded px-2 py-1 w-24 text-sm text-right", oninput: "hamsQuoteTotal()", data: { unit: "__N__" } %></td>
+          <td class="px-3 py-2 align-top text-xs text-gray-400 italic">new line — no breakdown</td>
+          <td class="px-3 py-2 align-top"><button type="button" class="text-xs text-red-600" onclick="this.closest('tr').remove(); hamsQuoteTotal()">remove</button></td>
+        </tr>
+      </template>
+    </div>
+
+    <%# Each prices %>
+    <% if parts.any? %>
+      <div class="bg-white shadow rounded-lg overflow-hidden">
+        <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
+          <h3 class="font-semibold text-gray-900">Each price saved on the part</h3>
+          <p class="text-xs text-gray-500">Follows the lines above — the sum of that part's lines at its first quantity break. Type a figure to override; blank = use that.</p>
+        </div>
+        <table class="min-w-full divide-y divide-gray-200 text-sm">
+          <tbody class="divide-y divide-gray-200">
+            <% parts.each do |pt| %>
+              <tr>
+                <td class="px-4 py-2"><%= link_to pt.display_name, pt, target: "_blank", class: "text-blue-600 hover:text-blue-900 font-medium" %> <span class="text-xs text-gray-500"><%= pt.description %></span></td>
+                <td class="px-4 py-2 text-xs text-gray-500 text-right">currently £<%= '%.2f' % pt.each_price.to_f %></td>
+                <td class="px-4 py-2 w-48">
+                  <%= number_field_tag "form[parts][#{pt.id}][each_price]", nil, step: 0.01, min: 0, placeholder: ("%.2f" % (@quote.quoted_each_price(pt) || pt.each_price.to_f)), class: "border border-gray-300 rounded px-2 py-1 w-full text-sm text-right", data: { each_for: pt.id } %>
+                  <p class="text-xs text-gray-400 mt-0.5" data-each-note="<%= pt.id %>"></p>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
+
+    <div class="flex justify-between items-center">
+      <p class="text-xs text-gray-500">Status stays <strong><%= @quote.status %></strong>. To have the assistant re-price from the drawing, raise a new quote.</p>
+      <button type="submit" class="bg-blue-600 hover:bg-blue-800 text-white font-bold py-2 px-4 rounded" data-disable-with="Saving…">Save changes</button>
+    </div>
+  <% end %>
+</div>
+
+<script>
+  var hamsNewLineCount = 0;
+  function hamsAddLine() {
+    var n = hamsNewLineCount++;
+    var html = document.getElementById('new-line-template').innerHTML.replace(/__N__/g, 'n' + n);
+    document.getElementById('quote-lines').insertAdjacentHTML('beforeend', html);
+  }
+  // Total, and each-price placeholders = sum of each part's live lines at
+  // its first quantity break — the same rule QuoteService.edit! applies.
+  function hamsQuoteTotal() {
+    var t = 0, byPart = {};
+    document.querySelectorAll('[data-qty]').forEach(function (q) {
+      var i = q.dataset.qty;
+      var skip = document.querySelector('[data-skip="' + i + '"]');
+      if (skip && skip.checked) return;
+      var qty  = parseFloat(q.value) || 0;
+      var unit = parseFloat(document.querySelector('[data-unit="' + i + '"]').value) || 0;
+      t += qty * unit;
+      var pid = (document.querySelector('[data-part-id="' + i + '"]') || {}).value;
+      if (!pid) return;
+      if (!(pid in byPart)) byPart[pid] = { qty: qty, sum: 0 };
+      if (byPart[pid].qty === qty) byPart[pid].sum += unit;
+    });
+    document.getElementById('quote-total').textContent = '£' + t.toFixed(2);
+    document.querySelectorAll('[data-each-for]').forEach(function (f) {
+      var k = f.dataset.eachFor, note = document.querySelector('[data-each-note="' + k + '"]');
+      if (k in byPart) { f.placeholder = byPart[k].sum.toFixed(2); if (note) note.textContent = ''; }
+      else if (note) { note.textContent = 'no live line for this part — each price unchanged'; }
+    });
+  }
+  document.addEventListener('DOMContentLoaded', hamsQuoteTotal);
+</script>

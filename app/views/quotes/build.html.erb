@@ -133,7 +133,40 @@
               <label class="block text-xs font-medium text-gray-500">Notes to customer (printed on the quote)</label>
               <%= text_area_tag "form[notes]", p["notes"].presence || @quote.notes, rows: 2, class: "border border-gray-300 rounded px-2 py-1 w-full text-sm" %>
             </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500">Minimum per piece £ <span class="font-normal">— floor under any part's each price (rate card £<%= '%.2f' % Quote::MINIMUM_PER_PIECE_DEFAULT %>)</span></label>
+              <%= number_field_tag "form[minimum_per_piece]", ("%.2f" % @quote.minimum_per_piece), step: 0.01, min: 0, class: "border border-gray-300 rounded px-2 py-1 w-32 text-sm text-right" %>
+              <p class="text-xs text-gray-500 mt-1">Applied by HAMS to the assistant's figures on every run. Change it and Re-run to re-price; prices you type below are never raised to it.</p>
+            </div>
           </div>
+
+          <%# What needs the assistant and what doesn't %>
+          <details class="bg-white shadow rounded-lg">
+            <summary class="px-4 py-3 text-sm font-medium text-gray-700 cursor-pointer">When to Re-run, when to just Save</summary>
+            <div class="px-4 pb-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-gray-700">
+              <div>
+                <p class="font-semibold text-gray-900 mb-1">Re-run with answers — the assistant re-reads the drawing and re-prices</p>
+                <ul class="list-disc pl-4 space-y-0.5">
+                  <li>Answering its questions</li>
+                  <li>Changing material, specification, thickness or process type — these pick the template and the rate</li>
+                  <li>Correcting the customer (template parts are looked up per customer) or the ITAR drawing description</li>
+                  <li>Changing the minimum per piece and wanting the prices to follow</li>
+                  <li>A part is missing, or the wrong drawing is on a part</li>
+                </ul>
+                <p class="mt-1 text-gray-500">It starts from what's on the cards now — your text edits carry over — but it may change any price you've typed.</p>
+              </div>
+              <div>
+                <p class="font-semibold text-gray-900 mb-1">Just Save — no assistant, exactly what the cards say</p>
+                <ul class="list-disc pl-4 space-y-0.5">
+                  <li>Typing a unit price, quantity or line description</li>
+                  <li>Each price override, jig type, jigging location</li>
+                  <li>Dropping a line or leaving a part out</li>
+                  <li>Title, summary, notes, enquirer, customer name</li>
+                </ul>
+                <p class="mt-1 text-gray-500">After Save, <strong>Edit</strong> on the quote page changes lines and prices by hand at any stage — draft, sent, even won — without the assistant.</p>
+              </div>
+            </div>
+          </details>
 
           <%# Questions %>
           <% if @quote.proposal_questions.any? %>
@@ -209,7 +242,8 @@
                   <div>
                     <label class="block text-xs font-medium text-gray-500">Each price (saved on the part) <span class="font-normal">— sum of this part's per-piece lines; blank = use that</span></label>
                     <% quoted_each = @quote.proposal_lines.select { |l| l["part_key"] == k }.sum { |l| l["unit_amount"].to_f } %>
-                    <%= number_field_tag "form[parts][#{k}][each_price]", nil, step: 0.01, min: 0, placeholder: ("%.2f" % (quoted_each.positive? ? quoted_each : existing&.each_price.to_f)), class: "border border-gray-300 rounded px-2 py-1 w-full text-sm" %>
+                    <%= number_field_tag "form[parts][#{k}][each_price]", nil, step: 0.01, min: 0, placeholder: ("%.2f" % (quoted_each.positive? ? quoted_each : existing&.each_price.to_f)), class: "border border-gray-300 rounded px-2 py-1 w-full text-sm", data: { each_for: k } %>
+                    <p class="text-xs text-gray-400 mt-0.5" data-each-note="<%= k %>"></p>
                   </div>
 
                   <div class="col-span-2 border-t border-gray-100 pt-3 grid grid-cols-2 gap-3">
@@ -270,7 +304,7 @@
                     <td class="px-3 py-2 align-top">
                       <%= hidden_field_tag "form[lines][#{i}][position]", i %>
                       <%= select_tag "form[lines][#{i}][part_key]", options_for_select([["— MOC / no part —", ""]] + @quote.proposal_parts.map { |pp| ["#{pp['part_number']}-#{pp['part_issue']}", pp["key"]] }, l["part_key"].to_s),
-                          class: "border border-gray-300 rounded px-1 py-1 text-xs" %>
+                          class: "border border-gray-300 rounded px-1 py-1 text-xs", onchange: "hamsQuoteTotal()", data: { part_key: i } %>
                     </td>
                     <td class="px-3 py-2 align-top"><%= text_area_tag "form[lines][#{i}][description]", l["description"], rows: 4, class: "border border-gray-300 rounded px-2 py-1 w-full min-w-[24rem] text-sm" %></td>
                     <td class="px-3 py-2 align-top"><%= number_field_tag "form[lines][#{i}][quantity]", l["quantity"], min: 1, class: "border border-gray-300 rounded px-2 py-1 w-20 text-sm text-right", oninput: "hamsQuoteTotal()", data: { qty: i } %></td>
@@ -289,17 +323,35 @@
               </tfoot>
             </table>
             <script>
+              // Total, and the "Each price" placeholder on every part card:
+              // the sum of that part's live lines at its first quantity break,
+              // which is what Save writes to the part if the box is left blank.
               function hamsQuoteTotal() {
-                var t = 0;
+                var t = 0, byPart = {};
                 document.querySelectorAll('[data-qty]').forEach(function (q) {
                   var i = q.dataset.qty;
                   var skip = document.querySelector('[data-skip="' + i + '"]');
                   if (skip && skip.checked) return;
-                  var u = document.querySelector('[data-unit="' + i + '"]');
-                  t += (parseFloat(q.value) || 0) * (parseFloat(u.value) || 0);
+                  var qty  = parseFloat(q.value) || 0;
+                  var unit = parseFloat(document.querySelector('[data-unit="' + i + '"]').value) || 0;
+                  t += qty * unit;
+                  var key = (document.querySelector('[data-part-key="' + i + '"]') || {}).value;
+                  if (!key) return;
+                  if (!(key in byPart)) byPart[key] = { qty: qty, sum: 0 };   // first live line fixes the break
+                  if (byPart[key].qty === qty) byPart[key].sum += unit;
                 });
                 document.getElementById('quote-total').textContent = '£' + t.toFixed(2);
+                document.querySelectorAll('[data-each-for]').forEach(function (f) {
+                  var k = f.dataset.eachFor, note = document.querySelector('[data-each-note="' + k + '"]');
+                  if (k in byPart) {
+                    f.placeholder = byPart[k].sum.toFixed(2);
+                    if (note) note.textContent = '';
+                  } else if (note) {
+                    note.textContent = 'no live price line for this part — each price unchanged';
+                  }
+                });
               }
+              document.addEventListener('DOMContentLoaded', hamsQuoteTotal);
             </script>
           </div>
 

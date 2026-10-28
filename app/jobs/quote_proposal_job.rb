@@ -110,6 +110,7 @@ class QuoteProposalJob < AiAssistantJob
     run_proposal_loop([{ role: "user", content: user_content }])
 
     raise "The assistant finished without calling propose_quote" unless @proposal
+    apply_minimum_per_piece!(@proposal) # floor first: it's a rate-card figure, the prime rate multiplies it
     apply_prime_uplift!(@proposal)
     @quote.update!(proposal: @proposal, proposal_error: nil, status: "proposed", proposed_at: Time.current)
   rescue => e
@@ -118,6 +119,45 @@ class QuoteProposalJob < AiAssistantJob
   end
 
   private
+
+  # No part may be quoted under quote.minimum_per_piece each. The prompt
+  # asks the model to apply it, but a floor the model can forget isn't a
+  # floor — so raise any part line that came back under it, note it in the
+  # working, and recompute the MOC shortfall (which the model worked out
+  # from its lower figures).
+  def apply_minimum_per_piece!(prop)
+    min = @quote.minimum_per_piece.to_f
+    return unless min.positive?
+    lines   = Array(prop["lines"])
+    part_ls = lines.select { |l| l["part_key"].present? }
+    raised  = part_ls.select { |l| l["unit_amount"].to_f.positive? && l["unit_amount"].to_f < min }
+    return if raised.empty?
+
+    moc_line = lines.find { |l| l["part_key"].blank? }
+    moc      = moc_line && part_ls.sum { |l| l["quantity"].to_i * l["unit_amount"].to_f } + moc_line["unit_amount"].to_f
+
+    raised.each do |l|
+      was = l["unit_amount"].to_f
+      l["unit_amount"] = min.round(2)
+      # Keep the breakdown honest: the uplift to the floor is its own component.
+      l["components"]  = Array(l["components"]).select { |c| c.is_a?(Hash) } + [{ "description" => "Minimum per piece", "unit_amount" => (min - was).round(2) }]
+      l["reasoning"]   = "#{l['reasoning']}\nUnder the £#{'%.2f' % min} minimum per piece: £#{'%.2f' % was} → £#{'%.2f' % min} (applied by HAMS)"
+    end
+    recompute_moc!(lines, moc_line, moc, "minimum per piece") if moc_line
+  end
+
+  # After per-line prices change, the MOC line is the shortfall against the
+  # same job minimum the model used; drop it if the lines now clear it.
+  def recompute_moc!(lines, moc_line, moc, why)
+    part_ls   = lines.select { |l| l["part_key"].present? }
+    shortfall = moc - part_ls.sum { |l| l["quantity"].to_i * l["unit_amount"].to_f }
+    if shortfall > 0
+      moc_line["unit_amount"] = shortfall.round(2)
+      moc_line["reasoning"]   = "#{moc_line['reasoning']}\nRecomputed after #{why}: MOC £#{'%.2f' % moc} − lines → £#{'%.2f' % shortfall}"
+    else
+      lines.delete(moc_line)
+    end
+  end
 
   def apply_prime_uplift!(prop)
     prime  = PRIME_UPLIFT.keys.find { |k| k.casecmp?(prop["end_user_prime"].to_s.strip) }
@@ -138,15 +178,7 @@ class QuoteProposalJob < AiAssistantJob
       l["reasoning"]   = "#{l['reasoning']}\n#{prime} prime: £#{'%.2f' % base} × #{factor} = £#{'%.2f' % l['unit_amount']} (applied by HAMS)"
     end
 
-    if moc_line
-      shortfall = moc - part_ls.sum { |l| l["quantity"].to_i * l["unit_amount"].to_f }
-      if shortfall > 0
-        moc_line["unit_amount"] = shortfall.round(2)
-        moc_line["reasoning"]   = "#{moc_line['reasoning']}\nRecomputed after #{prime} uplift: MOC £#{'%.2f' % moc} − lines → £#{'%.2f' % shortfall}"
-      else
-        lines.delete(moc_line)
-      end
-    end
+    recompute_moc!(lines, moc_line, moc, "#{prime} uplift") if moc_line
 
     # A prime end user is NADCAP work whoever the customer is: water break,
     # foil verification and OCV capture on every part on the quote.
@@ -447,6 +479,12 @@ class QuoteProposalJob < AiAssistantJob
     text = <<~TXT
       #{itar_block}#{customer_block}
       ENQUIRER: #{[@quote.enquirer_name, @quote.enquirer_email].compact_blank.join(' · ').presence || 'not given — take it from the enquiry'}
+
+      MINIMUM PER PIECE: £#{'%.2f' % @quote.minimum_per_piece} — no part's each price (all treatments
+      and masking summed) may be below this. Small parts cost nearly as much
+      to jig, inspect and pack as large ones; the area formula alone under-
+      prices them. If the sqft price comes out under the minimum, use the
+      minimum and say so in the working. HAMS enforces it after you anyway.
 
       ENQUIRY:
       #{@quote.enquiry.presence || '(no text — work from the drawing)'}
