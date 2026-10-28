@@ -211,8 +211,25 @@ class PoIntakeAssistantJob < AiAssistantJob
 
       STEP 1 — Is this actually a PO?
       Acknowledgements of our order confirmations, "please quote", delivery queries,
-      progress chasers, drawings with no PO, spam, and internal forwards with no
-      order on them are outcome "not_a_po".
+      progress chasers, drawings with no order on them, spam, and internal forwards
+      with no order on them are outcome "not_a_po".
+
+      A PO DOES NOT HAVE TO LOOK LIKE A PO. Some customers never send a purchase
+      order document: the work arrives with a routing card, traveller, job sheet,
+      subcontract label or goods-out note, and THAT is the order. If the paperwork
+      names us as the vendor/supplier (Hard Anodising Surface Treatments / HASTL)
+      and carries an order or job number, a part number and a quantity, it IS a
+      PO and you book it: the order number on the card is the po_number, the card
+      (or the photo of it) is the po_attachment_index, and a photo of several
+      identical cards for the same part is ONE line, not several — the contract
+      reviewer counts the parts. Instron work this way: their card reads
+      "Order No: 360311-*-*", "Vendor Name: HARD ANODISING SURFACE TREATMENTS
+      LTD", then Part No / Part Name / Quantity, with the plating spec in a Note
+      box. Use the order number without the "-*-*" suffix. A customer's own
+      goods-RECEIPT slips (their receiving of parts from a supplier, "Qty Rec",
+      "Shortage Qty") are not an order to us — ignore those and note them.
+      An internal forward from a @hardanodisingstl.com address with such
+      paperwork attached is a colleague asking you to book it, not noise.
 
       AMENDMENTS: an amendment is a PO whose ORDER IS ALREADY IN HAMS with works
       orders on it. Check by number — the number on the PO and its base without a
