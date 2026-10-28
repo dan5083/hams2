@@ -1,98 +1,346 @@
-# app/jobs/po_intake_job.rb
+# app/jobs/po_intake_assistant_job.rb
 #
-# Stage 1 of intake. Runs once per InboundPurchaseOrder:
-#   1. drop obvious noise (auto-replies, no usable attachment)
-#   2. upload each parked PDF/image to the Anthropic Files API, once, so
-#      every turn of the assistant run references it by id instead of
-#      carrying the bytes (the controller parked them in Cloudinary at
-#      inbound_purchase_orders/<id>/ — that's the durable copy that
-#      #create_order! attaches later)
-#   3. build an AiAssistantRequest (file references + email context) for the
-#      system user and hand off to PoIntakeAssistantJob
+# Stage 2 of intake — same agentic loop and DB guards as the chat assistant,
+# but with an intake-only system prompt and one extra tool, record_outcome,
+# which writes the structured proposal onto the InboundPurchaseOrder.
+#
+# The assistant reads the PO, resolves each line to a Part (creating one the
+# usual template-clone way when the PO gives enough to go on), then records
+# the outcome. A clean proposal — customer unambiguous, every line matched —
+# is booked on the spot via InboundPurchaseOrder#create_order!: customer
+# order, PO attached, works orders. The human check is Contract Review.
+# Anything it can't resolve parks in needs_review with the reason.
+class PoIntakeAssistantJob < AiAssistantJob
+  RECORD_OUTCOME_TOOL = {
+    name: "record_outcome",
+    description: <<~DESC,
+      Record your reading of this email on the InboundPurchaseOrder. Call this
+      exactly once, as your last tool call, then reply with a 2–4 line summary.
+      If outcome is "proposal" and every line has part_status "matched", HAMS
+      books it immediately: CustomerOrder, PO attached, one WorksOrder per line.
+      Otherwise it parks for a person. The tool result tells you which happened.
+    DESC
+    input_schema: {
+      type: "object",
+      properties: {
+        outcome: {
+          type: "string",
+          enum: %w[proposal already_on_file not_a_po needs_human],
+          description: "proposal = a PO you could read; already_on_file = a CustomerOrder with this number already has a PO attached; not_a_po = acknowledgement/query/spam/drawing-only; needs_human = something you couldn't resolve (customer ambiguous, unreadable, amendment to an existing order, etc)"
+        },
+        customer_id:          { type: "string", description: "Organization id (uuid), if uniquely matched" },
+        customer_name:        { type: "string" },
+        po_number:            { type: "string" },
+        order_date:           { type: "string", description: "ISO 8601 date if on the PO" },
+        po_attachment_index:  { type: "integer", description: "Which attachment index is the PO itself (not drawings/T&Cs)" },
+        existing_customer_order_id: { type: "string", description: "For already_on_file, or when an order exists without a PO attached" },
+        orders: {
+          type: "array",
+          description: "ONLY when the email carries MORE THAN ONE purchase order (two PDFs, two PO numbers). One entry per PO, each with its own po_number, po_attachment_index and lines; leave the top-level po_number/lines empty. A single-PO email uses the top-level fields as normal.",
+          items: {
+            type: "object",
+            required: %w[po_number lines],
+            properties: {
+              po_number:           { type: "string" },
+              order_date:          { type: "string" },
+              po_attachment_index: { type: "integer" },
+              existing_customer_order_id: { type: "string" },
+              lines: { type: "array", items: { type: "object" } }
+            }
+          }
+        },
+        lines: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              part_number:        { type: "string" },
+              part_issue:         { type: "string" },
+              description:        { type: "string" },
+              quantity:           { type: "number" },
+              unit_price:         { type: "number" },
+              customer_reference: { type: "string", description: "Line-level reference, e.g. Lufthansa CS-Order/SerialNo" },
+              part_id:            { type: "string", description: "Matching Part id (uuid) in HAMS, if found" },
+              part_status:        { type: "string", enum: %w[matched not_found ambiguous], description: "Result of Part.matching for this line" },
+              price_note:         { type: "string", description: "e.g. 'PO £4.50 vs HAMS each_price £4.20'" },
+              rework:             { type: "boolean", description: "The PO is for rework of parts we previously processed (header says REWORK, or asks to strip and re-process)" },
+              free_of_charge:     { type: "boolean", description: "Book at £0 — the PO prices it at zero AND it's rework/warranty/FOC. Never for an ordinary order with a missing price" },
+              operation_note:     { type: "string", description: "Shop-floor instruction from the PO for the route card: stripping details, masking/seal omissions, 'do not etch', spec called up on the line. Plain text, ≤ 1500 chars" },
+              drawing_attachment_indexes: { type: "array", items: { type: "integer" }, description: "Attachment indexes that are drawings for THIS part (not the PO). Attached to the part on booking, whether the part was created or already existed." }
+            }
+          }
+        },
+        notes: { type: "string", description: "Anything the reviewer should know: mismatches, delivery dates, special instructions, drawings supplied" }
+      },
+      required: ["outcome"]
+    }
+  }.freeze
 
-class PoIntakeJob < ApplicationJob
-  queue_as :default
+  def perform(request_id, inbound_id)
+    @inbound      = InboundPurchaseOrder.find(inbound_id)
+    request       = AiAssistantRequest.find(request_id)
+    @request_user = request.user
+    @request_id   = request_id
 
-  SYSTEM_USER_EMAIL = ENV.fetch("PO_INTAKE_USER_EMAIL", "orders@hardanodisingstl.com")
+    response_text = run_agentic_loop(request.messages)
+    request.mark_complete!(response_text)
 
-  def perform(inbound_id)
-    ipo = InboundPurchaseOrder.find(inbound_id)
-    return unless ipo.status == "received"
-
-    if ipo.auto_reply?
-      return ipo.update!(status: "ignored", summary: "Auto-reply / bounce / notification — not processed")
+    # Belt and braces: if the model never called record_outcome, don't leave
+    # the row stuck in "analysing".
+    if @inbound.reload.status == "analysing"
+      @inbound.update!(status: "needs_review",
+                       summary: "Assistant finished without recording an outcome. Reply was:\n#{response_text.to_s.first(2000)}")
     end
-
-    usable = ipo.usable_attachments.select { |a| a["secure_url"].present? }
-    if usable.empty?
-      return ipo.update!(status: "needs_review",
-                         summary: "No PDF or image attachment — PO may be in the email body, or this isn't a PO")
-    end
-
-    ipo.update!(status: "fetching")
-
-    files = usable.map { |att| file_ref(att) }
-    # Remember the file_ids on the row so a retry doesn't upload twice.
-    ids   = files.to_h { |f| [f["index"], f["file_id"]] }
-    ipo.update!(attachments: ipo.attachments.map { |a| ids[a["index"]] ? a.merge("file_id" => ids[a["index"]]) : a })
-
-    request = AiAssistantRequest.create!(
-      user:     system_user,
-      messages: [{ "role" => "user", "content" => build_content(ipo, files) }]
-    )
-
-    ipo.update!(ai_assistant_request: request, status: "analysing")
-    PoIntakeAssistantJob.perform_later(request.id, ipo.id)
   rescue => e
-    Rails.logger.error "[PoIntakeJob] #{inbound_id}: #{e.class} #{e.message}\n#{e.backtrace.first(5).join("\n")}"
-    InboundPurchaseOrder.find_by(id: inbound_id)&.update!(status: "error", error: "#{e.class}: #{e.message}")
+    Rails.logger.error "[PoIntakeAssistantJob] #{inbound_id}: #{e.class} #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+    AiAssistantRequest.find_by(id: request_id)&.mark_error!(e.message)
+    @inbound&.update!(status: "error", error: "#{e.class}: #{e.message}")
   end
 
   private
 
-  def system_user
-    User.find_by(email_address: SYSTEM_USER_EMAIL) or
-      raise "PO intake system user #{SYSTEM_USER_EMAIL} not found — create it (see README)"
+  def tools
+    TOOLS + [RECORD_OUTCOME_TOOL]
   end
 
-  # Parked attachment -> "hams_file" reference block (AssistantAttachments
-  # shape). A Mailgun retry re-runs this job, so reuse a file_id already on
-  # the attachment rather than uploading again.
-  def file_ref(att)
-    file_id = att["file_id"].presence ||
-              AnthropicFiles.upload_from_url(att["secure_url"], filename: att["name"], media_type: att["content_type"]) ||
-              raise("could not upload #{att['name']} to Anthropic Files")
-
-    { "type" => AssistantAttachments::TYPE, "file_id" => file_id,
-      "public_id" => att["public_id"], "secure_url" => att["secure_url"],
-      "content_type" => att["content_type"], "name" => att["name"], "bytes" => att["bytes"],
-      "index" => att["index"] }
+  def dispatch_tool(name, input)
+    name == "record_outcome" ? record_outcome(input) : super
   end
 
-  def build_content(ipo, files)
-    blocks = files.map { |f| f.except("index") }
+  def record_outcome(input)
+    input   = input.deep_stringify_keys
+    outcome = input["outcome"].to_s
 
-    attachment_lines = ipo.attachments.map do |a|
-      usable = InboundPurchaseOrder::USABLE_CONTENT_TYPES.include?(a["content_type"].to_s.downcase)
-      "  [#{a['index']}] #{a['name']} (#{a['content_type']}, #{a['size']} bytes)#{usable ? '' : ' — not supplied, unsupported type'}"
+    status, summary =
+      case outcome
+      when "proposal"        then ["needs_review",    "PO #{input['po_number']} from #{input['customer_name']} — #{Array(input['lines']).size} line(s)"]
+      when "already_on_file" then ["already_on_file", "PO #{input['po_number']} already attached to CustomerOrder #{input['existing_customer_order_id']}"]
+      when "not_a_po"        then ["ignored",         "Not a PO: #{input['notes'].to_s.first(300)}"]
+      else                        ["needs_review",    "Needs a human: #{input['notes'].to_s.first(300)}"]
+      end
+
+    @inbound.update!(
+      status:            status,
+      proposal:          input,
+      summary:           summary,
+      customer_order_id: input["existing_customer_order_id"].presence
+    )
+
+    orders = orders_in(input)
+    return { recorded: true, status: status, booked: false } unless input["outcome"] == "proposal" && input["customer_id"].present? && orders.any?
+
+    begin
+      booked, parked = [], []
+      orders.each do |o|
+        matched, unmatched = partition_lines(o)
+        next parked << "#{o['po_number']}: no bookable line" if matched.empty?
+        co = @inbound.book_order!(reviewed_by: @request_user, customer_id: input["customer_id"],
+                                  number: o["po_number"], order_date: o["order_date"],
+                                  attachment_index: o["po_attachment_index"],
+                                  existing_customer_order_id: o["existing_customer_order_id"], lines: matched)
+        booked << co
+        # Order, PO and the resolvable lines are in; the rest wait for a
+        # person to set the part up and book them onto the same order.
+        unmatched.each { |l| parked << "#{o['po_number']} #{l['part_number']}#{"/#{l['part_issue']}" if l['part_issue'].present?} × #{l['quantity']} (#{l['part_status']})" }
+      end
+      raise "nothing bookable" if booked.empty?
+
+      summary = "Booked as #{booked.map { |c| "#{c.display_name} — #{c.works_orders.active.map(&:display_name).join(', ')}" }.join('; ')}"
+      summary += " (#{booked.size} POs in one email)" if booked.size > 1
+      summary += "; still need a part: #{parked.join(', ')}" if parked.any?
+      @inbound.update!(customer_order: booked.first, status: parked.any? ? "needs_review" : "booked",
+                       reviewed_by: @request_user, reviewed_at: Time.current, summary: summary)
+      { recorded: true, status: @inbound.status, booked: true,
+        customer_orders: booked.map { |c| { id: c.id, number: c.number, works_orders: c.works_orders.active.map(&:display_name) } },
+        unbooked_lines: parked, summary: summary }
+    rescue => e
+      # Booking failed (part config, validation, duplicate...) — keep the
+      # proposal, park it with the reason. create_order! is transactional so
+      # nothing half-booked is left behind.
+      @inbound.update!(status: "needs_review", summary: "Auto-book failed: #{e.message.first(400)}")
+      { recorded: true, status: "needs_review", booked: false, error: e.message }
     end
+  rescue => e
+    { error: e.class.to_s, detail: e.message }
+  end
 
-    blocks << {
-      "type" => "text",
-      "text" => <<~TXT
-        EMAIL RECEIVED AT orders@ — inbound_purchase_order_id: #{ipo.id}
+  # One email, one or more POs. A single-PO proposal uses the top-level
+  # fields; a multi-PO one lists them under orders[]. Either way we book a
+  # list.
+  def orders_in(input)
+    list = Array(input["orders"]).select { |o| o.is_a?(Hash) && o["po_number"].present? }
+    list = [input.slice("po_number", "order_date", "po_attachment_index", "existing_customer_order_id", "lines")] if list.empty? && input["po_number"].present?
+    list
+  end
 
-        From:     #{ipo.from_header.presence || ipo.sender}
-        Subject:  #{ipo.subject}
-        Received: #{ipo.received_at&.strftime('%d %b %Y %H:%M')}
+  # Lines that can book now vs lines a person has to sort a part for.
+  def partition_lines(order)
+    Array(order["lines"]).partition { |l| l["part_status"] == "matched" && l["part_id"].present? && l["quantity"].to_i.positive? }
+  end
 
-        Attachments (indexes match the files above, in order):
-        #{attachment_lines.join("\n")}
+  # ── Prompt ─────────────────────────────────────────────────────────────
 
-        Body:
-        #{ipo.stripped_text.presence || ipo.body_plain.to_s.first(4000)}
-      TXT
-    }
-    blocks
+  def build_system_prompt
+    [
+      core_identity,
+      integrity_rules,
+      business_context,
+      customer_rules,
+      pricing_rules,
+      part_creation,
+      intake_instructions,
+      response_style,
+      schema_section
+    ].join("\n\n")
+  end
+
+  def intake_instructions
+    <<~PROMPT
+      PURCHASE ORDER INTAKE — UNATTENDED RUN:
+      You are processing an email that arrived at orders@ with no human present.
+      Read the purchase order, resolve every line to a Part, and call record_outcome.
+      If your proposal is clean, HAMS books it in on the spot and the works orders go
+      to Contract Review, where a person checks them. That board is the safety net —
+      your job is to get a sensible, well-read booking in front of it, not to be
+      timid. Park only what you cannot resolve.
+
+      WRITES: The only writes you may make with execute_query are creating Parts
+      (Step 5b below) and correcting a part issue as CREATING PARTS describes. Do
+      NOT create CustomerOrders or WorksOrders yourself and do not call
+      PurchaseOrderService — record_outcome does the booking.
+
+      STEP 1 — Is this actually a PO?
+      Acknowledgements of our order confirmations, "please quote", delivery queries,
+      progress chasers, drawings with no order on them, spam, and internal forwards
+      with no order on them are outcome "not_a_po".
+
+      A PO DOES NOT HAVE TO LOOK LIKE A PO. Some customers never send a purchase
+      order document: the work arrives with a routing card, traveller, job sheet,
+      subcontract label or goods-out note, and THAT is the order. If the paperwork
+      names us as the vendor/supplier (Hard Anodising Surface Treatments / HASTL)
+      and carries an order or job number, a part number and a quantity, it IS a
+      PO and you book it: the order number on the card is the po_number, the card
+      (or the photo of it) is the po_attachment_index, and a photo of several
+      identical cards for the same part is ONE line, not several — the contract
+      reviewer counts the parts. Instron work this way: their card reads
+      "Order No: 360311-*-*", "Vendor Name: HARD ANODISING SURFACE TREATMENTS
+      LTD", then Part No / Part Name / Quantity, with the plating spec in a Note
+      box. Use the order number without the "-*-*" suffix. A customer's own
+      goods-RECEIPT slips (their receiving of parts from a supplier, "Qty Rec",
+      "Shortage Qty") are not an order to us — ignore those and note them.
+      An internal forward from a @hardanodisingstl.com address with such
+      paperwork attached is a colleague asking you to book it, not noise.
+
+      AMENDMENTS: an amendment is a PO whose ORDER IS ALREADY IN HAMS with works
+      orders on it. Check by number — the number on the PO and its base without a
+      revision suffix ("PO664895-S-2" → "PO664895", "12345 Rev B" → "12345"):
+        CustomerOrder.where(customer_id: org.id).where("number ILIKE ?", "PO664895%")
+      Found with works orders and the PO differs (quantity, price, lines, "cancel")
+      → "needs_human" with what changed in notes. NOT found → it is simply a new
+      order, whatever the header says ("Updated", "Revised", "Amended", a -2
+      suffix); book it as normal and mention the wording in notes.
+
+      WHAT IS NOT A REASON TO PARK:
+      Special instructions, warnings, "DO NOT …" notes, polishing/etching
+      prohibitions, delivery dates, cert requirements, packaging notes, truncated or
+      partly legible text, "Updated"/"Revised" wording with no earlier order in
+      HAMS, a line with no spec on it, an internal forward with no original email
+      — these are all normal. Put what matters in notes for the contract reviewer
+      (who has the PO document in front of them) and BOOK IT. The only reasons to
+      use "needs_human" are: customer not uniquely identifiable, PO number
+      unreadable, quantity unreadable, or a genuine amendment/cancellation of an
+      order already in HAMS. A line you cannot match or create does NOT park the
+      order: the other lines book and that line is left "not_found" for a person
+      (see Step 5b).
+
+      STEP 2 — Identify the customer:
+        Organization.where("name ILIKE ?", "%fragment%").where(is_customer: true)
+      Also try the sender's email domain against the Organizations you find.
+      Not exactly one clean match → outcome "needs_human". Never guess a customer.
+
+      STEP 3 — PO number and date. Usually labelled "PO Number", "Purchase Order
+      No.", "Order No.". Order date in ISO format if present.
+      MORE THAN ONE PO IN THE EMAIL (two PDFs, two PO numbers — "please see
+      enclosed 2 new orders"): that is normal, not a reason to park. Put each
+      PO under orders[] with its own po_number, po_attachment_index and lines,
+      leave the top-level po_number and lines empty, and HAMS books each as its
+      own customer order.
+
+      STEP 4 — Existing order?
+        CustomerOrder.find_by(customer_id: ..., number: ...)
+      Exists with po_attached? and works orders → "already_on_file" with
+      existing_customer_order_id. Exists with no PO / no works orders → still
+      "proposal", with existing_customer_order_id set so it's attached to that
+      order rather than duplicated.
+
+      STEP 5 — Lines. For every line item extract part number, issue/revision,
+      description, quantity, unit price and any line-level reference (apply the
+      LUFTHANSA rules). For each line:
+        Part.matching(customer_id: org.id, part_number: "...", part_issue: "...").to_a
+      5a. Exactly one enabled part with treatments configured → part_id, "matched".
+          If a matched part has each_price and the PO states a different price, put
+          both in price_note (the PO price is used; the part's price is updated).
+          unit_price is the PO's per-part price, or nothing. Do NOT invent a
+          price, do NOT put a minimum order charge in as a price, and do NOT
+          adjust a line to reach £250 — HAMS applies the customer's minimum
+          charges after booking as separate top-up lines. A PO that shows a
+          "minimum charge" line of its own is just confirming that; note it
+          in notes, don't book it as a part.
+      5b. No part → CREATE one (CREATING PARTS above). Same part number under
+          this customer with a different issue → follow the DUPLICATE PART NUMBERS
+          rule rather than creating a second part. Where the treatment comes from,
+          in order:
+            i.  a spec on the line ("hard anodise 50µm to DEF STAN 03-26", "natural
+                anodise & seal to BS1615 AA10", "Alocrom 1200", "ENP 25µm") or a
+                drawing among the attachments — use it;
+            ii. otherwise the customer's CLOSEST EXISTING PART: same part-number
+                stem first (DX-59073-N-001 → other DX-59073-* parts), else a part
+                with the same description family, else the customer's most recent
+                part. Clone its treatments, and put
+                  "PROCESS ASSUMED FROM <that part's number> — CONFIRM AT CONTRACT REVIEW"
+                at the start of operation_note so it is on the route card in front
+                of the reviewer, and say the same in notes;
+            iii. only if the customer has NO parts at all and the PO gives no spec
+                and no drawing, leave it "not_found" with the reason in notes.
+          After creating, set part_id and "matched".
+      5c. More than one match → "ambiguous", with the candidates in notes.
+      A "proposal" books every "matched" line straight away: CustomerOrder, PO,
+      works orders. Lines left "not_found"/"ambiguous" park with the order for a
+      person to add — they do not hold up the rest.
+
+      REWORK ORDERS: rework means re-doing OUR OWN previous work — a PO headed
+      REWORK, or one that references our earlier works order / release and asks
+      us to strip and redo it. It books against the SAME part as the original
+      job — don't create a rework variant. Set rework: true. It does NOT mean a
+      repair-shop customer (Lufthansa, MRO work) whose standard workscope is
+      strip + re-process: that is the part's normal route, rework stays false
+      and no REWORK prefix is added. Put the customer's rework/job reference
+      in customer_reference (it gets a REWORK prefix automatically). If the PO
+      prices it at £0.00, set free_of_charge: true — it books as a £0 lot and
+      the part's normal price is left alone. Put the process instructions from
+      the PO (strip details, what to omit, what to do IAW which spec) in
+      operation_note — that lands on the route card for contract review.
+
+      OPERATION NOTES GENERALLY: any processing instruction on a PO line or in
+      the PO's comments ("omit hot water seal from painted surfaces", "do not
+      etch, chemical or electro polish", "mask thread") goes in that line's
+      operation_note as well as in notes — UNLESS the matched part's
+      specification field already says it (compare before writing). The note
+      is for what the route card would otherwise not carry, not a copy of the
+      PO. A part number on the PO that differs
+      from the drawing/part number only by a supplier suffix (e.g. "-F1") is
+      the same part.
+
+      STEP 6 — Which attachment is the PO? Set po_attachment_index. For each line,
+      set drawing_attachment_indexes to the attachments that are that part's
+      drawing(s) — match by the part/drawing number in the filename or title
+      block. They are attached to the part on booking, even if the part already
+      existed (many older parts have no drawing on file yet). T&Cs, certs and
+      anything else are noted in notes only.
+
+      STEP 7 — record_outcome, then a short summary in your final reply: customer,
+      PO number, what was booked (or why it parked), and anything the contract
+      reviewer should look at. No links needed.
+    PROMPT
   end
 end
