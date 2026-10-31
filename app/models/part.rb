@@ -1,4 +1,8 @@
 class Part < ApplicationRecord
+  # Set by PartsController#create when copying; library_text_deviations
+  # accepts the source part's text for an op as well as the library's.
+  attr_accessor :copied_from
+
   belongs_to :customer, class_name: 'Organization'
   belongs_to :replaces, class_name: 'Part', optional: true
 
@@ -1927,12 +1931,19 @@ end
     library = library_operations_by_id
     sealing_ids = OperationLibrary::Sealing.available_sealing_types.map { |t| t[:value] }
 
+    # Copies: context-dependent ops (jig, stripping...) can't match the
+    # context-free library lookup, so the source part's text is also accepted.
+    source_texts = Array(copied_from&.get_operations_with_auto_ops)
+                     .group_by { |o| o.id.to_s }
+                     .transform_values { |v| v.map { |o| squash(o.operation_text) } }
+
     ops.filter_map do |op|
       id   = op["id"].to_s
       text = op["operation_text"].to_s
       if op["process_type"].to_s == "sealing" && !sealing_ids.include?(id)
         "op #{op['position']} (#{id}): not a library sealing operation — use one of #{sealing_ids.join(', ')}"
-      elsif (lib = library[id]) && squash(lib.operation_text) != squash(text)
+      elsif (lib = library[id]) && squash(lib.operation_text) != squash(text) &&
+            !Array(source_texts[id]).include?(squash(text))
         "op #{op['position']} (#{id}): text differs from the library — use exactly Operation.all_operations.find { |o| o.id == \"#{id}\" }.operation_text"
       end
     end

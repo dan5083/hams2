@@ -28,7 +28,7 @@
   <% end %>
 
   <!-- Hidden field for manual mode switch -->
-  <%= hidden_field_tag :switch_to_manual, false, id: "switch_to_manual_field", data: { parts_form_target: "manualModeField" } %>
+  <%= hidden_field_tag :switch_to_manual, (!part.persisted? && part.locked_for_editing?) ? "true" : "false", id: "switch_to_manual_field", data: { parts_form_target: "manualModeField" } %>
 
   <!-- Part Details Section -->
   <div class="bg-white shadow rounded-lg p-6">
@@ -216,7 +216,7 @@
     </div>
   </div>
 
-  <% if part.locked_for_editing? %>
+  <% if part.locked_for_editing? && part.persisted? %>
     <!-- Locked Operations Editing Mode with Modal-Based Manual Management -->
     <div class="bg-white shadow rounded-lg p-6" data-controller="locked-operations">
       <div class="flex items-center justify-between mb-4">
@@ -470,6 +470,23 @@
           </div>
         </div>
       </div>
+    </div>
+
+  <% elsif part.locked_for_editing? %>
+    <%# Failed create of a copied part: the editor above needs a saved part
+        (all its routes are /parts/:id/...), so carry the copied ops through
+        the re-render as hidden fields and show them read-only. %>
+    <div class="bg-white shadow rounded-lg p-6">
+      <h3 class="text-lg font-medium text-gray-900 mb-2">Copied Operations</h3>
+      <p class="text-sm text-gray-600 mb-4">Fix the errors above and save. You can edit the operations once the part exists.</p>
+      <%= hidden_field_tag :source_part_id, params[:source_part_id], id: "source_part_id_field" %>
+      <ol class="list-decimal list-inside space-y-1 text-sm text-gray-800">
+        <% part.locked_operations.each do |op| %>
+          <li><%= op["display_name"] %></li>
+          <%= hidden_field_tag "locked_operations[#{op["position"]}]", op["operation_text"], id: nil %>
+          <%= hidden_field_tag "locked_operations_display_names[#{op["position"]}]", op["display_name"], id: nil %>
+        <% end %>
+      </ol>
     </div>
 
   <% else %>

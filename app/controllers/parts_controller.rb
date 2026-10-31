@@ -164,6 +164,7 @@ class PartsController < ApplicationController
       if params[:source_part_id].present?
         source_part = Part.find_by(id: params[:source_part_id])
         if source_part
+          @part.copied_from = source_part
           source_op_sel = source_part.customisation_data.dig("operation_selection") || {}
           @part.customisation_data["operation_selection"]["treatments"] = source_op_sel["treatments"] if source_op_sel["treatments"].present?
           @part.customisation_data["operation_selection"]["aerospace_defense"] = source_part.aerospace_defense?
