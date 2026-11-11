@@ -277,6 +277,10 @@ class PoIntakeAssistantJob < AiAssistantJob
       description, quantity, unit price and any line-level reference (apply the
       LUFTHANSA rules). For each line:
         Part.matching(customer_id: org.id, part_number: "...", part_issue: "...").to_a
+      LUFTHANSA LINES: the LUFTHANSA WORKSCOPE CHECK above decides the part and
+      replaces 5a's "exactly one", 5b's "closest existing part" and 5c for them —
+      a part number that exists is only a match if that part does the job the
+      line asks for; otherwise create the STRIP ONLY / ALT alternative.
       5a. Exactly one enabled part with treatments configured → part_id, "matched".
           If a matched part has each_price and the PO states a different price, put
           both in price_note (the PO price is used; the part's price is updated).
