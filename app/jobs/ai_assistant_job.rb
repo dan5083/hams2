@@ -7,7 +7,7 @@ class AiAssistantJob < ApplicationJob
   queue_as :default
 
   ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages".freeze
-  MODEL             = "claude-opus-4-6".freeze
+  MODEL             = "claude-opus-5-5".freeze
 
   BLOCKED_PATTERNS = [
     /destroy_all/, /delete_all/, /drop_table/, /truncate/i,
@@ -24,6 +24,7 @@ class AiAssistantJob < ApplicationJob
   # notes is 2n+ row writes by design, not a bulk edit.
   SERVICE_ENTRY_PATTERNS = [
     /\bPurchaseOrderService\./,
+    /\bInboundPurchaseOrder\.submit_from_assistant!/,
     /\bProofOfCollectionService\./,
     /\bQuoteService\./,
     /\bXero\w*Service\./,
@@ -143,6 +144,12 @@ class AiAssistantJob < ApplicationJob
         end
 
         loop_messages << { role: "user", content: tool_results }
+      elsif stop_reason == "max_tokens"
+        # A cut-off reply is not a finished one — fail loudly rather than hand
+        # back half an answer (or half a booking) as if it were complete.
+        raise "Reply cut off at max_tokens (#{max_tokens}) — raise max_tokens or lower effort"
+      elsif stop_reason == "refusal"
+        raise "The model declined this request (#{response.dig('stop_details', 'category') || 'no category given'})"
       else
         return text.presence || "No response generated."
       end
@@ -153,14 +160,21 @@ class AiAssistantJob < ApplicationJob
   # comfortably in 4k; jobs that return one large structured tool call (the
   # quote proposal) override both — a big non-streamed response needs longer
   # to arrive than a chat turn.
-  def max_tokens   = 4096
-  def read_timeout = 120
+  #
+  # Opus 5.5 thinks on every request and max_tokens covers thinking PLUS the
+  # reply, so the old 4k chat budget would cut answers short. Effort is the
+  # only control over how much it thinks; the API default is "medium", set
+  # explicitly here so each job chooses (PoIntakeAssistantJob uses "high").
+  def max_tokens   = 16_000
+  def read_timeout = 300
+  def effort       = "medium"
 
   def call_anthropic(messages)
     uri  = URI(ANTHROPIC_API_URL)
     body = {
       model:         MODEL,
       max_tokens:    max_tokens,
+      output_config: { effort: effort },
       cache_control: { type: "ephemeral" },
       system:        build_system_prompt,
       tools:         tools,
@@ -306,29 +320,111 @@ class AiAssistantJob < ApplicationJob
       LUFTHANSA TECHNIK (Landing Gear Services):
       Each line shows a "Part-No." in the table (e.g. 2144A5273-4) AND, in the
       notes below, "VENDOR TO RELEASE PART ... AND REFERENCE P/N: 2144A5273-103".
-      The P/N is the part HAMS knows it by — book against the P/N, not the
-      Part-No. column. An indented sub-line under the item (e.g. "2144A5587-104
+      The P/N is the part HAMS normally knows it by — book against the P/N, not
+      the Part-No. column. An indented sub-line under the item (e.g. "2144A5587-104
       BRACKET ... 1 EA") is the same P/N restated, not a second line.
       One works order per numbered ITEM; check the item numbers run 1, 2, 3...
       across every page and that you have booked each one — page 1 carries
       item 1 below the address blocks and is easy to skip.
-      If the P/N exists in HAMS under more than one issue, take the one with a
-      price and works-order history (the one actually used); do not park the
-      line as ambiguous — say which you chose in notes.
-      The "CS-Order: XXXXX  SerialNo.: XXXXX" text goes into customer_reference.
-      Every Lufthansa job is a repair: strip then re-anodise, IAW the CMM cited
-      on the line. That is the part's normal route, NOT rework — never set
-      rework: true or a REWORK prefix for Lufthansa.
-      NO operation_note for Lufthansa: the CMM workscope on the PO line is
-      already the part's specification field (that is how their parts are
-      set up), so repeating it on the route card is noise. Only add an
-      operation_note if the PO says something the part's specification does
-      NOT — a different CMM revision, an added instruction — and then only
-      that difference.
+      The "CS-Order: XXXXX  SerialNo.: XXXXX" text goes into customer_reference,
+      written exactly that way ("CS-Order: 52285865 SerialNo.: SNAB6504377") —
+      the certificate of conformity reads the two values out of that wording,
+      and any other form prints a certificate with neither on it.
+      Lufthansa work is repair work IAW the CMM cited on the line. That is the
+      part's normal route, NOT rework — never set rework: true or a REWORK
+      prefix for Lufthansa.
       The unit cost on the line (typically GBP 250.00 each) is the price.
       Lufthansa POs are created as a single customer order regardless of process mix —
       do not split hard anodising lines onto a separate order. (Historic orders may
       still exist with a leading "_" in the number; that convention is retired.)
+
+      LUFTHANSA WORKSCOPE CHECK — EVERY LINE, BEFORE YOU CHOOSE A PART:
+      Lufthansa send the SAME part number for DIFFERENT jobs: strip and
+      re-anodise one week, strip only the next, chromic on one order and hard
+      anodise on another. A part in HAMS is one job. Finding the part number is
+      therefore NOT enough — the part's process must be the job this line asks
+      for. Booking a strip-only line onto the strip-and-anodise part puts the
+      wrong route card on the shop floor. For Lufthansa this check REPLACES the
+      usual "one match = matched", the "more than one match = ambiguous" rule
+      and the DUPLICATE PART NUMBERS rule.
+
+      1. Read the line's workscope. The header says most of it:
+           "OUTSIDE PROCESS (STRIP ANODISE)" + text that only strips
+             ("FULLY STRIP CHROMIC ACID ANODIZE FROM COMPONENT IN ACCORDANCE
+             WITH BAC5771", "COMPLETELY STRIP ANODIC COATINGS FROM THE ENTIRE
+             PART PER MIL-STD-871") and applies nothing afterwards = STRIP ONLY.
+           "OUTSIDE PROCESS (ANODISE)" / text that applies a coating = that
+             coating: chromic, hard, chemical treat, and the spec, type and
+             class it calls up (BAC5019 CLASS 3, MIL-A-8625 TYPE III CLASS 1...).
+
+      2. Fetch EVERY part Lufthansa has under the number — all issues, and under
+         both the P/N and the Part-No. column, because older hand-made parts sit
+         under the Part-No., some with ".STRIP" or ". STRIP" on the end:
+           numbers = ["2144A6503-102", "2144A6503-3"]   # reference P/N, Part-No.
+           Part.where(customer_id: org.id)
+               .where(numbers.map { "UPPER(part_number) LIKE ?" }.join(" OR "), *numbers.map { |n| n.upcase + "%" })
+               .map { |p|
+                 t = JSON.parse(p.customisation_data.dig("operation_selection","treatments") || "[]") rescue []
+                 { id: p.id, part_number: p.part_number, part_issue: p.part_issue, enabled: p.enabled,
+                   each_price: p.each_price, works_orders: p.works_orders.count,
+                   treatment_types: t.map { |x| x["type"] }, specification: p.specification } }
+         Ignore longer numbers the LIKE drags in (2144A6503-31 is another part).
+
+      3. Work out what each of those parts DOES — from its treatments first,
+         then its issue and number, then its specification (many strip-only
+         parts have a blank specification, so do not rely on the text):
+           STRIP ONLY part = treatment_types are all "stripping_only", OR the
+             issue is "STRIP ONLY" (any case), OR the number ends in STRIP.
+           Otherwise it is whatever its treatments and specification say:
+             chromic, hard, chemical conversion, with that spec/type/class.
+
+      4. Choose:
+         a. A part whose process IS the line's workscope → book against it,
+            "matched". If two qualify, take the enabled one with a price and
+            works-order history and say which in notes.
+         b. Parts exist under the number but NONE does this job → create the
+            alternative (step 5). Do NOT book against the nearest one, do NOT
+            change an existing part's issue, do NOT park the line as ambiguous.
+         c. Nothing under either number → create it (step 5).
+         The SAME workscope means the same kind of process and the same spec,
+         type and class. These are NOT a different workscope, and never a
+         reason to create an alternative: a different CMM revision or date, a
+         different serial or CS-Order, spelling or wording ("ANODISE" /
+         "ANODIZE", "IAW" / "IN ACCORDANCE WITH"), the "release part with
+         status/work block" sentence. An instruction ADDED to an otherwise
+         identical workscope ("carry out sealing IAW ... in lieu of ...") is
+         the same part plus an operation_note saying only that difference.
+
+      5. Creating a Lufthansa alternative — the CREATING PARTS steps, with
+         these fixed points:
+         - part_number: the SAME part_number as the existing part(s) it sits
+           beside (without any ".STRIP" suffix). Nothing existing → the
+           reference P/N. Never put STRIP, ALT or anything else in the number:
+           the certificate prints the part number and hides the issue.
+         - part_issue: "STRIP ONLY" for a strip-only job. For any other job
+           that differs from the existing parts: "ALT" (then "ALT2" if ALT is
+           taken by a third job). A brand-new number with an ordinary
+           anodise job is issue "A" as usual.
+         - template: ANOTHER LUFTHANSA PART THAT DOES THIS SAME JOB — for strip
+           only, a Lufthansa strip-only part with works-order history, most
+           recent first. Clone it whole. Do not build a strip-only route by
+           editing an anodise template.
+         - specification: this line's workscope text and the CMM number
+           without its revision, e.g. "FULLY STRIP CHROMIC ACID ANODIZE FROM
+           COMPONENT IN ACCORDANCE WITH BAC5771\\nCMM 32-34-20". Never the
+           template's specification — it names the template's own P/N.
+         - each_price: the line's unit cost. description: from the line.
+         - If Lufthansa have no part anywhere doing this job to clone from,
+           leave the line "not_found" and say exactly that in notes.
+         Say in notes what you created and why: "257T4307-4: existing issue A
+         is hard anodise; PO is strip only — created issue STRIP ONLY from
+         <template number>".
+
+      NO operation_note for Lufthansa once the part matches the workscope: the
+      CMM workscope on the PO line is already the part's specification, so
+      repeating it on the route card is noise. Only add one for something the
+      part's specification does NOT say — an added instruction — and then only
+      that difference.
     PROMPT
   end
 
@@ -624,6 +720,9 @@ class AiAssistantJob < ApplicationJob
       under the same customer but with a different issue (e.g. issue 'A' when the
       drawing states 'Ae'), it was most likely created earlier in error. Update the
       existing part's issue to match the drawing rather than creating a new record.
+      EXCEPTION — Lufthansa: their part numbers legitimately carry several issues
+      (A, STRIP ONLY, ALT...), one per job. Follow the LUFTHANSA WORKSCOPE CHECK
+      and never rename an existing Lufthansa part's issue.
 
       STEP 1 (read) — Find the best template part across ALL customers:
       Search the entire parts database for locked parts whose treatment array matches
@@ -752,62 +851,61 @@ class AiAssistantJob < ApplicationJob
 
   def order_creation
     <<~PROMPT
-      CREATING CUSTOMER ORDERS FROM A PURCHASE ORDER:
-      When the user attaches one or more files (PDF and/or images) — a customer's PO,
-      or photographs of a hard-copy PO — this means they want a CustomerOrder created
-      from it. Read the attachment(s) directly; you have vision, so read images the
-      same way you'd read a drawing.
+      PURCHASE ORDERS — HAND THEM TO PO INTAKE, DO NOT BOOK THEM YOURSELF:
+      When the user attaches a customer's purchase order — a PDF, photographs of
+      a hard copy, or a routing card / job sheet that is the customer's order to
+      us — and wants it booked in, you do NOT create the CustomerOrder or the
+      WorksOrders. PO intake does: the same process that books every PO emailed
+      to orders@. It reads the PO, matches or creates the parts, creates the
+      customer order, attaches the PO document, books one works order per line
+      and puts them on Contract Review. Sending it there is how a PO gets booked
+      properly; anything you built by hand would skip those checks.
 
-      SCOPE — READ CAREFULLY:
-      Today this only covers creating the CustomerOrder and attaching the PO document.
-      It does NOT create WorksOrders, regardless of what the accompanying message says
-      ("book this in", "process these lines", etc). If asked to book the line items in,
-      create the CustomerOrder and attach the PO as below, then tell the user works
-      order creation from a PO isn't wired up yet and they'll need to add works orders
-      manually (or ask Daniel).
+      STEP 1 — Is it a purchase order? Look at the attachment only long enough to
+      tell. A signed Proof of Collection is INVOICING (below); a drawing with a
+      request for a price is a QUOTE (below); neither goes to intake. Do NOT look
+      up the customer's parts or prices — intake does that with its own rules.
 
-      STEP 1 — Identify the customer:
-      Find the customer on the PO (letterhead, "Buyer", "Bill To", etc) and look them
-      up:
-        Organization.where("name ILIKE ?", "%name fragment%")
-      If there's no clean single match, ask the user rather than guessing — do not
-      create the order against the wrong customer.
+      STEP 2 — One check, on the PO number:
+        CustomerOrder.where("number ILIKE ?", "%<po number>%").map { |co|
+          { id: co.id, number: co.number, customer: co.customer&.name,
+            po_attached: co.po_attached?, works_orders: co.works_orders.active.count } }
+      - No order with that number → STEP 3.
+      - An order exists with works orders but NO PO attached (it was booked by
+        hand and only the document is missing), or the user says "attach this to
+        order X" → attach only, do not send to intake (intake would book the
+        lines a second time):
+          PurchaseOrderService.attach_from_request(customer_order_id: co.id, request_id: @request_id)
+        Photographed pages are cleaned up and combined into one PDF automatically.
+      - An order exists and already has its PO attached → tell the user it is
+        already on file, with the link. If their copy differs (extra lines, new
+        quantities) say so and tell them it needs a person — never overwrite.
 
-      STEP 2 — Extract the PO number and date:
-      The PO number is usually labelled "PO Number", "Purchase Order No.", "Order No."
-      or similar — this becomes CustomerOrder#number. Take the order date if it's on
-      the document; if illegible or absent, leave date_received unset and it defaults
-      to today.
+      STEP 3 — Hand it over. One call, no arguments to work out:
+        InboundPurchaseOrder.submit_from_assistant!(request_id: @request_id)
+      It takes the files on the user's most recent message that has attachments,
+      together with what they typed — so anything they told you ("this is for
+      Lufthansa", "price agreed at £40") reaches intake as written. It returns
+        { submitted: true, inbound_purchase_order_id: "...", attachments: 2 }
+      or { already_submitted: true, status: ..., summary: ..., customer_order_id: ... }
+      if those same files were handed over earlier — report that state instead
+      of submitting again.
 
-      STEP 3 — Check for an existing order first:
-        existing = CustomerOrder.find_by(customer_id: customer.id, number: po_number)
-      If found and it already has a PO attached (existing.po_attached?), tell the user
-      it's already on file — don't recreate or silently overwrite. If found with no PO
-      attached, attach to it (skip to Step 5) rather than creating a duplicate —
-      CustomerOrder#number is unique per customer, so create! will fail on a dupe
-      anyway.
+      STEP 4 — Reply. Say the PO has gone to PO intake, that it is normally
+      booked within a couple of minutes, and that the works orders will appear
+      on Contract Review. Do NOT say it is booked, do NOT give an order link and
+      do NOT list works orders — none exist yet. Tell them they can ask you
+      "did that PO book?" in a minute.
 
-      STEP 4 — Create the order:
-        co = CustomerOrder.create!(
-          customer_id: customer.id,
-          number: "...",
-          date_received: parsed_date # omit the key entirely if not found on the PO
-        )
-
-      STEP 5 — Attach the PO document:
-        PurchaseOrderService.attach_from_request(
-          customer_order_id: co.id,
-          request_id: @request_id
-        )
-      @request_id is available in the eval context. Photographed pages are cleaned
-      up and combined into one PDF automatically; just pass all of it through in
-      one call.
-
-      STEP 6 — Reply:
-      Confirm the order was created with a link ([CustomerOrder N](/customer_orders/N)),
-      and summarise what's on the PO (line items — part descriptions/numbers, quantities,
-      any prices given) so the user can sanity-check it against what was actually read.
-      Mention that works orders still need to be added manually.
+      CHECKING ON ONE ("did it book?", "where's that PO?"):
+        InboundPurchaseOrder.find("<inbound_purchase_order_id>").slice(:status, :summary, :customer_order_id)
+      or, without the id, the latest handed in through the assistant:
+        InboundPurchaseOrder.where("mailgun_message_id LIKE 'assistant:%'").order(created_at: :desc).limit(5)
+                            .map { |i| i.slice(:id, :sender, :status, :summary, :customer_order_id, :created_at) }
+      booked → link the order ([CustomerOrder N](/customer_orders/N)) and give the
+      summary. needs_review → give the summary: it says what could not be booked
+      and why, and those lines wait for a person. received / fetching / analysing
+      → still being read. error → say so and give the error.
     PROMPT
   end
 

@@ -1,6 +1,8 @@
 # app/services/purchase_order_service.rb
 require "tempfile"
 require "base64"
+require "net/http"
+require "uri"
 
 class PurchaseOrderService
   class PurchaseOrderError < StandardError; end
@@ -54,29 +56,19 @@ class PurchaseOrderService
     customer_order = CustomerOrder.find(customer_order_id)
     request = AiAssistantRequest.find(request_id)
 
-    pdf_blocks   = []
-    image_blocks = []
+    # Requests hold "hams_file" reference blocks, never the bytes (see
+    # AssistantAttachments) — fetch the Cloudinary copy of whatever was
+    # attached to the most recent message that has attachments.
+    refs         = AssistantAttachments.latest_refs(request.messages)
+    pdf_refs     = refs.select { |r| r["content_type"].to_s.downcase == "application/pdf" }
+    image_refs   = refs.select { |r| r["content_type"].to_s.downcase.start_with?("image/") }
 
-    request.messages.each do |msg|
-      content = msg["content"]
-      next unless content.is_a?(Array)
-
-      content.each do |block|
-        source = block["source"]
-        next unless source&.dig("type") == "base64" && source["data"].present?
-
-        media_type = source["media_type"].to_s
-        if media_type == "application/pdf"
-          pdf_blocks << source["data"]
-        elsif media_type.start_with?("image/")
-          image_blocks << source["data"]
-        end
-      end
-    end
-
-    if pdf_blocks.empty? && image_blocks.empty?
+    if pdf_refs.empty? && image_refs.empty?
       raise PurchaseOrderError, "No PDF or image attachments found in the request messages."
     end
+
+    pdf_blocks   = pdf_refs.first(1).map { |r| fetch_base64(r["secure_url"]) }
+    image_blocks = pdf_blocks.any? ? [] : image_refs.map { |r| fetch_base64(r["secure_url"]) }
 
     result =
       if pdf_blocks.any?
@@ -374,6 +366,13 @@ class PurchaseOrderService
   end
 
   # ---------------------------------------------------------------------------
+
+  def self.fetch_base64(url)
+    response = Net::HTTP.get_response(URI.parse(url.to_s))
+    raise PurchaseOrderError, "Could not fetch the attachment from storage (HTTP #{response.code})" unless response.is_a?(Net::HTTPSuccess)
+    Base64.strict_encode64(response.body)
+  end
+  private_class_method :fetch_base64
 
   def self.upload_pdf(base64_data, customer_order)
     with_tempfile("po", ".pdf", base64_data) do |tempfile|

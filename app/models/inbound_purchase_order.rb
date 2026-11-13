@@ -1,6 +1,10 @@
 # app/models/inbound_purchase_order.rb
-#
-# One row per email that arrived at orders@ (via a Mailgun forward() route).
+require "digest"
+
+# One row per email that arrived at orders@ (via a Mailgun forward() route),
+# or per PO handed over by the in-app assistant (.submit_from_assistant!) —
+# those carry mailgun_message_id "assistant:<hash of the files>" and otherwise
+# go down exactly the same path.
 # The controller records it and parks the attachments in Cloudinary,
 # PoIntakeJob asks the assistant to read the PO, and the outcome lands in
 # `proposal` / `status`. A clean proposal is booked on the spot by
@@ -18,6 +22,80 @@ class InboundPurchaseOrder < ApplicationRecord
   scope :recent, -> { order(received_at: :desc) }
 
   USABLE_CONTENT_TYPES = %w[application/pdf image/jpeg image/png image/webp image/gif].freeze
+
+  ASSISTANT_PREFIX = "assistant:".freeze
+
+  def from_assistant? = mailgun_message_id.to_s.start_with?(ASSISTANT_PREFIX)
+
+  # ---------------------------------------------------------------------------
+  # A PO given to the in-app assistant joins the same queue as an email to
+  # orders@. Takes the files on the most recent user message that has any
+  # (plus what the user typed, as the "body"), copies them into this row's
+  # Cloudinary folder — #book_order! renames the PO asset onto the order, so
+  # it must not be the chat's own copy — and queues PoIntakeJob.
+  #
+  #   InboundPurchaseOrder.submit_from_assistant!(request_id: @request_id)
+  #
+  # Idempotent per set of files: the widget re-posts the conversation every
+  # turn, so a second call with the same attachments returns the existing
+  # row's state instead of booking the PO twice.
+  # ---------------------------------------------------------------------------
+  def self.submit_from_assistant!(request_id:)
+    request = AiAssistantRequest.find(request_id)
+    user    = request.user
+    message = AssistantAttachments.latest_message_with_refs(request.messages)
+    refs    = AssistantAttachments.refs([message].compact).select do |r|
+      USABLE_CONTENT_TYPES.include?(r["content_type"].to_s.downcase) && r["secure_url"].present?
+    end
+    raise "No PDF or image attached in this conversation — nothing to send to PO intake" if refs.empty?
+
+    key = ASSISTANT_PREFIX + Digest::SHA256.hexdigest(refs.map { |r| r["public_id"].to_s }.sort.join("|"))[0, 40]
+    if (existing = find_by(mailgun_message_id: key))
+      return { submitted: false, already_submitted: true, inbound_purchase_order_id: existing.id,
+               status: existing.status, summary: existing.summary, customer_order_id: existing.customer_order_id }
+    end
+
+    typed = Array(message["content"]).select { |b| b["type"] == "text" }.map { |b| b["text"].to_s }.join("\n").strip
+    name  = user.try(:name).presence || user.email_address
+
+    ipo = create!(
+      mailgun_message_id: key,
+      sender:        user.email_address,
+      from_header:   "#{name} <#{user.email_address}>",
+      recipient:     "HAMS assistant",
+      subject:       "PO submitted through the HAMS assistant by #{name}",
+      body_plain:    typed,
+      stripped_text: typed,
+      received_at:   Time.current,
+      headers:       { "X-Hams-Source" => "assistant", "X-Hams-Request-Id" => request.id.to_s, "X-Hams-User-Id" => user.id.to_s },
+      status:        "receiving"
+    )
+
+    begin
+      parked = refs.each_with_index.map do |ref, i|
+        copy = Cloudinary::Uploader.upload(
+          ref["secure_url"],
+          public_id:       "inbound_purchase_orders/#{ipo.id}/#{i}_#{File.basename(ref['name'].to_s, '.*').parameterize.presence || 'attachment'}",
+          resource_type:   "image", # as Inbound::PurchaseOrdersController parks them
+          overwrite:       true,
+          unique_filename: false
+        )
+        { "index" => i, "name" => ref["name"].to_s, "content_type" => ref["content_type"].to_s.downcase,
+          "size" => ref["bytes"].to_i, "public_id" => copy["public_id"], "secure_url" => copy["secure_url"],
+          "bytes" => copy["bytes"], "file_id" => ref["file_id"] } # file_id: PoIntakeJob reuses it, no second Files upload
+      end
+      ipo.update!(attachments: parked, status: "received")
+    rescue => e
+      ipo.destroy # leave nothing behind holding the key, so the user can simply try again
+      raise "Could not hand the PO to intake: #{e.message}"
+    end
+
+    # A short delay: this is called from inside the assistant's write
+    # transaction, and the job must not start before that commits.
+    PoIntakeJob.set(wait: 5.seconds).perform_later(ipo.id)
+
+    { submitted: true, inbound_purchase_order_id: ipo.id, attachments: parked.size, status: ipo.status }
+  end
 
   def usable_attachments
     attachments.reject { |a| a["inline"] }.select { |a| USABLE_CONTENT_TYPES.include?(a["content_type"].to_s.downcase) }

@@ -69,6 +69,14 @@ class PoIntakeJob < ApplicationJob
       "index" => att["index"] }
   end
 
+  # Same instructions either way; this only tells the model how it arrived.
+  def intro(ipo)
+    return "EMAIL RECEIVED AT orders@" unless ipo.from_assistant?
+
+    "PO HANDED IN THROUGH THE HAMS ASSISTANT by a colleague (named below) who wants it booked. " \
+      "Treat it exactly as an email to orders@; the Body is what they typed with it"
+  end
+
   def build_content(ipo, files)
     blocks = files.map { |f| f.except("index") }
 
@@ -80,7 +88,7 @@ class PoIntakeJob < ApplicationJob
     blocks << {
       "type" => "text",
       "text" => <<~TXT
-        EMAIL RECEIVED AT orders@ — inbound_purchase_order_id: #{ipo.id}
+        #{intro(ipo)} — inbound_purchase_order_id: #{ipo.id}
 
         From:     #{ipo.from_header.presence || ipo.sender}
         Subject:  #{ipo.subject}

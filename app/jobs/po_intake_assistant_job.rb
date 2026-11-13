@@ -99,6 +99,9 @@ class PoIntakeAssistantJob < AiAssistantJob
 
   private
 
+  # Unattended booking: worth the extra thinking.
+  def effort = "high"
+
   def tools
     TOOLS + [RECORD_OUTCOME_TOOL]
   end

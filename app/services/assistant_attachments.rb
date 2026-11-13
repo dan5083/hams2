@@ -44,6 +44,19 @@ module AssistantAttachments
     end
   end
 
+  # The message a "book this in" / "attach this" refers to: the most recent
+  # user message that carries attachments. The widget re-posts the whole
+  # conversation every turn, so refs(messages) alone would also pick up a
+  # drawing or an earlier PO from further up the chat.
+  def self.latest_message_with_refs(messages)
+    Array(messages).reverse.find { |m| m["role"] == "user" && refs([m]).any? }
+  end
+
+  def self.latest_refs(messages)
+    msg = latest_message_with_refs(messages)
+    msg ? refs([msg]) : []
+  end
+
   def self.pdfs(messages)   = refs(messages).select { |r| r["content_type"] == "application/pdf" }
   def self.images(messages) = refs(messages).select { |r| r["content_type"].to_s.start_with?("image/") }
 
