@@ -365,6 +365,10 @@ window.additionalChargesData = {
   <% end %>
 };
 
+// Saved custom amounts, so the variable-charge boxes open showing what is
+// stored instead of blank (a blank box saved back used to wipe the amount).
+window.savedCustomAmounts = <%= raw json_escape((works_order.custom_amounts || {}).to_h.to_json) %>;
+
 // Store all parts as an array for filtering
 window.allParts = Object.values(window.partsData);
 
@@ -564,7 +568,13 @@ function handleAdditionalChargeSelection() {
   const variableSection = document.getElementById('variable_charges_section');
   const variableInputs = document.getElementById('variable_charge_inputs');
 
+  // The boxes are rebuilt on every tick; carry over whatever is typed (or,
+  // on first render, what is saved) so ticking another charge loses nothing.
+  const keep = Object.assign({}, window.savedCustomAmounts || {});
   if (variableInputs) {
+    variableInputs.querySelectorAll('input[id^="custom_amount_"]').forEach(input => {
+      keep[input.id.replace('custom_amount_', '')] = input.value;
+    });
     variableInputs.innerHTML = '';
   }
 
@@ -601,6 +611,10 @@ function handleAdditionalChargeSelection() {
       `;
       if (variableInputs) {
         variableInputs.appendChild(inputDiv);
+        const input = document.getElementById(`custom_amount_${chargeId}`);
+        if (input && keep[chargeId] !== undefined && keep[chargeId] !== null) {
+          input.value = keep[chargeId];
+        }
       }
     }
   });

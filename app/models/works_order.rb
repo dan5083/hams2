@@ -43,6 +43,7 @@ class WorksOrder < ApplicationRecord
   before_validation :set_part_details, if: :part_changed?
   before_validation :set_works_order_number, if: :new_record?
   before_validation :set_part_details_from_relationship, if: :should_sync_part_details?
+  before_validation :normalise_additional_charges, if: :will_save_change_to_additional_charge_data?
   after_initialize :set_defaults, if: :new_record?
   after_update :update_open_status
   after_create :update_part_pricing, if: :should_update_part_pricing_on_create?
@@ -2241,6 +2242,26 @@ class WorksOrder < ApplicationRecord
 
   def part_changed?
     part_id_changed?
+  end
+
+  # One shape for additional_charge_data whatever wrote it (edit form, bulk
+  # JSON, MinimumCharges, console): selected_charge_ids a de-duplicated list
+  # of id strings with the form's "" placeholder removed; custom_amounts only
+  # for selected ids, numeric, 2dp. A blank amount is DROPPED rather than
+  # stored as "" - "".to_f is 0, so a blank box used to bill the charge at
+  # £0 on the invoice instead of falling back to the preset amount as the
+  # form says it will.
+  def normalise_additional_charges
+    ids = Array(selected_charge_ids).map(&:to_s).reject(&:blank?).uniq
+    raw = custom_amounts.respond_to?(:to_h) ? custom_amounts.to_h : {}
+    amounts = raw.each_with_object({}) do |(id, value), out|
+      id = id.to_s
+      next unless ids.include?(id)
+      number = Float(value.to_s.strip, exception: false)
+      out[id] = number.round(2) if number && number >= 0
+    end
+    self.selected_charge_ids = ids
+    self.custom_amounts = amounts
   end
 
   # after_update: is_open tracks fully_released? in BOTH directions. Closing on

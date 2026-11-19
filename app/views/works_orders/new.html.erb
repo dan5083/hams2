@@ -902,7 +902,13 @@ function handleModalAdditionalChargeSelection() {
   const variableSection = document.getElementById('modal_variable_charges_section');
   const variableInputs = document.getElementById('modal_variable_charge_inputs');
 
+  // Rebuilt on every tick: carry typed amounts over so ticking a second
+  // charge doesn't blank the first one's amount.
+  const keep = {};
   if (variableInputs) {
+    variableInputs.querySelectorAll('input[id^="modal_custom_amount_"]').forEach(input => {
+      keep[input.id.replace('modal_custom_amount_', '')] = input.value;
+    });
     variableInputs.innerHTML = '';
   }
 
@@ -936,6 +942,8 @@ function handleModalAdditionalChargeSelection() {
       `;
       if (variableInputs) {
         variableInputs.appendChild(inputDiv);
+        const input = document.getElementById(`modal_custom_amount_${chargeId}`);
+        if (input && keep[chargeId]) input.value = keep[chargeId];
       }
     }
   });

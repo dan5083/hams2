@@ -549,6 +549,12 @@ class WorksOrdersController < ApplicationController
 
     ActiveRecord::Base.transaction do
       works_orders_params.each do |wo_params|
+        # Additional charges ride each line from new.html.erb. They were never
+        # copied across, so a charge ticked at booking silently vanished.
+        # Permitted (not to_unsafe_h) so only an id list and a flat
+        # id => amount hash can land in additional_charge_data.
+        charges = wo_params.permit(selected_charge_ids: [], custom_amounts: {})
+
         wo = WorksOrder.new(
           customer_order_id: wo_params[:customer_order_id],
           part_id: wo_params[:part_id],
@@ -556,7 +562,9 @@ class WorksOrdersController < ApplicationController
           price_type: wo_params[:price_type],
           each_price: wo_params[:each_price],
           lot_price: wo_params[:lot_price],
-          customer_reference: wo_params[:customer_reference]
+          customer_reference: wo_params[:customer_reference],
+          selected_charge_ids: Array(charges[:selected_charge_ids]),
+          custom_amounts: charges[:custom_amounts]&.to_h || {}
         )
 
         if validate_part_configuration(wo) && wo.save
