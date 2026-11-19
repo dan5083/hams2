@@ -20,12 +20,31 @@ Works Order:      WO<%= wo.number %>
 Part Number:      <%= wo.part_number %>-<%= wo.part_issue %>
 Description:      <%= wo.part_description %>
 Quantity:         <%= wo.quantity %>
-Price:            £<%= number_with_precision(wo.lot_price, precision: 2, delimiter: ',') %>
+Price:            £<%= number_with_precision(wo.lot_price, precision: 2, delimiter: ',') %><% if wo.price_type == 'each' && wo.each_price.present? %> (£<%= number_with_precision(wo.each_price, precision: 2, delimiter: ',') %> each)<% else %> (lot price)<% end %>
+
+<% end %>
+<% if @one_off_charges.any? || @carriage_charges.any? %>
+ADDITIONAL CHARGES
+--------------------------------------------------------------------------------
+<% @one_off_charges.each do |line| %>
+WO<%= line[:works_order].number %>  <%= line[:label] %>: £<%= number_with_precision(line[:amount], precision: 2, delimiter: ',') %>
+<% end %>
+<% @carriage_charges.each do |line| %>
+WO<%= line[:works_order].number %>  <%= line[:label] %>: £<%= number_with_precision(line[:amount], precision: 2, delimiter: ',') %> per delivery
+<% end %>
 
 <% end %>
 --------------------------------------------------------------------------------
 Total Quantity:   <%= @total_quantity %> items
-Total Value:      £<%= number_with_precision(@total_value, precision: 2, delimiter: ',') %>
+<% if @one_off_charges.any? %>
+Parts:            £<%= number_with_precision(@parts_total, precision: 2, delimiter: ',') %>
+Additional:       £<%= number_with_precision(@charges_total, precision: 2, delimiter: ',') %>
+<% end %>
+Total Value:      £<%= number_with_precision(@total_value, precision: 2, delimiter: ',') %> (ex VAT)
+<% if @carriage_charges.any? %>
+Plus carriage, charged per delivery as shown above.
+<% end %>
+VAT will be added at the prevailing rate.
 ================================================================================
 
 PLEASE SEND ALL FUTURE ORDERS TO orders@hardanodisingstl.com

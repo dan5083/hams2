@@ -2137,6 +2137,37 @@ class WorksOrder < ApplicationRecord
     custom_amounts&.dig(charge_id.to_s)
   end
 
+  # The additional charges on this WO as the customer will be billed them.
+  # Amount and label follow InvoiceItem.create_from_additional_charge exactly
+  # (variable -> custom amount, else preset amount; "name - description"), so
+  # the order acknowledgement and the eventual invoice cannot disagree. Kept
+  # in selected_charge_ids order; zero-amount lines are dropped.
+  #
+  # carriage: true lines are billed once PER RELEASE NOTE (see
+  # Invoice.stage_to_date), so their amount is per delivery, not a total -
+  # callers must not add them into an order total.
+  #   [{ preset:, label:, amount: BigDecimal, carriage: true/false }]
+  def additional_charge_lines
+    ids = Array(selected_charge_ids).map(&:to_s).reject(&:blank?).uniq
+    return [] if ids.empty?
+
+    presets = AdditionalChargePreset.where(id: ids).index_by { |p| p.id.to_s }
+    amounts = custom_amounts || {}
+    ids.filter_map do |id|
+      preset = presets[id] or next
+      raw = if preset.is_variable?
+              amounts[id]&.to_f || preset.amount || 0.0
+            else
+              preset.amount || 0.0
+            end
+      amount = BigDecimal(raw.to_s).round(2)
+      next unless amount.positive?
+
+      label = preset.description.present? ? "#{preset.name} - #{preset.description}" : preset.name
+      { preset: preset, label: label, amount: amount, carriage: preset.carriage? }
+    end
+  end
+
   # Get available additional charges for this works order
   def available_additional_charges
     AdditionalChargePreset.enabled.ordered

@@ -11,9 +11,22 @@ class OrderAcknowledgementMailer < ApplicationMailer
     @works_orders = works_orders
     @customer = customer_order.customer
 
-    # Calculate totals
+    # Totals. The acknowledgement must state what the customer will actually
+    # be billed: line (lot) prices PLUS the additional charges sitting on the
+    # WOs - minimum works order / order charges (MinimumCharges), rework,
+    # masking etc. Carriage is billed per delivery, so it is listed with its
+    # per-delivery rate but kept out of the total (the number of deliveries
+    # isn't known yet). Everything is ex VAT, as on the invoice.
     @total_quantity = @works_orders.sum(&:quantity)
-    @total_value = @works_orders.sum(&:lot_price)
+    @parts_total    = @works_orders.sum { |wo| BigDecimal((wo.lot_price || 0).to_s) }
+
+    charge_lines = @works_orders.flat_map do |wo|
+      wo.additional_charge_lines.map { |line| line.merge(works_order: wo) }
+    end
+    @one_off_charges  = charge_lines.reject { |l| l[:carriage] }
+    @carriage_charges = charge_lines.select { |l| l[:carriage] }
+    @charges_total    = @one_off_charges.sum { |l| l[:amount] }
+    @total_value      = @parts_total + @charges_total
 
     # Get unique customer references if any
     @customer_references = @works_orders.map(&:customer_reference).compact.uniq.reject(&:blank?)

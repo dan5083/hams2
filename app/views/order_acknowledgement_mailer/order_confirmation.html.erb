@@ -196,11 +196,47 @@
         </td>
         <td><%= wo.part_description %></td>
         <td class="text-right"><%= wo.quantity %></td>
-        <td class="text-right">£<%= number_with_precision(wo.lot_price, precision: 2, delimiter: ',') %></td>
+        <td class="text-right">
+          £<%= number_with_precision(wo.lot_price, precision: 2, delimiter: ',') %>
+          <% if wo.price_type == 'each' && wo.each_price.present? %>
+            <br><span style="color: #6b7280; font-size: 13px;">£<%= number_with_precision(wo.each_price, precision: 2, delimiter: ',') %> each</span>
+          <% else %>
+            <br><span style="color: #6b7280; font-size: 13px;">lot price</span>
+          <% end %>
+        </td>
       </tr>
       <% end %>
     </tbody>
   </table>
+
+  <% if @one_off_charges.any? || @carriage_charges.any? %>
+  <h2 style="color: #1e40af; margin-bottom: 15px;">Additional Charges</h2>
+  <table class="items-table">
+    <thead>
+      <tr>
+        <th>Works Order</th>
+        <th>Charge</th>
+        <th class="text-right">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @one_off_charges.each do |line| %>
+      <tr>
+        <td><strong>WO<%= line[:works_order].number %></strong></td>
+        <td><%= line[:label] %></td>
+        <td class="text-right">£<%= number_with_precision(line[:amount], precision: 2, delimiter: ',') %></td>
+      </tr>
+      <% end %>
+      <% @carriage_charges.each do |line| %>
+      <tr>
+        <td><strong>WO<%= line[:works_order].number %></strong></td>
+        <td><%= line[:label] %></td>
+        <td class="text-right">£<%= number_with_precision(line[:amount], precision: 2, delimiter: ',') %> per delivery</td>
+      </tr>
+      <% end %>
+    </tbody>
+  </table>
+  <% end %>
 
   <div class="totals">
     <table>
@@ -208,11 +244,24 @@
         <td>Total Quantity:</td>
         <td><%= @total_quantity %> items</td>
       </tr>
+      <% if @one_off_charges.any? %>
+      <tr>
+        <td>Parts:</td>
+        <td>£<%= number_with_precision(@parts_total, precision: 2, delimiter: ',') %></td>
+      </tr>
+      <tr>
+        <td>Additional Charges:</td>
+        <td>£<%= number_with_precision(@charges_total, precision: 2, delimiter: ',') %></td>
+      </tr>
+      <% end %>
       <tr class="grand-total">
-        <td>Total Value:</td>
+        <td>Total Value (ex VAT):</td>
         <td>£<%= number_with_precision(@total_value, precision: 2, delimiter: ',') %></td>
       </tr>
     </table>
+    <p style="margin: 12px 0 0; text-align: right; font-size: 14px; color: #6b7280;">
+      <% if @carriage_charges.any? %>Plus carriage, charged per delivery as shown above. <% end %>VAT will be added at the prevailing rate.
+    </p>
   </div>
 
   <div class="orders-note">
