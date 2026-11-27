@@ -105,10 +105,13 @@
                       Received <%= ncr.date.strftime("%d %b %Y") %>
                     </div>
                     <div class="flex items-center mt-1 space-x-1">
-                      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium <%= ncr.response_timer_badge_class %>"
-                            title="<%= ncr.target_response_date&.strftime('Target response date: %d %b %Y') %>">
-                        <%= ncr.response_timer_label %>
-                      </span>
+                      <%# Timer badge hidden once completed — status column already says so %>
+                      <% unless ncr.status == 'completed' %>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium <%= ncr.response_timer_badge_class %>"
+                              title="<%= ncr.target_response_date&.strftime('Target response date: %d %b %Y') %>">
+                          <%= ncr.response_timer_label %>
+                        </span>
+                      <% end %>
                       <% if ncr.has_document? %>
                         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
                           <svg class="mr-1 h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
